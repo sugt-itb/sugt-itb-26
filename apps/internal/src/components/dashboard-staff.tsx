@@ -9,9 +9,9 @@ import Link from "next/link";
  * The Advance strip and the PIC reports are money, fetched behind the Staff-only choke point (#40,
  * ADR-0004).
  *
- * Counts, not claims: the delivery figures carry no red and no denominator-of-judgement, the owed
- * list is the chase list, and the PIC strip says "Tidak ada gerbang — DITSAMA yang menetapkan
- * tenggat, bukan alat ini." **Participants are never counted** — there is no such figure here.
+ * Counts, not claims: the delivery figures carry no red and no denominator-of-judgement, and the
+ * PIC strip says "Tidak ada gerbang — DITSAMA yang menetapkan tenggat, bukan alat ini."
+ * **Participants are never counted** — there is no such figure here.
  */
 function DashboardStaff({
   dashboard,
@@ -86,38 +86,6 @@ function DashboardStaff({
         <p className="mt-1 font-heading text-2xl font-semibold tabular-nums">
           Rp {formatIdr(dashboard.advanceOutstandingIdr)}
         </p>
-      </section>
-
-      <section>
-        <h2 className="font-heading text-sm font-medium">Perlu Anda kerjakan</h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Tanpa tenggat — daftar untuk dikejar.
-        </p>
-
-        {dashboard.owed.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Belum ada Session Record yang menunggu.
-          </p>
-        ) : (
-          <ul className="mt-3 flex flex-col gap-1.5">
-            {dashboard.owed.map((entry) => (
-              <li
-                key={entry.sessionId}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border px-4 py-2.5 text-sm"
-              >
-                <span className="font-medium">{entry.schoolName}</span>
-                <span className="text-muted-foreground">Session Record</span>
-                <span className="text-muted-foreground tabular-nums">{entry.heldOn}</span>
-                <Link
-                  href={`/sesi/${entry.sessionId}`}
-                  className="ml-auto text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  Isi Session Record
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
       <section>
