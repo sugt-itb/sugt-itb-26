@@ -4,6 +4,7 @@ import { FeedbackTokenDialog } from "-/components/feedback-token";
 import { RecordTransaction } from "-/components/laporan-perjadin/acquittal-transactions";
 import { PerjadinAnggotaModal } from "-/components/perjadin-anggota-modal";
 import { PerjadinFeedbackTokenDialog } from "-/components/perjadin-feedback-token";
+import { PerjadinMarkDeliveredDialog } from "-/components/perjadin-mark-delivered";
 import { PerjadinPreparationDialog } from "-/components/perjadin-preparation";
 import { shortenKabupaten } from "-/lib/format-destination";
 import type { MyPerjadinSchool, MyUpcomingPerjadin } from "@sugt/db/queries";
@@ -199,6 +200,17 @@ function TripCard({ trip }: { trip: MyUpcomingPerjadin }) {
               size="sm"
             >
               Evaluasi Perjadin
+            </Button>
+          }
+        />
+        <PerjadinMarkDeliveredDialog
+          schools={trip.schools}
+          trigger={
+            <Button
+              variant="outline"
+              size="sm"
+            >
+              Tandai Terlaksana
             </Button>
           }
         />
