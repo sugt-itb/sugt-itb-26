@@ -96,7 +96,6 @@ export {
 export {
   staffDashboard,
   type ClusterReach,
-  type OwedSessionRecord,
   type PicReport,
   type StaffDashboard,
 } from "./dashboard";

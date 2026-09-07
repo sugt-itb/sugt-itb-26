@@ -75,6 +75,16 @@ function TripCard({ trip }: { trip: MyUpcomingPerjadin }) {
   // for both, so the pill and the boxes can never disagree. `N` is always seven (amendment to ADR-0018).
   const preparationDone = trip.preparation.filter((item) => item.checked).length;
   const preparationTotal = trip.preparation.length;
+  // The same three-way progress tone `/perjadin`'s `PreparationPill` wears — neutral before
+  // anything is ticked, amber part-way, emerald once every item is done — so the two screens read
+  // the pill the same way. This one stays a button (the checklist opens from it); the tone replaces
+  // the plain border rather than the click.
+  const preparationTone =
+    preparationDone === preparationTotal
+      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+      : preparationDone > 0
+        ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+        : "bg-muted text-muted-foreground";
 
   return (
     <li className="rounded-lg border border-border p-4">
@@ -92,7 +102,7 @@ function TripCard({ trip }: { trip: MyUpcomingPerjadin }) {
             trigger={
               <button
                 type="button"
-                className="rounded-full border border-border px-2 py-0.5 tabular-nums hover:border-foreground/30 hover:text-foreground"
+                className={`rounded-full px-2 py-0.5 font-medium tabular-nums transition-opacity hover:opacity-80 ${preparationTone}`}
               >
                 Persiapan {preparationDone}/{preparationTotal}
               </button>
@@ -159,7 +169,7 @@ function TripCard({ trip }: { trip: MyUpcomingPerjadin }) {
       </div>
 
       {trip.schools.length > 0 && (
-        <div className="mt-3 grid gap-2">
+        <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:flex-wrap">
           {trip.schools.map((school) => (
             <SchoolCard
               key={school.schoolId}
