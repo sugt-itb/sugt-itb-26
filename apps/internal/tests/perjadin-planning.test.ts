@@ -5,11 +5,11 @@ import {
   perjadinAcquittal,
   perjadinDetail,
   perjadinDirectory,
+  perjadinPlan,
   planPerjadin,
   updatePerjadinLogistics,
   type PlanPerjadinInput,
 } from "@sugt/db/queries";
-import { PIMPINAN } from "@sugt/domain";
 import type { Role } from "@sugt/domain";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -172,8 +172,9 @@ async function teachersOf(perjadinId: string) {
 
 async function pimpinanOf(perjadinId: string) {
   return db
-    .select({ name: schema.perjadinPimpinan.name })
+    .select({ name: schema.person.fullName })
     .from(schema.perjadinPimpinan)
+    .innerJoin(schema.person, eq(schema.person.id, schema.perjadinPimpinan.personId))
     .where(eq(schema.perjadinPimpinan.perjadinId, perjadinId));
 }
 
@@ -244,14 +245,23 @@ describe("Rencanakan Perjadin", () => {
   it("persists three Sessions, their Streams, the teaching-team links, the teachers and the Pimpinan", async () => {
     const pic = await staff();
     const { subCluster, schools } = await twoSchools();
-    const [pimpinanA, pimpinanB] = PIMPINAN;
+    const pimpinanA = await addPerson({
+      fullName: "Fatimah Arofiati Noor",
+      email: "fatimah@ditsama.itb.ac.id",
+      role: "Pimpinan",
+    });
+    const pimpinanB = await addPerson({
+      fullName: "Anton Timur Jaelani",
+      email: "anton@ditsama.itb.ac.id",
+      role: "Pimpinan",
+    });
 
     const planned = await planPerjadin(pic, {
       subClusterId: subCluster.id,
       advanceIdr: 5_000_000,
       picPersonId: pic.id,
       teacherNames: ["Dr. Andi", "Dr. Bella"],
-      pimpinan: [pimpinanA, pimpinanB],
+      pimpinan: [pimpinanA.id, pimpinanB.id],
       sessions: [
         {
           schoolId: schools[0].id,
@@ -289,7 +299,7 @@ describe("Rencanakan Perjadin", () => {
     expect(teachers.map((row) => row.name).sort()).toEqual(["Dr. Andi", "Dr. Bella"]);
 
     expect((await pimpinanOf(planned.perjadinId)).map((row) => row.name).sort()).toEqual(
-      [pimpinanA, pimpinanB].sort(),
+      [pimpinanA.fullName, pimpinanB.fullName].sort(),
     );
 
     const sessions = await sessionsOf(planned.perjadinId);
@@ -308,25 +318,35 @@ describe("Rencanakan Perjadin", () => {
   /** A trip planned with two Pimpinan writes exactly those two `perjadin_pimpinan` rows. */
   it("records the Pimpinan who join, as record-only rows", async () => {
     const { pic, input } = await validPlan();
-    const [pimpinanA, pimpinanB] = PIMPINAN;
+    const pimpinanA = await addPerson({
+      fullName: "Fatimah Arofiati Noor",
+      email: "fatimah@ditsama.itb.ac.id",
+      role: "Pimpinan",
+    });
+    const pimpinanB = await addPerson({
+      fullName: "Anton Timur Jaelani",
+      email: "anton@ditsama.itb.ac.id",
+      role: "Pimpinan",
+    });
 
-    const planned = await planPerjadin(pic, { ...input, pimpinan: [pimpinanA, pimpinanB] });
+    const planned = await planPerjadin(pic, { ...input, pimpinan: [pimpinanA.id, pimpinanB.id] });
     if (planned.outcome !== "planned") throw new Error("fixture failed to plan");
 
     expect((await pimpinanOf(planned.perjadinId)).map((row) => row.name).sort()).toEqual(
-      [pimpinanA, pimpinanB].sort(),
+      [pimpinanA.fullName, pimpinanB.fullName].sort(),
     );
     // Pimpinan are never Group members.
     expect(await groupOf(planned.perjadinId)).toHaveLength(1);
   });
 
-  /** A name outside the fixed three is refused before anything is written. */
-  it("refuses a Pimpinan name that is not one of the three, and writes nothing", async () => {
+  /** An id that is not an active Pimpinan is refused before anything is written. */
+  it("refuses a Pimpinan id that is not an active Pimpinan, and writes nothing", async () => {
     const { pic, input } = await validPlan();
+    // The PIC is a valid Person id, but a Staff — the wrong role for the Pimpinan roster.
 
-    const result = await planPerjadin(pic, { ...input, pimpinan: ["Nobody At All"] });
+    const result = await planPerjadin(pic, { ...input, pimpinan: [pic.id] });
 
-    expect(result).toEqual({ outcome: "unknown-pimpinan", offending: ["Nobody At All"] });
+    expect(result).toEqual({ outcome: "unknown-pimpinan", offending: [pic.id] });
     expect(await perjadinRows()).toEqual([]);
   });
 
@@ -834,7 +854,8 @@ describe("the Perjadin list and detail", () => {
 
   /**
    * No money on this payload, for either role. The Advance and the acquittal are
-   * `perjadinAcquittal`'s, behind the Staff-only choke point. The Group is the PIC alone now.
+   * `perjadinAcquittal`'s, a separate read (open to any signed-in Person since #180). The Group is
+   * the PIC alone now.
    */
   it("returns the Group, the Schools and no money", async () => {
     const { pic, input } = await validPlan();
@@ -899,14 +920,15 @@ describe("the Perjadin list and detail", () => {
     expect(await perjadinDetail(pic, "00000000-0000-0000-0000-000000000000")).toBeNull();
   });
 
-  it("refuses a non-Staff caller the money, which is the whole of the variant", async () => {
+  it("opens the money read to any signed-in caller now (ADR-0026, #180)", async () => {
     const { pic, input } = await validPlan();
     const planned = await planPerjadin(pic, input);
     if (planned.outcome !== "planned") throw new Error("fixture failed to plan");
 
-    await expect(perjadinAcquittal(nonStaff(), planned.perjadinId)).rejects.toSatisfy(
-      isNotStaffError,
-    );
+    // ADR-0004 reversed by ADR-0026 (#180): the money read is open to any signed-in Person, so a
+    // non-Staff caller reads the acquittal rather than being refused it. Writing money stays
+    // Staff-only — see money-read-open.test.ts.
+    await expect(perjadinAcquittal(nonStaff(), planned.perjadinId)).resolves.not.toBeNull();
     await expect(perjadinAcquittal(pic, planned.perjadinId)).resolves.not.toBeNull();
   });
 });
@@ -1096,5 +1118,22 @@ describe("extra Staff and travel logistics", () => {
         returnZone: "WIT",
       }),
     ).rejects.toSatisfy(isNotStaffError);
+  });
+});
+
+describe("perjadinPlan", () => {
+  beforeEach(resetDatabase);
+
+  it("carries each Sub-Cluster School's Province Time Zone onto the plan form (#165)", async () => {
+    const caller = await staff();
+    await twoSchools();
+
+    const plan = await perjadinPlan(caller);
+    const schools = plan.subClusters.flatMap((subCluster) => subCluster.schools);
+
+    // The plan form labels a per-School Session's Jam Mulai with the School's zone. Both Schools
+    // are in JB (WIB); the field is present on every one, joined from `province`.
+    expect(schools.length).toBeGreaterThan(0);
+    expect(schools.every((school) => school.timeZone === "WIB")).toBe(true);
   });
 });

@@ -3,11 +3,10 @@ import {
   attachTransactionEvidence,
   filePerjadinReport,
   isNotStaffError,
-  markReceiptsSettled,
   perjadinAcquittal,
   recordTransaction,
 } from "@sugt/db/queries";
-import { PIMPINAN, REPORT_DEADLINE_DAYS_AFTER_RETURN, TRANSACTION_CATEGORIES } from "@sugt/domain";
+import { REPORT_DEADLINE_DAYS_AFTER_RETURN, TRANSACTION_CATEGORIES } from "@sugt/domain";
 import type { Role } from "@sugt/domain";
 import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -26,8 +25,7 @@ import {
  *
  * The invariants under test are the ones no column holds: the reconciliation is derived
  * rather than typed, the evidence rule is checked when the Report is filed rather than when
- * a transaction is entered, the receipts checklist is an explicit mark rather than a count
- * of transactions, and every entry point refuses a non-Staff caller.
+ * a transaction is entered, and every entry point refuses a non-Staff caller.
  *
  * `staff-only.test.ts` covers the choke point itself at the sign-in seam. This file drives
  * the same guard on the four surfaces #30 added, and asserts on rows.
@@ -183,51 +181,46 @@ describe("the acquittal payload", () => {
     expect(acquittal?.transactions[0]?.evidence).toHaveLength(2);
   });
 
-  it("names who incurred a line item, and leaves it null where nobody did", async () => {
-    // `incurred_by_person_id` is a foreign key into `person` — nothing more — so whoever ran up
-    // the cost need only be a Person, not a Group member. T3 (#153) retired the Teaching Team, so
-    // the traveller here is Staff; the column's claim is the same either way.
+  it("carries each line's participant type and splits the spend by cohort", async () => {
+    // `participant_type` is an axis orthogonal to `category` — which cohort the spend served. The
+    // acquittal returns it per line and sums the two subtotals off the loaded rows, so a mix of
+    // Siswa and GTK-MS spend splits into `siswaSpentIdr` / `gtkMsSpentIdr` that add back to
+    // `spentIdr`.
     const { staff, trip } = await aTrip();
-    const traveller = await addPerson({
-      fullName: "Budi Santoso",
-      email: "budi@gmail.com",
-      role: "Staff",
-    });
     await addTransaction({
       perjadinId: trip.id,
       amountIdr: 600_000,
       description: "Uang harian",
       spentOn: "2026-09-01",
       category: "Uang Harian",
-      incurredByPersonId: traveller.id,
+      participantType: "Siswa",
+      createdByPersonId: staff.id,
+    });
+    await addTransaction({
+      perjadinId: trip.id,
+      amountIdr: 400_000,
+      description: "Konsumsi",
+      spentOn: "2026-09-02",
+      category: "Konsumsi",
+      participantType: "GTK-MS",
       createdByPersonId: staff.id,
     });
     await addTransaction({
       perjadinId: trip.id,
       amountIdr: 75_000,
-      spentOn: "2026-09-02",
+      spentOn: "2026-09-03",
+      participantType: "Siswa",
       createdByPersonId: staff.id,
     });
 
     const acquittal = await perjadinAcquittal(staff, trip.id);
 
-    expect(acquittal?.transactions[0]?.incurredBy).toEqual({
-      personId: traveller.id,
-      fullName: "Budi Santoso",
-    });
-    expect(acquittal?.transactions[1]?.incurredBy).toBeNull();
-  });
-
-  it("lists every Group member on the receipts checklist, settled or not", async () => {
-    // The Group is the PIC alone now (T3 (#153) made `group_member` Staff-only and Stream-less),
-    // so the checklist is the one member.
-    const { staff, trip } = await aTrip();
-
-    const acquittal = await perjadinAcquittal(staff, trip.id);
-
-    expect(acquittal?.receipts).toHaveLength(1);
-    expect(acquittal?.receipts.map((member) => member.personId)).toEqual([staff.id]);
-    expect(acquittal?.receipts.every((member) => member.settledAt === null)).toBe(true);
+    expect(acquittal?.transactions[0]?.participantType).toBe("Siswa");
+    expect(acquittal?.transactions[1]?.participantType).toBe("GTK-MS");
+    expect(acquittal?.siswaSpentIdr).toBe(675_000);
+    expect(acquittal?.gtkMsSpentIdr).toBe(400_000);
+    // The two cohorts partition the spend: there is no third type and no unset state.
+    expect(acquittal!.siswaSpentIdr + acquittal!.gtkMsSpentIdr).toBe(acquittal?.spentIdr);
   });
 
   it("tells a missing Perjadin apart from a refusal", async () => {
@@ -240,20 +233,30 @@ describe("the acquittal payload", () => {
 
   it("names the Pimpinan who joined the trip, ordered, and reads none as an empty list", async () => {
     /**
-     * The Laporan names who travelled (#142). A Pimpinan is record-only — just a name from the
-     * fixed three — so the acquittal carries the names and nothing more, ordered so the screen
-     * and its CSV read the same on every load.
+     * The Laporan names who travelled (#142). A Pimpinan is record-only — now the name of a real
+     * Pimpinan-Person row (#181, joined from `person`) — so the acquittal carries the names and
+     * nothing more, ordered so the screen and its CSV read the same on every load.
      */
     const staff = await pic();
-    const [fatimah, , anton] = PIMPINAN;
+    const fatimah = await addPerson({
+      fullName: "Fatimah Arofiati Noor",
+      email: "fatimah@ditsama.itb.ac.id",
+      role: "Pimpinan",
+    });
+    const anton = await addPerson({
+      fullName: "Anton Timur Jaelani",
+      email: "anton@ditsama.itb.ac.id",
+      role: "Pimpinan",
+    });
     const trip = await addPerjadin({
       advanceIdr: 1_000_000,
       picPersonId: staff.id,
-      pimpinan: [fatimah, anton],
+      pimpinan: [fatimah.id, anton.id],
     });
 
     const acquittal = await perjadinAcquittal(staff, trip.id);
-    expect(acquittal?.pimpinan).toEqual([fatimah, anton].sort());
+    // Ordered by name — "Anton …" sorts before "Fatimah …".
+    expect(acquittal?.pimpinan).toEqual([anton.fullName, fatimah.fullName]);
 
     const noneTrip = await addPerjadin({ advanceIdr: 1_000_000, picPersonId: staff.id });
     const none = await perjadinAcquittal(staff, noneTrip.id);
@@ -279,7 +282,7 @@ describe("the category", () => {
         description: category,
         amountIdr: 10_000,
         category,
-        incurredByPersonId: null,
+        participantType: "Siswa",
       });
       expect(result.outcome).toBe("recorded");
     }
@@ -326,6 +329,8 @@ describe("the category", () => {
         // The cast is the point: this is what a caller bypassing the type would send, and
         // the database is what has to refuse it.
         category: "Parkir" as (typeof TRANSACTION_CATEGORIES)[number],
+        // Valid, so the category check is the one that fires rather than the not-null on this.
+        participantType: "Siswa",
         createdByPersonId: staff.id,
       }),
     );
@@ -346,26 +351,16 @@ describe("recording a line item", () => {
       description: "Taksi",
       amountIdr: 50_000,
       category: "Transport Lokal Dalam Provinsi",
-      incurredByPersonId: null,
+      participantType: "Siswa",
     }).catch((error: unknown) => error);
 
     expect(isNotStaffError(refusal)).toBe(true);
   });
 
-  it("names somebody who did not travel, because an honorarium is paid to exactly that", async () => {
-    /**
-     * The tempting rule — only a Group member can have incurred a cost on this trip — is false
-     * against the category list it would police. `Honorarium Narasumber` pays a speaker, who is
-     * a Person the Programme knows and is on no Group. The foreign key into `person` is the
-     * whole of what this column claims — so the speaker is just a Person, Staff now that T3 (#153)
-     * retired the Teaching Team Role, and on no Group regardless.
-     */
+  it("records the participant type the form collected, and reads it back on the acquittal", async () => {
+    // `participant_type` is required and orthogonal to `category`; the write persists it and the
+    // acquittal returns it unchanged, which is what the Laporan's per-cohort split reads.
     const { staff, trip } = await aTrip();
-    const speaker = await addPerson({
-      fullName: "Sari Wulandari",
-      email: "sari@gmail.com",
-      role: "Staff",
-    });
 
     const result = await recordTransaction(staff, {
       perjadinId: trip.id,
@@ -373,15 +368,14 @@ describe("recording a line item", () => {
       description: "Honorarium narasumber",
       amountIdr: 600_000,
       category: "Honorarium Narasumber",
-      incurredByPersonId: speaker.id,
+      participantType: "GTK-MS",
     });
 
     expect(result.outcome).toBe("recorded");
     const acquittal = await perjadinAcquittal(staff, trip.id);
-    expect(acquittal?.transactions[0]?.incurredBy).toEqual({
-      personId: speaker.id,
-      fullName: "Sari Wulandari",
-    });
+    expect(acquittal?.transactions[0]?.participantType).toBe("GTK-MS");
+    expect(acquittal?.gtkMsSpentIdr).toBe(600_000);
+    expect(acquittal?.siswaSpentIdr).toBe(0);
   });
 
   it("comes back as a value on a stale Perjadin link and on a non-positive amount", async () => {
@@ -394,7 +388,7 @@ describe("recording a line item", () => {
         description: "Taksi",
         amountIdr: 50_000,
         category: "Transport Lokal Dalam Provinsi",
-        incurredByPersonId: null,
+        participantType: "Siswa",
       }),
     ).resolves.toEqual({ outcome: "no-such-perjadin" });
 
@@ -405,7 +399,7 @@ describe("recording a line item", () => {
         description: "Taksi",
         amountIdr: 0,
         category: "Transport Lokal Dalam Provinsi",
-        incurredByPersonId: null,
+        participantType: "Siswa",
       }),
     ).resolves.toEqual({ outcome: "amount-not-positive" });
   });
@@ -496,57 +490,6 @@ describe("attaching evidence", () => {
   });
 });
 
-describe("the receipts checklist", () => {
-  beforeEach(resetDatabase);
-
-  it("is an explicit mark and not a count of transactions", async () => {
-    /**
-     * The member below has no transactions at all. Deriving the checklist would read that as
-     * settled, when it is ambiguous between *spent nothing* and *has not handed anything
-     * over yet* — which is the whole reason the column exists. The Group is the PIC alone now
-     * (T3 (#153)), so the PIC is the member with nothing against them.
-     */
-    const { staff, trip } = await aTrip();
-
-    const before = await perjadinAcquittal(staff, trip.id);
-    expect(before?.receipts.find((m) => m.personId === staff.id)?.settledAt).toBeNull();
-
-    const marked = await markReceiptsSettled(staff, trip.id, staff.id, true);
-    expect(marked.outcome).toBe("marked");
-
-    const after = await perjadinAcquittal(staff, trip.id);
-    expect(after?.receipts.find((m) => m.personId === staff.id)?.settledAt).toBeInstanceOf(Date);
-  });
-
-  it("unticks by clearing the mark rather than storing a second event", async () => {
-    const { staff, trip } = await aTrip();
-
-    await markReceiptsSettled(staff, trip.id, staff.id, true);
-    await expect(markReceiptsSettled(staff, trip.id, staff.id, false)).resolves.toEqual({
-      outcome: "marked",
-      settledAt: null,
-    });
-  });
-
-  it("refuses a non-Staff caller, and reports somebody off the Group as a value", async () => {
-    const { staff, trip } = await aTrip();
-    const outsider = await addPerson({
-      fullName: "Sari Wulandari",
-      email: "sari@gmail.com",
-      role: "Staff",
-    });
-
-    const refusal = await markReceiptsSettled(nonStaff(), trip.id, staff.id, true).catch(
-      (error: unknown) => error,
-    );
-    expect(isNotStaffError(refusal)).toBe(true);
-
-    await expect(markReceiptsSettled(staff, trip.id, outsider.id, true)).resolves.toEqual({
-      outcome: "no-such-member",
-    });
-  });
-});
-
 describe("filing the Report", () => {
   beforeEach(resetDatabase);
 
@@ -563,7 +506,7 @@ describe("filing the Report", () => {
       description: "Taksi bandara",
       amountIdr: 150_000,
       category: "Transport Bandara/Stasiun",
-      incurredByPersonId: null,
+      participantType: "Siswa",
     });
     expect(recorded.outcome).toBe("recorded");
 

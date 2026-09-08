@@ -1,25 +1,22 @@
 import {
   REPORT_DEADLINE_DAYS_AFTER_RETURN,
-  type Role,
   type TransactionCategory,
+  type TransactionParticipantType,
 } from "@sugt/domain";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { person } from "../schema/people";
-import {
-  groupMember,
-  perjadin,
-  perjadinPimpinan,
-  transaction,
-  transactionEvidence,
-} from "../schema/travel";
+import { perjadin, perjadinPimpinan, transaction, transactionEvidence } from "../schema/travel";
 import type { Person } from "./caller";
+import { todayInDeadlineZone } from "./deadline";
 import { requireStaff } from "./staff-only";
 
 /**
- * **Perjadin Report** — the acquittal of one Perjadin. Staff-only, at every level, and the
- * one surface the choke point exists for (ADR-0004).
+ * **Perjadin Report** — the acquittal of one Perjadin. Reading it is now open to any signed-in
+ * Person (ADR-0026 reversed ADR-0004's money-read half, #180); only **writing** it — recording a
+ * transaction, attaching a receipt, settling, filing — stays Staff-only, each write query below
+ * opening with its own `requireStaff`.
  *
  * There is no `perjadin_report` table: a Perjadin yields exactly one Report, always, so the
  * acquittal is the state already on `perjadin`, plus its line items and their evidence.
@@ -30,17 +27,6 @@ import { requireStaff } from "./staff-only";
  * Nothing is gated on the deadline: DITSAMA sets it for itself, and the tool is never
  * stricter than the process it serves.
  */
-
-/**
- * The zone "days remaining" counts in. DITSAMA is in Bandung and the deadline is its own, so
- * this is the office's calendar rather than a School's — Indonesia spans three zones and a
- * Perjadin's Schools may sit in more than one of them.
- *
- * It is a named constant rather than a literal in the SQL so that the one decision is visible,
- * and it stays here rather than in `@sugt/domain` because it is a fact about where the
- * Programme is administered, not a term `CONTEXT.md` defines.
- */
-const DEADLINE_TIME_ZONE = "Asia/Jakarta";
 
 /**
  * One uploaded receipt. `storagePath` is an opaque key in the private `receipts` bucket —
@@ -58,9 +44,8 @@ export type AcquittalEvidence = {
 /**
  * One line item against the Advance.
  *
- * `incurredBy` is null on most of them and that absence is not a gap: per-diems and
- * honoraria carry a person, a taxi and a box of ATK do not. The Advance is still one pot
- * either way.
+ * `category` and `participantType` are two orthogonal axes: what kind of spend it was, and which
+ * cohort it served (`Siswa` or `GTK-MS`). The latter is what the Laporan's per-type subtotals sum.
  */
 export type AcquittalTransaction = {
   id: string;
@@ -68,22 +53,8 @@ export type AcquittalTransaction = {
   description: string;
   amountIdr: number;
   category: TransactionCategory;
-  incurredBy: { personId: string; fullName: string } | null;
+  participantType: TransactionParticipantType;
   evidence: AcquittalEvidence[];
-};
-
-/**
- * One Group member on the PIC's receipts checklist.
- *
- * `settledAt` is an **explicit mark and never derived**, because a member with no
- * transactions is genuinely ambiguous between *spent nothing* and *has not handed anything
- * over yet*. Counting their transactions would answer the wrong question confidently.
- */
-export type AcquittalReceipt = {
-  personId: string;
-  fullName: string;
-  role: Role;
-  settledAt: Date | null;
 };
 
 /**
@@ -103,6 +74,10 @@ export type PerjadinAcquittal = {
   advanceIdr: number;
   /** The sum of every transaction against the Advance. Zero when none has been entered. */
   spentIdr: number;
+  /** Of `spentIdr`, the spend attributed to the Siswa cohort. */
+  siswaSpentIdr: number;
+  /** Of `spentIdr`, the spend attributed to the GTK-MS cohort. */
+  gtkMsSpentIdr: number;
   /** What is left of the Advance to hand back. Negative means the Group overspent. */
   remainderIdr: number;
   /**
@@ -127,12 +102,11 @@ export type PerjadinAcquittal = {
    */
   daysRemaining: number;
   transactions: AcquittalTransaction[];
-  receipts: AcquittalReceipt[];
   /**
-   * The Pimpinan who joined this trip — record-only names from the fixed three, ordered so the
-   * Report and its CSV read the same on every load. A printed trip report names who travelled;
-   * these carry no money, so they belong on the Laporan rather than a delivery surface ([#142],
-   * ADR-0004). Empty when none joined.
+   * The Pimpinan who joined this trip — record-only, now the names of real Pimpinan-Person rows
+   * (#181, joined from `person`), ordered so the Report and its CSV read the same on every load. A
+   * printed trip report names who travelled; these carry no money, so they belong on the Laporan
+   * rather than a delivery surface ([#142], ADR-0004). Empty when none joined.
    */
   pimpinan: string[];
   returnedToTreasurerIdr: number | null;
@@ -143,18 +117,28 @@ export type PerjadinAcquittal = {
 /**
  * One Perjadin's acquittal.
  *
- * Opens with the choke point, which throws `NotStaffError` on a Teaching Team `Person` —
- * **not** an empty result, because an empty return would make a mis-passed caller
- * indistinguishable from a Perjadin that has spent nothing yet.
+ * **An OPEN read now.** ADR-0004 said reading money was Staff-only; [ADR-0026](../../../../docs/adr/0026-money-is-open-to-read-and-staff-only-to-write.md)
+ * ([#180](https://github.com/mafiefa02/sugt/issues/180)) reverses that half: the boundary is now
+ * **read (any signed-in Person) vs write (Staff)**, so this read no longer opens with the choke
+ * point — a Pimpinan reads all money. There is no `requireStaff` here any more.
+ *
+ * **Two write actions used to lean on this read's guard, and now do not.** `mintReceiptUploadsAction`
+ * and `finalizeReceiptsAction` (`perjadin/[id]/laporan/actions.ts`) had no Staff guard of their own —
+ * this read's `requireStaff` was the whole of theirs. Opening the read would have opened those writes
+ * (a receipt-upload credential, a service-role Storage read) to a Pimpinan, so each now calls
+ * `requireStaff` explicitly, ahead of this read. Every other money-write query (`recordTransaction`,
+ * `attachTransactionEvidence`, `filePerjadinReport`) keeps its own `requireStaff`.
  *
  * Returns `null` when there is no such Perjadin. That is a genuinely reachable state — a
- * stale link to a deleted Perjadin — and is distinct from the refusal above, which is not.
+ * stale link to a deleted Perjadin.
  */
 export async function perjadinAcquittal(
-  caller: Person,
+  _caller: Person,
   perjadinId: string,
 ): Promise<PerjadinAcquittal | null> {
-  requireStaff(caller);
+  // No Staff check: money reads are open to any signed-in Person (ADR-0004 reversed by ADR-0026,
+  // #180). The `Person` parameter stays in the signature — the sign-in seam refuses a service
+  // caller or token before this runs — but the role no longer gates the read, so it is unused.
 
   const [trip] = await db
     .select({
@@ -169,12 +153,12 @@ export async function perjadinAcquittal(
       reportDueOn: sql<string>`to_char(
         ${perjadin.endsOn} + ${sql.raw(String(REPORT_DEADLINE_DAYS_AFTER_RETURN))}, 'YYYY-MM-DD'
       )`,
-      // `now() at time zone` yields a timestamp *in* that zone; casting it to `date` is the
-      // calendar day there. Bare `current_date` would be the session's zone instead, which
-      // nothing in this repository sets — see the field's own comment.
+      // The deadline less today, both in the office's zone: `todayInDeadlineZone` is the shared
+      // `(now() at time zone …)::date` fragment (`./deadline.ts`), the calendar day in Bandung's
+      // zone rather than the session's default, which nothing in this repository sets.
       daysRemaining: sql<number>`(
         ${perjadin.endsOn} + ${sql.raw(String(REPORT_DEADLINE_DAYS_AFTER_RETURN))}
-        - (now() at time zone ${DEADLINE_TIME_ZONE})::date
+        - ${todayInDeadlineZone}
       )`.mapWith(Number),
       returnedToTreasurerIdr: perjadin.returnedToTreasurerIdr,
       returnedAt: perjadin.returnedAt,
@@ -185,22 +169,30 @@ export async function perjadinAcquittal(
 
   if (!trip) return null;
 
-  const [transactions, receipts, pimpinan] = await Promise.all([
+  const [transactions, pimpinan] = await Promise.all([
     transactionsOf(perjadinId),
-    receiptsOf(perjadinId),
     pimpinanOf(perjadinId),
   ]);
 
   // Summed here rather than in a second `sum()` round trip: every row is already loaded, and
   // two sources for one figure is a way for the screen's total to disagree with its own list.
   const spentIdr = transactions.reduce((total, line) => total + line.amountIdr, 0);
+  // The two cohort subtotals, summed off the same loaded rows for the same reason `spentIdr` is:
+  // a second `sum()` round trip is a second place for the screen's split to disagree with its list.
+  const siswaSpentIdr = transactions
+    .filter((l) => l.participantType === "Siswa")
+    .reduce((t, l) => t + l.amountIdr, 0);
+  const gtkMsSpentIdr = transactions
+    .filter((l) => l.participantType === "GTK-MS")
+    .reduce((t, l) => t + l.amountIdr, 0);
 
   return {
     ...trip,
     spentIdr,
+    siswaSpentIdr,
+    gtkMsSpentIdr,
     remainderIdr: trip.advanceIdr - spentIdr,
     transactions,
-    receipts,
     pimpinan,
   };
 }
@@ -220,11 +212,9 @@ async function transactionsOf(perjadinId: string): Promise<AcquittalTransaction[
       description: transaction.description,
       amountIdr: transaction.amountIdr,
       category: transaction.category,
-      incurredByPersonId: transaction.incurredByPersonId,
-      incurredByFullName: person.fullName,
+      participantType: transaction.participantType,
     })
     .from(transaction)
-    .leftJoin(person, eq(person.id, transaction.incurredByPersonId))
     .where(eq(transaction.perjadinId, perjadinId))
     .orderBy(asc(transaction.spentOn), asc(transaction.createdAt));
 
@@ -255,44 +245,25 @@ async function transactionsOf(perjadinId: string): Promise<AcquittalTransaction[
     else byTransaction.set(transactionId, [file]);
   }
 
-  return lines.map(({ incurredByPersonId, incurredByFullName, ...line }) => ({
+  return lines.map((line) => ({
     ...line,
-    // Both come off the same left join, so they are set together or not at all. The
-    // condition names the id because that is the column that decides it.
-    incurredBy:
-      incurredByPersonId && incurredByFullName
-        ? { personId: incurredByPersonId, fullName: incurredByFullName }
-        : null,
     evidence: byTransaction.get(line.id) ?? [],
   }));
 }
 
-/** The checklist: every Group member, whether or not they have handed anything over. */
-async function receiptsOf(perjadinId: string): Promise<AcquittalReceipt[]> {
-  return db
-    .select({
-      personId: groupMember.personId,
-      fullName: person.fullName,
-      role: groupMember.role,
-      settledAt: groupMember.receiptsSettledAt,
-    })
-    .from(groupMember)
-    .innerJoin(person, eq(person.id, groupMember.personId))
-    .where(eq(groupMember.perjadinId, perjadinId))
-    .orderBy(asc(person.fullName));
-}
-
 /**
- * The Pimpinan recorded on the trip, ordered by name. Record-only — a `perjadin_pimpinan` row is
- * just a name from the fixed three ([ADR-0020]) — so this returns the plain strings. Ordering
- * here rather than at the render sites keeps the Report and its CSV in step on every load.
+ * The Pimpinan recorded on the trip, ordered by name. Record-only — a `perjadin_pimpinan` row now
+ * references a real Person of role Pimpinan (#181), not a fixed-three name — so this joins `person`
+ * for the name and, since the Laporan shows names only, returns the plain strings. Ordering here
+ * rather than at the render sites keeps the Report and its CSV in step on every load.
  */
 async function pimpinanOf(perjadinId: string): Promise<string[]> {
   const rows = await db
-    .select({ name: perjadinPimpinan.name })
+    .select({ name: person.fullName })
     .from(perjadinPimpinan)
+    .innerJoin(person, eq(person.id, perjadinPimpinan.personId))
     .where(eq(perjadinPimpinan.perjadinId, perjadinId))
-    .orderBy(asc(perjadinPimpinan.name));
+    .orderBy(asc(person.fullName));
   return rows.map((row) => row.name);
 }
 
@@ -303,8 +274,8 @@ export type NewTransaction = {
   description: string;
   amountIdr: number;
   category: TransactionCategory;
-  /** Null for anything the Advance paid for without paying a particular person. */
-  incurredByPersonId: string | null;
+  /** Which cohort the spend served — `Siswa` or `GTK-MS`. Required, like `category`. */
+  participantType: TransactionParticipantType;
 };
 
 export type RecordTransactionResult =
@@ -320,14 +291,6 @@ export type RecordTransactionResult =
  * Every refusal here is something a PIC can type honestly, so each comes back as a value and
  * earns a field-level message rather than an error page. `NotStaffError` is the opposite
  * case and still throws.
- *
- * **`incurredByPersonId` is not checked against the Group**, and the omission is deliberate
- * rather than missing. The obvious rule — "only somebody who travelled can have incurred a
- * cost on this trip" — is false against the category list it would police:
- * `Honorarium Narasumber` pays a speaker, who is a `Person` the Programme knows and is on no
- * Group. The foreign key into `person` is the constraint `docs/data-model.md` specifies, and
- * it is the whole of what this column claims. The acquittal form offers the Group because
- * that is the common case, not because the write refuses anybody else.
  */
 export async function recordTransaction(
   caller: Person,
@@ -352,7 +315,7 @@ export async function recordTransaction(
         description: input.description,
         amountIdr: input.amountIdr,
         category: input.category,
-        incurredByPersonId: input.incurredByPersonId,
+        participantType: input.participantType,
         createdByPersonId: caller.id,
       })
       .returning({ id: transaction.id });
@@ -413,36 +376,6 @@ export async function attachTransactionEvidence(
 
     return { outcome: "attached", count: evidence.length };
   });
-}
-
-export type MarkReceiptsSettledResult =
-  | { outcome: "marked"; settledAt: Date | null }
-  /** The person is not on this Perjadin's Group — a stale screen after a substitution. */
-  | { outcome: "no-such-member" };
-
-/**
- * Tick or untick one Group member on the receipts checklist.
- *
- * The mark is a timestamp rather than a boolean because *when* the PIC accepted somebody's
- * receipts is the useful half; unticking clears it rather than storing a second event, since
- * an undone tick is a correction and not a thing that happened.
- */
-export async function markReceiptsSettled(
-  caller: Person,
-  perjadinId: string,
-  personId: string,
-  settled: boolean,
-): Promise<MarkReceiptsSettledResult> {
-  requireStaff(caller);
-
-  const [member] = await db
-    .update(groupMember)
-    .set({ receiptsSettledAt: settled ? new Date() : null })
-    .where(and(eq(groupMember.perjadinId, perjadinId), eq(groupMember.personId, personId)))
-    .returning({ settledAt: groupMember.receiptsSettledAt });
-
-  if (!member) return { outcome: "no-such-member" };
-  return { outcome: "marked", settledAt: member.settledAt };
 }
 
 export type FilePerjadinReportResult =

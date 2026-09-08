@@ -6,6 +6,7 @@ import {
   moveSessionDateAction,
 } from "-/app/(app)/sesi/[id]/actions";
 import type { SessionDetail } from "@sugt/db/queries";
+import { timeZoneSuffix } from "@sugt/domain";
 import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
 import {
@@ -278,7 +279,7 @@ function MoveDate({ session }: { session: SessionDetail }) {
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor={timeId}>Jam Mulai</Label>
+            <Label htmlFor={timeId}>Jam Mulai{timeZoneSuffix(session.timeZone)}</Label>
             {/* Wall-clock time local to the School, in the School's Time Zone. */}
             <Input
               id={timeId}

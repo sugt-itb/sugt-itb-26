@@ -19,8 +19,11 @@ import { forbidden } from "next/navigation";
  * Wrap the call instead:
  *
  * ```ts
- * const acquittal = await staffSurface(() => perjadinAcquittal(person, id));
+ * const result = await staffSurface(() => filePerjadinReport(person, id));
  * ```
+ *
+ * (The example is a money **write**: reading the acquittal is open to any signed-in Person since
+ * #180, so `perjadinAcquittal` no longer throws here — the surfaces that still do are the writes.)
  *
  * **It wraps writes as well as reads, and the argument above is the reason it has to.**
  * Jadwalkan Sesi daring's Server Action is the first: a Staff-only *write* refused inside

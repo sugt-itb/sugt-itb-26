@@ -3,9 +3,9 @@ import { desc, eq, sql } from "drizzle-orm";
 import { db } from "../client";
 import { session } from "../schema/delivery";
 import { person } from "../schema/people";
-import { perjadin, perjadinPreparationItem } from "../schema/travel";
+import { perjadin } from "../schema/travel";
 import type { Person } from "./caller";
-import { PREPARATION_FIXED_KEYS } from "./preparation-checklist";
+import { PREPARATION_FIXED_KEYS, preparationDoneSubquery } from "./preparation-checklist";
 
 /**
  * **The Perjadin list** — every trip, open to anyone signed in.
@@ -59,23 +59,12 @@ export async function perjadinDirectory(_caller: Person): Promise<DirectoryPerja
       // precisely so a cancelled Session and the one that replaced it coexist on one trip.
       // Counting Sessions would report a two-School trip as three the first time that happens.
       schoolCount: sql<number>`count(distinct ${session.schoolId})`.mapWith(Number),
-      // **The pill's `x`, as one correlated scalar subquery** — the style `./dashboard.ts` uses for
-      // its PIC-report counts: interpolate the table ref (`${perjadinPreparationItem}`) so a rename
-      // propagates, correlate on the outer `${perjadin.id}` (a grouping column here), and keep it off
-      // the `session` left join above so it never fans out. Since the amendment to ADR-0018 the
-      // checklist is a flat fixed seven — no per-member derivation — so `N` is the constant 7 and `x`
-      // counts the ticks whose key is one of the seven fixed items. A `dosen:` tick the old model left
-      // behind matches none of them, so it never counts and `x` never exceeds `N`. The fixed keys are
-      // bound from the one list so they cannot drift from the strings the rows hold.
+      // The pill's `N` (the flat fixed seven, amendment to ADR-0018) and its `x` — the shared
+      // correlated subquery in `./preparation-checklist.ts`, correlated on this query's `perjadin.id`
+      // and kept off the `session` left join above so it never fans out. `myUpcomingPerjadin` builds
+      // the same pill from the same helper, so the fragment has one home (convention 3).
       preparationTotal: sql<number>`${PREPARATION_FIXED_KEYS.length}`.mapWith(Number),
-      preparationDone: sql<number>`(
-        select count(*) from ${perjadinPreparationItem} pi
-        where pi.perjadin_id = ${perjadin.id}
-        and pi.item_key in (${sql.join(
-          PREPARATION_FIXED_KEYS.map((key) => sql`${key}`),
-          sql`, `,
-        )})
-      )`.mapWith(Number),
+      preparationDone: preparationDoneSubquery(perjadin.id),
     })
     .from(perjadin)
     .innerJoin(person, eq(person.id, perjadin.picPersonId))

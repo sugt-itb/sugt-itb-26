@@ -2,10 +2,17 @@
 
 import { addPersonAction, revokePersonAction } from "-/app/(app)/orang/actions";
 import type { RosterEntry } from "@sugt/db/queries";
-import { ROLE_LABELS } from "@sugt/domain";
+import { type Role, ROLES, ROLE_LABELS } from "@sugt/domain";
 import { Badge } from "@sugt/ui/components/badge";
 import { Button } from "@sugt/ui/components/button";
 import { Input } from "@sugt/ui/components/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@sugt/ui/components/select";
 import {
   Table,
   TableBody,
@@ -176,13 +183,16 @@ function RevokeButton({ personId }: { personId: string }) {
  * by #115) — any Google address may be listed — so the only failures the form surfaces are an
  * incomplete row and a duplicate active email the database's partial index refuses.
  *
- * **Every invite is Staff now** (T3, #153). The form used to offer a role picker (Staff vs Teaching
- * Team), but the `Teaching Team` Person role is retired — professors are free-text names who never
- * sign in — so there is one role and no picker; `addPerson` writes `role: "Staff"`.
+ * **The picker is back, now Staff | Pimpinan** (#179). It was dropped in T3 (#153) when the
+ * `Teaching Team` Person role was retired and Staff stood alone; `Pimpinan` — a signed-in, read-only
+ * role — is the second role a Person may hold, so an invite chooses which. The options iterate
+ * `ROLES` and are labelled through `ROLE_LABELS`, so the picker cannot drift from the role set. The
+ * gating above is unchanged: only Staff manage the roster, and a Pimpinan added here manages nobody.
  */
 function AddPersonForm() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<Role>("Staff");
   const [error, setError] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
 
@@ -192,10 +202,11 @@ function AddPersonForm() {
     if (!canSubmit) return;
 
     startSaving(async () => {
-      const result = await addPersonAction({ fullName, email, role: "Staff" });
+      const result = await addPersonAction({ fullName, email, role });
       if (result.outcome === "added") {
         setFullName("");
         setEmail("");
+        setRole("Staff");
         setError(null);
         return;
       }
@@ -227,8 +238,31 @@ function AddPersonForm() {
           aria-label="Email"
           className="h-8 w-full max-w-64"
         />
-        {/* One role now — every Person added here is {ROLE_LABELS.Staff}, so the picker is gone. */}
-        <span className="text-sm text-muted-foreground">{ROLE_LABELS.Staff}</span>
+        {/* Staff or Pimpinan (#179). The trigger shows the current role's label; options iterate ROLES. */}
+        <Select
+          items={ROLE_LABELS}
+          value={role}
+          onValueChange={(next) => {
+            setRole(next as Role);
+          }}
+        >
+          <SelectTrigger
+            aria-label="Peran"
+            className="h-8 w-full max-w-40"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ROLES.map((r) => (
+              <SelectItem
+                key={r}
+                value={r}
+              >
+                {ROLE_LABELS[r]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           size="sm"
           disabled={saving || !canSubmit}

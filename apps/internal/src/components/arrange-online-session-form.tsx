@@ -3,7 +3,12 @@
 import { arrangeOnlineSessionAction } from "-/app/(app)/jadwalkan-sesi-daring/actions";
 import { PersonSelect } from "-/components/person-select";
 import type { ArrangePerson, SchoolOption } from "@sugt/db/queries";
-import { MAX_TEACHING_TEAM_PER_ONLINE_SESSION, STREAMS, type Stream } from "@sugt/domain";
+import {
+  MAX_TEACHING_TEAM_PER_ONLINE_SESSION,
+  STREAMS,
+  type Stream,
+  timeZoneSuffix,
+} from "@sugt/domain";
 import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
 import { Input } from "@sugt/ui/components/input";
@@ -74,6 +79,11 @@ function ArrangeOnlineSessionForm({
   // optional at arrangement (mandatory at Tandai terlaksana), so they are not required here.
   const incomplete =
     schoolId === "" || heldOn === "" || startsAt === "" || picPersonId === "" || stream === "";
+
+  // The picked School's Time Zone, for the Jam Mulai label (#165). The pinned entry point carries
+  // one School; the picker looks its zone up by the current selection, so the suffix appears and
+  // flips as the School changes, and is absent before one is chosen (standalone screen).
+  const timeZone = school?.timeZone ?? schools?.find((option) => option.id === schoolId)?.timeZone;
 
   function reset() {
     setHeldOn("");
@@ -255,7 +265,7 @@ function ArrangeOnlineSessionForm({
 
         <Field
           id={timeId}
-          label="Jam Mulai"
+          label={`Jam Mulai${timeZoneSuffix(timeZone)}`}
         >
           {/* Local wall-clock time, in the School's Time Zone. */}
           <Input

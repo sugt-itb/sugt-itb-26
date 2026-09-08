@@ -320,6 +320,27 @@ describe("arrangeOnlineSessionForm", () => {
     expect(form).not.toHaveProperty("teachingTeam");
   });
 
+  it("carries each School's Province Time Zone onto the picker options (#165)", async () => {
+    const staff = await staffCaller();
+    // A School in a WIT Province beside a School in JB's default WIB, so a hardcoded zone would fail
+    // one of the two — the assertion proves the value is joined from `province`, not assumed.
+    await addProvince("PA", "Papua", "WIT");
+    const papua = await addCluster({ slug: "cluster-papua", name: "Cluster Papua" });
+    await addSchool({
+      slug: "sman-jayapura",
+      name: "SMAN Jayapura",
+      clusterId: papua.id,
+      provinceCode: "PA",
+    });
+    await oneSchool("sman-1", "SMAN 1 Bandung");
+
+    const form = await arrangeOnlineSessionForm(staff);
+
+    const zoneByName = new Map(form.schools.map((entry) => [entry.name, entry.timeZone]));
+    expect(zoneByName.get("SMAN 1 Bandung")).toBe("WIB");
+    expect(zoneByName.get("SMAN Jayapura")).toBe("WIT");
+  });
+
   it("throws NotStaffError for a non-Staff caller", async () => {
     const teacher = nonStaff();
 
@@ -338,7 +359,7 @@ describe("arrangeOnlineSessionAt", () => {
 
     const at = await arrangeOnlineSessionAt(staff, "sman-8");
 
-    expect(at?.school).toMatchObject({ id: school.id, name: "SMAN 8" });
+    expect(at?.school).toMatchObject({ id: school.id, name: "SMAN 8", timeZone: "WIB" });
     expect(at?.staff.map((entry) => entry.fullName)).toContain("Rina Nurhayati");
   });
 

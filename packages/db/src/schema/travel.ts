@@ -1,4 +1,11 @@
-import type { Role, Stream, TimeZone, TransactionCategory, TransportMode } from "@sugt/domain";
+import type {
+  Role,
+  Stream,
+  TimeZone,
+  TransactionCategory,
+  TransactionParticipantType,
+  TransportMode,
+} from "@sugt/domain";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -125,14 +132,12 @@ export const perjadin = pgTable(
  * `role` is denormalised from `person`, but it cannot drift: the composite foreign
  * key means a row can only exist if the pair is true there.
  *
- * `receiptsSettledAt` is the PIC's checklist. It has to be an explicit mark rather
- * than something derived, because a member with no transactions is ambiguous between
- * *spent nothing* and *has not handed anything over yet*.
- *
- * **This table is Staff-only, and now so is the whole Person roster** (ADR-0020, and T3/#153): the
- * Group is the PIC plus up to ten other DITSAMA Staff, and the teaching team left it entirely for
- * `perjadin_teacher` (trip-scoped names). With every Person now Staff, `group_member_role_check`
- * pins `'Staff'`, and `stream` can never be carried by a Group member — so the old
+ * **This table is Staff-only** (ADR-0020, and T3/#153): the Group is the PIC plus up to ten other
+ * DITSAMA Staff, and the teaching team left it entirely for `perjadin_teacher` (trip-scoped names).
+ * The roster now carries a second role — `Pimpinan`, a signed-in read-only principal (#179, ADR-0025)
+ * — but the Group does not admit it: `group_member_role_check` still pins `'Staff'` and the composite
+ * `(id, role)` FK below asks `person` for a Staff pair, so a Pimpinan can never be a member. `stream`
+ * can never be carried by a Group member either — so the old
  * `group_member_stream_iff_teaching` equivalence (which pinned Stream to Teaching-Team rows)
  * collapses to `group_member_stream_null`: a Group member holds no Stream at all. See
  * `docs/data-model.md`'s Group section.
@@ -144,13 +149,13 @@ export const groupMember = pgTable(
       .notNull()
       .references(() => perjadin.id, { onDelete: "cascade" }),
     personId: uuid("person_id").notNull(),
-    // `group_member_role_check` and `group_member_stream_check` name exactly the values
-    // `ROLES` and `STREAMS` hold — `role` is now the single value `'Staff'` (T3, #153).
-    // `stream` stays nullable, so it reads as `Stream | null`; the CHECK pins which strings
-    // are allowed, and `group_member_stream_null` below pins that it is always null now.
+    // `group_member_stream_check` names exactly the values `STREAMS` holds. `group_member_role_check`
+    // deliberately pins `'Staff'` alone — a subset of `ROLES` now that `Pimpinan` exists (#179) — which
+    // is what keeps a Pimpinan out of the Group. `stream` stays nullable, so it reads as `Stream | null`;
+    // the CHECK pins which strings are allowed, and `group_member_stream_null` below pins that it is
+    // always null now.
     role: text("role").$type<Role>().notNull(),
     stream: text("stream").$type<Stream>(),
-    receiptsSettledAt: timestamp("receipts_settled_at", { withTimezone: true }),
   },
   (t) => [
     primaryKey({ columns: [t.perjadinId, t.personId] }),
@@ -196,11 +201,12 @@ export const perjadinTeacher = pgTable("perjadin_teacher", {
  * member**: they file no Perjadin Evaluation and add nothing to the Preparation Checklist, so they
  * are deliberately not a `group_member` row.
  *
- * `name` CHECKs the three `PIMPINAN` values character for character — the same discipline as the
- * `transaction.category` and `perjadin.*_mode` CHECKs, and for the same reason (`@sugt/domain`'s
- * header): a composed constraint string is not the one the drizzle-kit snapshot holds, and the two
- * would then diff forever. The primary key `(perjadin_id, name)` makes a Pimpinan recordable at most
- * once per trip.
+ * A row references a **real Person of role Pimpinan** — the Pimpinan roster is the single source of
+ * truth now (#181), so the old fixed-three `PIMPINAN` constant and the `name` CHECK that mirrored it
+ * are gone. `role` is pinned to `'Pimpinan'` and the composite `(person_id, role)` foreign key into
+ * `person (id, role)` guarantees a non-Pimpinan can never be recorded here, the same discipline the
+ * PIC-is-Staff family (`perjadin_pic_is_staff`, `group_member_person_role_fk`) enforces. The primary
+ * key `(perjadin_id, person_id)` makes a Pimpinan recordable at most once per trip.
  */
 export const perjadinPimpinan = pgTable(
   "perjadin_pimpinan",
@@ -208,14 +214,17 @@ export const perjadinPimpinan = pgTable(
     perjadinId: uuid("perjadin_id")
       .notNull()
       .references(() => perjadin.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
+    personId: uuid("person_id").notNull(),
+    role: text("role").$type<"Pimpinan">().notNull().default("Pimpinan"),
   },
   (t) => [
-    primaryKey({ columns: [t.perjadinId, t.name] }),
-    check(
-      "perjadin_pimpinan_name_check",
-      sql`${t.name} in ('Prof. Dr. Fatimah Arofiati Noor, S.Si., M.Si.', 'Oktofa Yudha Sudrajad, S.T., M.S.M., Ph.D.', 'Dr. Anton Timur Jaelani, S.Si., M.Si.')`,
-    ),
+    primaryKey({ columns: [t.perjadinId, t.personId] }),
+    check("perjadin_pimpinan_role_check", sql`${t.role} = 'Pimpinan'`),
+    foreignKey({
+      name: "perjadin_pimpinan_is_pimpinan",
+      columns: [t.personId, t.role],
+      foreignColumns: [person.id, person.role],
+    }),
   ],
 );
 
@@ -223,17 +232,14 @@ export const perjadinPimpinan = pgTable(
  * The acquittal's line items. **The Advance is one pot and the acquittal reconciles the
  * pot** — a transaction consumes the Advance, not a person's share of it.
  *
- * `incurredByPersonId` does not contradict that. It is nullable because the question it
- * answers is only sometimes meaningful: the budget carries per-diems as `2 orang × N hari`
- * at different rates per role, so `Uang Harian` and `Honorarium Narasumber` have a person
- * and a taxi does not. Naming that person changes nothing about how the pot reconciles, so
- * ADR-0004's Staff-only rule is untouched.
- *
- * `category` is a closed set **read off DITSAMA's own approved budget** rather than
- * invented for a template nobody has read. The CHECK below is written out character for
- * character rather than composed from `TRANSACTION_CATEGORIES`, for the reason
- * `./index.ts` gives: a composed constraint string is not the one the drizzle-kit snapshot
- * holds, and the two would then diff forever.
+ * **Two orthogonal axes describe each line.** `category` is *what kind of spend* it was — a
+ * closed set read off DITSAMA's own approved budget. `participantType` is *which cohort* it
+ * served — `Siswa` (the Student Class) or `GTK-MS` (the GTK and MS Classes together) — so the
+ * Laporan can split every acquittal's spend by Class. Both are required, and both are closed
+ * sets whose CHECKs below are written out character for character rather than composed from
+ * `TRANSACTION_CATEGORIES` / `TRANSACTION_PARTICIPANT_TYPES`, for the reason `./index.ts` gives:
+ * a composed constraint string is not the one the drizzle-kit snapshot holds, and the two would
+ * then diff forever.
  */
 export const transaction = pgTable(
   "transaction",
@@ -246,7 +252,7 @@ export const transaction = pgTable(
     description: text("description").notNull(),
     amountIdr: bigint("amount_idr", { mode: "number" }).notNull(),
     category: text("category").$type<TransactionCategory>().notNull(),
-    incurredByPersonId: uuid("incurred_by_person_id").references(() => person.id),
+    participantType: text("participant_type").$type<TransactionParticipantType>().notNull(),
     createdByPersonId: uuid("created_by_person_id")
       .notNull()
       .references(() => person.id),
@@ -258,6 +264,7 @@ export const transaction = pgTable(
       "transaction_category_check",
       sql`${t.category} in ('Tiket Pesawat/Kereta PP', 'Uang Harian', 'Honorarium Narasumber', 'Akomodasi', 'Transport Bandara/Stasiun', 'Transport Lokal Dalam Provinsi', 'Konsumsi', 'Modul', 'ATK', 'Alat dan Bahan Research Project', 'Seminar kit', 'Lainnya')`,
     ),
+    check("transaction_participant_type_check", sql`${t.participantType} in ('Siswa', 'GTK-MS')`),
   ],
 );
 

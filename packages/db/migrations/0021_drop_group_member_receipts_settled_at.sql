@@ -1,0 +1,1 @@
+ALTER TABLE "group_member" DROP COLUMN "receipts_settled_at";

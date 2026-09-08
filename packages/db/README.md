@@ -17,8 +17,9 @@ what one screen renders in one round trip, a Staff-only surface opens with the S
 choke point, and a write owns its own transaction.
 
 The fourth of those read _"money opens with…"_ until Jadwalkan Sesi daring, which is
-Staff-only and is not money: reading money is Staff-only by ADR-0004, and **arranging
-delivery** is Staff-only by the surface list. One guard, two reasons.
+Staff-only and is not money — and since #180 money **reads** are open too, so **writing**
+money is Staff-only (ADR-0026 reversed ADR-0004's read half), and **arranging delivery** is
+Staff-only by the surface list. One guard, two reasons.
 
 **This package resolves nobody.** It takes a `Person` it is given; `@sugt/internal`
 produces one, because resolving is React-aware and this package is not.

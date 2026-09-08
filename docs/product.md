@@ -43,7 +43,7 @@ conventions.
 
 **Not everything on the scope band is a figure from the database.** Four stats lead the
 page, and only the first is fetched: 42 Schools across 15 provinces. Two Streams, three
-Classes per School and ten Sessions per School are `@sugt/domain` constants both apps
+Classes per School and eight Sessions per School are `@sugt/domain` constants both apps
 already hold. Serving those over the endpoint would put the same fixed set in two places,
 which is the duplication the ADR-0008 amendment exists to remove — just pointing the
 other way.
@@ -153,7 +153,7 @@ of this list before settling it.
 
 ### Sessions
 
-A School receives **ten**: four offline, six online. Each teaches all three of its
+A School receives **eight**: two offline, six online. Each teaches all three of its
 Classes.
 
 **A Session has a date and a start time, and the time is the School's.** 09:00 at a School in
@@ -164,9 +164,9 @@ from Bandung show the WIB equivalent alongside it. This holds for online Session
 stored time is the School's, so it means one thing whichever mode a Session is.
 
 A Session comes into existence **when it is arranged** — when a Perjadin is planned or an
-online meeting scheduled — never before. The full ten are not laid out in advance with
+online meeting scheduled — never before. The full eight are not laid out in advance with
 target dates, because those dates would be invented and a schedule nobody maintains
-displays confident wrong information. Progress reads "3 of 10 delivered" without any
+displays confident wrong information. Progress reads "3 of 8 delivered" without any
 planned rows existing.
 
 An arranged Session is then delivered or **cancelled**. A cancelled Session persists,
@@ -176,7 +176,7 @@ difference.
 
 **Every Session has a PIC.** An offline Session's is its Perjadin's. An online Session has
 no Perjadin, so scheduling one means naming a Staff member as its PIC — otherwise six of
-every ten Sessions would have nobody to file the Session Record.
+every eight Sessions would have nobody to file the Session Record.
 
 **Online Sessions are arranged one School at a time.** Each is held at a moment of its own —
 its own date, its own start time, its own PIC — so there is nothing for a batch to share.
@@ -187,7 +187,7 @@ seventeen rows at once fails seventeen rows at once.
 
 The screen stands on its own with a School picker, and the same action appears on a School's
 own page, which is where you already are when you are thinking about one School. Six of every
-ten Sessions are online, so this is not a secondary path.
+eight Sessions are online, so this is not a secondary path.
 
 **Marking a Session delivered is also how it records who taught.** The form asks for the
 Teaching Team member on each Stream — pre-filled from the Group on an offline Session, empty on
@@ -233,7 +233,7 @@ departure, so a Perjadin is never in an unfunded state.
 
 Offline Sessions happen during a Perjadin. **Online Sessions have no Perjadin at all** —
 which is why counting trips never tells you how much teaching has happened, and why six
-of every ten Sessions are invisible to anything trip-shaped.
+of every eight Sessions are invisible to anything trip-shaped.
 
 **A Perjadin's screen carries a Preparation Checklist** — a private, hand-ticked list of
 pre-departure to-dos, shown under `Persiapan`. It is an internal-monitoring aid and nothing more:
@@ -256,8 +256,10 @@ _Transport Bandara/Stasiun_, _Transport Lokal Dalam Provinsi_, _Konsumsi_, _Modu
 _Alat dan Bahan Research Project_, _Seminar kit_. They are the line items the Programme's
 approved budget repeats across every travel group, so they are what DITSAMA already itemises
 rather than a scheme invented here, and they are in Indonesian because that is what goes on the
-paperwork. A transaction may also name **who incurred it**, which per-diems and honoraria do
-and a taxi does not; the Advance is still one pot and the acquittal still reconciles the pot.
+paperwork. Each transaction also carries a **participant type** — _Siswa_ or _GTK-MS_ — an axis
+orthogonal to the category that records which cohort the spend served, so the acquittal can split
+how much of the Advance went to the Student cohort versus the GTK and MS cohorts (#182). The
+Advance is still one pot and the acquittal still reconciles the pot.
 
 **The export is generic until the real paperwork exists.** Nobody has filed an acquittal
 for this Programme yet and no prior trip's completed set is available to borrow, so the
@@ -272,10 +274,6 @@ Transactions can be entered **as they happen or after returning** — whichever 
 Both are first-class paths. There is no offline support; capture needs connectivity, and
 where it fails the PIC enters it later, losing convenience but never data. Offline is
 worth adding eventually, not worth blocking on.
-
-Receipts from the other travellers reach the PIC however they reach them today. The tool
-does not collect them from Group members; it tracks who is still outstanding so the PIC
-has a checklist rather than a memory.
 
 **The Report is due two days after the Group gets back**, and the screen shows days
 remaining. Nothing enters that date — it follows from the Perjadin's end date, so it
@@ -531,7 +529,7 @@ can sign in to reach this screen. See
 Absences look like oversights unless they are written down. These are decisions.
 
 - **No stages** between a School's first and last Session. Progress is delivered
-  Sessions out of ten, and nothing else.
+  Sessions out of eight, and nothing else.
 - **No Project Teams and no Final Projects.** Several hundred exist across the Programme;
   none are tracked. They reach the public as curated Stories, never as records — a piece
   written about one is not a record of it.

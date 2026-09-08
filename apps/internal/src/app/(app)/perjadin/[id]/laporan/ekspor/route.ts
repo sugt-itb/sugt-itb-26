@@ -1,5 +1,4 @@
 import { requirePerson } from "-/lib/person";
-import { staffSurface } from "-/lib/staff-surface";
 import { perjadinAcquittal } from "@sugt/db/queries";
 import { notFound } from "next/navigation";
 
@@ -12,15 +11,17 @@ import { csvOf, fileNameOf } from "./csv";
  * yet: nobody has filed an acquittal for this Programme, and no prior trip's completed set is
  * available to borrow, so there is no real form to fill. The screen ships anyway, with a plain
  * itemisation the PIC attaches. The text itself is `./csv`'s `csvOf` — a pure function of the
- * payload, split out so it can be driven directly; this handler only signs in, reads the Staff-only
- * payload and sets the file headers.
+ * payload, split out so it can be driven directly; this handler only signs in, reads the payload —
+ * open to any signed-in Person now (ADR-0004 reversed by ADR-0026, #180) — and sets the file
+ * headers.
  *
  * **A Route Handler rather than a Server Action**, because the response is a file: it needs its own
  * content type and a `Content-Disposition`, neither of which an action can set.
  *
- * Staff-only, by the same choke point the screen uses. A Route Handler runs no layout, so
- * `perjadinAcquittal` refusing a Teaching Team `Person` is the whole of the guard — which is
- * exactly what that choke point is for.
+ * Open to any signed-in Person, like the screen it exports (ADR-0004 reversed by ADR-0026, #180):
+ * `perjadinAcquittal` is an open money read now, so a Pimpinan can export the acquittal too. Only
+ * `requirePerson()` gates this — money reads are open, and every money write stays Staff-only in its
+ * own query.
  */
 export async function GET(
   _request: Request,
@@ -29,7 +30,7 @@ export async function GET(
   const person = await requirePerson();
   const { id } = await params;
 
-  const acquittal = await staffSurface(() => perjadinAcquittal(person, id));
+  const acquittal = await perjadinAcquittal(person, id);
   if (!acquittal) notFound();
 
   return new Response(csvOf(acquittal), {

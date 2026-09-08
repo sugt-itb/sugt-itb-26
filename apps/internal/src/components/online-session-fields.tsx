@@ -3,7 +3,7 @@
 import { updateOnlineSessionAction } from "-/app/(app)/sesi-daring/[id]/actions";
 import { PersonSelect } from "-/components/person-select";
 import type { OnlineSessionDetail } from "@sugt/db/queries";
-import { formatSessionStartTimeWithWib, STREAMS, type Stream } from "@sugt/domain";
+import { formatSessionStartTimeWithWib, STREAMS, type Stream, timeZoneSuffix } from "@sugt/domain";
 import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
 import {
@@ -236,7 +236,9 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor={`${idPrefix}-time`}>Jam Mulai</Label>
+              <Label htmlFor={`${idPrefix}-time`}>
+                Jam Mulai{timeZoneSuffix(session.timeZone)}
+              </Label>
               {/* Local wall-clock time, in the School's Time Zone. */}
               <Input
                 id={`${idPrefix}-time`}

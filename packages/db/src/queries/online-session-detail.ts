@@ -119,8 +119,14 @@ export async function onlineSessionDetail(
       // carries no timestamp, so this is the stable order the editor renders in.
       .orderBy(asc(sessionTeacherName.name), asc(sessionTeacherName.id)),
     db
-      .select({ id: school.id, name: school.name, kabupatenKota: school.kabupatenKota })
+      .select({
+        id: school.id,
+        name: school.name,
+        kabupatenKota: school.kabupatenKota,
+        timeZone: province.timeZone,
+      })
       .from(school)
+      .innerJoin(province, eq(province.code, school.provinceCode))
       .orderBy(asc(school.name)),
     db
       .select({ id: person.id, fullName: person.fullName })

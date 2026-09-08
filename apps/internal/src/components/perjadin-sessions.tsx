@@ -10,9 +10,10 @@ import { SessionStatusBadge } from "-/components/session-labels";
 import type {
   AddPerjadinSessionResult,
   EditPerjadinSessionResult,
+  EligibleSchool,
   PerjadinSession,
 } from "@sugt/db/queries";
-import { formatSessionStartTimeWithWib, STREAMS, type Stream } from "@sugt/domain";
+import { formatSessionStartTimeWithWib, STREAMS, type Stream, timeZoneSuffix } from "@sugt/domain";
 import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
 import {
@@ -36,7 +37,6 @@ import {
 import Link from "next/link";
 import { useId, useState, useTransition } from "react";
 
-type EligibleSchool = { id: string; name: string; kabupatenKota: string };
 type TripTeacher = { id: string; name: string };
 
 /**
@@ -190,6 +190,12 @@ function SessionDialog({
   const teacherOptions = teachers.map((teacher) => ({ value: teacher.id, label: teacher.name }));
   const incomplete = schoolId === "" || date === "" || time === "" || stream === "";
 
+  // The picked School's Time Zone, for the Jam Mulai label. In add mode it appears and flips as the
+  // School is chosen (#165); in edit mode the seeded School's zone matches `session.timeZone`, and
+  // that seed is the fallback for the rare case the seeded School is not among the eligible ones.
+  const timeZone =
+    eligibleSchools.find((option) => option.id === schoolId)?.timeZone ?? session?.timeZone;
+
   function submit() {
     if (incomplete) return;
     startSaving(async () => {
@@ -279,7 +285,8 @@ function SessionDialog({
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor={`${idPrefix}-time`}>Jam Mulai</Label>
+              {/* Zone follows the picked School (#165): shown once one is chosen in add mode, seeded from the Session's School in edit mode, omitted when none is in scope. */}
+              <Label htmlFor={`${idPrefix}-time`}>Jam Mulai{timeZoneSuffix(timeZone)}</Label>
               <Input
                 id={`${idPrefix}-time`}
                 type="time"

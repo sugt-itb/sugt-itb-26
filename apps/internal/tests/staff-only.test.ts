@@ -1,5 +1,5 @@
 import { staffSurface } from "-/lib/staff-surface";
-import { isNotStaffError, perjadinAcquittal } from "@sugt/db/queries";
+import { filePerjadinReport, isNotStaffError, perjadinAcquittal } from "@sugt/db/queries";
 import type { Role } from "@sugt/domain";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,9 +9,9 @@ import { signInAsPerson } from "./support/sign-in";
 /**
  * A non-Staff caller, hand-built rather than invited. T3 (#153) retired the Teaching Team Role, so
  * no such Person can exist in the database any more — but the choke point must still reject a
- * non-Staff caller, which is the whole of what this file proves. `requireStaff` throws on the role
- * alone, before the money query touches a row, so a cast object is a faithful stand-in; the cast
- * through `unknown` is the only way to name a role the type no longer admits.
+ * non-Staff caller from a money **write**, which is the whole of what this file proves. `requireStaff`
+ * throws on the role alone, before the write query touches a row, so a cast object is a faithful
+ * stand-in; the cast through `unknown` is the only way to name a role the type no longer admits.
  */
 function nonStaff() {
   return {
@@ -32,9 +32,12 @@ function nonStaff() {
  * Nothing asserts that a particular helper ran — that is the kind of test a Better
  * Auth upgrade breaks without breaking the product.
  *
- * ADR-0004: delivery data is open to everyone signed in; **financial data is not**.
+ * The boundary the choke point now holds is **read (any signed-in Person) vs write (Staff)**:
+ * ADR-0004 kept money reads to Staff, and [ADR-0026](../../../docs/adr/0026-money-is-open-to-read-and-staff-only-to-write.md)
+ * (#180) reversed that half, so what this file drives at the seam is a money **write** —
+ * `filePerjadinReport` — while `perjadinAcquittal` reads open to everyone.
  */
-describe("money is Staff-only", () => {
+describe("money writes are Staff-only", () => {
   beforeEach(resetDatabase);
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -52,25 +55,38 @@ describe("money is Staff-only", () => {
     return { pic, perjadin };
   }
 
-  it("refuses a non-Staff Person with a distinguishable typed error", async () => {
+  it("refuses a non-Staff Person a money write with a distinguishable typed error", async () => {
     const { perjadin } = await aPerjadinWithSpending();
     const teacher = nonStaff();
 
-    const refusal = await perjadinAcquittal(teacher, perjadin.id).catch((error: unknown) => error);
+    const refusal = await filePerjadinReport(teacher, perjadin.id).catch((error: unknown) => error);
 
     expect(isNotStaffError(refusal)).toBe(true);
   });
 
-  it("refuses rather than returning an empty result", async () => {
+  it("refuses a write with a throw rather than a value outcome", async () => {
     /**
-     * An empty return would make a mis-passed caller indistinguishable from a Perjadin
-     * that genuinely has no transactions yet, with nothing in the logs to separate
-     * them. So the refusal is a throw, and this asserts it is not quietly a `null`.
+     * A refused caller is a bug or an attack, never a user state, so `requireStaff` throws
+     * before the write can return one of its reachable value outcomes (`filed`,
+     * `no-such-perjadin`, …). This asserts the refusal is not quietly one of those.
      */
     const { perjadin } = await aPerjadinWithSpending();
     const teacher = nonStaff();
 
-    await expect(perjadinAcquittal(teacher, perjadin.id)).rejects.toThrow();
+    await expect(filePerjadinReport(teacher, perjadin.id)).rejects.toThrow();
+  });
+
+  it("opens the money READ to any signed-in Person now (ADR-0026, #180)", async () => {
+    /**
+     * The other half of the read/write split. `perjadinAcquittal` lost its `requireStaff`, so a
+     * non-Staff caller reads the acquittal rather than being refused it — the read is open, and
+     * only the write above stays Staff-only.
+     */
+    const { perjadin } = await aPerjadinWithSpending();
+
+    await expect(perjadinAcquittal(nonStaff(), perjadin.id)).resolves.toMatchObject({
+      spentIdr: 1_250_000,
+    });
   });
 
   it("gives Staff the reconciliation, derived rather than stored", async () => {
@@ -115,7 +131,7 @@ describe("money is Staff-only", () => {
     const { perjadin } = await aPerjadinWithSpending();
     const teacher = nonStaff();
 
-    const thrown = await staffSurface(() => perjadinAcquittal(teacher, perjadin.id)).catch(
+    const thrown = await staffSurface(() => filePerjadinReport(teacher, perjadin.id)).catch(
       (error: unknown) => error,
     );
 

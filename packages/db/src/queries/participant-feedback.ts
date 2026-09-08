@@ -24,7 +24,8 @@ import type { ParticipantToken, Person } from "./caller";
  * **No elaboration rule here.** A Participant owes nothing and refusing their 3 for want of a
  * sentence would simply lose the 3 — the CHECK that forces prose is on `class_record` and
  * `session_record` only. There is no rate limiting either, deliberately: the accepted cost is
- * that junk Ratings reach the concerns list (#33, ADR-0012).
+ * that junk Ratings reach the Feedback list (#33, ADR-0012) — the `/feedback` Peserta tab that
+ * replaced the retired `/concerns` page (#169).
  */
 
 export type IssueFeedbackTokenResult =
@@ -108,8 +109,8 @@ export type ParticipantFeedbackRatings = {
 
 /**
  * One optional comment per Aspect, keyed off `PARTICIPANT_FEEDBACK_ASPECTS` so the form, this
- * type and the concerns query stay driven by the one list. Each is independently optional — a
- * Participant may explain one low Rating and leave the rest blank.
+ * type and the Feedback read (`feedback.ts`) stay driven by the one list. Each is independently
+ * optional — a Participant may explain one low Rating and leave the rest blank.
  */
 export type ParticipantFeedbackComments = Record<ParticipantFeedbackAspect, string | null>;
 

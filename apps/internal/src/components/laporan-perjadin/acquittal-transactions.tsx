@@ -9,10 +9,24 @@ import {
   mintReceiptUploadsAction,
   recordTransactionAction,
 } from "-/app/(app)/perjadin/[id]/laporan/actions";
-import type { AcquittalReceipt } from "@sugt/db/queries";
-import { formatIdr, TRANSACTION_CATEGORIES, type TransactionCategory } from "@sugt/domain";
+import {
+  DEFAULT_TRANSACTION_LIST_CONTROLS,
+  sortAndFilterTransactions,
+  type CategoryFilter,
+  type ParticipantFilter,
+  type SortDirection,
+} from "-/components/laporan-perjadin/acquittal-transactions-sort";
+import {
+  formatIdr,
+  TRANSACTION_CATEGORIES,
+  TRANSACTION_PARTICIPANT_TYPES,
+  type TransactionCategory,
+  type TransactionParticipantType,
+} from "@sugt/domain";
 import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
+import { Badge } from "@sugt/ui/components/badge";
 import { Button } from "@sugt/ui/components/button";
+import { Card, CardHeader } from "@sugt/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@sugt/ui/components/select";
-import { useId, useRef, useState, useTransition } from "react";
+import { type ReactElement, useId, useMemo, useRef, useState, useTransition } from "react";
 
 /**
  * **The line items, and the two things a PIC does to them**: enter one, and attach the receipts
@@ -49,20 +63,43 @@ import { useId, useRef, useState, useTransition } from "react";
 function AcquittalTransactions({
   perjadinId,
   transactions,
-  group,
 }: {
   perjadinId: string;
   transactions: ViewableTransaction[];
-  group: AcquittalReceipt[];
 }) {
+  // Sort/filter is a lens on the rendered list only. The list is bounded and already fully loaded,
+  // so this is in-memory (no server round-trip, unlike `/feedback`); the Laporan money figures and
+  // the CSV export are computed from the full set upstream and are deliberately not routed through
+  // `visible`.
+  const [amountSort, setAmountSort] = useState<SortDirection>(
+    DEFAULT_TRANSACTION_LIST_CONTROLS.amountSort,
+  );
+  const [dateSort, setDateSort] = useState<SortDirection>(
+    DEFAULT_TRANSACTION_LIST_CONTROLS.dateSort,
+  );
+  const [participantFilter, setParticipantFilter] = useState<ParticipantFilter>(
+    DEFAULT_TRANSACTION_LIST_CONTROLS.participantFilter,
+  );
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(
+    DEFAULT_TRANSACTION_LIST_CONTROLS.categoryFilter,
+  );
+
+  const visible = useMemo(
+    () =>
+      sortAndFilterTransactions(transactions, {
+        amountSort,
+        dateSort,
+        participantFilter,
+        categoryFilter,
+      }),
+    [transactions, amountSort, dateSort, participantFilter, categoryFilter],
+  );
+
   return (
     <div className="border-b border-border px-7 py-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-heading text-sm font-medium">Transaksi</h2>
-        <RecordTransaction
-          perjadinId={perjadinId}
-          group={group}
-        />
+        <RecordTransaction perjadinId={perjadinId} />
       </div>
 
       {transactions.length === 0 ? (
@@ -70,47 +107,156 @@ function AcquittalTransactions({
           Belum ada transaksi terhadap uang muka ini.
         </p>
       ) : (
-        <ul className="mt-2.5 divide-y divide-border">
-          {transactions.map((line) => (
-            <TransactionRow
-              key={line.id}
-              perjadinId={perjadinId}
-              line={line}
+        <>
+          {/* Two sort dropdowns — amount primary, date tiebreak — both always active, no "off" arm. */}
+          <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ControlSelect
+              ariaLabel="Urutkan jumlah"
+              options={AMOUNT_SORT_OPTIONS}
+              value={amountSort}
+              onChange={setAmountSort}
             />
-          ))}
-        </ul>
+            <ControlSelect
+              ariaLabel="Urutkan tanggal"
+              options={DATE_SORT_OPTIONS}
+              value={dateSort}
+              onChange={setDateSort}
+            />
+          </div>
+
+          {/* Two exact-match filters, ANDed; each defaults to "Semua" (no predicate on that axis). */}
+          <div className="mt-3 mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ControlSelect
+              ariaLabel="Saring tipe peserta"
+              options={PARTICIPANT_FILTER_OPTIONS}
+              value={participantFilter}
+              onChange={setParticipantFilter}
+            />
+            <ControlSelect
+              ariaLabel="Saring kategori"
+              options={CATEGORY_FILTER_OPTIONS}
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+            />
+          </div>
+
+          {visible.length === 0 ? (
+            // Distinct from the "no transactions at all" state above: the filters hid everything.
+            <p className="text-sm text-muted-foreground">Tidak ada transaksi yang cocok</p>
+          ) : (
+            <ul className="space-y-3">
+              {visible.map((line) => (
+                <li key={line.id}>
+                  <TransactionCard
+                    perjadinId={perjadinId}
+                    line={line}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-/** One line item: what it was, what it cost, who incurred it, and what evidences it. */
-function TransactionRow({ perjadinId, line }: { perjadinId: string; line: ViewableTransaction }) {
+/**
+ * One line item as a card, in the `/feedback` header style: date · description · category, a badge
+ * for the cohort it served, and — pushed right — the amount and the existing receipts block. Nothing
+ * the old row carried is dropped; there is no rating, so no `destructive` badge.
+ */
+function TransactionCard({ perjadinId, line }: { perjadinId: string; line: ViewableTransaction }) {
   return (
-    <li className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 py-2.5 text-sm">
-      <div className="min-w-0">
-        <p>
-          <span className="text-muted-foreground tabular-nums">{line.spentOn}</span>{" "}
+    <Card size="sm">
+      <CardHeader>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          <span className="text-muted-foreground tabular-nums">{line.spentOn}</span>
+          <span className="text-muted-foreground">·</span>
           <span>{line.description}</span>
-        </p>
-        <p className="text-muted-foreground">
-          {line.category}
-          {/*
-            Named only where somebody incurred it. Per-diems and honoraria carry a person; a
-            taxi does not, and an empty label would read as missing rather than as inapplicable.
-          */}
-          {line.incurredBy !== null && ` · ${line.incurredBy.fullName}`}
-        </p>
-      </div>
+          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground">{line.category}</span>
+          <Badge variant="secondary">{line.participantType}</Badge>
+          <div className="ml-auto flex items-center gap-4">
+            <span className="tabular-nums">Rp {formatIdr(line.amountIdr)}</span>
+            <Receipts
+              perjadinId={perjadinId}
+              line={line}
+            />
+          </div>
+        </div>
+      </CardHeader>
+    </Card>
+  );
+}
 
-      <div className="flex items-center gap-4">
-        <span className="tabular-nums">Rp {formatIdr(line.amountIdr)}</span>
-        <Receipts
-          perjadinId={perjadinId}
-          line={line}
-        />
-      </div>
-    </li>
+/** The label maps for the four controls. Sort keys are the direction; each filter carries "Semua". */
+const AMOUNT_SORT_OPTIONS = { desc: "Termahal", asc: "Termurah" } satisfies Record<
+  SortDirection,
+  string
+>;
+const DATE_SORT_OPTIONS = { desc: "Terbaru", asc: "Terlama" } satisfies Record<
+  SortDirection,
+  string
+>;
+
+/** Self-labelled options for a closed value set — keeps the two filters in step with `@sugt/domain`. */
+function labelSelf<T extends string>(values: readonly T[]): Record<T, string> {
+  const options = {} as Record<T, string>;
+  for (const value of values) options[value] = value;
+  return options;
+}
+
+const PARTICIPANT_FILTER_OPTIONS: Record<ParticipantFilter, string> = {
+  Semua: "Semua",
+  ...labelSelf(TRANSACTION_PARTICIPANT_TYPES),
+};
+const CATEGORY_FILTER_OPTIONS: Record<CategoryFilter, string> = {
+  Semua: "Semua",
+  ...labelSelf(TRANSACTION_CATEGORIES),
+};
+
+/**
+ * One control dropdown — the `/feedback` `SortSelect`/`FilterSelect` shape, unified because a sort
+ * and a filter here are the same widget over an options map with a value that is always a valid key
+ * (so no placeholder branch). No `disabled`: the work is in-memory, nothing is ever pending.
+ */
+function ControlSelect<T extends string>({
+  ariaLabel,
+  options,
+  value,
+  onChange,
+}: {
+  ariaLabel: string;
+  options: Record<T, string>;
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <Select
+      items={options}
+      value={value}
+      onValueChange={(next) => {
+        onChange(next as T);
+      }}
+    >
+      <SelectTrigger
+        aria-label={ariaLabel}
+        className="w-full"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {(Object.entries(options) as [T, string][]).map(([key, label]) => (
+          <SelectItem
+            key={key}
+            value={key}
+          >
+            {label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -242,22 +388,30 @@ function Receipts({ perjadinId, line }: { perjadinId: string; line: ViewableTran
 /** The entry form. One line item at a time, which is how a PIC has them. */
 function RecordTransaction({
   perjadinId,
-  group,
+  trigger,
 }: {
   perjadinId: string;
-  group: AcquittalReceipt[];
+  // An optional custom trigger so a card elsewhere can open this exact entry form from its own
+  // control. Omitted, the default "Catat transaksi" button renders and `AcquittalTransactions`
+  // behaves exactly as before — it still mounts `<RecordTransaction perjadinId={perjadinId} />`.
+  trigger?: ReactElement;
 }) {
   const [open, setOpen] = useState(false);
   const [spentOn, setSpentOn] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<TransactionCategory | "">("");
-  const [incurredBy, setIncurredBy] = useState("");
+  const [participantType, setParticipantType] = useState<TransactionParticipantType | "">("");
   const [refusal, setRefusal] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const fields = useId();
 
-  const complete = spentOn !== "" && description.trim() !== "" && amount !== "" && category !== "";
+  const complete =
+    spentOn !== "" &&
+    description.trim() !== "" &&
+    amount !== "" &&
+    category !== "" &&
+    participantType !== "";
 
   function submit() {
     startSaving(async () => {
@@ -266,11 +420,12 @@ function RecordTransaction({
         perjadinId,
         spentOn,
         description: description.trim(),
-        // Whole rupiah, which is what the column holds. `Number` on a `type="number"` field
-        // can only produce a finite value or `NaN`, and `NaN` fails the positivity check.
+        // Whole rupiah, which is what the column holds. `amount` holds raw digits (the mask
+        // strips everything else on change), so `Number` is finite or `NaN`, and `NaN` fails the
+        // positivity check.
         amountIdr: Math.trunc(Number(amount)),
         category: category as TransactionCategory,
-        incurredByPersonId: incurredBy === "" ? null : incurredBy,
+        participantType: participantType as TransactionParticipantType,
       });
 
       if (result.outcome === "recorded") {
@@ -279,7 +434,7 @@ function RecordTransaction({
         setDescription("");
         setAmount("");
         setCategory("");
-        setIncurredBy("");
+        setParticipantType("");
         return;
       }
       setRefusal(REFUSALS[result.outcome]);
@@ -293,12 +448,14 @@ function RecordTransaction({
     >
       <DialogTrigger
         render={
-          <Button
-            variant="outline"
-            size="sm"
-          >
-            Catat transaksi
-          </Button>
+          trigger ?? (
+            <Button
+              variant="outline"
+              size="sm"
+            >
+              Catat transaksi
+            </Button>
+          )
         }
       />
       <DialogContent>
@@ -342,14 +499,21 @@ function RecordTransaction({
 
           <div className="grid gap-1.5">
             <Label htmlFor={`${fields}-amount`}>Jumlah (Rp)</Label>
+            {/*
+              A masked text input, not `type="number"`: it groups the thousands as they type so a
+              large amount's magnitude is legible at the point of entry — the same pattern the plan
+              form's Uang muka uses. `amount` stays a plain digit string in state; every non-digit
+              is stripped back out on change, so submit's `Number(...)` and the `complete` guard are
+              unchanged.
+            */}
             <Input
               id={`${fields}-amount`}
-              type="number"
-              min={1}
-              step={1}
-              value={amount}
+              type="text"
+              inputMode="numeric"
+              value={amount === "" ? "" : `Rp ${formatIdr(Number(amount))}`}
               onChange={(event) => {
-                setAmount(event.target.value);
+                const digits = event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+                setAmount(digits);
               }}
             />
           </div>
@@ -383,38 +547,29 @@ function RecordTransaction({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor={`${fields}-incurred-by`}>Atas nama (opsional)</Label>
+            <Label htmlFor={`${fields}-participant-type`}>Tipe Peserta</Label>
             {/*
-              Offered from the Group, because the write refuses anybody who did not travel.
-              Most line items leave it empty: the Advance is one pot, and only per-diems and
-              honoraria carry a person.
+              An axis orthogonal to Kategori — which cohort the spend served. The two values come
+              from `@sugt/domain`, the same list `transaction_participant_type_check` pins in the
+              database. Required, so there is no empty option: a shared cost is attributed to
+              whichever type it predominantly served.
             */}
             <Select
-              value={incurredBy}
+              value={participantType}
               onValueChange={(value) => {
-                // The control clears to `null`; the column's absence is what that means, and
-                // the action turns the empty string back into `null` on the way out.
-                setIncurredBy(value ?? "");
+                setParticipantType(value as TransactionParticipantType);
               }}
             >
-              <SelectTrigger id={`${fields}-incurred-by`}>
-                {/*
-                  A function-child, because the `SelectItem` value is the `personId` while the
-                  visible label is the `fullName` — without this the trigger would show the raw
-                  id. Scoped to this call site on purpose (#101); the shared wrapper's general
-                  value≠label handling is a separate cross-cutting change.
-                */}
-                <SelectValue placeholder="Tidak atas nama siapa pun">
-                  {(value) => group.find((member) => member.personId === value)?.fullName}
-                </SelectValue>
+              <SelectTrigger id={`${fields}-participant-type`}>
+                <SelectValue placeholder="Pilih tipe peserta" />
               </SelectTrigger>
               <SelectContent>
-                {group.map((member) => (
+                {TRANSACTION_PARTICIPANT_TYPES.map((option) => (
                   <SelectItem
-                    key={member.personId}
-                    value={member.personId}
+                    key={option}
+                    value={option}
                   >
-                    {member.fullName}
+                    {option}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -461,4 +616,4 @@ const REFUSALS = {
   "no-such-perjadin": STALE_PAGE,
 } as const;
 
-export { AcquittalTransactions };
+export { AcquittalTransactions, RecordTransaction };

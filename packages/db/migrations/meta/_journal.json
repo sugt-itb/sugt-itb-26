@@ -113,6 +113,48 @@
       "when": 1788143612205,
       "tag": "0015_retire_session_teacher_and_teaching_team_role",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788276301920,
+      "tag": "0016_wealthy_killer_shrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788278427904,
+      "tag": "0017_late_venom",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788340303523,
+      "tag": "0018_widen_person_role_pimpinan",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788349270726,
+      "tag": "0019_unify_perjadin_pimpinan_onto_person",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788355407388,
+      "tag": "0020_transaction_participant_type",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788359971403,
+      "tag": "0021_drop_group_member_receipts_settled_at",
+      "breakpoints": true
     }
   ]
 }

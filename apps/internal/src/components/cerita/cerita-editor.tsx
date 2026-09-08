@@ -694,8 +694,15 @@ function PhotoRow({
   );
 }
 
-/** A published timestamp, short and local. Server time is fine here — this is an editor, not a public page. */
+/**
+ * A published timestamp, short and local, as `YYYY-MM-DD HH:MM` (24h) — the ISO date form every
+ * other date reads in across the internal app (#166), not the `id-ID` `31 Agu 2026, 09.00` this
+ * once produced. Local wall-clock components: server time is fine here — this is an editor, not a
+ * public page.
+ */
 function formatWhen(when: Date | null): string {
   if (!when) return "";
-  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(when);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const date = `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}`;
+  return `${date} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
 }

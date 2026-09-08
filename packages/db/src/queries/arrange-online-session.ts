@@ -3,7 +3,7 @@ import { asc, eq } from "drizzle-orm";
 
 import { db } from "../client";
 import { ONLINE_SESSION_STILL_STANDS, session, sessionTeacherName } from "../schema/delivery";
-import { school } from "../schema/reference";
+import { province, school } from "../schema/reference";
 import type { Person } from "./caller";
 import { activeRosters, type RosterPerson, type SelectedSchool } from "./rosters";
 import { requireStaff } from "./staff-only";
@@ -150,11 +150,16 @@ export async function arrangeOnlineSession(
 /** A School the screen can arrange a Session at, as a picker or a heading names it. */
 export type SchoolOption = SelectedSchool;
 
-/** The three columns a `SchoolOption` renders, selected the same way by both reads below. */
+/**
+ * The columns a `SchoolOption` renders, selected the same way by both reads below. `timeZone` comes
+ * from the School's Province, so both reads join `province` on `province.code = school.province_code`
+ * (#165) — the form labels its time input with the zone the moment a School is picked.
+ */
 const SCHOOL_OPTION_COLUMNS = {
   id: school.id,
   name: school.name,
   kabupatenKota: school.kabupatenKota,
+  timeZone: province.timeZone,
 };
 
 /** Somebody a picker on this screen can name — the PIC. */
@@ -173,7 +178,11 @@ export type ArrangeOnlineSessionForm = {
 
 /** Every School, in name order, for the standalone screen's School picker. */
 async function pickableSchools(): Promise<SchoolOption[]> {
-  return db.select(SCHOOL_OPTION_COLUMNS).from(school).orderBy(asc(school.name));
+  return db
+    .select(SCHOOL_OPTION_COLUMNS)
+    .from(school)
+    .innerJoin(province, eq(province.code, school.provinceCode))
+    .orderBy(asc(school.name));
 }
 
 /**
@@ -209,7 +218,11 @@ export async function arrangeOnlineSessionAt(
 ): Promise<ArrangeOnlineSessionAt | null> {
   requireStaff(caller);
 
-  const [row] = await db.select(SCHOOL_OPTION_COLUMNS).from(school).where(eq(school.slug, slug));
+  const [row] = await db
+    .select(SCHOOL_OPTION_COLUMNS)
+    .from(school)
+    .innerJoin(province, eq(province.code, school.provinceCode))
+    .where(eq(school.slug, slug));
   if (!row) return null;
 
   const { staff } = await activeRosters();

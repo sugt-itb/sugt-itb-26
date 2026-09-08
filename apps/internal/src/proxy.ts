@@ -40,9 +40,12 @@ export function proxy(request: NextRequest) {
  *
  *   - `/f/**` — the Participant Feedback handler. Reached by a **short-lived token**
  *     in the URL, by a Participant who has no account and never will.
+ *   - `/ep/**` — the Perjadin Evaluation handler (ADR-0024). The same hole as `/f/**`,
+ *     one form over: reached by a **short-lived token** in the URL, by a Pengajar,
+ *     Pendamping or Pimpinan who need not sign in and self-declare who they are.
  *   - `/api/aggregates/**` — the four routes the public site reads. They authenticate
  *     with a **shared secret** in a header, not a session.
  */
 export const config = {
-  matcher: ["/((?!api/auth|api/aggregates|masuk|f/|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|api/aggregates|masuk|f/|ep/|_next/static|_next/image|favicon.ico).*)"],
 };

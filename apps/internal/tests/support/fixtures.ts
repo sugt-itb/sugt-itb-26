@@ -4,11 +4,14 @@ import { db, schema } from "@sugt/db";
 import type {
   ClassKind,
   ParticipantFeedbackAspect,
+  PerjadinAspect,
+  PerjadinEvaluationRole,
   SessionStatus,
   Stream,
   Role,
   TimeZone,
   TransactionCategory,
+  TransactionParticipantType,
 } from "@sugt/domain";
 import { eq, sql } from "drizzle-orm";
 
@@ -284,6 +287,12 @@ export type ParticipantFeedbackFixture = {
   /** Optional comment per Aspect, as the form is — a Participant owes no prose. Null by default. */
   comments?: Partial<Record<ParticipantFeedbackAspect, string>>;
   ratings?: Partial<Record<"materials" | "instructor" | "relevance", number>>;
+  /**
+   * When it was submitted. Defaults to the schema's `now()`. The Feedback list orders on this
+   * and pages by it, so a test that asserts on the order supplies distinct values; existing
+   * callers pass none and keep the default.
+   */
+  submittedAt?: Date;
 };
 
 /**
@@ -305,6 +314,7 @@ export async function addParticipantFeedback(fixture: ParticipantFeedbackFixture
       instructor: FINE,
       relevance: FINE,
       ...fixture.ratings,
+      ...(fixture.submittedAt ? { submittedAt: fixture.submittedAt } : {}),
     })
     .returning();
   return feedback!;
@@ -312,31 +322,97 @@ export async function addParticipantFeedback(fixture: ParticipantFeedbackFixture
 
 export type PerjadinEvaluationFixture = {
   perjadinId: string;
-  /** A Group member. Membership is the application's rule; the row references `person`. */
-  filedByPersonId: string;
+  /**
+   * The self-declared filer (ADR-0024). `filed_by_role` is one of `PERJADIN_EVALUATION_ROLES` and
+   * `filed_by_name` is free text — neither references `person` any more. Both default so a test
+   * that does not care about identity stays terse.
+   */
+  role?: PerjadinEvaluationRole;
+  name?: string;
   /** The one nullable Rating — pass `null` for a day trip with no hotel. Defaults to a fine Rating. */
   lodging?: number | null;
   ratings?: Partial<Record<"transport" | "meals" | "punctuality", number>>;
+  /**
+   * Optional Komentar per Aspect, as the form is (#163). A low Aspect with none supplied gets
+   * `WENT_WRONG` on its OWN comment so `perjadin_evaluation_low_rating_needs_prose` is satisfied —
+   * so a caller passing FINE Ratings needs no comments at all.
+   */
+  comments?: Partial<Record<PerjadinAspect, string>>;
+  /**
+   * When it was filed. Defaults to the schema's `now()`. The Feedback list's Perjadin tab orders on
+   * this and pages by it, so a test that asserts on the order supplies distinct values; existing
+   * callers pass none and keep the default.
+   */
+  createdAt?: Date;
 };
 
-/** How the trip went. Four Aspects, `lodging` nullable, the elaboration rule on the other prose. */
+/** How the trip went. Four Aspects, `lodging` nullable, the elaboration rule now per-Aspect. */
 export async function addPerjadinEvaluation(fixture: PerjadinEvaluationFixture) {
   const ratings = { transport: FINE, meals: FINE, punctuality: FINE, ...fixture.ratings };
   const lodging = fixture.lodging === undefined ? FINE : fixture.lodging;
-  const given = [lodging, ...Object.values(ratings)].filter(
-    (rating): rating is number => rating !== null,
-  );
+  const ratingByAspect: Record<PerjadinAspect, number | null> = { lodging, ...ratings };
+  // A low Aspect owes ITS OWN Komentar (#163) — fill it with WENT_WRONG unless the test supplied
+  // one; a null (skipped) lodging is never low and needs none.
+  const commentFor = (aspect: PerjadinAspect): string | null => {
+    const supplied = fixture.comments?.[aspect];
+    if (supplied !== undefined) return supplied;
+    const rating = ratingByAspect[aspect];
+    return rating !== null && needsProse([rating]) ? WENT_WRONG : null;
+  };
   const [evaluation] = await db
     .insert(schema.perjadinEvaluation)
     .values({
       perjadinId: fixture.perjadinId,
-      filedByPersonId: fixture.filedByPersonId,
+      filedByRole: fixture.role ?? "Pendamping",
+      filedByName: fixture.name ?? "Dewi Lestari",
       lodging,
       ...ratings,
-      problems: needsProse(given) ? WENT_WRONG : null,
+      lodgingComment: commentFor("lodging"),
+      transportComment: commentFor("transport"),
+      mealsComment: commentFor("meals"),
+      punctualityComment: commentFor("punctuality"),
+      ...(fixture.createdAt ? { createdAt: fixture.createdAt } : {}),
     })
     .returning();
   return evaluation!;
+}
+
+export type PerjadinFeedbackTokenFixture = {
+  perjadinId: string;
+  /** Any signed-in Person issued it. `perjadin_feedback_token.issued_by_person_id` references one. */
+  issuedByPersonId: string;
+  /** Defaults to a fresh random token. Pass one to drive the resolver at a known value. */
+  token?: string;
+  /**
+   * When the token was issued. Defaults to the schema's `now()`. Pass a past `Date` **with** a past
+   * `expiresAt` to build an already-expired token — `perjadin_feedback_token_expiry_check` refuses
+   * `expires_at <= issued_at`, so an expired token needs both in the past.
+   */
+  issuedAt?: Date;
+  /**
+   * When the token dies. Defaults to the schema's 14-days-from-now. Pass a past `Date` to build an
+   * already-expired token — the resolver enforces expiry itself, so a test needs a real one.
+   */
+  expiresAt?: Date;
+};
+
+/**
+ * One Perjadin's feedback token — the link's target (ADR-0024). The primary key is `perjadin_id`,
+ * so a second one for the same trip replaces the first, which is how a reissue kills the old link.
+ * The sibling of `addFeedbackToken`.
+ */
+export async function addPerjadinFeedbackToken(fixture: PerjadinFeedbackTokenFixture) {
+  const [token] = await db
+    .insert(schema.perjadinFeedbackToken)
+    .values({
+      perjadinId: fixture.perjadinId,
+      token: fixture.token ?? randomUUID(),
+      issuedByPersonId: fixture.issuedByPersonId,
+      ...(fixture.issuedAt ? { issuedAt: fixture.issuedAt } : {}),
+      ...(fixture.expiresAt ? { expiresAt: fixture.expiresAt } : {}),
+    })
+    .returning();
+  return token!;
 }
 
 export type FeedbackTokenFixture = {
@@ -390,8 +466,9 @@ export type PerjadinFixture = {
   /** Staff. They are the PIC and, by the deferred foreign key, a member of their own Group. */
   picPersonId: string;
   /**
-   * The Pimpinan recorded on the trip — record-only names, each a member of the fixed `PIMPINAN`
-   * three (`perjadin_pimpinan_name_check` refuses anything else). Empty or absent by default.
+   * The Pimpinan recorded on the trip — record-only rows referencing real People of role Pimpinan
+   * (#181). Pass the `person.id`s; the composite `perjadin_pimpinan_is_pimpinan` FK refuses any id
+   * that is not a Pimpinan. Empty or absent by default.
    */
   pimpinan?: string[];
 };
@@ -456,7 +533,7 @@ export async function addPerjadin(fixture: PerjadinFixture) {
     if (fixture.pimpinan && fixture.pimpinan.length > 0) {
       await tx
         .insert(schema.perjadinPimpinan)
-        .values(fixture.pimpinan.map((name) => ({ perjadinId: perjadin!.id, name })));
+        .values(fixture.pimpinan.map((personId) => ({ perjadinId: perjadin!.id, personId })));
     }
 
     return perjadin!;
@@ -469,8 +546,8 @@ export type TransactionFixture = {
   description?: string;
   spentOn?: string;
   category?: TransactionCategory;
-  /** Only per-diems and honoraria carry one, so the default is the common case: nobody. */
-  incurredByPersonId?: string;
+  /** Which cohort the spend served. Required on the column; defaults to `Siswa`, overridable. */
+  participantType?: TransactionParticipantType;
   createdByPersonId: string;
 };
 
@@ -490,7 +567,7 @@ export async function addTransaction(fixture: TransactionFixture) {
       description: fixture.description ?? "Transport lokal",
       amountIdr: fixture.amountIdr,
       category: fixture.category ?? "Transport Lokal Dalam Provinsi",
-      incurredByPersonId: fixture.incurredByPersonId ?? null,
+      participantType: fixture.participantType ?? "Siswa",
       createdByPersonId: fixture.createdByPersonId,
     })
     .returning();
@@ -549,6 +626,9 @@ export async function addTransactionEvidence(fixture: EvidenceFixture) {
  * the table.) `perjadin_evaluation` sits beside it for the same reason: no fixture writes one,
  * but the Perjadin Evaluation write-path tests file them directly, and `cascade` from
  * `public."perjadin"` reaches it, so naming it is for the same reason and not for a fixture.
+ * `perjadin_feedback_token` is named for the fixture reason `session_feedback_token` is:
+ * `addPerjadinFeedbackToken` writes it (ADR-0024), even though `cascade` from `public."perjadin"`
+ * already reaches it.
  *
  * `public."session"` and `better_auth."session"` are both here and both qualified.
  * That collision is the whole reason Better Auth was given a Postgres schema of its
@@ -573,6 +653,7 @@ export async function resetDatabase() {
       public."participant_feedback",
       public."session_feedback_token",
       public."perjadin_evaluation",
+      public."perjadin_feedback_token",
       public."perjadin",
       public."group_member",
       public."transaction",

@@ -28,6 +28,7 @@ surface for is a file to maintain and nothing more.
 
 | Component      | From                  | A surface that needs it                                                                                                                              |
 | -------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accordion`    | hand-written          | Monitoring — the "Peringatan yang diabaikan" list of set-aside warnings ([#178](https://github.com/mafiefa02/sugt/issues/178))                       |
 | `alert`        | `shadcn add`          | Perjadin Report — the note that a transaction has no evidence                                                                                        |
 | `avatar`       | `shadcn add`          | Rencanakan Perjadin — the Group's members; the sidebar's signed-in Person                                                                            |
 | `badge`        | `shadcn add`          | Concerns — which of the four sources a row came from; Cerita — the Stream                                                                            |

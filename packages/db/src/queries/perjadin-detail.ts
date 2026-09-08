@@ -1,6 +1,5 @@
 import {
   MAX_EXTRA_STAFF_PER_GROUP,
-  PIMPINAN,
   type Role,
   type SessionStatus,
   type Stream,
@@ -24,6 +23,7 @@ import {
 import type { Person } from "./caller";
 import { duplicatedStaff } from "./group-rules";
 import { derivePreparationChecklist, type PreparationItem } from "./preparation-checklist";
+import { unknownPimpinanIds } from "./rosters";
 import { heldOnWithinPerjadin } from "./session-detail";
 import { requireStaff } from "./staff-only";
 
@@ -31,13 +31,12 @@ import { requireStaff } from "./staff-only";
  * **One Perjadin, and the writes on it** — the read open to anyone signed in and carrying no
  * money at all; the writes Staff-only.
  *
- * The no-money part is the Teaching Team variant, and it is a **shape** rather than a rendering
- * rule. The criterion asks for the Advance strip, the transactions and the Report to be *absent, not
- * disabled*; the way to make that true is for the payload never to carry them. Money is
- * `./perjadin-report.ts`'s `perjadinAcquittal`, which opens with the Staff-only choke point — so a
- * professor's screen is money that was never fetched, not money hidden on the way out. The read here
- * needs no role check, because there is nothing here to refuse; every **write** below opens with
- * `requireStaff`.
+ * The no-money part is a **shape** rather than a rendering rule: this payload never carries the
+ * Advance, the transactions or the Report. Money is `./perjadin-report.ts`'s `perjadinAcquittal`, a
+ * separate read — and since #180 (ADR-0026) that read is open to any signed-in Person, so the trip
+ * page fetches it alongside this one and shows the money strip to a Pimpinan too. This query still
+ * carries none of it, and needs no role check because there is nothing here to refuse; every
+ * **write** below opens with `requireStaff`, and reading money stays a job for `perjadinAcquittal`.
  */
 
 /** One member of the Group. Staff-only now (ADR-0020), so `stream` is always null. */
@@ -82,6 +81,11 @@ export type EligibleSchool = {
   id: string;
   name: string;
   kabupatenKota: string;
+  /**
+   * The School's Time Zone, from its Province — carried so the add-Session dialog labels its time
+   * input with the zone the moment a School is picked (#165). A School always sits in one Province.
+   */
+  timeZone: TimeZone;
 };
 
 /** Everything the Perjadin detail screen renders, and no money. */
@@ -97,17 +101,26 @@ export type PerjadinDetail = {
   /** Return; null when this trip predates the logistics columns. */
   return: PerjadinTravelLeg | null;
   /**
-   * **The Report deadline is not here.** It is on `perjadinAcquittal`, behind the
-   * Staff-only choke point, because the Perjadin Report *is* the acquittal —
-   * `docs/data-model.md` says so in as many words — and the criterion puts the Report among
-   * what is absent for a Teaching Team member.
+   * **The Report deadline is not here.** It is on `perjadinAcquittal`, because the Perjadin
+   * Report *is* the acquittal — `docs/data-model.md` says so in as many words — and this payload
+   * carries no money-side figure. That acquittal read is open to any signed-in Person since #180
+   * (ADR-0026), so the deadline rides with the money there rather than being duplicated here.
    */
   group: GroupMemberEntry[];
   sessions: PerjadinSession[];
   /** The trip's Teaching Team as trip-scoped names (ADR-0020), for the per-name editor and the "Diajar oleh" pickers. */
   teachers: { id: string; name: string }[];
-  /** The Pimpinan recorded on the trip, for the checkbox editor. A subset of the fixed three. */
-  pimpinan: string[];
+  /**
+   * The Pimpinan recorded on the trip, for the checkbox editor — each a real Person of role Pimpinan
+   * (#181), carried as its `personId` and the person's `name` so the editor can key on the id and
+   * the read-only view can show the name.
+   */
+  pimpinan: { personId: string; name: string }[];
+  /**
+   * The Pimpinan roster the editor picks from — every active Person of role Pimpinan (#181). Mirrors
+   * `staff` below; empty until Pimpinan are added on `/orang`. Revoked People are not offered.
+   */
+  pimpinanRoster: { id: string; fullName: string }[];
   /**
    * Every active Staff member, for the PIC picker and the extra-Staff multi-select. Revoked People
    * are not offered — naming one puts them on a trip they are no longer on.
@@ -119,7 +132,7 @@ export type PerjadinDetail = {
    * The Preparation Checklist, each item with its tick state ([#114](https://github.com/mafiefa02/sugt/issues/114)).
    * **Derived here, not stored**: `perjadin_preparation_item` holds only the ticks. Its per-teacher
    * derivation is T4's ([#139](https://github.com/mafiefa02/sugt/issues/139)); this ticket leaves it
-   * as it stands. No money, so it rides on this open payload rather than the Staff-only acquittal.
+   * as it stands. No money, so it rides on this payload rather than the separate acquittal read.
    */
   preparation: PreparationItem[];
 };
@@ -144,6 +157,7 @@ export async function perjadinDetail(
     sessions,
     teachers,
     pimpinan,
+    pimpinanRoster,
     staff,
     eligibleSchools,
     teachingLinks,
@@ -202,11 +216,21 @@ export async function perjadinDetail(
       .from(perjadinTeacher)
       .where(eq(perjadinTeacher.perjadinId, perjadinId))
       .orderBy(asc(perjadinTeacher.name)),
-    // The Pimpinan recorded on the trip — record-only names, a subset of the fixed three.
+    // The Pimpinan recorded on the trip — record-only rows referencing a real Person (#181). Joined
+    // to `person` for the display name, in name order for the read-only view.
     db
-      .select({ name: perjadinPimpinan.name })
+      .select({ personId: perjadinPimpinan.personId, name: person.fullName })
       .from(perjadinPimpinan)
-      .where(eq(perjadinPimpinan.perjadinId, perjadinId)),
+      .innerJoin(person, eq(person.id, perjadinPimpinan.personId))
+      .where(eq(perjadinPimpinan.perjadinId, perjadinId))
+      .orderBy(asc(person.fullName)),
+    // The Pimpinan roster the checkbox editor picks from — active Pimpinan People (#181). Mirrors the
+    // Staff roster below, filtering role='Pimpinan'. Revoked People excluded.
+    db
+      .select({ id: person.id, fullName: person.fullName })
+      .from(person)
+      .where(and(eq(person.active, true), eq(person.role, "Pimpinan")))
+      .orderBy(asc(person.fullName)),
     // The Staff roster, for the PIC picker and the extra-Staff multi-select. Revoked People excluded.
     db
       .select({ id: person.id, fullName: person.fullName })
@@ -215,9 +239,15 @@ export async function perjadinDetail(
       .orderBy(asc(person.fullName)),
     // The Schools of the trip's Sub-Cluster — the set a new Session may be added at (ADR-0016).
     db
-      .select({ id: school.id, name: school.name, kabupatenKota: school.kabupatenKota })
+      .select({
+        id: school.id,
+        name: school.name,
+        kabupatenKota: school.kabupatenKota,
+        timeZone: province.timeZone,
+      })
       .from(school)
       .innerJoin(perjadin, eq(perjadin.subClusterId, school.subClusterId))
+      .innerJoin(province, eq(province.code, school.provinceCode))
       .where(eq(perjadin.id, perjadinId))
       .orderBy(asc(school.name)),
     // "Diajar oleh" for every Session on the trip: the teacher rows those Sessions link to. Scoped
@@ -278,7 +308,8 @@ export async function perjadinDetail(
       taughtBy: taughtBySession.get(row.sessionId) ?? [],
     })),
     teachers,
-    pimpinan: pimpinan.map((row) => row.name),
+    pimpinan: pimpinan.map((row) => ({ personId: row.personId, name: row.name })),
+    pimpinanRoster,
     staff,
     eligibleSchools,
     preparation,
@@ -304,8 +335,7 @@ export type SetPerjadinStaffResult =
  *
  * **The PIC is re-inserted rather than asked for.** They are the one member the caller cannot drop —
  * `perjadin_pic_is_a_group_member` refuses a Group without them at COMMIT — and the PIC is changed
- * through `changePerjadinPic`, not here. A staying member's `receiptsSettledAt` is preserved across
- * the rewrite, because a member with transactions still owes their receipts afterwards.
+ * through `changePerjadinPic`, not here.
  */
 export async function setPerjadinStaff(
   caller: Person,
@@ -333,15 +363,6 @@ export async function setPerjadinStaff(
     const duplicate = duplicatedStaff(trip.picPersonId, staffPersonIds);
     if (duplicate.length > 0) return { outcome: "duplicate-staff", personIds: duplicate };
 
-    const settled = new Map(
-      (
-        await tx
-          .select({ personId: groupMember.personId, settledAt: groupMember.receiptsSettledAt })
-          .from(groupMember)
-          .where(eq(groupMember.perjadinId, perjadinId))
-      ).map((member) => [member.personId, member.settledAt]),
-    );
-
     await tx.delete(groupMember).where(eq(groupMember.perjadinId, perjadinId));
     await tx.insert(groupMember).values([
       {
@@ -349,14 +370,12 @@ export async function setPerjadinStaff(
         personId: trip.picPersonId,
         role: "Staff" as const,
         stream: null,
-        receiptsSettledAt: settled.get(trip.picPersonId) ?? null,
       },
       ...staffPersonIds.map((personId) => ({
         perjadinId,
         personId,
         role: "Staff" as const,
         stream: null,
-        receiptsSettledAt: settled.get(personId) ?? null,
       })),
     ]);
 
@@ -418,30 +437,34 @@ export async function changePerjadinPic(
 
 export type SetPerjadinPimpinanResult =
   | { outcome: "set" }
-  /** A name outside the fixed three. Not reachable through the checkbox editor, checked anyway. */
+  /**
+   * A personId that is not an active Person of role Pimpinan — a revoked Pimpinan, a Staff id, or a
+   * stranger. Not reachable through the checkbox editor (it offers the roster), checked anyway.
+   */
   | { outcome: "unknown-pimpinan"; offending: string[] }
   /** The id names no Perjadin — a stale link, which is reachable. */
   | { outcome: "no-such-perjadin" };
 
 /**
- * **Set the Pimpinan recorded on a trip** — the subset of the fixed three who joined. Staff-only.
+ * **Set the Pimpinan recorded on a trip** — the subset of the Pimpinan roster who joined. Staff-only.
  *
  * Record-only rows (ADR-0020): a Pimpinan is not a `group_member`, files no Perjadin Evaluation and
- * adds nothing to the Preparation Checklist. The set is written whole — removed names deleted, added
- * ones inserted — deduped so the `(perjadin_id, name)` primary key cannot collide. A name outside
- * `PIMPINAN` is refused before any write, the way planning refuses it, rather than surfaced as the
- * raw `perjadin_pimpinan_name_check` violation the database would also raise.
+ * adds nothing to the Preparation Checklist. The set is written whole — removed rows deleted, added
+ * ones inserted — deduped so the `(perjadin_id, person_id)` primary key cannot collide. Each id is
+ * validated against the roster (an active Person of role='Pimpinan') before any write, the way
+ * planning validates it; the composite `perjadin_pimpinan_is_pimpinan` FK is the DB backstop that
+ * refuses a non-Pimpinan even from the SQL editor.
  */
 export async function setPerjadinPimpinan(
   caller: Person,
   perjadinId: string,
-  names: string[],
+  personIds: string[],
 ): Promise<SetPerjadinPimpinanResult> {
   requireStaff(caller);
 
-  const unique = [...new Set(names)];
-  const unknown = unique.filter((name) => !(PIMPINAN as readonly string[]).includes(name));
-  if (unknown.length > 0) return { outcome: "unknown-pimpinan", offending: unknown };
+  const unique = [...new Set(personIds)];
+  const offending = await unknownPimpinanIds(unique);
+  if (offending.length > 0) return { outcome: "unknown-pimpinan", offending };
 
   return db.transaction(async (tx) => {
     const [trip] = await tx
@@ -453,7 +476,9 @@ export async function setPerjadinPimpinan(
 
     await tx.delete(perjadinPimpinan).where(eq(perjadinPimpinan.perjadinId, perjadinId));
     if (unique.length > 0) {
-      await tx.insert(perjadinPimpinan).values(unique.map((name) => ({ perjadinId, name })));
+      await tx
+        .insert(perjadinPimpinan)
+        .values(unique.map((personId) => ({ perjadinId, personId })));
     }
 
     return { outcome: "set" };
@@ -575,4 +600,50 @@ export async function updatePerjadinLogistics(
 
     return { outcome: "updated" };
   });
+}
+
+export type UpdatePerjadinAdvanceResult =
+  | { outcome: "updated" }
+  /**
+   * A negative Advance. The DB `perjadin_advance_check` (`advance_idr >= 0`) is the floor;
+   * returning a value lets the edit surface point at the field rather than surfacing a raw
+   * constraint violation. **Zero is allowed** — an unfunded trip is a real state.
+   */
+  | { outcome: "negative-advance" }
+  /** The id names no Perjadin — a stale link, which is reachable. */
+  | { outcome: "no-such-perjadin" };
+
+/**
+ * **Correct a Perjadin's Advance after planning.** Staff-only (money writes stay Staff-only,
+ * ADR-0026); reading it is open, so this write is the only place the figure changes after
+ * `planPerjadin` set it once.
+ *
+ * **No lifecycle gate.** The correction is allowed at any time, *including after the Perjadin
+ * Report is filed* — it is a correction affordance, and the acquittal derives the remainder live
+ * (`remainderIdr = advance − spent`), so a fixed Advance fixes the remainder for free.
+ *
+ * **The only validation is the DB floor** (`advance_idr >= 0`). It is deliberately *not* coupled
+ * to what has already been spent: setting the Advance below current spend yields a negative
+ * remainder (an overspend), which is a real, representable state and not an error.
+ */
+export async function updatePerjadinAdvance(
+  caller: Person,
+  perjadinId: string,
+  advanceIdr: number,
+): Promise<UpdatePerjadinAdvanceResult> {
+  requireStaff(caller);
+
+  // The DB CHECK is the floor; reject a negative value up front so the surface can point at the
+  // field rather than showing a raw constraint violation. Not coupled to spend on purpose.
+  if (advanceIdr < 0) return { outcome: "negative-advance" };
+
+  const updated = await db
+    .update(perjadin)
+    .set({ advanceIdr })
+    .where(eq(perjadin.id, perjadinId))
+    .returning({ id: perjadin.id });
+
+  if (updated.length === 0) return { outcome: "no-such-perjadin" };
+
+  return { outcome: "updated" };
 }

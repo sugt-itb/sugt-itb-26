@@ -14,9 +14,8 @@ import {
   setPerjadinPimpinan,
   setPerjadinStaff,
 } from "@sugt/db/queries";
-import { PIMPINAN } from "@sugt/domain";
 import type { Role } from "@sugt/domain";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -27,7 +26,9 @@ import {
   addProvince,
   addSchool,
   addSubCluster,
+  refusedBy,
   resetDatabase,
+  revokePerson,
 } from "./support/fixtures";
 
 /**
@@ -110,7 +111,6 @@ async function groupOf(perjadinId: string) {
       personId: schema.groupMember.personId,
       role: schema.groupMember.role,
       stream: schema.groupMember.stream,
-      receiptsSettledAt: schema.groupMember.receiptsSettledAt,
     })
     .from(schema.groupMember)
     .where(eq(schema.groupMember.perjadinId, perjadinId));
@@ -141,15 +141,22 @@ async function linkedTeacherIds(sessionId: string) {
     .sort();
 }
 
+/** The recorded Pimpinan's names, via the join — a `perjadin_pimpinan` row references a Person now (#181). */
 async function pimpinanOf(perjadinId: string) {
   return (
     await db
-      .select({ name: schema.perjadinPimpinan.name })
+      .select({ name: schema.person.fullName })
       .from(schema.perjadinPimpinan)
+      .innerJoin(schema.person, eq(schema.person.id, schema.perjadinPimpinan.personId))
       .where(eq(schema.perjadinPimpinan.perjadinId, perjadinId))
   )
     .map((row) => row.name)
     .sort();
+}
+
+/** A Person on the Pimpinan roster — a real `role='Pimpinan'` row a trip may record (#181). */
+async function pimpinan(fullName: string, email: string) {
+  return addPerson({ fullName, email, role: "Pimpinan" });
 }
 
 /** Put a `perjadin_preparation_item` tick down, so a later mutation's DELETE can be seen. */
@@ -643,26 +650,6 @@ describe("editing a Perjadin's Staff and PIC", () => {
     expect(group.every((m) => m.role === "Staff" && m.stream === null)).toBe(true);
   });
 
-  it("preserves a staying member's receipt mark across a set", async () => {
-    const { pic, perjadinId } = await trip();
-    const dewi = await staff("Dewi Koordinator", "dewi@ditsama.itb.ac.id");
-    await setPerjadinStaff(pic, perjadinId, [dewi.id]);
-    await db
-      .update(schema.groupMember)
-      .set({ receiptsSettledAt: new Date("2026-09-04T00:00:00Z") })
-      .where(
-        and(
-          eq(schema.groupMember.perjadinId, perjadinId),
-          eq(schema.groupMember.personId, dewi.id),
-        ),
-      );
-
-    await setPerjadinStaff(pic, perjadinId, [dewi.id]);
-
-    const group = await groupOf(perjadinId);
-    expect(group.find((m) => m.personId === dewi.id)?.receiptsSettledAt).not.toBeNull();
-  });
-
   it("refuses more than ten extra Staff, writing nothing", async () => {
     const { pic, perjadinId } = await trip();
     const eleven = await Promise.all(
@@ -752,39 +739,65 @@ describe("editing a Perjadin's Staff and PIC", () => {
 describe("editing a Perjadin's Pimpinan", () => {
   beforeEach(resetDatabase);
 
-  it("sets the recorded Pimpinan to the subset given", async () => {
+  it("sets the recorded Pimpinan to the subset of the roster given", async () => {
     const { pic, perjadinId } = await trip();
-    const [a, b] = PIMPINAN;
+    const a = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
+    const b = await pimpinan("Anton Timur Jaelani", "anton@ditsama.itb.ac.id");
 
-    expect(await setPerjadinPimpinan(pic, perjadinId, [a, b])).toEqual({ outcome: "set" });
-    expect(await pimpinanOf(perjadinId)).toEqual([a, b].sort());
+    expect(await setPerjadinPimpinan(pic, perjadinId, [a.id, b.id])).toEqual({ outcome: "set" });
+    expect(await pimpinanOf(perjadinId)).toEqual([a.fullName, b.fullName].sort());
     // They are never Group members.
     expect(await groupOf(perjadinId)).toHaveLength(1);
   });
 
   it("clears the Pimpinan when given an empty set", async () => {
     const { pic, perjadinId } = await trip();
-    const [a] = PIMPINAN;
-    await setPerjadinPimpinan(pic, perjadinId, [a]);
+    const a = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
+    await setPerjadinPimpinan(pic, perjadinId, [a.id]);
 
     expect(await setPerjadinPimpinan(pic, perjadinId, [])).toEqual({ outcome: "set" });
     expect(await pimpinanOf(perjadinId)).toEqual([]);
   });
 
-  it("dedupes a repeated name rather than colliding on the primary key", async () => {
+  it("dedupes a repeated id rather than colliding on the primary key", async () => {
     const { pic, perjadinId } = await trip();
-    const [a] = PIMPINAN;
+    const a = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
 
-    expect(await setPerjadinPimpinan(pic, perjadinId, [a, a])).toEqual({ outcome: "set" });
-    expect(await pimpinanOf(perjadinId)).toEqual([a]);
+    expect(await setPerjadinPimpinan(pic, perjadinId, [a.id, a.id])).toEqual({ outcome: "set" });
+    expect(await pimpinanOf(perjadinId)).toEqual([a.fullName]);
   });
 
-  it("refuses a name outside the fixed three, writing nothing", async () => {
+  it("refuses a Staff id, which is not an active Pimpinan, writing nothing", async () => {
     const { pic, perjadinId } = await trip();
-
-    expect(await setPerjadinPimpinan(pic, perjadinId, ["Nobody At All"])).toEqual({
+    // `pic` is a Staff Person — a valid id, but the wrong role for the Pimpinan roster.
+    expect(await setPerjadinPimpinan(pic, perjadinId, [pic.id])).toEqual({
       outcome: "unknown-pimpinan",
-      offending: ["Nobody At All"],
+      offending: [pic.id],
+    });
+    expect(await pimpinanOf(perjadinId)).toEqual([]);
+  });
+
+  it("refuses a random uuid that names no Person, writing nothing", async () => {
+    const { pic, perjadinId } = await trip();
+    const stranger = randomUUID();
+
+    expect(await setPerjadinPimpinan(pic, perjadinId, [stranger])).toEqual({
+      outcome: "unknown-pimpinan",
+      offending: [stranger],
+    });
+    expect(await pimpinanOf(perjadinId)).toEqual([]);
+  });
+
+  it("refuses a revoked Pimpinan, whose id is no longer active, writing nothing", async () => {
+    const { pic, perjadinId } = await trip();
+    // A once-valid Pimpinan, now revoked (active = false) — the roster check requires active, so a
+    // stale id from before the revoke is named rather than recorded.
+    const gone = await pimpinan("Fatimah Azzahra", "fatimah@ditsama.itb.ac.id");
+    await revokePerson(gone.id);
+
+    expect(await setPerjadinPimpinan(pic, perjadinId, [gone.id])).toEqual({
+      outcome: "unknown-pimpinan",
+      offending: [gone.id],
     });
     expect(await pimpinanOf(perjadinId)).toEqual([]);
   });
@@ -795,6 +808,18 @@ describe("editing a Perjadin's Pimpinan", () => {
 
     await expect(setPerjadinPimpinan(prof, perjadinId, [])).rejects.toSatisfy(isNotStaffError);
   });
+
+  it("has the DB composite FK refuse a non-Pimpinan personId that bypassed the query", async () => {
+    const { pic, perjadinId } = await trip();
+    // A direct insert of a Staff person, skipping `setPerjadinPimpinan`'s roster check — the
+    // composite `(person_id, role)` FK into `person (id, role)` is the DB backstop that refuses it.
+    const refusal = await refusedBy(
+      db
+        .insert(schema.perjadinPimpinan)
+        .values({ perjadinId, personId: pic.id, role: "Pimpinan" as const }),
+    );
+    expect(refusal).toBe("perjadin_pimpinan_is_pimpinan");
+  });
 });
 
 describe("perjadinDetail's new payload", () => {
@@ -804,8 +829,8 @@ describe("perjadinDetail's new payload", () => {
     const { pic, perjadinId, schools } = await trip();
     const andi = await addPerjadinTeacher(pic, perjadinId, "Dr. Andi");
     if (andi.outcome !== "added") throw new Error("fixture failed");
-    const [p0] = PIMPINAN;
-    await setPerjadinPimpinan(pic, perjadinId, [p0]);
+    const p0 = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
+    await setPerjadinPimpinan(pic, perjadinId, [p0.id]);
     const added = await addPerjadinSession(pic, perjadinId, {
       schoolId: schools[0].id,
       heldOn: "2026-09-02",
@@ -818,10 +843,15 @@ describe("perjadinDetail's new payload", () => {
     const detail = await perjadinDetail(pic, perjadinId);
 
     expect(detail?.teachers).toEqual([{ id: andi.teacherId, name: "Dr. Andi" }]);
-    expect(detail?.pimpinan).toEqual([p0]);
+    expect(detail?.pimpinan).toEqual([{ personId: p0.id, name: p0.fullName }]);
+    // The Pimpinan roster carries the active Pimpinan People the editor picks from.
+    expect(detail?.pimpinanRoster).toEqual([{ id: p0.id, fullName: p0.fullName }]);
     expect(detail?.eligibleSchools.map((s) => s.id).sort()).toEqual(
       schools.map((s) => s.id).sort(),
     );
+    // Each eligible School carries its Province's Time Zone, so the add-Session dialog can label
+    // its time input on selection (#165). The trip's Schools are all in JB (WIB).
+    expect(detail?.eligibleSchools.every((s) => s.timeZone === "WIB")).toBe(true);
     // The Group is Staff-only, so no People roster of Teaching Team is carried any more.
     expect(detail).not.toHaveProperty("teachingTeam");
     const session = detail?.sessions[0];

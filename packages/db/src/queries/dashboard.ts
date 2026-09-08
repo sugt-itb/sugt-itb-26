@@ -3,7 +3,6 @@ import { and, asc, eq, isNull, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { session } from "../schema/delivery";
-import { sessionRecord } from "../schema/evaluations";
 import { cluster, school } from "../schema/reference";
 import { groupMember, perjadin, transaction } from "../schema/travel";
 import type { Person } from "./caller";
@@ -29,13 +28,8 @@ const OUTER_PERJADIN_ID = sql.raw(`"perjadin"."id"`);
  * `session_teacher`) is gone. Class Records are deferred for both modes.
  *
  * The tone throughout is **counts, not claims** (ADR-0009, `docs/data-model.md`'s *who still
- * owes what*): nothing is overdue, nothing is gated, and the owed list names who has not filed so
- * they can be chased. **Participants are never counted** — there is no attendee list, so a count
- * would have no denominator.
- *
- * *"Who still owes what" filters on `session.status = 'delivered'`*, so a dashboard never reports a
- * Session Record owed for a visit that has not happened, the overdue-shaped state ADR-0006 exists
- * to prevent.
+ * owes what*): nothing is overdue and nothing is gated. **Participants are never counted** — there
+ * is no attendee list, so a count would have no denominator.
  */
 
 /** One Cluster's delivered-Session count, for the Staff dashboard's reach picture. */
@@ -43,13 +37,6 @@ export type ClusterReach = {
   clusterId: string;
   clusterName: string;
   delivered: number;
-};
-
-/** One Session Record the PIC still owes on a delivered Session they led. */
-export type OwedSessionRecord = {
-  sessionId: string;
-  schoolName: string;
-  heldOn: string;
 };
 
 /**
@@ -62,8 +49,6 @@ export type PicReport = {
   startsOn: string;
   endsOn: string;
   groupCount: number;
-  /** Members who have handed their receipts over — the `2 / 4` the design shows. */
-  receiptsSettled: number;
   transactionCount: number;
   /** Advance minus everything spent. Negative means the Group overspent. */
   remainderIdr: number;
@@ -91,21 +76,19 @@ export type StaffDashboard = {
   perCluster: ClusterReach[];
   /** The Advance still out, unaccounted for: the sum of Advances not yet returned. Money. */
   advanceOutstandingIdr: number;
-  /** Session Records this PIC owes on delivered Sessions they led — the list to be chased. */
-  owed: OwedSessionRecord[];
   /** Trips they are PIC of whose Report is not yet filed. */
   picReports: PicReport[];
 };
 
 /**
  * The Staff dashboard, in one call and behind the Staff-only choke point. The reads are
- * independent aggregates — the reach picture, the outstanding Advance, the owed Records and the
- * PIC's trips — kept concurrent with `Promise.all`.
+ * independent aggregates — the reach picture, the outstanding Advance and the PIC's trips — kept
+ * concurrent with `Promise.all`.
  */
 export async function staffDashboard(caller: Person): Promise<StaffDashboard> {
   requireStaff(caller);
 
-  const [perCluster, reached, advance, owed, picReports] = await Promise.all([
+  const [perCluster, reached, advance, picReports] = await Promise.all([
     // Delivered count per Cluster, the delivered filter in the JOIN so a Cluster at zero still
     // appears — the rule `./delivered-sessions.ts` owns.
     db
@@ -131,28 +114,6 @@ export async function staffDashboard(caller: Person): Promise<StaffDashboard> {
       })
       .from(perjadin)
       .where(isNull(perjadin.returnedAt)),
-    // Session Records the caller owes: delivered Sessions where they are PIC (online) or the
-    // trip's PIC (offline), and no Session Record of theirs exists yet.
-    db
-      .select({
-        sessionId: session.id,
-        schoolName: school.name,
-        heldOn: session.heldOn,
-      })
-      .from(session)
-      .innerJoin(school, eq(school.id, session.schoolId))
-      .leftJoin(perjadin, eq(perjadin.id, session.perjadinId))
-      .where(
-        and(
-          eq(session.status, "delivered"),
-          sql`coalesce(${session.onlinePicPersonId}, ${perjadin.picPersonId}) = ${caller.id}`,
-          sql`not exists (
-            select 1 from ${sessionRecord} sr
-            where sr.session_id = ${session.id} and sr.filed_by_person_id = ${caller.id}
-          )`,
-        ),
-      )
-      .orderBy(asc(session.heldOn), asc(session.id)),
     // Trips the caller is PIC of whose Report is not filed, with the acquittal figures the strip
     // shows. `reportDueOn` is derived here the way `perjadinAcquittal` derives it — two days after
     // return — and stated as a date rather than counted down to, so nothing reads as overdue.
@@ -164,10 +125,6 @@ export async function staffDashboard(caller: Person): Promise<StaffDashboard> {
         endsOn: perjadin.endsOn,
         groupCount:
           sql<number>`(select count(*) from ${groupMember} gm where gm.perjadin_id = ${OUTER_PERJADIN_ID})`.mapWith(
-            Number,
-          ),
-        receiptsSettled:
-          sql<number>`(select count(*) from ${groupMember} gm where gm.perjadin_id = ${OUTER_PERJADIN_ID} and gm.receipts_settled_at is not null)`.mapWith(
             Number,
           ),
         transactionCount:
@@ -194,7 +151,6 @@ export async function staffDashboard(caller: Person): Promise<StaffDashboard> {
     deliveredTotal: perCluster.reduce((sum, row) => sum + row.delivered, 0),
     perCluster,
     advanceOutstandingIdr: advance[0]?.total ?? 0,
-    owed,
     picReports,
   };
 }

@@ -1,17 +1,21 @@
 import type { Person } from "./caller";
 
 /**
- * The Staff-only choke point. **Delivery data is open to everyone signed in;
- * financial data is not** — [ADR-0004](../../../../docs/adr/0004-delivery-data-is-open-internally-money-is-not.md).
+ * The Staff-only choke point. **The boundary is now read (any signed-in Person) vs write
+ * (Staff)** — [ADR-0004](../../../../docs/adr/0004-delivery-data-is-open-internally-money-is-not.md)
+ * drew the line at delivery-vs-money, and [ADR-0026](../../../../docs/adr/0026-money-is-open-to-read-and-staff-only-to-write.md)
+ * ([#180](https://github.com/mafiefa02/sugt/issues/180)) reversed the money-read half.
  *
- * **Two kinds of surface pass through here, and ADR-0004 only argues for one of them.**
- * Reading money is Staff-only by that ADR. *Arranging* delivery — Jadwalkan Sesi daring
- * and Rencanakan Perjadin — is Staff-only because
- * [#9](https://github.com/mafiefa02/sugt/issues/9) says so, and ADR-0004 is silent on
- * it: that ADR opens delivery data to both roles for **reading** and leaves writes with
- * "the record's owner", which a Session nobody has arranged yet does not have. So the
- * guard is one guard and the reasons are two, and neither of them is "this function
- * touches money".
+ * **What passes through here is writes, not money reads.** Money READS are now open to any
+ * signed-in Person — a Pimpinan reads all money (the acquittal, the CSV export, the trip money
+ * strip, the `/monitoring` budget card), so `perjadinAcquittal` no longer opens with this guard.
+ * What this choke point guards is money **WRITES** — recording, attaching, settling and filing a
+ * transaction, plus the treasurer return — and delivery-*arranging* writes: Jadwalkan Sesi daring
+ * and Rencanakan Perjadin are Staff-only because [#9](https://github.com/mafiefa02/sugt/issues/9)
+ * says so, and ADR-0004 is silent on it (that ADR opens delivery data to both roles for **reading**
+ * and leaves writes with "the record's owner", which a Session nobody has arranged yet does not
+ * have). So the guard is one guard and the reasons are two, and neither of them is "this function
+ * reads money".
  *
  * That rule is application code rather than RLS, because Better Auth means there is
  * no `auth.uid()` in Postgres and a policy would need `SET LOCAL` on every
@@ -51,11 +55,11 @@ export class NotStaffError extends Error {
 
   constructor(person: Person) {
     super(
-      `A Staff-only query was handed ${person.role} caller ${person.id}. Reading money is ` +
-        `Staff-only by ADR-0004 and arranging delivery is Staff-only by the surface list; ` +
-        `either way the surfaces that reach one are absent for Teaching Team rather than ` +
-        `disabled — so this is a bug in whoever offered the surface, not a state a user ` +
-        `can reach.`,
+      `A Staff-only query was handed ${person.role} caller ${person.id}. Writing money is ` +
+        `Staff-only by ADR-0026 (reading it is open to any signed-in Person) and arranging ` +
+        `delivery is Staff-only by the surface list; either way the write that reaches one is ` +
+        `refused server-side for a non-Staff Person — so this is a bug in whoever offered the ` +
+        `write, not a state a user can reach.`,
     );
   }
 }

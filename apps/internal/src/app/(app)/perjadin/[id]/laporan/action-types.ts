@@ -42,10 +42,11 @@ export type FinalizeReceiptsResult =
  * is private — and the URL below is what renders it, so sending the key too would put it in the
  * page's serialised payload for nothing.
  *
- * The URL is minted server-side, after `perjadinAcquittal` has already refused a non-Staff caller.
- * Better Auth means storage policies cannot see who is asking, so this signed link is the only way
- * a receipt renders, and the Staff check that precedes it is the only thing standing between
- * Teaching Team and one.
+ * The URL is minted server-side, on the Laporan page — an open money read now (ADR-0026, #180), so
+ * any signed-in Person who reads the acquittal renders its receipts. Better Auth means storage
+ * policies cannot see who is asking, so this signed link is the only way a receipt renders. Reading
+ * is open; the money *writes* on this surface (attaching a receipt, filing) stay Staff-only in their
+ * own Server Actions.
  */
 export type ViewableEvidence = Omit<AcquittalEvidence, "storagePath" | "uploadedAt"> & {
   url: string | null;

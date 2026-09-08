@@ -14,8 +14,8 @@ import {
   MAX_EXTRA_STAFF_PER_GROUP,
   MAX_OFFLINE_SESSIONS_PER_SCHOOL_PER_PERJADIN,
   MAX_TEACHING_TEAM_PER_PERJADIN,
-  PIMPINAN,
   STREAMS,
+  timeZoneSuffix,
   TRANSPORT_MODES,
   type Stream,
   type TransportMode,
@@ -60,19 +60,21 @@ function emptySession(): SessionDraft {
  * a repeatable list of Sessions — a School is "kept" on the trip exactly when it has at least one —
  * and each Session carries its own date, start time, Stream and the subset of the trip's Teaching
  * Team who taught it. The Teaching Team are **free-text names**, not People (ADR-0020): typed in one
- * at a time and shown as removable chips. Pimpinan are chosen from the fixed three.
+ * at a time and shown as removable chips. Pimpinan are chosen from the Pimpinan roster (#181).
  *
  * A client component because every row is editable and none of that state is worth a URL. The
- * Sub-Clusters and Staff roster arrive as props; nothing here fetches. The action is called with a
- * typed value rather than through a `<form action>`, because the payload is nested — Sessions with
- * teacher references — and `FormData` would mean flattening it out and parsing it back.
+ * Sub-Clusters and the Staff and Pimpinan rosters arrive as props; nothing here fetches. The action
+ * is called with a typed value rather than through a `<form action>`, because the payload is nested —
+ * Sessions with teacher references — and `FormData` would mean flattening it out and parsing it back.
  */
 function PerjadinPlanForm({
   subClusters,
   staff,
+  pimpinan: pimpinanRoster,
 }: {
   subClusters: PlannableSubCluster[];
   staff: PlannablePerson[];
+  pimpinan: PlannablePerson[];
 }) {
   const router = useRouter();
   const [subClusterId, setSubClusterId] = useState("");
@@ -89,7 +91,8 @@ function PerjadinPlanForm({
   const [teacherDraft, setTeacherDraft] = useState("");
   // Extra Staff on the Group beyond the PIC — a searchable multi-select of Person ids, capped at ten.
   const [extraStaff, setExtraStaff] = useState<string[]>([]);
-  // The Pimpinan recorded on the trip — a subset of the fixed three. Record-only (ADR-0020).
+  // The Pimpinan recorded on the trip — personIds chosen from the Pimpinan roster. Record-only
+  // (ADR-0020, #181).
   const [pimpinan, setPimpinan] = useState<string[]>([]);
   // Departure/return logistics, all six required to submit. The zones are the server's — WIB out,
   // derived back.
@@ -415,35 +418,41 @@ function PerjadinPlanForm({
             <p className="-mt-0.5 text-xs text-muted-foreground">
               Pimpinan DITSAMA yang ikut memantau — tercatat saja, bukan anggota Group.
             </p>
-            <ul className="mt-1 grid gap-2">
-              {PIMPINAN.map((name) => {
-                const checkboxId = `${idPrefix}-pimpinan-${name}`;
-                return (
-                  <li
-                    key={name}
-                    className="flex items-center gap-2.5"
-                  >
-                    <Checkbox
-                      id={checkboxId}
-                      checked={pimpinan.includes(name)}
-                      onCheckedChange={(checked) => {
-                        setPimpinan((previous) =>
-                          checked === true
-                            ? [...previous, name]
-                            : previous.filter((entry) => entry !== name),
-                        );
-                      }}
-                    />
-                    <Label
-                      htmlFor={checkboxId}
-                      className="text-sm font-normal"
+            {pimpinanRoster.length === 0 ? (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Belum ada Pimpinan di roster — tambahkan lewat /orang.
+              </p>
+            ) : (
+              <ul className="mt-1 grid gap-2">
+                {pimpinanRoster.map((person) => {
+                  const checkboxId = `${idPrefix}-pimpinan-${person.id}`;
+                  return (
+                    <li
+                      key={person.id}
+                      className="flex items-center gap-2.5"
                     >
-                      {name}
-                    </Label>
-                  </li>
-                );
-              })}
-            </ul>
+                      <Checkbox
+                        id={checkboxId}
+                        checked={pimpinan.includes(person.id)}
+                        onCheckedChange={(checked) => {
+                          setPimpinan((previous) =>
+                            checked === true
+                              ? [...previous, person.id]
+                              : previous.filter((entry) => entry !== person.id),
+                          );
+                        }}
+                      />
+                      <Label
+                        htmlFor={checkboxId}
+                        className="text-sm font-normal"
+                      >
+                        {person.fullName}
+                      </Label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </div>
       </div>
@@ -545,7 +554,7 @@ function PerjadinPlanForm({
 
                         <Field
                           id={`${idPrefix}-time-${school.id}-${index}`}
-                          label="Jam Mulai"
+                          label={`Jam Mulai${timeZoneSuffix(school.timeZone)}`}
                         >
                           <Input
                             id={`${idPrefix}-time-${school.id}-${index}`}

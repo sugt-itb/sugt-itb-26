@@ -14,10 +14,11 @@ import type { Role } from "@sugt/domain";
  * | `Person`           | somebody signed in whose `person` row is still `active` | delivery; money only if Staff | their own records           |
  * | `ServiceCaller`    | `@sugt/public`, holding `AGGREGATES_SECRET`            | the four aggregate payloads   | nothing                     |
  * | `ParticipantToken` | a live Session feedback token                          | nothing                       | `participant_feedback` only |
+ * | `PerjadinToken`    | a live Perjadin feedback token                         | nothing                       | `perjadin_evaluation` only  |
  *
  * See `docs/data-model.md`, *what the database does not hold*.
  */
-export type Caller = Person | ServiceCaller | ParticipantToken;
+export type Caller = Person | ServiceCaller | ParticipantToken | PerjadinToken;
 
 /**
  * Somebody signed in, whose `person` row is still `active`.
@@ -77,4 +78,22 @@ export type ParticipantToken = {
   readonly kind: "participant";
   /** The Session the token was issued for, already resolved and already unexpired. */
   sessionId: string;
+};
+
+/**
+ * A live Perjadin feedback token — the same idea as `ParticipantToken`, one table over. **It reads
+ * nothing**: `docs/data-model.md` gives it write access to `perjadin_evaluation` and no read at all,
+ * so no read query will ever accept this arm.
+ *
+ * A Perjadin Evaluation used to be a signed-in write by a Group member; ADR-0024 retargeted it onto
+ * the Participant Feedback token pattern so the name-based Pengajar and the record-only Pimpinan —
+ * who have no login — can file too. The handler resolving the token needs the Perjadin, and that
+ * resolution is an internal step (`apps/internal/src/lib/perjadin-feedback-token.ts`) rather than a
+ * query taking a `PerjadinToken`: the token has to be checked before there is a caller to check it
+ * as. See ADR-0012, ADR-0024 and [#167](https://github.com/mafiefa02/sugt/issues/167).
+ */
+export type PerjadinToken = {
+  readonly kind: "perjadin";
+  /** The Perjadin the token was issued for, already resolved and already unexpired. */
+  perjadinId: string;
 };
