@@ -24,11 +24,11 @@ describe("monthGrid", () => {
     const grid = monthGrid(SEPT);
     expect(grid).toHaveLength(42);
     // The first cell is the Sunday on or before the 1st — 30 Aug, a greyed spillover day.
-    expect(grid[0]).toEqual({ date: "2026-08-30", inMonth: false });
+    expect(grid[0]).toEqual({ date: "2026-08-30", dayNumber: 30, inMonth: false });
     // The 1st of the month is a Tuesday, so it is the third cell, in-month.
-    expect(grid[2]).toEqual({ date: "2026-09-01", inMonth: true });
+    expect(grid[2]).toEqual({ date: "2026-09-01", dayNumber: 1, inMonth: true });
     // The last cell is the trailing spillover into October.
-    expect(grid[41]).toEqual({ date: "2026-10-10", inMonth: false });
+    expect(grid[41]).toEqual({ date: "2026-10-10", dayNumber: 10, inMonth: false });
   });
 
   it("marks exactly the month's own days in-month and greys the rest", () => {
@@ -37,16 +37,16 @@ describe("monthGrid", () => {
     expect(grid.filter((d) => d.inMonth)).toHaveLength(30);
     expect(grid.filter((d) => !d.inMonth)).toHaveLength(12);
     const nine = grid.find((d) => d.date === "2026-09-09");
-    expect(nine).toEqual({ date: "2026-09-09", inMonth: true });
+    expect(nine).toEqual({ date: "2026-09-09", dayNumber: 9, inMonth: true });
   });
 
   it("has no leading spillover when the 1st is itself a Sunday", () => {
     // 1 Feb 2026 is a Sunday, so the grid opens on it — still 42 cells, trailing into March.
     const grid = monthGrid({ year: 2026, month: 2 });
     expect(grid).toHaveLength(42);
-    expect(grid[0]).toEqual({ date: "2026-02-01", inMonth: true });
+    expect(grid[0]).toEqual({ date: "2026-02-01", dayNumber: 1, inMonth: true });
     expect(grid.filter((d) => d.inMonth)).toHaveLength(28);
-    expect(grid[41]).toEqual({ date: "2026-03-14", inMonth: false });
+    expect(grid[41]).toEqual({ date: "2026-03-14", dayNumber: 14, inMonth: false });
   });
 
   it("yields 42 consecutive calendar days", () => {

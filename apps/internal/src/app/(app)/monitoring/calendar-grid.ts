@@ -11,9 +11,9 @@
 /** A calendar month, `month` 1–12 (human), so a fixture reads `{ year: 2026, month: 9 }` for September. */
 export type CalendarMonth = { year: number; month: number };
 
-/** One grid cell: its `YYYY-MM-DD` date and whether it belongs to the month on display (vs. a greyed
- *  spillover day from the adjacent month). */
-export type CalendarDay = { date: string; inMonth: boolean };
+/** One grid cell: its `YYYY-MM-DD` date, the day-of-month number the cell prints, and whether it
+ *  belongs to the month on display (vs. a greyed spillover day from the adjacent month). */
+export type CalendarDay = { date: string; dayNumber: number; inMonth: boolean };
 
 /** The seven column headers, Sunday first — the mockup's `S M T W T F S`. Keyed by index in the view
  *  because the letters repeat. */
@@ -75,6 +75,7 @@ export function monthGrid(m: CalendarMonth): CalendarDay[] {
     const at = new Date(start + i * DAY_MS);
     days.push({
       date: at.toISOString().slice(0, 10),
+      dayNumber: at.getUTCDate(),
       inMonth: at.getUTCMonth() === m.month - 1,
     });
   }

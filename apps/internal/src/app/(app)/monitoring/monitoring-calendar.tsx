@@ -92,17 +92,18 @@ function DayCell({
   isToday: boolean;
   markers: MarkerType[];
 }) {
-  const dayNumber = Number(day.date.slice(-2));
   return (
     <div className="flex min-h-14 flex-col items-center gap-1 py-1">
       <span
         className={cn(
           "flex size-6 items-center justify-center rounded-full text-sm tabular-nums",
-          !day.inMonth && "text-muted-foreground/50",
+          // Grey only a spillover day that is not today, so today's own colour is never in a
+          // class-order race with the muted spillover colour.
+          !day.inMonth && !isToday && "text-muted-foreground/50",
           isToday && "border border-primary font-medium text-primary",
         )}
       >
-        {dayNumber}
+        {day.dayNumber}
       </span>
       {markers.length > 0 && (
         <div className="grid w-fit grid-cols-4 gap-0.5">
