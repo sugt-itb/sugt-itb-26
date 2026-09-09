@@ -32,7 +32,7 @@ export type MarkerType =
  * Folding a day's marker set in this order dedups and priority-sorts in one pass, and doubles as the
  * truncation order — the first `MAX_MARKERS_PER_DAY` win.
  */
-const MARKER_PRIORITY: readonly MarkerType[] = [
+const MARKER_PRIORITY = [
   "offline-cluster-1",
   "offline-cluster-2",
   "offline-cluster-3",
@@ -43,7 +43,20 @@ const MARKER_PRIORITY: readonly MarkerType[] = [
   "online-cluster-3",
   "online-cluster-4",
   "pretest-posttest",
-];
+] as const satisfies readonly MarkerType[];
+
+/**
+ * A compile-time guard that `MARKER_PRIORITY` lists **every** `MarkerType`. The list is both the
+ * render order and the dedup filter (the final fold keeps only markers it names), so a type omitted
+ * here would silently vanish from every day's output. `satisfies` above already rejects a member
+ * that is not a `MarkerType`; this rejects the other direction — add an eleventh `MarkerType`
+ * without listing it and `Exclude` is no longer `never`, so this alias fails to instantiate and the
+ * build breaks. Pure types, no runtime cost.
+ */
+type AssertNever<_T extends never> = true;
+type _MarkerPriorityIsExhaustive = AssertNever<
+  Exclude<MarkerType, (typeof MARKER_PRIORITY)[number]>
+>;
 
 /**
  * Two rows of four dots. More than eight distinct markers on one day is practically impossible
