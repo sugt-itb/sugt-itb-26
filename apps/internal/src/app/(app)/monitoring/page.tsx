@@ -1,6 +1,7 @@
 import { requirePerson } from "-/lib/person";
 import { monitoringData } from "@sugt/db/queries";
 
+import { deriveCalendarMarkers } from "./calendar-derive";
 import { deriveMonitoring } from "./monitoring-derive";
 import { showBudget } from "./monitoring-state";
 import { MonitoringView } from "./monitoring-view";
@@ -27,6 +28,10 @@ export default async function Page() {
   // against the WIB window bounds in `LURING_SESI_WINDOWS`.
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
   const derived = deriveMonitoring(data, today);
+  // The Calendar's markers — a date→markers map over every date in the data, so the client can page
+  // to any month without a refetch. The grid seeds its view on `today` (the same WIB date the rest
+  // of the screen turns over on).
+  const calendarMarkers = deriveCalendarMarkers(data);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -46,6 +51,8 @@ export default async function Page() {
         daring={derived.daring}
         timeline={derived.timeline}
         warnings={derived.warnings}
+        calendarMarkers={calendarMarkers}
+        today={today}
       />
     </div>
   );

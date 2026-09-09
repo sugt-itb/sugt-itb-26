@@ -29,6 +29,8 @@ import { cn } from "@sugt/ui/lib/utils";
 import { Check } from "lucide-react";
 import { useState } from "react";
 
+import type { MarkerType } from "./calendar-derive";
+import { MonitoringCalendar } from "./monitoring-calendar";
 import type { MatrixRow, TimelineStep } from "./monitoring-derive";
 import { dismissWarning, initialWarningState, type Warning } from "./monitoring-state";
 
@@ -53,6 +55,8 @@ export function MonitoringView({
   daring,
   timeline,
   warnings,
+  calendarMarkers,
+  today,
 }: {
   showBudget: boolean;
   activitiesPercent: number;
@@ -62,6 +66,8 @@ export function MonitoringView({
   daring: MatrixRow[];
   timeline: TimelineStep[];
   warnings: Warning[];
+  calendarMarkers: Record<string, MarkerType[]>;
+  today: string;
 }) {
   const [state, setState] = useState(() => initialWarningState(warnings));
 
@@ -154,17 +160,31 @@ export function MonitoringView({
         </CardContent>
       </Card>
 
-      {/* Delivery matrices, one Card each. */}
-      <MatrixCard
-        title="Luring Terlaksana"
-        clusters={clusters}
-        rows={luring}
-      />
-      <MatrixCard
-        title="Daring Terlaksana"
-        clusters={clusters}
-        rows={daring}
-      />
+      {/* Calendar + the two delivery matrices. On mobile this is one column ordered Calendar →
+          Luring → Daring (the Timeline card above already sits first); on `md` it becomes two
+          columns — the matrices stacked on the left, the Calendar spanning both rows on the right. */}
+      <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start">
+        <div className="order-1 md:order-none md:col-start-2 md:row-span-2">
+          <MonitoringCalendar
+            markers={calendarMarkers}
+            today={today}
+          />
+        </div>
+        <div className="order-2 md:order-none md:col-start-1 md:row-start-1">
+          <MatrixCard
+            title="Luring Terlaksana"
+            clusters={clusters}
+            rows={luring}
+          />
+        </div>
+        <div className="order-3 md:order-none md:col-start-1 md:row-start-2">
+          <MatrixCard
+            title="Daring Terlaksana"
+            clusters={clusters}
+            rows={daring}
+          />
+        </div>
+      </div>
     </div>
   );
 }
