@@ -162,6 +162,7 @@ describe("deriveMonitoring", () => {
         sess({ schoolId: "s1", mode: "offline", status: "delivered" }),
         sess({ schoolId: "s2", mode: "online", status: "delivered" }),
       ],
+      perjadinSpans: [],
       budgetUsedIdr: 29_560_000,
     };
 
