@@ -3,8 +3,8 @@ import { asc, eq, ne, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { session } from "../schema/delivery";
-import { cluster, school } from "../schema/reference";
-import { transaction } from "../schema/travel";
+import { cluster, school, subCluster } from "../schema/reference";
+import { perjadin, perjadinPimpinan, transaction } from "../schema/travel";
 import type { Person } from "./caller";
 
 /**
@@ -51,8 +51,25 @@ export type MonitoringData = {
    * next Session take rank 1, exactly as the Sesi labelling means it (ADR-0027).
    */
   sessions: MonitoringSession[];
+  /**
+   * Every Perjadin as a date span the Calendar draws offline and Monev markers from — **all** rows,
+   * with no status filter (there is no cancel concept on a Perjadin). `clusterId` comes from the
+   * trip's `sub_cluster.cluster_id`; `startsOn`/`endsOn` are the `date` columns (`YYYY-MM-DD`);
+   * `hasPimpinan` is an EXISTS over `perjadin_pimpinan`, so a trip with any recorded Pimpinan draws
+   * the Monev marker across its span. The fold in `calendar-derive.ts` unions overlapping spans.
+   */
+  perjadinSpans: PerjadinSpan[];
   /** `SUM(transaction.amount_idr)` over every transaction, programme-wide. Coalesced to 0. */
   budgetUsedIdr: number;
+};
+
+/** One Perjadin as the Calendar reads it: its Cluster, its inclusive date span, and whether any
+ *  Pimpinan travels on it (the Monev marker). */
+export type PerjadinSpan = {
+  clusterId: string;
+  startsOn: string;
+  endsOn: string;
+  hasPimpinan: boolean;
 };
 
 /**
@@ -88,11 +105,33 @@ export async function monitoringData(_caller: Person): Promise<MonitoringData> {
     // has one to skip — a cancelled Session simply does not exist to it.
     .where(ne(session.status, "cancelled"));
 
+  const perjadinSpans = await db
+    .select({
+      // The trip's Cluster is its Sub-Cluster's Cluster — `sub_cluster.cluster_id` is NOT NULL, so
+      // the inner join never drops a Perjadin.
+      clusterId: subCluster.clusterId,
+      startsOn: perjadin.startsOn,
+      endsOn: perjadin.endsOn,
+      // A trip carries the Monev marker iff any Pimpinan is recorded on it. EXISTS is a boolean the
+      // fold reads directly — it never needs the Pimpinan rows themselves.
+      hasPimpinan: sql<boolean>`exists (
+        select 1 from ${perjadinPimpinan} where ${perjadinPimpinan.perjadinId} = ${perjadin.id}
+      )`.mapWith(Boolean),
+    })
+    .from(perjadin)
+    .innerJoin(subCluster, eq(subCluster.id, perjadin.subClusterId));
+
   const [budget] = await db
     .select({
       budgetUsedIdr: sql<number>`coalesce(sum(${transaction.amountIdr}), 0)`.mapWith(Number),
     })
     .from(transaction);
 
-  return { clusters, schools, sessions, budgetUsedIdr: budget?.budgetUsedIdr ?? 0 };
+  return {
+    clusters,
+    schools,
+    sessions,
+    perjadinSpans,
+    budgetUsedIdr: budget?.budgetUsedIdr ?? 0,
+  };
 }
