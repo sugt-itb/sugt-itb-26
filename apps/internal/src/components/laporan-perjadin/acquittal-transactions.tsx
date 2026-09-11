@@ -56,8 +56,9 @@ import { type ReactElement, useId, useMemo, useRef, useState, useTransition } fr
  * evening. The entry form carries the same control for evidence already in hand at the moment of
  * entry, so a PIC working through a folder of receipts after returning records the line and its
  * proof in one step. ADR-0007 rests on both post-trip and on-the-spot entry being equally easy;
- * ADR-0030 records that attaching at entry time serves the on-the-spot case without weakening the
- * row path, which stays exactly as it was.
+ * ADR-0030 records that attaching at entry time is now a first-class path alongside the row one —
+ * it serves that folder-of-receipts case — without weakening the row path, which stays exactly as
+ * it was.
  *
  * The order is forced by the schema: a receipt's row FKs a `transaction` that does not exist until
  * the line is inserted, so the entry form *stages* its files and uploads them only after the record
