@@ -429,7 +429,10 @@ export type TransactionCategory = (typeof TRANSACTION_CATEGORIES)[number];
  * change `/monitoring`'s "Anggaran terpakai", which still sums **every** category (that figure is
  * programme spend, not float draw-down — the two are two different numbers by design).
  */
-export const ADVANCE_DRAWDOWN_CATEGORIES = ["Konsumsi", "Lainnya"] as const;
+export const ADVANCE_DRAWDOWN_CATEGORIES = [
+  "Konsumsi",
+  "Lainnya",
+] as const satisfies readonly TransactionCategory[];
 export type AdvanceDrawdownCategory = (typeof ADVANCE_DRAWDOWN_CATEGORIES)[number];
 
 /** Whether a category draws down the travel float. Widened to `string` so a DB-read row's `category` compares without a cast. */

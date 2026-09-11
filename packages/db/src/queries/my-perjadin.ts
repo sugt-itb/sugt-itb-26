@@ -1,9 +1,4 @@
-import {
-  ADVANCE_DRAWDOWN_CATEGORIES,
-  type SessionStatus,
-  type TimeZone,
-  type TransportMode,
-} from "@sugt/domain";
+import type { SessionStatus, TimeZone, TransportMode } from "@sugt/domain";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../client";
@@ -18,6 +13,7 @@ import {
   perjadinTeacher,
   transaction,
 } from "../schema/travel";
+import { advanceDrawdownCategoryList } from "./advance-drawdown";
 import type { Person } from "./caller";
 import { todayInDeadlineZone } from "./deadline";
 import {
@@ -180,7 +176,7 @@ export async function myUpcomingPerjadin(caller: Person): Promise<MyUpcomingPerj
   const tripIds = trips.map((trip) => trip.id);
 
   // The six hanging lists, gathered concurrently and each scoped to just these trips.
-  const [spentRows, staffRows, pengajarRows, pimpinanRows, sessionRows, preparationRows] =
+  const [drawnDownRows, staffRows, pengajarRows, pimpinanRows, sessionRows, preparationRows] =
     await Promise.all([
       // Travel-float draw-down per trip (ADR-0029): `sum(amount_idr) filter (where category in …)`
       // over only `ADVANCE_DRAWDOWN_CATEGORIES`, grouped by `perjadin_id`. A trip with no drawdown
@@ -192,10 +188,9 @@ export async function myUpcomingPerjadin(caller: Person): Promise<MyUpcomingPerj
         .select({
           perjadinId: transaction.perjadinId,
           drawnDownIdr:
-            sql<number>`coalesce(sum(${transaction.amountIdr}) filter (where ${transaction.category} in (${sql.join(
-              ADVANCE_DRAWDOWN_CATEGORIES.map((category) => sql`${category}`),
-              sql`, `,
-            )})), 0)`.mapWith(Number),
+            sql<number>`coalesce(sum(${transaction.amountIdr}) filter (where ${transaction.category} in (${advanceDrawdownCategoryList()})), 0)`.mapWith(
+              Number,
+            ),
         })
         .from(transaction)
         .where(inArray(transaction.perjadinId, tripIds))
@@ -270,7 +265,7 @@ export async function myUpcomingPerjadin(caller: Person): Promise<MyUpcomingPerj
     ]);
 
   // Float draw-down keyed by trip; a trip absent from the grouped sum drew nothing down.
-  const drawnDownByTrip = new Map(spentRows.map((row) => [row.perjadinId, row.drawnDownIdr]));
+  const drawnDownByTrip = new Map(drawnDownRows.map((row) => [row.perjadinId, row.drawnDownIdr]));
 
   const staffByTrip = new Map<string, MyPerjadinStaff[]>();
   const pengajarByTrip = new Map<string, MyPerjadinPengajar[]>();
