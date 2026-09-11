@@ -195,6 +195,38 @@ export const PERJADIN_ROLE_LABELS: Record<Role, string> = {
 };
 
 /**
+ * The Grants a Person may hold — a **second, additive access axis** alongside the write-once
+ * `role`. A Role is exactly one and write-once (ADR-0013); a Grant is optional, revocable,
+ * **Staff-only**, and a Person may hold several. Grants never touch `person.role` or its composite
+ * `(id, role)` foreign keys, and being Staff-only they can never punch through "a Pimpinan writes
+ * nothing" (ADR-0025). See `docs/adr/0028-grants-are-a-second-additive-access-axis.md`.
+ *
+ * Two named Grants:
+ * - **Administrator** — administers Grants (assign/revoke any Grant on any Staff Person, including
+ *   making another Administrator) and **implies every other Grant**, so an Administrator satisfies
+ *   any grant check without holding that grant's own row.
+ * - **Monitoring Editor** — may write Monitoring Preparation.
+ *
+ * Unlike `TRANSACTION_CATEGORIES`, these **are** terms the Programme's language defines — `CONTEXT.md`
+ * glosses them under **Access** — so they belong here beside `ROLES`. The list is mirrored by
+ * `person_grant_grant_check` character for character (see `packages/db/src/schema/people.ts`); a
+ * future Grant widens that CHECK the way `0018_widen_person_role_pimpinan.sql` widened the role one.
+ */
+export const GRANTS = ["Administrator", "Monitoring Editor"] as const;
+export type Grant = (typeof GRANTS)[number];
+
+/**
+ * How each Grant is **labelled in the UI**, keyed on the stored `Grant` exactly like `ROLE_LABELS`.
+ * The map is `Record<Grant, string>`, so adding a Grant to `GRANTS` forces a key here — a compile
+ * error otherwise — which keeps the label map in step with the Grant set. Presentation only; the
+ * stored value stays the English term the CHECK pins.
+ */
+export const GRANT_LABELS: Record<Grant, string> = {
+  Administrator: "Administrator",
+  "Monitoring Editor": "Editor Monitoring",
+};
+
+/**
  * The two kinds a Story may be. They share one editor and one upload path; they differ only
  * in where the public site lists them — a Final Project reaches the public this way without
  * becoming a tracked record (see `docs/adr/0009-the-tool-tracks-delivery-not-outcomes.md`).

@@ -20,7 +20,7 @@ import {
 
 /** A `Person` the query layer accepts; `monitoringData` asks nothing of the caller's role. */
 function asPerson(row: { id: string; fullName: string; email: string }): Person {
-  return { id: row.id, fullName: row.fullName, email: row.email, role: "Staff" };
+  return { id: row.id, fullName: row.fullName, email: row.email, role: "Staff", grants: [] };
 }
 
 describe("monitoringData returns perjadinSpans", () => {

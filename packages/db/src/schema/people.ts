@@ -1,4 +1,4 @@
-import type { Role } from "@sugt/domain";
+import type { Grant, Role } from "@sugt/domain";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -77,5 +77,38 @@ export const person = pgTable(
       .on(sql`lower(${t.email})`)
       .where(sql`${t.active}`),
     unique("person_id_role_key").on(t.id, t.role),
+  ],
+);
+
+/**
+ * A **Grant** a Person holds — the second, additive access axis beside the write-once `role`
+ * (ADR-0028). A row is a capability granted; deleting it is a revocation. A Person may hold
+ * several, so this is a child table rather than a column on `person`.
+ *
+ * **The foreign key targets `person.id`, not the composite `(id, role)`.** Grants must never
+ * rewrite the write-once role or ride one of the `(id, role)` keys that pin `'Staff'` (ADR-0013),
+ * so this points at the plain primary key and `on delete cascade` lets a revoked-and-deleted
+ * Person take their grants with them. **Staff-only is not enforced here** — a `person.id` FK cannot
+ * express it — but in the guard: `requireGrant` asserts `role === 'Staff'` first, and the
+ * assign path refuses a non-Staff target. This keeps a Grant from ever punching through
+ * "a Pimpinan writes nothing" (ADR-0025) without a composite key this table deliberately avoids.
+ *
+ * `unique (person_id, grant)` makes "a Person holds a Grant at most once" a fact about the schema.
+ * The CHECK names the two `GRANTS` values character for character — the same pattern as
+ * `person_role_check`, and widened the same way (`0018_widen_person_role_pimpinan.sql`) when a
+ * future Grant is added. `$type<Grant>()` reads the column back as `Grant` rather than `string`.
+ */
+export const personGrant = pgTable(
+  "person_grant",
+  {
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => person.id, { onDelete: "cascade" }),
+    grant: text("grant").$type<Grant>().notNull(),
+    grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("person_grant_person_id_grant_key").on(t.personId, t.grant),
+    check("person_grant_grant_check", sql`${t.grant} in ('Administrator', 'Monitoring Editor')`),
   ],
 );

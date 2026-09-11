@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { db, schema } from "@sugt/db";
 import type {
   ClassKind,
+  Grant,
   ParticipantFeedbackAspect,
   PerjadinAspect,
   PerjadinEvaluationRole,
@@ -22,7 +23,15 @@ export type PersonFixture = {
   active?: boolean;
 };
 
-/** Put a Person on the invite list. A row **is** the invitation. */
+/**
+ * Put a Person on the invite list. A row **is** the invitation.
+ *
+ * The return carries `grants: []` on top of the row so a freshly-added Person is directly usable as
+ * a query **caller** — the caller `Person` gained a `grants` axis (ADR-0028), and a Person just
+ * added holds none. A test that needs a caller *with* grants resolves one through
+ * `findActivePersonByEmail` after `addGrant`, which reads the real rows; this default is the empty
+ * case every existing caller already was.
+ */
 export async function addPerson(fixture: PersonFixture) {
   const [person] = await db
     .insert(schema.person)
@@ -33,12 +42,21 @@ export async function addPerson(fixture: PersonFixture) {
       active: fixture.active ?? true,
     })
     .returning();
-  return person!;
+  return { ...person!, grants: [] as Grant[] };
 }
 
 /** Revoke a Person. One write — this is the whole revocation mechanism. */
 export async function revokePerson(id: string) {
   await db.update(schema.person).set({ active: false }).where(eq(schema.person.id, id));
+}
+
+/**
+ * Grant a Person a Grant directly — a `person_grant` row (ADR-0028). The Staff-only rule lives in
+ * the guard and the assign path, not the FK, so this writes the row a test needs without going
+ * through `assignGrant`; a test of the write path itself calls `assignGrant`.
+ */
+export async function addGrant(personId: string, grant: Grant) {
+  await db.insert(schema.personGrant).values({ personId, grant }).onConflictDoNothing();
 }
 
 /** Every `better_auth.user` row. The invite gate's job is to leave this empty. */
@@ -642,6 +660,7 @@ export async function resetDatabase() {
       better_auth."account",
       better_auth."verification",
       public."person",
+      public."person_grant",
       public."province",
       public."cluster",
       public."sub_cluster",

@@ -23,7 +23,7 @@ import {
 
 /** A `Person` shaped the way the query layer takes one, from an inserted `person` row. */
 function asPerson(row: { id: string; fullName: string; email: string }): Person {
-  return { id: row.id, fullName: row.fullName, email: row.email, role: "Staff" };
+  return { id: row.id, fullName: row.fullName, email: row.email, role: "Staff", grants: [] };
 }
 
 /**

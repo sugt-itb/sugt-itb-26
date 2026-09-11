@@ -1,3 +1,5 @@
+import type { Grant } from "@sugt/domain";
+
 import type { Person } from "./caller";
 
 /**
@@ -105,4 +107,74 @@ export function isNotStaffError(error: unknown): error is NotStaffError {
  */
 export function requireStaff(person: Person): void {
   if (person.role !== "Staff") throw new NotStaffError(person);
+}
+
+const NOT_GRANTED_ERROR_CODE = "sugt/not-granted";
+
+/**
+ * A caller reached a Grant-guarded surface without the Grant.
+ *
+ * The sibling of `NotStaffError`, and it is a sibling on purpose: a Grant is a **second, additive
+ * access axis** beside the write-once role (ADR-0028), so its refusal is a second typed error at
+ * the same choke point rather than a variant of the first. `staffSurface()` translates it into the
+ * same **403** — reaching it is a bug or an attack, never a user state, because the UI offers a
+ * Grant-guarded write only to a Person who holds the Grant.
+ *
+ * It is discriminated on `sugtErrorCode`, not `instanceof`, for the reason spelled out on
+ * `NotStaffError`: two module instances of this package give two classes, and `instanceof` is false
+ * across them while the error is plainly the same one.
+ */
+export class NotGrantedError extends Error {
+  readonly sugtErrorCode = NOT_GRANTED_ERROR_CODE;
+
+  override readonly name = "NotGrantedError";
+
+  constructor(person: Person, grant: Grant) {
+    super(
+      `A ${grant}-granted surface was handed ${person.role} caller ${person.id}, who holds ` +
+        `[${person.grants.join(", ") || "no grants"}]. A Grant is Staff-only and additive ` +
+        `(ADR-0028); the write that reaches one is refused server-side, so this is a bug in ` +
+        `whoever offered the write, not a state a user can reach.`,
+    );
+  }
+}
+
+/**
+ * Is this the Grant refusal? Translated into a **403** server-side by `staffSurface()`, the same
+ * as `isNotStaffError` — see the note there on why this must not run in an `error.tsx` boundary.
+ */
+export function isNotGrantedError(error: unknown): error is NotGrantedError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "sugtErrorCode" in error &&
+    error.sugtErrorCode === NOT_GRANTED_ERROR_CODE
+  );
+}
+
+/**
+ * Does this Person hold this Grant? **Staff-only first, then the grant**, and it is synchronous
+ * because the caller carries its `grants` (threaded at resolution, like `role`).
+ *
+ * Two rules, in this order:
+ * 1. **Grants are Staff-only.** A non-Staff caller holds no Grant, whatever rows exist — a Pimpinan
+ *    resolves with an empty list, but this guards the role directly so the answer does not depend on
+ *    that. This is what keeps a Grant from ever punching through "a Pimpinan writes nothing"
+ *    (ADR-0025).
+ * 2. **Administrator implies every Grant.** An Administrator satisfies any grant check without
+ *    holding that grant's own row — the one privilege that makes it the administering Grant.
+ */
+export function hasGrant(person: Person, grant: Grant): boolean {
+  if (person.role !== "Staff") return false;
+  return person.grants.includes("Administrator") || person.grants.includes(grant);
+}
+
+/**
+ * The Grant choke point. A Grant-guarded write opens with it, exactly as a Staff-only one opens with
+ * `requireStaff`, and it throws the distinguishable `NotGrantedError` that `staffSurface()` turns
+ * into a 403. It returns nothing for the same reason `requireStaff` does: the passing case is not
+ * what any call site is interested in, and a narrowed type would have no consumer.
+ */
+export function requireGrant(person: Person, grant: Grant): void {
+  if (!hasGrant(person, grant)) throw new NotGrantedError(person, grant);
 }

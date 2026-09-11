@@ -56,6 +56,7 @@ function nonStaff() {
     fullName: "Budi Santoso",
     email: "budi@gmail.com",
     role: "Teaching Team" as unknown as Role,
+    grants: [],
   };
 }
 

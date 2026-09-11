@@ -129,6 +129,20 @@ _Avoid_: preparation status, readiness, onboarding, workflow (it tracks nothing 
 One line of a **Preparation Checklist**. Seven are fixed for every Perjadin — SK Perjalanan, the two tickets, lodging, local transport, a single "confirmed with the Pendamping" box, and **"Pengajar sudah lengkap"**. Only the ticked items are stored. Every box is ticked by hand; every box stays ticked until a hand un-ticks it — **except "Pengajar sudah lengkap"**, the one box the tool clears by itself whenever the Teaching Team changes (a name added, removed or renamed), so that each change forces a fresh manual confirmation that the team is complete (see the amendment to [ADR-0018](./docs/adr/0018-the-preparation-checklist-stores-ticks-and-derives-the-list.md)).
 _Avoid_: task, step, todo (it is neither assigned nor sequenced)
 
+### Access
+
+**Grant**:
+An optional, revocable, **Staff-only** capability a **Person** may hold — a **second, additive access axis** beside the write-once **Role** ([ADR-0028](./docs/adr/0028-grants-are-a-second-additive-access-axis.md)). A Role is exactly one and write-once (a Person is **Staff** or **Pimpinan**); a Grant is none, one or several, and can be taken away. Grants never touch a Person's Role, and being Staff-only they never let a **Pimpinan** — who writes nothing — write anything. Two Grants exist: **Administrator** and **Monitoring Editor**. Granted and revoked by an **Administrator** from **/orang**.
+_Avoid_: role (a Role is the one write-once axis; a Grant is the second, additive one), permission, scope, claim
+
+**Administrator**:
+The **Grant** that administers Grants — an Administrator assigns and revokes any Grant on any **Staff** Person, including making another Administrator — and that **implies every other Grant**, so an Administrator can do anything a Grant gates. The first Administrator is seeded outside the tool (the founding-Staff seed grants it), because there is otherwise no one who could grant it. Held only by Staff, like every Grant.
+_Avoid_: admin, superuser, owner (it is a Grant a Staff Person holds, not a Role or an account tier)
+
+**Monitoring Editor**:
+The **Grant** that lets a **Staff** Person **write Monitoring Preparation**. Without it a Staff Person reads **/monitoring** but does not edit its Preparation; an **Administrator** has it implicitly. It gates writing only — reading Monitoring is open to any signed-in Person like the rest of delivery.
+_Avoid_: monitor, editor (unqualified), reviewer
+
 ### Reporting
 
 **Advance**:

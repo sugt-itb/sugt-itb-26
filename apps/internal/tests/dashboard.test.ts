@@ -38,6 +38,7 @@ function nonStaff() {
     fullName: "Bagus Prakoso",
     email: "bagus@itb.ac.id",
     role: "Teaching Team" as unknown as Role,
+    grants: [],
   };
 }
 
