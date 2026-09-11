@@ -51,10 +51,18 @@ import { type ReactElement, useId, useMemo, useRef, useState, useTransition } fr
  * **The line items, and the two things a PIC does to them**: enter one, and attach the receipts
  * that evidence it.
  *
- * Both are first-class paths rather than a primary and a fallback, which is why the receipt upload
- * sits on the row and not inside the entry form: a fare logged on the pavement is photographed
- * later, and one worked through after returning has its receipt to hand. ADR-0007 rests on both
- * being equally easy.
+ * Receipts attach by two paths, both first-class. The row carries an "Unggah bukti" for evidence
+ * that arrives after the line is logged — a fare photographed on the pavement, uploaded that
+ * evening. The entry form carries the same control for evidence already in hand at the moment of
+ * entry, so a PIC working through a folder of receipts after returning records the line and its
+ * proof in one step. ADR-0007 rests on both post-trip and on-the-spot entry being equally easy;
+ * ADR-0030 records that attaching at entry time is now a first-class path alongside the row one —
+ * it serves that folder-of-receipts case — without weakening the row path, which stays exactly as
+ * it was.
+ *
+ * The order is forced by the schema: a receipt's row FKs a `transaction` that does not exist until
+ * the line is inserted, so the entry form *stages* its files and uploads them only after the record
+ * lands. `Receipts` (the row path) already has a `transactionId`, so it uploads straight away.
  *
  * **Nothing here checks the evidence rule.** "Every transaction has at least one piece of evidence"
  * is checked when the Report is filed and nowhere else — a row with no receipt is an ordinary state
@@ -402,8 +410,14 @@ function RecordTransaction({
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<TransactionCategory | "">("");
   const [participantType, setParticipantType] = useState<TransactionParticipantType | "">("");
+  // Files chosen but not yet uploaded — the entry form has no `transactionId` to attach them to
+  // until its own insert lands, so they wait here until `submit` has one.
+  const [staged, setStaged] = useState<File[]>([]);
   const [refusal, setRefusal] = useState<string | null>(null);
+  // Distinct from `refusal`: the transaction was recorded and it is the receipts that did not land.
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
+  const picker = useRef<HTMLInputElement>(null);
   const fields = useId();
 
   const complete =
@@ -413,9 +427,19 @@ function RecordTransaction({
     category !== "" &&
     participantType !== "";
 
+  function reset() {
+    setSpentOn("");
+    setDescription("");
+    setAmount("");
+    setCategory("");
+    setParticipantType("");
+    setStaged([]);
+  }
+
   function submit() {
     startSaving(async () => {
       setRefusal(null);
+      setUploadNote(null);
       const result = await recordTransactionAction({
         perjadinId,
         spentOn,
@@ -428,23 +452,44 @@ function RecordTransaction({
         participantType: participantType as TransactionParticipantType,
       });
 
-      if (result.outcome === "recorded") {
-        setOpen(false);
-        setSpentOn("");
-        setDescription("");
-        setAmount("");
-        setCategory("");
-        setParticipantType("");
+      // The insert failed, so nothing is uploaded — staged files stay staged, and there is no
+      // orphan object in Storage or evidence row against a line that was never written.
+      if (result.outcome !== "recorded") {
+        setRefusal(REFUSALS[result.outcome]);
         return;
       }
-      setRefusal(REFUSALS[result.outcome]);
+
+      // The line is in. Only now, and only if any were staged, do the receipts — recording with
+      // none is unchanged. Errors past this point are not refusals: the transaction stands.
+      if (staged.length > 0) {
+        const note = await attachStagedReceipts(perjadinId, result.transactionId, staged);
+        if (note !== null) {
+          // Said out loud rather than swallowed: the line is recorded (the page behind will show
+          // it) but its proof did not attach. The form is cleared so a second "Catat" cannot log
+          // the same line again; the row's own "Unggah bukti" is where the receipts go from here.
+          setUploadNote(note);
+          reset();
+          return;
+        }
+      }
+
+      setOpen(false);
+      reset();
     });
   }
 
   return (
     <Dialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(next) => {
+        setOpen(next);
+        // Clear stale alerts when the form is reopened, so a prior refusal or upload note does not
+        // greet the next entry.
+        if (next) {
+          setRefusal(null);
+          setUploadNote(null);
+        }
+      }}
     >
       <DialogTrigger
         render={
@@ -470,6 +515,15 @@ function RecordTransaction({
           <Alert variant="destructive">
             <AlertTitle>Transaksi belum tercatat.</AlertTitle>
             <AlertDescription>{refusal}</AlertDescription>
+          </Alert>
+        )}
+
+        {uploadNote !== null && (
+          <Alert variant="destructive">
+            <AlertTitle>Transaksi tercatat, bukti belum terlampir.</AlertTitle>
+            <AlertDescription>
+              {uploadNote} Muat ulang halaman, lalu lampirkan lewat baris transaksinya.
+            </AlertDescription>
           </Alert>
         )}
 
@@ -575,6 +629,61 @@ function RecordTransaction({
               </SelectContent>
             </Select>
           </div>
+
+          <div className="grid gap-1.5">
+            <Label>Bukti (opsional)</Label>
+            {/*
+              Optional and staged, not uploaded on pick: `submit` inserts the transaction first and
+              only then pushes these against the id it gets back (a receipt row FKs a transaction
+              that does not exist yet). Same picker as the row's `Receipts` — image or PDF, many at
+              once, capped at `MAX_RECEIPT_BATCH`.
+            */}
+            <input
+              ref={picker}
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                const chosen = Array.from(event.target.files ?? []);
+                event.target.value = "";
+                if (chosen.length > 0)
+                  setStaged((current) => [...current, ...chosen].slice(0, MAX_RECEIPT_BATCH));
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={saving || staged.length >= MAX_RECEIPT_BATCH}
+              onClick={() => picker.current?.click()}
+            >
+              Unggah bukti
+            </Button>
+
+            {staged.length > 0 && (
+              <ul className="grid gap-1">
+                {staged.map((file, index) => (
+                  <li
+                    key={`${index}-${file.name}`}
+                    className="flex items-center justify-between gap-2 text-sm"
+                  >
+                    <span className="truncate text-muted-foreground">{file.name}</span>
+                    <button
+                      type="button"
+                      className="text-muted-foreground underline hover:no-underline"
+                      disabled={saving}
+                      onClick={() => {
+                        setStaged((current) => current.filter((_, at) => at !== index));
+                      }}
+                    >
+                      Hapus
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
         <DialogFooter>
@@ -596,6 +705,67 @@ function RecordTransaction({
       </DialogContent>
     </Dialog>
   );
+}
+
+/**
+ * Push the entry form's staged receipts to Storage and record them against a line item that has
+ * just been inserted.
+ *
+ * The steps are `Receipts`' exactly — mint → PUT straight to Storage → finalize — but run after the
+ * transaction exists rather than against a row that already had one, which is the only order the
+ * evidence FK allows. Returns a note to show when something did not land, or `null` when every file
+ * did. The transaction is already recorded by the time this runs, so a failure here is a receipt
+ * problem, never a lost line item.
+ */
+async function attachStagedReceipts(
+  perjadinId: string,
+  transactionId: string,
+  files: File[],
+): Promise<string | null> {
+  const batch = files.slice(0, MAX_RECEIPT_BATCH);
+
+  // The mint throws when the trip is gone — a page left open while somebody deleted it in another
+  // tab — and is caught here for the same reason `Receipts` catches it.
+  let targets;
+  try {
+    targets = await mintReceiptUploadsAction(perjadinId, batch.length);
+  } catch {
+    return STALE_PAGE;
+  }
+
+  const landed: { path: string }[] = [];
+  let failed = 0;
+  await Promise.all(
+    batch.map(async (file, index) => {
+      const target = targets[index];
+      if (!target) {
+        failed += 1;
+        return;
+      }
+      try {
+        const response = await fetch(target.signedUrl, {
+          method: "PUT",
+          headers: { "content-type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!response.ok) throw new Error(`PUT ${response.status}`);
+        landed.push({ path: target.path });
+      } catch {
+        failed += 1;
+      }
+    }),
+  );
+
+  if (landed.length > 0) {
+    const result = await finalizeReceiptsAction(perjadinId, transactionId, landed);
+    // A refused write means the same as a stale mint: what is on screen is no longer stored.
+    if (result.outcome !== "attached") return STALE_PAGE;
+    failed += result.failed;
+  }
+  // Partial success is real — files upload independently and one can fail while the rest land — so
+  // it is reported rather than swallowed.
+  if (failed > 0) return `${failed} berkas gagal diunggah.`;
+  return null;
 }
 
 /**
