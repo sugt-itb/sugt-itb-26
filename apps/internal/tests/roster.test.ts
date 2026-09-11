@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   addCluster,
+  addGrant,
   addPerjadin,
   addPerson as seedPerson,
   addProvince,
@@ -247,5 +248,26 @@ describe("roster", () => {
 
     const list = await roster(staff);
     expect(byEmail(list, "penulis@ditsama.itb.ac.id")?.used).toBe(true);
+  });
+
+  it("carries each Person's Grants, ordered, and an empty list for one with none", async () => {
+    // The roster's Grant-management column reads these per row (ADR-0028), so the read carries them.
+    const staff = await staffCaller();
+    const granted = await seedPerson({
+      fullName: "Diberi",
+      email: "diberi@ditsama.itb.ac.id",
+      role: "Staff",
+    });
+    await addGrant(granted.id, "Monitoring Editor");
+    await addGrant(granted.id, "Administrator");
+    await seedPerson({ fullName: "Tanpa", email: "tanpa@ditsama.itb.ac.id", role: "Staff" });
+
+    const list = await roster(staff);
+    // array_agg orders on the grant, so the row's list is stable regardless of insert order.
+    expect(byEmail(list, "diberi@ditsama.itb.ac.id")?.grants).toEqual([
+      "Administrator",
+      "Monitoring Editor",
+    ]);
+    expect(byEmail(list, "tanpa@ditsama.itb.ac.id")?.grants).toEqual([]);
   });
 });

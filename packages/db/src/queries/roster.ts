@@ -1,11 +1,11 @@
-import { type Role } from "@sugt/domain";
+import { type Grant, type Role } from "@sugt/domain";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { user } from "../schema/auth";
 import { session } from "../schema/delivery";
 import { classRecord, sessionRecord } from "../schema/evaluations";
-import { person } from "../schema/people";
+import { person, personGrant } from "../schema/people";
 import { story } from "../schema/stories";
 import { groupMember, perjadin } from "../schema/travel";
 import type { Person } from "./caller";
@@ -43,6 +43,12 @@ export type RosterEntry = {
   signedIn: boolean;
   /** Referenced by one of the six composite foreign keys, so their `role` is now write-once. */
   used: boolean;
+  /**
+   * The Grants this Person holds (ADR-0028), ordered, so the roster's Grant-management controls
+   * render each toggle's state without a per-row round trip. Empty for anyone with none — and always
+   * empty for a Pimpinan, who holds none by construction (Grants are Staff-only).
+   */
+  grants: Grant[];
 };
 
 /**
@@ -82,6 +88,22 @@ const hasSignedIn = sql<boolean>`exists (
 )`;
 
 /**
+ * The Grants this Person holds, as an ordered array (ADR-0028) — a correlated `array_agg` so the
+ * whole roster's grant state comes back in the one read the screen already makes. `coalesce(…, '{}')`
+ * makes a Person with none an empty array, never `null`. A non-Staff Person holds none by
+ * construction, so this is empty for a Pimpinan; the roster still renders no Grant controls on those
+ * rows regardless, since Grants are Staff-only.
+ */
+const grantsHeld = sql<Grant[]>`coalesce(
+  (
+    select array_agg(pg.grant order by pg.grant)
+    from ${personGrant} pg
+    where pg.person_id = ${OUTER_PERSON_ID}
+  ),
+  '{}'::text[]
+)`;
+
+/**
  * The whole roster, revoked rows included, oldest name first.
  *
  * A read open to anyone signed in, so **no `requireStaff`** — the caller is taken because every
@@ -99,6 +121,7 @@ export async function roster(_caller: Person): Promise<RosterEntry[]> {
       active: person.active,
       signedIn: hasSignedIn,
       used: usedByComposite,
+      grants: grantsHeld,
     })
     .from(person)
     .orderBy(asc(person.fullName));
