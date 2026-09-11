@@ -34,7 +34,7 @@ export function csvOf(acquittal: PerjadinAcquittal): string {
       String(line.evidence.length),
     ]),
     [],
-    ["Uang muka", "", "", "", String(acquittal.advanceIdr), ""],
+    ["Uang Perjalanan", "", "", "", String(acquittal.advanceIdr), ""],
     ["Terpakai", "", "", "", String(acquittal.spentIdr), ""],
     // The Terpakai total split by cohort, the same two figures the page tiles show; the payload
     // carries them so nothing is retyped or re-summed here.

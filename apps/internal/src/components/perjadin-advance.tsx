@@ -18,7 +18,7 @@ import { Label } from "@sugt/ui/components/label";
 import { useId, useState, useTransition } from "react";
 
 /**
- * **The Advance (uang muka), and the one way Staff correct it after planning** (#192).
+ * **The Advance (Uang Perjalanan), and the one way Staff correct it after planning** (#192).
  *
  * `planPerjadin` writes the Advance once; this is the only edit that changes it afterwards. The
  * amount was judged fixed-at-planning before, and this reverses that to Staff-correctable — while
@@ -60,7 +60,7 @@ function EditAdvance({
         return;
       }
       if (result.outcome === "negative-advance") {
-        setRefusal("Uang muka tidak boleh kurang dari nol.");
+        setRefusal("Uang Perjalanan tidak boleh kurang dari nol.");
         return;
       }
       setRefusal("Perjadin ini sudah tidak ada. Muat ulang halaman untuk melihat keadaannya.");
@@ -78,28 +78,29 @@ function EditAdvance({
             variant="outline"
             size="sm"
           >
-            Ubah uang muka
+            Ubah Uang Perjalanan
           </Button>
         }
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Ubah uang muka</DialogTitle>
+          <DialogTitle>Ubah Uang Perjalanan</DialogTitle>
           <DialogDescription>
-            Koreksi jumlah uang muka yang diterima. Sisa dihitung ulang otomatis (uang muka
-            dikurangi pengeluaran) dan boleh menjadi negatif jika pengeluaran melebihi uang muka.
+            Koreksi jumlah Uang Perjalanan yang diterima. Sisa dihitung ulang otomatis (Uang
+            Perjalanan dikurangi pengeluaran) dan boleh menjadi negatif jika pengeluaran melebihi
+            Uang Perjalanan.
           </DialogDescription>
         </DialogHeader>
 
         {refusal !== null && (
           <Alert variant="destructive">
-            <AlertTitle>Uang muka belum diubah.</AlertTitle>
+            <AlertTitle>Uang Perjalanan belum diubah.</AlertTitle>
             <AlertDescription>{refusal}</AlertDescription>
           </Alert>
         )}
 
         <div className="grid gap-1.5">
-          <Label htmlFor={fieldId}>Uang muka (Rp)</Label>
+          <Label htmlFor={fieldId}>Uang Perjalanan (Rp)</Label>
           <Input
             id={fieldId}
             type="text"
@@ -125,7 +126,7 @@ function EditAdvance({
             disabled={saving || empty}
             onClick={submit}
           >
-            {saving ? "Menyimpan…" : "Simpan uang muka"}
+            {saving ? "Menyimpan…" : "Simpan Uang Perjalanan"}
           </Button>
         </DialogFooter>
       </DialogContent>
