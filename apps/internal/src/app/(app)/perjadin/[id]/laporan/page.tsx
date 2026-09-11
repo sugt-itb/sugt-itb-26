@@ -107,8 +107,9 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
             amountIdr={acquittal.gtkMsSpentIdr}
           />
           {/*
-            Derived and never stored: the Advance less every transaction against it. Negative
-            means the Group overspent, which is a real state and not an error.
+            Derived and never stored: the Advance less the travel-float draw-down — only Konsumsi and
+            Lainnya draw down (ADR-0029), so this can differ from Diterima − Terpakai. Negative means
+            the Group overspent the float, which is a real state and not an error.
           */}
           <Figure
             label="Sisa"

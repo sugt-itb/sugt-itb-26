@@ -151,7 +151,9 @@ describe("myUpcomingPerjadin filters on ends_on >= today and sorts soonest first
 describe("myUpcomingPerjadin carries the same money as the acquittal", () => {
   beforeEach(resetDatabase);
 
-  it("sums the trip's transactions and agrees with perjadinAcquittal's remainder math", async () => {
+  it("draws the float down only for drawdown categories and agrees with the acquittal's remainder", async () => {
+    // ADR-0029: only Konsumsi/Lainnya draw down. A Konsumsi 1.2M draws down; a non-drawdown Akomodasi
+    // 300k does not — so drawnDownIdr is 1.2M, not the 1.5M full spend, and Tersisa = advance − 1.2M.
     const caller = asPerson(
       await addPerson({ fullName: "Rina", email: "rina@ditsama.itb.ac.id", role: "Staff" }),
     );
@@ -164,22 +166,28 @@ describe("myUpcomingPerjadin carries the same money as the acquittal", () => {
     await addTransaction({
       perjadinId: trip.id,
       amountIdr: 1_200_000,
+      category: "Konsumsi",
       createdByPersonId: caller.id,
     });
-    await addTransaction({ perjadinId: trip.id, amountIdr: 300_000, createdByPersonId: caller.id });
+    await addTransaction({
+      perjadinId: trip.id,
+      amountIdr: 300_000,
+      category: "Akomodasi",
+      createdByPersonId: caller.id,
+    });
 
     const [mine] = await myUpcomingPerjadin(caller);
     const acquittal = await perjadinAcquittal(caller, trip.id);
     if (!mine || !acquittal) throw new Error("expected the trip on both reads");
 
     expect(mine.advanceIdr).toBe(5_000_000);
-    expect(mine.spentIdr).toBe(1_500_000);
-    // The same figure the acquittal derives, and the UI's Tersisa matches its remainder.
-    expect(mine.spentIdr).toBe(acquittal.spentIdr);
-    expect(mine.advanceIdr - mine.spentIdr).toBe(acquittal.remainderIdr);
+    expect(mine.drawnDownIdr).toBe(1_200_000);
+    // The acquittal still logs the full 1.5M spend, but its remainder draws down only the 1.2M.
+    expect(acquittal.spentIdr).toBe(1_500_000);
+    expect(mine.advanceIdr - mine.drawnDownIdr).toBe(acquittal.remainderIdr);
   });
 
-  it("reports zero spend for a trip with no transactions", async () => {
+  it("draws nothing down for a trip with no transactions", async () => {
     const caller = asPerson(
       await addPerson({ fullName: "Rina", email: "rina@ditsama.itb.ac.id", role: "Staff" }),
     );
@@ -192,7 +200,7 @@ describe("myUpcomingPerjadin carries the same money as the acquittal", () => {
 
     const [mine] = await myUpcomingPerjadin(caller);
     expect(mine?.id).toBe(trip.id);
-    expect(mine?.spentIdr).toBe(0);
+    expect(mine?.drawnDownIdr).toBe(0);
   });
 });
 

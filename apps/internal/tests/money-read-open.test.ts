@@ -46,9 +46,11 @@ describe("a Pimpinan reads money", () => {
 
   it("reads a Perjadin's acquittal in full — the money read is open", async () => {
     const { staff, pimpinan, trip } = await aTripWithAPimpinan();
+    // Konsumsi draws the float down (ADR-0029), so the remainder is advance − 1.25M.
     await addTransaction({
       perjadinId: trip.id,
       amountIdr: 1_250_000,
+      category: "Konsumsi",
       createdByPersonId: staff.id,
     });
 

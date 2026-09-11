@@ -159,8 +159,8 @@ _Avoid_: monitor, editor (unqualified), reviewer
 ### Reporting
 
 **Advance**:
-Money for a Perjadin, its amount fixed during trip planning and transferred to the PIC before departure, which the PIC must later account for in full.
-_Avoid_: budget, allowance, float
+Money for a Perjadin, its amount fixed during trip planning and transferred to the PIC before departure. It is a **travel float** for direct on-trip purchases, **not** a pot reconciled in full: only transactions of the draw-down categories (**Konsumsi** and **Lainnya**, the `ADVANCE_DRAWDOWN_CATEGORIES`) consume the remaining float, so **the remaining float is `advance − drawn-down`, not `advance − all spend`** ([ADR-0029](./docs/adr/0029-advance-is-a-travel-float-only-some-categories-draw-it-down.md)). Every other category (Akomodasi, Tiket, Uang Harian, Honorarium, Transport, ATK, …) is still recorded against the trip and shown in the acquittal, but is paid outside the float and leaves the remainder untouched. Separately, **/monitoring**'s "Anggaran terpakai" still sums **every** category — programme spend and float draw-down are two different numbers by design. The stored code identifier stays `advanceIdr`.
+_Avoid_: budget, allowance (it is a float now — but "float" is the sense, not a rename; the user-facing label becomes "Uang Perjalanan" in a separate ticket)
 
 **Treasurer**:
 The Staff member who releases an Advance and receives whatever is left of it.

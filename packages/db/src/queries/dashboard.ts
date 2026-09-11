@@ -1,4 +1,4 @@
-import { REPORT_DEADLINE_DAYS_AFTER_RETURN } from "@sugt/domain";
+import { ADVANCE_DRAWDOWN_CATEGORIES, REPORT_DEADLINE_DAYS_AFTER_RETURN } from "@sugt/domain";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 
 import { db } from "../client";
@@ -50,7 +50,11 @@ export type PicReport = {
   endsOn: string;
   groupCount: number;
   transactionCount: number;
-  /** Advance minus everything spent. Negative means the Group overspent. */
+  /**
+   * Advance minus the **travel-float draw-down** — only `ADVANCE_DRAWDOWN_CATEGORIES` spend reduces
+   * it (ADR-0029), the same figure the acquittal's `remainderIdr` derives. Negative means the Group
+   * overspent the float.
+   */
   remainderIdr: number;
   /**
    * Two days after the Group gets back — derived, never stored. Shown as an absolute date, not a
@@ -131,10 +135,14 @@ export async function staffDashboard(caller: Person): Promise<StaffDashboard> {
           sql<number>`(select count(*) from ${transaction} tx where tx.perjadin_id = ${OUTER_PERJADIN_ID})`.mapWith(
             Number,
           ),
+        // Travel-float remainder (ADR-0029): the subquery sums only `ADVANCE_DRAWDOWN_CATEGORIES`, so
+        // this is `advance − drawn-down`, the same figure `perjadinAcquittal.remainderIdr` derives.
+        // The `in (…)` list is built from the domain constant so the two sites cannot drift.
         remainderIdr:
-          sql<number>`${perjadin.advanceIdr} - coalesce((select sum(tx.amount_idr) from ${transaction} tx where tx.perjadin_id = ${OUTER_PERJADIN_ID}), 0)`.mapWith(
-            Number,
-          ),
+          sql<number>`${perjadin.advanceIdr} - coalesce((select sum(tx.amount_idr) from ${transaction} tx where tx.perjadin_id = ${OUTER_PERJADIN_ID} and tx.category in (${sql.join(
+            ADVANCE_DRAWDOWN_CATEGORIES.map((category) => sql`${category}`),
+            sql`, `,
+          )})), 0)`.mapWith(Number),
         // Two calendar days after return, the way `perjadinAcquittal` derives it. The day count is
         // a trusted constant rendered as a literal so `date + int` type-checks rather than binding
         // an untyped param.
