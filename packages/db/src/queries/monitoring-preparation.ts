@@ -81,7 +81,9 @@ export async function preparationCards(_caller: Person): Promise<PreparationCard
 
   const byCard = new Map<string, PreparationChecklistItem[]>();
   for (const { cardId, ...item } of items) {
-    (byCard.get(cardId) ?? byCard.set(cardId, []).get(cardId)!).push(item);
+    const list = byCard.get(cardId);
+    if (list) list.push(item);
+    else byCard.set(cardId, [item]);
   }
 
   return cards.map((card) => ({ ...card, items: byCard.get(card.id) ?? [] }));
@@ -158,7 +160,8 @@ export type EditPreparationCardResult =
 
 /**
  * Edit a Card's own fields — title, Jenis, dates. Monitoring-Editor-guarded. Its checklist is edited
- * through the item writes below, not here. `updated_at` is bumped so the tab can order on recency.
+ * through the item writes below, not here. `updated_at` is bumped to record the edit — the list read
+ * orders by `(starts_on, created_at)`, not recency, so this is an audit timestamp, not a sort key.
  */
 export async function editPreparationCard(
   caller: Person,
@@ -210,8 +213,11 @@ export type AddChecklistItemResult =
 
 /**
  * Append one checklist item to a Card — Monitoring-Editor-guarded. It lands at the end
- * (`max(position) + 1`), and the `≤ 20` cap is enforced here as a value outcome. The count and the
- * insert run in one transaction so a racing add cannot slip a card past the cap.
+ * (`max(position) + 1`), and the `≤ 20` cap is enforced here as a value outcome. The card row is
+ * locked `for update` so two concurrent adds **serialize** on it — without the lock, at READ
+ * COMMITTED both could read a count of 19 and both insert, slipping the card to 21; the exemplar
+ * `addPerjadinTeacher` takes the same lock for the same reason. A transaction alone does not give
+ * this — the lock does.
  */
 export async function addChecklistItem(
   caller: Person,
@@ -228,7 +234,8 @@ export async function addChecklistItem(
       .select({ id: preparationCard.id })
       .from(preparationCard)
       .where(eq(preparationCard.id, cardId))
-      .limit(1);
+      .limit(1)
+      .for("update");
     if (!card) return { outcome: "no-such-card" };
 
     const [{ count, nextPosition }] = await tx
