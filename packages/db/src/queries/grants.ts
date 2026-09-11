@@ -51,10 +51,11 @@ export type SetGrantResult =
   | { outcome: "not-staff-target" };
 
 /**
- * Verify the target is an **active Staff** Person. Both the assign and the revoke resolve the same
- * two absences — a stale id and a non-Staff target — so the check is shared, and both writes then
- * gate on the result. `active` matters: a revoked Person is not a grant target, the same way
- * `requirePerson()` follows `active` on every request.
+ * Verify the target is an **active Staff** Person — the gate `assignGrant` opens with. It is not
+ * shared with `revokeGrant`: revoke is an unconditional removal (see there), and a non-Staff target
+ * can never hold a grant to begin with, so the check only ever does work on the assign path.
+ * `active` matters: a revoked Person is not a grant target, the same way `requirePerson()` follows
+ * `active` on every request.
  */
 async function activeStaffTarget(personId: string): Promise<SetGrantResult | null> {
   const [target] = await db
@@ -91,11 +92,13 @@ export async function assignGrant(
 }
 
 /**
- * Revoke a Grant from a Staff Person — **Administrator-guarded**. Deleting the `person_grant` row is
- * the whole revocation; a Grant the Person did not hold deletes nothing and still reports `revoked`,
- * because the post-condition — the Person does not hold the Grant — is the same either way. The
- * target is checked to be an active Staff Person for symmetry with `assignGrant`: a stale id and a
- * non-Staff row are the same two absences on both writes.
+ * Revoke a Grant — **Administrator-guarded, and unconditional**. Deleting the `person_grant` row is
+ * the whole revocation, and it does not gate on the target the way `assignGrant` does: the
+ * post-condition — the Person does not hold the Grant — is reached whether or not the row existed,
+ * whether the Person is Staff, and whether they are still active. So a Grant a Person never held
+ * deletes nothing and still reports `revoked`, and a lingering row on a now-revoked Person can be
+ * cleaned up rather than refused. There is no target check to do: a non-Staff Person can never hold
+ * a Grant (the assign path refuses one), so the only possible effect of this delete is removal.
  */
 export async function revokeGrant(
   caller: Person,
@@ -103,9 +106,6 @@ export async function revokeGrant(
   grant: Grant,
 ): Promise<SetGrantResult> {
   requireGrant(caller, "Administrator");
-
-  const refusal = await activeStaffTarget(personId);
-  if (refusal) return refusal;
 
   await db
     .delete(personGrant)
