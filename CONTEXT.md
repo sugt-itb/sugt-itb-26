@@ -123,11 +123,24 @@ _Avoid_: lead, owner, manager
 
 **Preparation Checklist**:
 A Perjadin's private, hand-ticked list of pre-departure to-dos — an internal-monitoring aid for Staff, shown only on the Perjadin's own screen. It carries no money, no deadline and no record. Every Perjadin has the **same seven fixed Preparation Items** — no per-member derivation any more — and its completion shows on the Perjadin list as a `Persiapan: x/N` count, `N = 7`.
-_Avoid_: preparation status, readiness, onboarding, workflow (it tracks nothing but hand-ticked boxes and blocks nothing)
+**Not the same thing as a Monitoring Preparation Card** (see **Monitoring Preparation**), though both read "Persiapan" in the UI: this is a Perjadin's seven _fixed_ boxes tied to one trip; a Preparation Card is a _standalone_ `/monitoring` artefact with a _variable_ checklist and no Perjadin behind it. They share no table and no code.
+_Avoid_: preparation status, readiness, onboarding, workflow (it tracks nothing but hand-ticked boxes and blocks nothing); Monitoring Preparation (a different concept)
 
 **Preparation Item**:
 One line of a **Preparation Checklist**. Seven are fixed for every Perjadin — SK Perjalanan, the two tickets, lodging, local transport, a single "confirmed with the Pendamping" box, and **"Pengajar sudah lengkap"**. Only the ticked items are stored. Every box is ticked by hand; every box stays ticked until a hand un-ticks it — **except "Pengajar sudah lengkap"**, the one box the tool clears by itself whenever the Teaching Team changes (a name added, removed or renamed), so that each change forces a fresh manual confirmation that the team is complete (see the amendment to [ADR-0018](./docs/adr/0018-the-preparation-checklist-stores-ticks-and-derives-the-list.md)).
 _Avoid_: task, step, todo (it is neither assigned nor sequenced)
+
+**Monitoring Preparation**:
+The free-standing **Preparation Cards** on the `/monitoring` **Persiapan** tab — a monitoring aid distinct from a Perjadin's **Preparation Checklist** despite both reading "Persiapan". Each is a standalone card (a title, a **Jenis**, a date or date-range, a variable **Checklist Item** list) with nothing behind it — no Perjadin, School, Cluster or Session. **Reading is open** to any signed-in Person, like the rest of `/monitoring`; **writing is gated by the Monitoring Editor Grant** (see **Grant**), and an **Administrator** may write it too. Its Jenis — Teknis, Kurikulum, LAPI, Pimpinan — is a category label; the **Pimpinan** Jenis is unrelated to the **Pimpinan** Role.
+_Avoid_: Preparation Checklist (the Perjadin's seven fixed boxes — a different concept), readiness, onboarding
+
+**Preparation Card**:
+One card of **Monitoring Preparation**: a title, a **Jenis**, a `starts_on` and an optional `ends_on` (null ⇒ a single date), and an ordered **Checklist Item** list. Standalone — it references no domain row. Its completion shows as a percentage — checked ÷ total items, **0 items ⇒ 0%**.
+_Avoid_: Perjadin, Preparation Checklist, task board
+
+**Checklist Item**:
+One line of a **Preparation Card**'s checklist — a label, a position, and a checked flag that toggles **both ways** (a ticked item can be unticked). A Card holds at most twenty. Not to be confused with a **Preparation Item**, which is one of a Perjadin Preparation Checklist's seven fixed boxes.
+_Avoid_: Preparation Item (the Perjadin one), task, todo
 
 ### Access
 

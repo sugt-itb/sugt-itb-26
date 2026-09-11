@@ -47,3 +47,4 @@ export * from "./travel";
 export * from "./delivery";
 export * from "./evaluations";
 export * from "./stories";
+export * from "./monitoring";
