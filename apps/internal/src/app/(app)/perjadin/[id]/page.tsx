@@ -23,7 +23,7 @@ import { notFound } from "next/navigation";
  * (#180). `perjadinDetail` still carries no money; the Advance and the acquittal come from
  * `perjadinAcquittal`, which is an open money read, so the strip below is fetched and shown to a
  * Pimpinan too. The strip carries a link to the Laporan, three figures, and — for Staff only — an
- * "Ubah uang muka" edit that corrects the Advance after planning (#192); the acquittal recomputes
+ * "Ubah Uang Perjalanan" edit that corrects the Advance after planning (#192); the acquittal recomputes
  * the remainder live from it. Writing money stays Staff-only, enforced in each Server Action rather
  * than by what this page renders, so a Pimpinan sees the figures but no edit.
  *
@@ -72,7 +72,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
       {acquittal !== null && (
         <div className="border-b border-border px-7 py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h2 className="font-heading text-sm font-medium">Uang muka</h2>
+            <h2 className="font-heading text-sm font-medium">Uang Perjalanan</h2>
             <div className="flex flex-wrap items-center gap-2">
               {/*
                 Correcting the Advance is a money write, so it is Staff-only (ADR-0026): the trigger

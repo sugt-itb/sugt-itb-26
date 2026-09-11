@@ -156,7 +156,7 @@ function TripCard({ trip }: { trip: MyUpcomingPerjadin }) {
 
       <div className="mt-2.5 grid gap-1 text-sm">
         <span className="text-muted-foreground">
-          Uang Muka:{" "}
+          Uang Perjalanan:{" "}
           <span className="text-foreground tabular-nums">Rp {formatIdr(trip.advanceIdr)}</span>
         </span>
         {/* The same travel-float remainder the acquittal derives (`advanceIdr - drawnDownIdr`, only
