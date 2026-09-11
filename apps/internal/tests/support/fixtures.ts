@@ -676,7 +676,9 @@ export async function resetDatabase() {
       public."perjadin",
       public."group_member",
       public."transaction",
-      public."transaction_evidence"
+      public."transaction_evidence",
+      public."preparation_card",
+      public."preparation_checklist_item"
     restart identity cascade
   `);
 }

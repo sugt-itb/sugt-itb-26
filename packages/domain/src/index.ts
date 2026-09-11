@@ -447,6 +447,23 @@ export const TRANSPORT_MODES = ["Pesawat", "Kereta", "Travel", "Mobil Dalam Kota
 export type TransportMode = (typeof TRANSPORT_MODES)[number];
 
 /**
+ * The **Jenis** a Monitoring Preparation Card carries — the kind of preparation the card tracks, on
+ * the `/monitoring` Persiapan tab. A closed set of four, mirrored by `preparation_card_jenis_check`
+ * character for character (see `packages/db/src/schema/monitoring.ts`).
+ *
+ * **`Pimpinan` here is a category label, not the Person Role.** It names a kind of preparation
+ * (leadership-facing), and has nothing to do with the signed-in read-only `Pimpinan` role in `ROLES`
+ * or with `requireGrant`/Grants — a Card's Jenis never gates access. Like `TRANSACTION_CATEGORIES`
+ * and `TRANSPORT_MODES`, these are **values a column may hold, not terms `CONTEXT.md` defines**, so
+ * they live here without a glossary entry; only the Monitoring Preparation *concepts* are glossed.
+ */
+export const PREPARATION_JENIS = ["Teknis", "Kurikulum", "LAPI", "Pimpinan"] as const;
+export type PreparationJenis = (typeof PREPARATION_JENIS)[number];
+
+/** The app-enforced ceiling on a Preparation Card's checklist — a safety cap the DB does not hold. */
+export const MAX_PREPARATION_CHECKLIST_ITEMS = 20;
+
+/**
  * The app-enforced caps on the new Perjadin model — ceilings the database deliberately does not
  * hold, in the same spirit as the Group rules that live in the application rather than a CHECK
  * ([ADR-0019](../../../docs/adr/0019-offline-sessions-carry-a-stream-and-a-school-gets-many-per-trip.md),
