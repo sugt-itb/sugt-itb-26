@@ -1,4 +1,4 @@
-import { isNotStaffError } from "@sugt/db/queries";
+import { isNotGrantedError, isNotStaffError } from "@sugt/db/queries";
 import { forbidden } from "next/navigation";
 
 /**
@@ -34,12 +34,18 @@ import { forbidden } from "next/navigation";
  * Reaching it is still a bug or an attack rather than a user state — the surfaces behind
  * it are **absent** for a Teaching Team member, not disabled — so this renders a refusal
  * and does not try to be helpful about it.
+ *
+ * It translates the **Grant** refusal too. `NotGrantedError` (ADR-0028) is the sibling of
+ * `NotStaffError` at the same `@sugt/db` choke point — a Grant is a second, additive access axis —
+ * and it is the same kind of refusal: server-side, a bug or an attack rather than a user state,
+ * sanitized to `digest` alone in production if left to an `error.tsx`. So both map to the same 403
+ * here, and everything else still passes through untouched.
  */
 export async function staffSurface<T>(call: () => Promise<T>): Promise<T> {
   try {
     return await call();
   } catch (error) {
-    if (isNotStaffError(error)) forbidden();
+    if (isNotStaffError(error) || isNotGrantedError(error)) forbidden();
     throw error;
   }
 }

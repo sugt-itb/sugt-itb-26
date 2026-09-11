@@ -267,7 +267,16 @@ export {
   type NotDelivered,
   type SessionRecordRatings,
 } from "./session-records";
-export { isNotStaffError, NotStaffError, requireStaff } from "./staff-only";
+export { assignGrant, personGrants, revokeGrant, type SetGrantResult } from "./grants";
+export {
+  hasGrant,
+  isNotGrantedError,
+  isNotStaffError,
+  NotGrantedError,
+  NotStaffError,
+  requireGrant,
+  requireStaff,
+} from "./staff-only";
 export {
   createSubCluster,
   deleteSubCluster,

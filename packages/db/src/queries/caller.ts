@@ -1,4 +1,4 @@
-import type { Role } from "@sugt/domain";
+import type { Grant, Role } from "@sugt/domain";
 
 /**
  * Who is asking. **Three named types, not one type with optional fields.**
@@ -38,12 +38,21 @@ export type Caller = Person | ServiceCaller | ParticipantToken | PerjadinToken;
  *
  * `role` is write-once — seven composite foreign keys into `person (id, role)` default
  * to `NO ACTION` — so nothing re-reads it within a session.
+ *
+ * `grants` is the **second, additive access axis** (ADR-0028), threaded onto the caller exactly
+ * as `role` is: resolution reads it once per request and hands it here, so a guard that takes a
+ * `Person` has the grants in hand and stays synchronous (`hasGrant`/`requireGrant` in
+ * `./staff-only.ts`). Grants are **Staff-only** — a Pimpinan resolves with an empty list because
+ * the assign path refuses a non-Staff target — so a non-empty `grants` implies `role === "Staff"`,
+ * but the guard never trusts that implication: it asserts the role itself first.
  */
 export type Person = {
   id: string;
   fullName: string;
   email: string;
   role: Role;
+  /** The Grants this Person holds, read at resolution. Empty for anyone with none — never `null`. */
+  grants: readonly Grant[];
 };
 
 /**

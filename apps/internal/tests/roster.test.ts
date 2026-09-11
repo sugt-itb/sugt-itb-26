@@ -42,6 +42,7 @@ function nonStaff() {
     fullName: "Prof",
     email: "prof@gmail.com",
     role: "Teaching Team" as unknown as Role,
+    grants: [],
   };
 }
 

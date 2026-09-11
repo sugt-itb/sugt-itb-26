@@ -1,5 +1,6 @@
 import { db, schema } from "@sugt/db";
 import type { Person } from "@sugt/db/queries";
+import type { Grant } from "@sugt/domain";
 import { and, eq, sql } from "drizzle-orm";
 
 /**
@@ -48,6 +49,23 @@ export async function findActivePersonByEmail(email: string): Promise<Person | n
       fullName: schema.person.fullName,
       email: schema.person.email,
       role: schema.person.role,
+      /**
+       * The Person's Grants, threaded onto the caller in the same read that resolves them — the
+       * second access axis carried exactly as `role` is (ADR-0028), so a guard that takes a
+       * `Person` has the grants in hand. A correlated `array_agg` keeps it to one round trip on
+       * this per-request hot path; `coalesce(…, '{}')` makes a Person with no grants an empty
+       * list, never `null`. This raw read lives here rather than behind a `@sugt/db` query for the
+       * same reason the whole lookup does: **resolving the caller cannot itself take a caller**, so
+       * it is the one grant read outside the caller-guarded query layer.
+       */
+      grants: sql<Grant[]>`coalesce(
+        (
+          select array_agg(${schema.personGrant.grant} order by ${schema.personGrant.grant})
+          from ${schema.personGrant}
+          where ${schema.personGrant.personId} = ${schema.person.id}
+        ),
+        '{}'::text[]
+      )`,
     })
     .from(schema.person)
     .where(

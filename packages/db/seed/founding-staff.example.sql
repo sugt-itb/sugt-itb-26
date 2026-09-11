@@ -42,6 +42,17 @@
 -- against a database where one of these People has since been revoked would either
 -- resurrect them or silently do nothing. Both are worse than an error. Run it once, on
 -- a fresh environment.
+--
+-- ## The Administrator grant tail
+--
+-- The trailing `insert` grants **Administrator** to every founding Staff row above. Administrator
+-- is a **Grant** — the second, additive access axis beside the write-once role (ADR-0028) — and it
+-- bootstraps Grant administration: the first Administrator is the only one who can then assign or
+-- revoke any Grant (including making another Administrator) through the tool, so someone has to be
+-- granted it outside the tool exactly as the founding Staff themselves are added outside it. It runs
+-- **after `db:migrate`**, so `person_grant` already exists; it carries **no emails** of its own —
+-- it selects `where role = 'Staff'`, so it grants to whichever founding Staff the rows above insert.
+-- Provisioning order: `db:migrate` → `db:seed` → fill this file in → `db:seed:people`.
 
 begin;
 
@@ -49,5 +60,10 @@ begin;
 --
 -- insert into person (full_name, email, role) values
 --   ('Nama Lengkap', 'nama@ditsama.itb.ac.id', 'Staff');
+
+-- Grant Administrator to every founding Staff inserted above. No emails here — this rides the rows
+-- above, so filling in the `insert` is the only edit this file needs.
+insert into person_grant (person_id, grant)
+  select id, 'Administrator' from person where role = 'Staff';
 
 commit;
