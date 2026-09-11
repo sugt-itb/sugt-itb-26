@@ -48,9 +48,11 @@ describe("money writes are Staff-only", () => {
   async function aPerjadinWithSpending() {
     const pic = await signInAsPerson("Staff", "rina@ditsama.itb.ac.id", "Rina Nurhayati");
     const perjadin = await addPerjadin({ advanceIdr: 5_000_000, picPersonId: pic.id });
+    // Konsumsi draws down the float (ADR-0029), so it reduces the remainder the reconciliation checks.
     await addTransaction({
       perjadinId: perjadin.id,
       amountIdr: 1_250_000,
+      category: "Konsumsi",
       createdByPersonId: pic.id,
     });
     return { pic, perjadin };

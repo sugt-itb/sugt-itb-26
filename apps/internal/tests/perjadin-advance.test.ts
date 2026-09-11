@@ -42,7 +42,13 @@ describe("Correcting a Perjadin's Advance", () => {
   it("persists a corrected Advance and recomputes the remainder", async () => {
     const pic = await staff();
     const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: 5_000_000 });
-    await addTransaction({ perjadinId: trip.id, amountIdr: 1_250_000, createdByPersonId: pic.id });
+    // Konsumsi draws down the float (ADR-0029), so the remainder tracks advance − 1.25M.
+    await addTransaction({
+      perjadinId: trip.id,
+      amountIdr: 1_250_000,
+      category: "Konsumsi",
+      createdByPersonId: pic.id,
+    });
 
     const result = await updatePerjadinAdvance(pic, trip.id, 7_000_000);
 
@@ -70,7 +76,13 @@ describe("Correcting a Perjadin's Advance", () => {
   it("accepts an Advance below current spend, yielding a negative remainder — no coupling to spend", async () => {
     const pic = await staff();
     const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: 5_000_000 });
-    await addTransaction({ perjadinId: trip.id, amountIdr: 2_000_000, createdByPersonId: pic.id });
+    // Konsumsi draws down the float (ADR-0029): 2M drawn against a 500k advance is a −1.5M remainder.
+    await addTransaction({
+      perjadinId: trip.id,
+      amountIdr: 2_000_000,
+      category: "Konsumsi",
+      createdByPersonId: pic.id,
+    });
 
     const result = await updatePerjadinAdvance(pic, trip.id, 500_000);
 

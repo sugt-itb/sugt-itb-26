@@ -78,9 +78,11 @@ describe("staffDashboard", () => {
     });
     // Offline mark-delivered is status-only — its teachers are trip-scoped names, not People.
     await markSessionDelivered(pic, delivered.id);
+    // Konsumsi draws down the float (ADR-0029), so the remainder is advance − 1M.
     await addTransaction({
       perjadinId: perjadin.id,
       amountIdr: 1_000_000,
+      category: "Konsumsi",
       createdByPersonId: pic.id,
     });
 

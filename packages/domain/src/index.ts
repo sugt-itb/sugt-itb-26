@@ -418,6 +418,45 @@ export const TRANSACTION_CATEGORIES = [
 export type TransactionCategory = (typeof TRANSACTION_CATEGORIES)[number];
 
 /**
+ * The transaction categories that **draw down a Perjadin's travel float** (ADR-0029). Only these
+ * reduce the remaining float (`advanceIdr − drawn-down`); every other category is recorded against
+ * the trip and shown in the acquittal, but is paid outside the float (pre-paid before departure or
+ * handled by other Staff) and does **not** reduce what is left.
+ *
+ * This is the single source of truth for that split. It is deliberately a **narrower** subset of
+ * `TRANSACTION_CATEGORIES` — the two values here are members of that list, character for character —
+ * and it is intended to be extensible: widening the float later is one edit here. It does **not**
+ * change `/monitoring`'s "Anggaran terpakai", which still sums **every** category (that figure is
+ * programme spend, not float draw-down — the two are two different numbers by design).
+ */
+export const ADVANCE_DRAWDOWN_CATEGORIES = [
+  "Konsumsi",
+  "Lainnya",
+] as const satisfies readonly TransactionCategory[];
+export type AdvanceDrawdownCategory = (typeof ADVANCE_DRAWDOWN_CATEGORIES)[number];
+
+/** Whether a category draws down the travel float. Widened to `string` so a DB-read row's `category` compares without a cast. */
+export function isAdvanceDrawdownCategory(category: string): boolean {
+  return (ADVANCE_DRAWDOWN_CATEGORIES as readonly string[]).includes(category);
+}
+
+/**
+ * The **drawn-down total** of a list of transactions — the sum of only those whose category is an
+ * `ADVANCE_DRAWDOWN_CATEGORIES` member. The one place the JS render/query sites compute float
+ * consumption, so the rule lives here beside the constant rather than being re-expressed per site.
+ * The two SQL sums (`my-perjadin`, `dashboard`) can't call this, so they carry a `category in (…)`
+ * built from the same constant; a test pins all three equal.
+ */
+export function sumAdvanceDrawdownIdr(
+  lines: readonly { category: string; amountIdr: number }[],
+): number {
+  return lines.reduce(
+    (total, line) => (isAdvanceDrawdownCategory(line.category) ? total + line.amountIdr : total),
+    0,
+  );
+}
+
+/**
  * Which cohort a transaction's spend served — an axis orthogonal to `category`. `category` is what
  * kind of spend it was; `participant_type` is which of the two Classes it was for. `Siswa` is the
  * Student Class; `GTK-MS` is the GTK and MS Classes taken together. Required on every transaction:

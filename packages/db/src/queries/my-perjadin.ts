@@ -13,6 +13,7 @@ import {
   perjadinTeacher,
   transaction,
 } from "../schema/travel";
+import { advanceDrawdownCategoryList } from "./advance-drawdown";
 import type { Person } from "./caller";
 import { todayInDeadlineZone } from "./deadline";
 import {
@@ -34,7 +35,7 @@ import {
  *
  * **Money rides on this payload**, unlike `./perjadin-detail.ts` which carries none. This is a
  * personal work list — "how much of my Advance is left" is the point of it — and money reads are
- * open now (ADR-0026), so `advanceIdr`/`spentIdr` sit here directly rather than behind a second call.
+ * open now (ADR-0026), so `advanceIdr`/`drawnDownIdr` sit here directly rather than behind a second call.
  */
 
 /** One Staff member of the trip's Group. `isPic` flags the one the reader looks for first. */
@@ -95,14 +96,14 @@ export type MyUpcomingPerjadin = {
   /** Fixed at planning and transferred before departure, so never null and never absent. */
   advanceIdr: number;
   /**
-   * The sum of every transaction against the Advance; zero when none has been entered. **The same
-   * rule `perjadinAcquittal` applies** — every one of the trip's line items counts, nothing is
-   * filtered out — so the two figures agree and the UI derives Tersisa the way the acquittal derives
-   * its remainder: `advanceIdr - spentIdr`. It is summed in SQL here because this list renders no
-   * line items, where the acquittal reduces in JS the rows it already loaded to show; a test pins the
-   * two against each other so the rule cannot drift into two answers.
+   * The **travel-float draw-down** for this trip: the sum of only the transactions whose category is
+   * an `ADVANCE_DRAWDOWN_CATEGORIES` member (ADR-0029), zero when none has been entered. The UI
+   * derives Tersisa as `advanceIdr - drawnDownIdr`, the same math `perjadinAcquittal.remainderIdr`
+   * uses — a test pins the two equal so the two screens never show two answers. It is summed in SQL
+   * here (this list renders no line items) with a `category in (…)` filter kept in step with the
+   * domain constant, where the acquittal reduces its loaded rows through `sumAdvanceDrawdownIdr`.
    */
-  spentIdr: number;
+  drawnDownIdr: number;
   /** Departure from Bandung's date and time; null when this trip predates the logistics columns. */
   departureAt: string | null;
   departureZone: TimeZone | null;
@@ -175,17 +176,21 @@ export async function myUpcomingPerjadin(caller: Person): Promise<MyUpcomingPerj
   const tripIds = trips.map((trip) => trip.id);
 
   // The six hanging lists, gathered concurrently and each scoped to just these trips.
-  const [spentRows, staffRows, pengajarRows, pimpinanRows, sessionRows, preparationRows] =
+  const [drawnDownRows, staffRows, pengajarRows, pimpinanRows, sessionRows, preparationRows] =
     await Promise.all([
-      // Spend per trip: `sum(amount_idr)` over the trip's line items, grouped by `perjadin_id`, so a
-      // trip with no transactions is absent and defaults to 0 below. The **same rule** as
-      // `perjadinAcquittal` — every line item counts, nothing filtered — summed in SQL here since this
-      // list shows no line items, where the acquittal reduces its loaded rows in JS. A test pins the
-      // two equal, so the UI's `advanceIdr - spentIdr` matches the acquittal's `remainderIdr`.
+      // Travel-float draw-down per trip (ADR-0029): `sum(amount_idr) filter (where category in …)`
+      // over only `ADVANCE_DRAWDOWN_CATEGORIES`, grouped by `perjadin_id`. A trip with no drawdown
+      // spend (or none at all) is absent or sums to 0 and defaults to 0 below. The `in (…)` list is
+      // built from the domain constant so it cannot drift; the acquittal reduces its loaded rows
+      // through `sumAdvanceDrawdownIdr` for the identical rule, and a test pins the UI's
+      // `advanceIdr - drawnDownIdr` equal to the acquittal's `remainderIdr`.
       db
         .select({
           perjadinId: transaction.perjadinId,
-          spentIdr: sql<number>`sum(${transaction.amountIdr})`.mapWith(Number),
+          drawnDownIdr:
+            sql<number>`coalesce(sum(${transaction.amountIdr}) filter (where ${transaction.category} in (${advanceDrawdownCategoryList()})), 0)`.mapWith(
+              Number,
+            ),
         })
         .from(transaction)
         .where(inArray(transaction.perjadinId, tripIds))
@@ -259,8 +264,8 @@ export async function myUpcomingPerjadin(caller: Person): Promise<MyUpcomingPerj
         .where(inArray(perjadinPreparationItem.perjadinId, tripIds)),
     ]);
 
-  // Spend keyed by trip; a trip absent from the grouped sum spent nothing.
-  const spentByTrip = new Map(spentRows.map((row) => [row.perjadinId, row.spentIdr]));
+  // Float draw-down keyed by trip; a trip absent from the grouped sum drew nothing down.
+  const drawnDownByTrip = new Map(drawnDownRows.map((row) => [row.perjadinId, row.drawnDownIdr]));
 
   const staffByTrip = new Map<string, MyPerjadinStaff[]>();
   const pengajarByTrip = new Map<string, MyPerjadinPengajar[]>();
@@ -332,7 +337,7 @@ export async function myUpcomingPerjadin(caller: Person): Promise<MyUpcomingPerj
     const pimpinan = pimpinanByTrip.get(trip.id) ?? [];
     return {
       ...trip,
-      spentIdr: spentByTrip.get(trip.id) ?? 0,
+      drawnDownIdr: drawnDownByTrip.get(trip.id) ?? 0,
       preparation: derivePreparationChecklist(preparationTicksByTrip.get(trip.id) ?? []),
       anggota: {
         staff,

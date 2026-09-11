@@ -86,12 +86,19 @@ describe("the acquittal payload", () => {
 
   it("derives the remainder from the Advance and the line items, and never stores it", async () => {
     const { staff, trip } = await aTrip(5_000_000);
+    // Both draw down the float (ADR-0029), so spentIdr (full log) and the drawn-down remainder agree.
     await addTransaction({
       perjadinId: trip.id,
       amountIdr: 1_250_000,
+      category: "Konsumsi",
       createdByPersonId: staff.id,
     });
-    await addTransaction({ perjadinId: trip.id, amountIdr: 400_000, createdByPersonId: staff.id });
+    await addTransaction({
+      perjadinId: trip.id,
+      amountIdr: 400_000,
+      category: "Lainnya",
+      createdByPersonId: staff.id,
+    });
 
     const acquittal = await perjadinAcquittal(staff, trip.id);
 
