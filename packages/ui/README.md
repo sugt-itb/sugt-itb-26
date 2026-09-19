@@ -44,7 +44,7 @@ surface for is a file to maintain and nothing more.
 | `input-group`  | `shadcn add`          | dependency of `combobox` — the chips/input shell it composes; kept because removing it breaks that import                                            |
 | `label`        | `shadcn add`          | every form                                                                                                                                           |
 | `link-button`  | hand-written          | every control that navigates but looks like a Button — see [Button vs LinkButton](#button-vs-linkbutton)                                             |
-| `popover`      | `shadcn add`          | Monitoring — the calendar's click-to-open event popup, anchored to a date cell ([#233](https://github.com/mafiefa02/sugt/issues/233))               |
+| `popover`      | `shadcn add`          | Monitoring — the calendar's click-to-open event popup, anchored to a date cell ([#233](https://github.com/mafiefa02/sugt/issues/233))                |
 | `progress`     | `shadcn add`          | Coverage — delivered against ten; the Staff Dashboard's per-Cluster bars                                                                             |
 | `rating`       | hand-written          | Concerns, Detail Sekolah, Detail Sesi — every Rating already filed                                                                                   |
 | `rating-input` | hand-written          | Class Record, Session Record, Perjadin Evaluation, Participant Feedback                                                                              |
