@@ -6,7 +6,9 @@ import { deriveMonitoring } from "./monitoring-derive";
 import { showBudget } from "./monitoring-state";
 import { MonitoringTabs } from "./monitoring-tabs";
 import { MonitoringView } from "./monitoring-view";
+import { MonitoringWarnings } from "./monitoring-warnings";
 import { PersiapanTab } from "./persiapan-tab";
+import { preparationWarnings } from "./preparation-derive";
 
 /**
  * **Monitoring** — a one-screen overview of how far Session delivery has got and how much of the
@@ -43,6 +45,10 @@ export default async function Page() {
   // The Calendar's per-date event list — the uncapped, named rows the click-to-open popup shows,
   // ordered and dated by the same pure seam (#232). Same date coverage as the markers.
   const calendarEvents = deriveCalendarEvents(data);
+  // The Peringatan section's warnings, merged in a stable order — the server's Luring-overdue
+  // warnings first, then the Persiapan due-date warnings (#234) folded from the same `cards` already
+  // fetched above (no new query). Rendered once above the tabs so the section shows on both (#235).
+  const warnings = [...derived.warnings, ...preparationWarnings(cards, today)];
 
   return (
     <div className="flex min-h-full flex-col">
@@ -52,6 +58,8 @@ export default async function Page() {
           Ringkasan kemajuan pelaksanaan Sesi dan penyerapan anggaran Program di seluruh Klaster.
         </p>
       </header>
+
+      <MonitoringWarnings warnings={warnings} />
 
       <MonitoringTabs
         pelaksanaan={
@@ -63,7 +71,6 @@ export default async function Page() {
             luring={derived.luring}
             daring={derived.daring}
             timeline={derived.timeline}
-            warnings={derived.warnings}
             calendarMarkers={calendarMarkers}
             calendarEvents={calendarEvents}
             today={today}
