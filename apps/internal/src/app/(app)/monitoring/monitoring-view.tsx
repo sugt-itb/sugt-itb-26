@@ -29,7 +29,7 @@ import { cn } from "@sugt/ui/lib/utils";
 import { Check } from "lucide-react";
 import { useState } from "react";
 
-import type { MarkerType } from "./calendar-derive";
+import type { CalendarEvent, MarkerType } from "./calendar-derive";
 import { MonitoringCalendar } from "./monitoring-calendar";
 import type { MatrixRow, TimelineStep } from "./monitoring-derive";
 import { dismissWarning, initialWarningState, type Warning } from "./monitoring-state";
@@ -56,6 +56,7 @@ export function MonitoringView({
   timeline,
   warnings,
   calendarMarkers,
+  calendarEvents,
   today,
 }: {
   showBudget: boolean;
@@ -67,6 +68,7 @@ export function MonitoringView({
   timeline: TimelineStep[];
   warnings: Warning[];
   calendarMarkers: Record<string, MarkerType[]>;
+  calendarEvents: Record<string, CalendarEvent[]>;
   today: string;
 }) {
   const [state, setState] = useState(() => initialWarningState(warnings));
@@ -167,6 +169,7 @@ export function MonitoringView({
         <div className="order-1 md:order-none md:col-start-2 md:row-span-2">
           <MonitoringCalendar
             markers={calendarMarkers}
+            events={calendarEvents}
             today={today}
           />
         </div>
