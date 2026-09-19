@@ -1,4 +1,6 @@
 import {
+  type CalendarEvent,
+  deriveCalendarEvents,
   deriveCalendarMarkers,
   MAX_MARKERS_PER_DAY,
   type MarkerType,
@@ -36,11 +38,18 @@ function data(over: Partial<MonitoringData> = {}): MonitoringData {
   };
 }
 
-/** A Perjadin span; `hasPimpinan` defaults off so a case names Monev only when it means it. */
+/** A Perjadin span; `hasPimpinan` defaults off, and `id`/`destination` are defaulted so a marker
+ *  case (which reads neither) stays terse and an event case overrides `destination` when it means
+ *  it. */
 function span(
   over: Partial<PerjadinSpan> & Pick<PerjadinSpan, "clusterId" | "startsOn" | "endsOn">,
 ): PerjadinSpan {
-  return { hasPimpinan: false, ...over };
+  return {
+    id: crypto.randomUUID(),
+    destination: "Kelompok X: Bandung",
+    hasPimpinan: false,
+    ...over,
+  };
 }
 
 /** An online Session held on one day in a Cluster; the fields the fold ignores are defaulted. */
@@ -57,6 +66,7 @@ function online(
     startsAt: "09:00",
     id: crypto.randomUUID(),
     status: "delivered",
+    name: "SDN Contoh",
     ...over,
   };
 }
@@ -228,5 +238,153 @@ describe("deriveCalendarMarkers — ordering and overflow", () => {
       "online-cluster-3",
     ];
     expect(got).toEqual(expected); // online-cluster-4 and pretest-posttest fall off the end
+  });
+});
+
+describe("deriveCalendarEvents — offline Perjadin and Monev", () => {
+  it("emits one offline event per trip across its span, named by destination, coloured by Cluster", () => {
+    const events = deriveCalendarEvents(
+      data({
+        perjadinSpans: [
+          span({
+            clusterId: "c2",
+            startsOn: "2026-10-13",
+            endsOn: "2026-10-15",
+            destination: "Kelompok 7: Jakarta Selatan",
+          }),
+        ],
+      }),
+    );
+    const expected: CalendarEvent = {
+      markerType: "offline-cluster-2",
+      name: "Kelompok 7: Jakarta Selatan",
+      startDate: "2026-10-13",
+      endDate: "2026-10-15",
+    };
+    expect(events["2026-10-13"]).toEqual([expected]);
+    expect(events["2026-10-14"]).toEqual([expected]);
+    expect(events["2026-10-15"]).toEqual([expected]);
+    expect(events["2026-10-16"]).toBeUndefined();
+  });
+
+  it("keeps two trips of one Cluster as two separate events, ordered by startDate then name", () => {
+    const events = deriveCalendarEvents(
+      data({
+        perjadinSpans: [
+          span({
+            clusterId: "c1",
+            startsOn: "2026-10-14",
+            endsOn: "2026-10-14",
+            destination: "Zebra trip",
+          }),
+          span({
+            clusterId: "c1",
+            startsOn: "2026-10-14",
+            endsOn: "2026-10-14",
+            destination: "Alpha trip",
+          }),
+        ],
+      }),
+    );
+    expect(events["2026-10-14"]?.map((e) => e.name)).toEqual(["Alpha trip", "Zebra trip"]);
+  });
+
+  it("emits Monev as its own event named `Monev - {destination}`, after the offline event", () => {
+    const events = deriveCalendarEvents(
+      data({
+        perjadinSpans: [
+          span({
+            clusterId: "c3",
+            startsOn: "2026-10-20",
+            endsOn: "2026-10-21",
+            destination: "Kelompok 2: Bandung",
+            hasPimpinan: true,
+          }),
+        ],
+      }),
+    );
+    expect(events["2026-10-20"]).toEqual([
+      {
+        markerType: "offline-cluster-3",
+        name: "Kelompok 2: Bandung",
+        startDate: "2026-10-20",
+        endDate: "2026-10-21",
+      },
+      {
+        markerType: "monev",
+        name: "Monev - Kelompok 2: Bandung",
+        startDate: "2026-10-20",
+        endDate: "2026-10-21",
+      },
+    ]);
+  });
+});
+
+describe("deriveCalendarEvents — online sessions", () => {
+  it("emits a single-day `Sesi Daring {school}` event with a null endDate", () => {
+    const events = deriveCalendarEvents(
+      data({ sessions: [online("c1", "2026-10-15", { name: "SDN Merdeka" })] }),
+    );
+    expect(events["2026-10-15"]).toEqual([
+      {
+        markerType: "online-cluster-1",
+        name: "Sesi Daring SDN Merdeka",
+        startDate: "2026-10-15",
+        endDate: null,
+      },
+    ]);
+  });
+
+  it("ignores a cancelled online session", () => {
+    const events = deriveCalendarEvents(
+      data({ sessions: [online("c1", "2026-10-15", { status: "cancelled" })] }),
+    );
+    expect(events["2026-10-15"]).toBeUndefined();
+  });
+});
+
+describe("deriveCalendarEvents — pretest/posttest and full ordering", () => {
+  it("splits the earlier window as Pretest and the later as Posttest, each over its range", () => {
+    const events = deriveCalendarEvents(data());
+    expect(events["2026-09-18"]).toEqual([
+      {
+        markerType: "pretest-posttest",
+        name: "Pretest",
+        startDate: "2026-09-18",
+        endDate: "2026-09-20",
+      },
+    ]);
+    expect(events["2026-12-01"]).toEqual([
+      {
+        markerType: "pretest-posttest",
+        name: "Posttest",
+        startDate: "2026-12-01",
+        endDate: "2026-12-05",
+      },
+    ]);
+  });
+
+  it("orders a shared day offline → Monev → online → pretest/posttest", () => {
+    const events = deriveCalendarEvents(
+      data({
+        perjadinSpans: [
+          span({
+            clusterId: "c1",
+            startsOn: "2026-09-18",
+            endsOn: "2026-09-18",
+            destination: "Trip A",
+            hasPimpinan: true,
+          }),
+        ],
+        sessions: [online("c1", "2026-09-18", { name: "SDN Satu" })],
+      }),
+    );
+    // 2026-09-18 is also the Pretest window's first day, so all four categories land together.
+    expect(events["2026-09-18"]?.map((e) => e.markerType)).toEqual([
+      "offline-cluster-1",
+      "monev",
+      "online-cluster-1",
+      "pretest-posttest",
+    ]);
   });
 });

@@ -19,8 +19,10 @@ export type CalendarDay = { date: string; dayNumber: number; inMonth: boolean };
  *  because the letters repeat. */
 export const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"] as const;
 
-/** Month names as the Indonesian page prints them, indexed by `month - 1`. */
-const MONTH_NAMES_ID = [
+/** Month names as the Indonesian page prints them, indexed by `month - 1`. Exported so the
+ *  long-date formatter (and the Peringatan warnings that consume it) name a month the same way the
+ *  grid header does. */
+export const MONTH_NAMES_ID = [
   "Januari",
   "Februari",
   "Maret",
@@ -57,6 +59,18 @@ export function addMonths(m: CalendarMonth, delta: number): CalendarMonth {
 /** The header title, e.g. `"September 2026"`. */
 export function monthTitle(m: CalendarMonth): string {
   return `${MONTH_NAMES_ID[m.month - 1]} ${m.year}`;
+}
+
+/**
+ * A `YYYY-MM-DD` date as the long Indonesian form the human-facing surfaces print, e.g.
+ * `"15 Oktober 2026"` — day without a leading zero, the month named from `MONTH_NAMES_ID`, then the
+ * year. Pure string arithmetic on the ISO parts (no `Date`, no locale, no time zone), so it names
+ * exactly the calendar day it is given. New surfaces only — the calendar event popup and the
+ * Peringatan Persiapan warnings; existing ISO `YYYY-MM-DD` displays stay as they are (#166).
+ */
+export function longDateId(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-");
+  return `${Number(day)} ${MONTH_NAMES_ID[Number(month) - 1]} ${year}`;
 }
 
 /**

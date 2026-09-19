@@ -7,6 +7,8 @@ import {
   addPerjadin,
   addPerson,
   addProvince,
+  addSchool,
+  addSession,
   addSubCluster,
   resetDatabase,
 } from "./support/fixtures";
@@ -45,21 +47,23 @@ describe("monitoringData returns perjadinSpans", () => {
     const subB = await addSubCluster({ slug: "sub-b", name: "Kelompok B", clusterId: clusterB.id });
 
     // A trip in Cluster A with a Pimpinan recorded — hasPimpinan true.
-    await addPerjadin({
+    const tripA = await addPerjadin({
       subClusterId: subA.id,
       picPersonId: staff.id,
       startsOn: "2026-10-10",
       endsOn: "2026-10-12",
       advanceIdr: 1_000_000,
+      destination: "Kelompok A: Jakarta Selatan",
       pimpinan: [pimpinan.id],
     });
     // A trip in Cluster B with no Pimpinan — hasPimpinan false.
-    await addPerjadin({
+    const tripB = await addPerjadin({
       subClusterId: subB.id,
       picPersonId: staff.id,
       startsOn: "2026-11-01",
       endsOn: "2026-11-01",
       advanceIdr: 500_000,
+      destination: "Kelompok B: Bandung",
     });
 
     const { perjadinSpans } = await monitoringData(asPerson(staff));
@@ -68,13 +72,17 @@ describe("monitoringData returns perjadinSpans", () => {
     const a = perjadinSpans.find((s) => s.clusterId === clusterA.id);
     const b = perjadinSpans.find((s) => s.clusterId === clusterB.id);
     expect(a).toEqual({
+      id: tripA.id,
       clusterId: clusterA.id,
+      destination: "Kelompok A: Jakarta Selatan",
       startsOn: "2026-10-10",
       endsOn: "2026-10-12",
       hasPimpinan: true,
     });
     expect(b).toEqual({
+      id: tripB.id,
       clusterId: clusterB.id,
+      destination: "Kelompok B: Bandung",
       startsOn: "2026-11-01",
       endsOn: "2026-11-01",
       hasPimpinan: false,
@@ -89,5 +97,36 @@ describe("monitoringData returns perjadinSpans", () => {
     });
     const { perjadinSpans } = await monitoringData(asPerson(staff));
     expect(perjadinSpans).toEqual([]);
+  });
+});
+
+describe("monitoringData carries the School name on each Session", () => {
+  beforeEach(resetDatabase);
+
+  it("returns school.name so the Calendar can name a `Sesi Daring {name}` event", async () => {
+    await addProvince("JB", "Jawa Barat", "WIB");
+    const staff = await addPerson({
+      fullName: "Rina",
+      email: "rina@ditsama.itb.ac.id",
+      role: "Staff",
+    });
+    const clusterA = await addCluster({ slug: "cluster-a", name: "Klaster A" });
+    const school = await addSchool({
+      slug: "sdn-merdeka",
+      name: "SDN Merdeka",
+      clusterId: clusterA.id,
+      provinceCode: "JB",
+    });
+    await addSession({
+      schoolId: school.id,
+      heldOn: "2026-10-15",
+      onlinePicPersonId: staff.id,
+    });
+
+    const { sessions } = await monitoringData(asPerson(staff));
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.name).toBe("SDN Merdeka");
+    expect(sessions[0]?.schoolId).toBe(school.id);
   });
 });

@@ -168,3 +168,121 @@ export function deriveCalendarMarkers(data: MonitoringData): Record<string, Mark
   }
   return markers;
 }
+
+/**
+ * One row the calendar's click-to-open popup shows for a date: the human `name`, its date (`endDate`
+ * null for a single-day event, set for a span), and the `markerType` that gives its dot the same
+ * colour the grid uses via `MARKER_FILL`. Unlike the grid markers, events are **not** deduped or
+ * capped — two trips in the same Cluster are two events, and the popup lists every one.
+ */
+export type CalendarEvent = {
+  markerType: MarkerType;
+  name: string;
+  startDate: string;
+  endDate: string | null;
+};
+
+/**
+ * The per-category order events sort into within a date: all offline Perjadin first, then the Monev
+ * lines, then online Sessions, then the Pretest/Posttest windows. Within a category events order by
+ * `startDate` then `name`, so two overlapping trips read in a stable, date-then-label order.
+ */
+function eventCategory(markerType: MarkerType): number {
+  if (markerType === "monev") return 1;
+  if (markerType.startsWith("online-")) return 2;
+  if (markerType === "pretest-posttest") return 3;
+  return 0; // offline-cluster-N
+}
+
+/** Push `event` onto every date it covers, from `startDate` through `endDate` (or just `startDate`
+ *  when `endDate` is null), creating each day's list on first touch. */
+function addEvent(byDay: Map<string, CalendarEvent[]>, event: CalendarEvent): void {
+  for (const day of eachDay(event.startDate, event.endDate ?? event.startDate)) {
+    const list = byDay.get(day);
+    if (list) list.push(event);
+    else byDay.set(day, [event]);
+  }
+}
+
+/**
+ * Fold the raw `monitoringData` payload into `date → events` — the uncapped, named event list the
+ * calendar popup reads, a sibling of `deriveCalendarMarkers` (which stays the dot grid's source).
+ * Every date any event touches gets an entry, so the UI can open any day without a refetch.
+ *
+ * - **Offline Perjadin** — one event per trip, `name` = its `destination`, spanning `startsOn`–
+ *   `endsOn`, coloured by its Cluster. **Not** grouped by Cluster: two trips of one Cluster are two
+ *   events; the Cluster survives only as the dot colour.
+ * - **Monev** — a **separate** event for each Perjadin that carries a Pimpinan, `name` =
+ *   `Monev - {destination}`, the same span, grey (`monev`).
+ * - **Online Session** — one single-day event per non-cancelled online Session, `name` =
+ *   `Sesi Daring {school name}`, `endDate` null.
+ * - **Pretest/Posttest** — the earlier fixed window is `Pretest`, the later `Posttest`; each its own
+ *   event over its range.
+ *
+ * Each day's list is then ordered offline → Monev → online → Pretest/Posttest, and within a category
+ * by `startDate` then `name`.
+ */
+export function deriveCalendarEvents(data: MonitoringData): Record<string, CalendarEvent[]> {
+  const clusterIndex = clusterIndexById(data.clusters);
+  const byDay = new Map<string, CalendarEvent[]>();
+
+  // Offline Perjadin, and a separate Monev event over the Pimpinan subset of the same trips.
+  for (const span of data.perjadinSpans) {
+    const n = clusterIndex.get(span.clusterId);
+    if (n !== undefined) {
+      addEvent(byDay, {
+        markerType: `offline-cluster-${n}` as MarkerType,
+        name: span.destination,
+        startDate: span.startsOn,
+        endDate: span.endsOn,
+      });
+    }
+    if (span.hasPimpinan) {
+      addEvent(byDay, {
+        markerType: "monev",
+        name: `Monev - ${span.destination}`,
+        startDate: span.startsOn,
+        endDate: span.endsOn,
+      });
+    }
+  }
+
+  // Online Sessions land on their single held day.
+  for (const s of data.sessions) {
+    if (s.mode !== "online" || s.status === "cancelled") continue;
+    const n = clusterIndex.get(s.clusterId);
+    if (n === undefined) continue;
+    addEvent(byDay, {
+      markerType: `online-cluster-${n}` as MarkerType,
+      name: `Sesi Daring ${s.name}`,
+      startDate: s.heldOn,
+      endDate: null,
+    });
+  }
+
+  // The two fixed windows, earlier = Pretest, later = Posttest, ordered by chronology not array
+  // position so the labels never depend on how the ranges are listed.
+  const orderedRanges = [...PRETEST_POSTTEST_RANGES].sort((a, b) =>
+    a.startsOn < b.startsOn ? -1 : 1,
+  );
+  orderedRanges.forEach((range, i) => {
+    addEvent(byDay, {
+      markerType: "pretest-posttest",
+      name: i === 0 ? "Pretest" : "Posttest",
+      startDate: range.startsOn,
+      endDate: range.endsOn,
+    });
+  });
+
+  // Order each day: offline → Monev → online → Pretest/Posttest, then startDate, then name.
+  const events: Record<string, CalendarEvent[]> = {};
+  for (const [day, list] of byDay) {
+    events[day] = list.sort((a, b) => {
+      const cat = eventCategory(a.markerType) - eventCategory(b.markerType);
+      if (cat !== 0) return cat;
+      if (a.startDate !== b.startDate) return a.startDate < b.startDate ? -1 : 1;
+      return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+    });
+  }
+  return events;
+}

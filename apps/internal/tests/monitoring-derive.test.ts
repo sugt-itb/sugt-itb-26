@@ -41,6 +41,7 @@ function sess(
     startsAt: "09:00",
     id: crypto.randomUUID(),
     status: "delivered",
+    name: "SDN Contoh",
     ...overrides,
   };
 }

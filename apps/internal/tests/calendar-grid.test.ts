@@ -1,6 +1,7 @@
 import {
   addMonths,
   type CalendarMonth,
+  longDateId,
   monthGrid,
   monthOf,
   monthTitle,
@@ -85,5 +86,17 @@ describe("monthTitle", () => {
     expect(monthTitle(SEPT)).toBe("September 2026");
     expect(monthTitle({ year: 2026, month: 1 })).toBe("Januari 2026");
     expect(monthTitle({ year: 2027, month: 12 })).toBe("Desember 2027");
+  });
+});
+
+describe("longDateId", () => {
+  it("renders the long Indonesian form `D Month YYYY`", () => {
+    expect(longDateId("2026-10-15")).toBe("15 Oktober 2026");
+    expect(longDateId("2026-01-31")).toBe("31 Januari 2026");
+    expect(longDateId("2027-12-01")).toBe("1 Desember 2027");
+  });
+
+  it("drops a leading zero from a single-digit day", () => {
+    expect(longDateId("2026-09-05")).toBe("5 September 2026");
   });
 });
