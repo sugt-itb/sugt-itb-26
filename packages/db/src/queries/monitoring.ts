@@ -33,6 +33,9 @@ export type MonitoringSession = {
   startsAt: string;
   id: string;
   status: SessionStatus;
+  /** The School's name, the human label the Calendar's online-session events read (`Sesi Daring
+   *  {name}`). The rank fold ignores it; only the calendar event list uses it. */
+  name: string;
 };
 
 /**
@@ -63,10 +66,13 @@ export type MonitoringData = {
   budgetUsedIdr: number;
 };
 
-/** One Perjadin as the Calendar reads it: its Cluster, its inclusive date span, and whether any
- *  Pimpinan travels on it (the Monev marker). */
+/** One Perjadin as the Calendar reads it: its id and its Cluster, the human `destination` label the
+ *  event popup shows, its inclusive date span, and whether any Pimpinan travels on it (the Monev
+ *  marker). */
 export type PerjadinSpan = {
+  id: string;
   clusterId: string;
+  destination: string;
   startsOn: string;
   endsOn: string;
   hasPimpinan: boolean;
@@ -98,6 +104,8 @@ export async function monitoringData(_caller: Person): Promise<MonitoringData> {
       startsAt: session.startsAt,
       id: session.id,
       status: session.status,
+      // The School's name, for the Calendar's `Sesi Daring {name}` online-session event.
+      name: school.name,
     })
     .from(session)
     .innerJoin(school, eq(school.id, session.schoolId))
@@ -107,9 +115,13 @@ export async function monitoringData(_caller: Person): Promise<MonitoringData> {
 
   const perjadinSpans = await db
     .select({
+      id: perjadin.id,
       // The trip's Cluster is its Sub-Cluster's Cluster — `sub_cluster.cluster_id` is NOT NULL, so
       // the inner join never drops a Perjadin.
       clusterId: subCluster.clusterId,
+      // The Surat Tugas destination line — the human label everywhere else names a trip by, and the
+      // name the Calendar's offline/Monev events show. There is no separate Perjadin name column.
+      destination: perjadin.destination,
       startsOn: perjadin.startsOn,
       endsOn: perjadin.endsOn,
       // A trip carries the Monev marker iff any Pimpinan is recorded on it. EXISTS is a boolean the
