@@ -263,14 +263,16 @@ function Legend() {
           />
         ))}
       </LegendRow>
-      <LegendRow label="Lainnya">
-        <LegendSwatch
+      <LegendRow label="Monev">
+        <Swatch
           marker="monev"
-          label="Monev"
+          className="size-2.5"
         />
-        <LegendSwatch
+      </LegendRow>
+      <LegendRow label="Pretest/Posttest">
+        <Swatch
           marker="pretest-posttest"
-          label="Pretest/Posttest"
+          className="size-2.5"
         />
       </LegendRow>
     </div>
