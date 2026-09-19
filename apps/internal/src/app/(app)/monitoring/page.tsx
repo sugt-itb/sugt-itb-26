@@ -1,7 +1,7 @@
 import { requirePerson } from "-/lib/person";
 import { hasGrant, monitoringData, preparationCards } from "@sugt/db/queries";
 
-import { deriveCalendarMarkers } from "./calendar-derive";
+import { deriveCalendarEvents, deriveCalendarMarkers } from "./calendar-derive";
 import { deriveMonitoring } from "./monitoring-derive";
 import { showBudget } from "./monitoring-state";
 import { MonitoringTabs } from "./monitoring-tabs";
@@ -40,6 +40,9 @@ export default async function Page() {
   // to any month without a refetch. The grid seeds its view on `today` (the same WIB date the rest
   // of the screen turns over on).
   const calendarMarkers = deriveCalendarMarkers(data);
+  // The Calendar's per-date event list — the uncapped, named rows the click-to-open popup shows,
+  // ordered and dated by the same pure seam (#232). Same date coverage as the markers.
+  const calendarEvents = deriveCalendarEvents(data);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -62,6 +65,7 @@ export default async function Page() {
             timeline={derived.timeline}
             warnings={derived.warnings}
             calendarMarkers={calendarMarkers}
+            calendarEvents={calendarEvents}
             today={today}
           />
         }
