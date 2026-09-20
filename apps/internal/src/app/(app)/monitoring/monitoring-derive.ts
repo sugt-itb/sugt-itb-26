@@ -1,11 +1,11 @@
 import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
 import {
+  KEGIATAN_UNITS_PER_SCHOOL,
   LURING_SESI_WINDOWS,
   PRETEST_PARTICIPANT_TYPES,
   PROGRAMME_BUDGET_IDR,
   SESSIONS_PER_SCHOOL,
   STREAMS,
-  TOTAL_SESSIONS_PER_SCHOOL,
   type PretestParticipantType,
   type SessionMode,
   type Stream,
@@ -133,13 +133,40 @@ export function deliveryMatrix(
 }
 
 /**
- * How much of the programme has been delivered, as a whole-number percent of every School's eight
- * Sessions (`TOTAL_SESSIONS_PER_SCHOOL`). Guards a zero School count — an empty programme is 0%,
- * not a division by zero.
+ * How much of the programme is done — **Kegiatan terlaksana** — as a whole-number percent of every
+ * School's ten units (`KEGIATAN_UNITS_PER_SCHOOL`: 8 Sessions + a pretest unit + a posttest unit,
+ * ADR-0031/#249). `completedUnits` is the numerator the caller assembles — delivered Sessions plus
+ * the assessment units from `completedAssessmentUnits`. Guards a zero School count — an empty
+ * programme is 0%, not a division by zero.
  */
-export function activitiesPercent(deliveredTotal: number, schoolCount: number): number {
+export function activitiesPercent(completedUnits: number, schoolCount: number): number {
   if (schoolCount === 0) return 0;
-  return Math.round((deliveredTotal / (schoolCount * TOTAL_SESSIONS_PER_SCHOOL)) * 100);
+  return Math.round((completedUnits / (schoolCount * KEGIATAN_UNITS_PER_SCHOOL)) * 100);
+}
+
+/** Every `(stream, participant-type)` box a School must tick for one assessment kind to count. */
+const BOXES_PER_ASSESSMENT_UNIT = STREAMS.length * PRETEST_PARTICIPANT_TYPES.length;
+
+/**
+ * The **all-or-nothing** assessment units complete across all Schools, summed over both kinds
+ * (ADR-0031/#249). A School earns one unit for a kind only when **all four** of that kind's boxes
+ * (STREAMS × PRETEST_PARTICIPANT_TYPES) are present; three of four contributes nothing. Written
+ * generically over `ASSESSMENT_KINDS`, so **posttest is already counted** — it simply stays 0 until
+ * posttest rows exist, which is what caps the KPI near 90% this iteration. The unique constraint on
+ * the completion row means a `(school, kind)` count of `BOXES_PER_ASSESSMENT_UNIT` is exactly "all
+ * four distinct boxes", so a plain per-`(school, kind)` tally is the rollup.
+ */
+export function completedAssessmentUnits(completions: AssessmentCompletion[]): number {
+  const boxesBySchoolKind = new Map<string, number>();
+  for (const c of completions) {
+    const key = `${c.schoolId}|${c.kind}`;
+    boxesBySchoolKind.set(key, (boxesBySchoolKind.get(key) ?? 0) + 1);
+  }
+  let units = 0;
+  for (const count of boxesBySchoolKind.values()) {
+    if (count >= BOXES_PER_ASSESSMENT_UNIT) units++;
+  }
+  return units;
 }
 
 /**
@@ -234,6 +261,9 @@ export function deriveMonitoring(
   completions: AssessmentCompletion[],
 ): DerivedMonitoring {
   const deliveredTotal = data.sessions.filter((s) => s.status === "delivered").length;
+  // Kegiatan terlaksana now folds the all-or-nothing pretest/posttest units into the numerator, over
+  // the ×10 denominator (ADR-0031/#249); posttest stays 0 until posttest rows exist.
+  const completedUnits = deliveredTotal + completedAssessmentUnits(completions);
   const luring = deliveryMatrix(
     data.clusters,
     data.schools,
@@ -251,7 +281,7 @@ export function deriveMonitoring(
   const usedIdr = data.budgetUsedIdr;
   const totalIdr = PROGRAMME_BUDGET_IDR;
   return {
-    activitiesPercent: activitiesPercent(deliveredTotal, data.schools.length),
+    activitiesPercent: activitiesPercent(completedUnits, data.schools.length),
     budget: { usedIdr, totalIdr, percent: Math.round((usedIdr / totalIdr) * 1000) / 10 },
     clusters: data.clusters,
     luring,

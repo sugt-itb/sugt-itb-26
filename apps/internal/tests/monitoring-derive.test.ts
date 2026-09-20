@@ -1,5 +1,6 @@
 import {
   activitiesPercent,
+  completedAssessmentUnits,
   deliveryMatrix,
   deriveMonitoring,
   overdueWarnings,
@@ -85,11 +86,11 @@ describe("deliveryMatrix", () => {
 });
 
 describe("activitiesPercent", () => {
-  it("is delivered over Schools times eight, rounded", () => {
-    // 4 delivered of 2 Schools × 8 = 16 possible → 25%.
-    expect(activitiesPercent(4, 2)).toBe(25);
-    // 1 of 3 × 8 = 24 → 4.16… rounds to 4.
-    expect(activitiesPercent(1, 3)).toBe(4);
+  it("is completed units over Schools times ten, rounded", () => {
+    // 4 units of 2 Schools × 10 = 20 possible → 20%.
+    expect(activitiesPercent(4, 2)).toBe(20);
+    // 1 of 3 × 10 = 30 → 3.33… rounds to 3.
+    expect(activitiesPercent(1, 3)).toBe(3);
   });
 
   it("guards a zero School count", () => {
@@ -173,8 +174,8 @@ describe("deriveMonitoring", () => {
     // Two offline Sesi rows, six online — the per-mode Session counts.
     expect(derived.luring).toHaveLength(2);
     expect(derived.daring).toHaveLength(6);
-    // 2 delivered of 3 Schools × 8 = 24 possible → 8%.
-    expect(derived.activitiesPercent).toBe(8);
+    // 2 delivered units (no assessment units) of 3 Schools × 10 = 30 possible → 6.67 rounds to 7%.
+    expect(derived.activitiesPercent).toBe(7);
     // The columns pass through in order; total is the programme budget; the tiny fraction is 0.2.
     expect(derived.clusters).toEqual(CLUSTERS);
     expect(derived.budget.totalIdr).toBe(15_000_000_000);
@@ -187,6 +188,65 @@ describe("deriveMonitoring", () => {
       { stream: "Research", participantType: "Siswa", done: 0, total: 3, percent: 0 },
       { stream: "Research", participantType: "GTK-MS", done: 0, total: 3, percent: 0 },
     ]);
+  });
+
+  it("folds a School's complete pretest unit into Kegiatan terlaksana over the ×10 denominator", () => {
+    // No delivered Sessions; s1 has all four pretest boxes → 1 completed unit of 3 × 10 = 30 → 3%.
+    const s1FullPretest: AssessmentCompletion[] = [
+      { schoolId: "s1", stream: "STEM", participantType: "Siswa", kind: "pretest" },
+      { schoolId: "s1", stream: "STEM", participantType: "GTK-MS", kind: "pretest" },
+      { schoolId: "s1", stream: "Research", participantType: "Siswa", kind: "pretest" },
+      { schoolId: "s1", stream: "Research", participantType: "GTK-MS", kind: "pretest" },
+    ];
+    const data: MonitoringData = {
+      clusters: CLUSTERS,
+      schools: SCHOOLS,
+      sessions: [],
+      perjadinSpans: [],
+      budgetUsedIdr: 0,
+    };
+    expect(deriveMonitoring(data, "2026-09-01", s1FullPretest).activitiesPercent).toBe(3);
+  });
+});
+
+describe("completedAssessmentUnits", () => {
+  const box = (
+    schoolId: string,
+    stream: "STEM" | "Research",
+    participantType: "Siswa" | "GTK-MS",
+    kind: "pretest" | "posttest",
+  ): AssessmentCompletion => ({ schoolId, stream, participantType, kind });
+
+  /** All four boxes of one kind for one School. */
+  const allFour = (schoolId: string, kind: "pretest" | "posttest"): AssessmentCompletion[] => [
+    box(schoolId, "STEM", "Siswa", kind),
+    box(schoolId, "STEM", "GTK-MS", kind),
+    box(schoolId, "Research", "Siswa", kind),
+    box(schoolId, "Research", "GTK-MS", kind),
+  ];
+
+  it("counts a School's kind only when all four boxes are present — three of four is zero", () => {
+    expect(completedAssessmentUnits(allFour("s1", "pretest"))).toBe(1);
+    // Drop one box → the unit no longer counts.
+    expect(completedAssessmentUnits(allFour("s1", "pretest").slice(0, 3))).toBe(0);
+  });
+
+  it("counts posttest generically — the same all-four rule, so it is 0 until posttest rows exist", () => {
+    expect(completedAssessmentUnits([])).toBe(0);
+    // A fully-pretested School plus a fully-posttested School → two units.
+    expect(
+      completedAssessmentUnits([...allFour("s1", "pretest"), ...allFour("s2", "posttest")]),
+    ).toBe(2);
+  });
+
+  it("sums independent per-(School, kind) units and ignores a partial one", () => {
+    const completions = [
+      ...allFour("s1", "pretest"),
+      ...allFour("s2", "pretest"),
+      ...allFour("s1", "posttest"),
+      box("s3", "STEM", "Siswa", "pretest"), // partial → contributes 0
+    ];
+    expect(completedAssessmentUnits(completions)).toBe(3);
   });
 });
 
