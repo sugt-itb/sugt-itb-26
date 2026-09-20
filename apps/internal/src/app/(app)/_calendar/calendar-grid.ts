@@ -15,9 +15,41 @@ export type CalendarMonth = { year: number; month: number };
  *  belongs to the month on display (vs. a greyed spillover day from the adjacent month). */
 export type CalendarDay = { date: string; dayNumber: number; inMonth: boolean };
 
-/** The seven column headers, Sunday first — the mockup's `S M T W T F S`. Keyed by index in the view
- *  because the letters repeat. */
+/** The seven column headers, Sunday first — the `/monitoring` mockup's `S M T W T F S`. Keyed by
+ *  index in the view because the letters repeat. */
 export const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"] as const;
+
+/**
+ * One-letter Indonesian weekday labels, **Monday-first** — Senin, Selasa, Rabu, Kamis, Jumat,
+ * Sabtu, Minggu → `S S R K J S M`. Paired with `monthGrid(..., "monday")`; the letters repeat
+ * (two `S`), so it is keyed by index like `WEEKDAY_LABELS`.
+ */
+export const WEEKDAY_LABELS_ID_SHORT = ["S", "S", "R", "K", "J", "S", "M"] as const;
+
+/**
+ * Full Indonesian weekday names, **Monday-first** — the wide weekday bar the `/kalender` month view
+ * prints across the top. Paired with `monthGrid(..., "monday")`.
+ */
+export const WEEKDAY_LABELS_ID_FULL = [
+  "Senin",
+  "Selasa",
+  "Rabu",
+  "Kamis",
+  "Jumat",
+  "Sabtu",
+  "Minggu",
+] as const;
+
+/**
+ * Which weekday a grid's first column is. `"sunday"` is the historical `/monitoring` default (the
+ * English `WEEKDAY_LABELS`); `"monday"` is the Indonesian-labelled bar `/kalender` and the flipped
+ * `/monitoring` use. Note a label set's order must match the week-start it is paired with — the
+ * Indonesian sets above are Monday-first.
+ */
+export type WeekStart = "sunday" | "monday";
+
+/** The day-of-week index (0 = Sunday, matching `Date#getUTCDay`) each `WeekStart` puts first. */
+const WEEK_START_INDEX: Record<WeekStart, number> = { sunday: 0, monday: 1 };
 
 /** Month names as the Indonesian page prints them, indexed by `month - 1`. Exported so the
  *  long-date formatter (and the Peringatan warnings that consume it) name a month the same way the
@@ -74,16 +106,21 @@ export function longDateId(isoDate: string): string {
 }
 
 /**
- * The always-**six-week** (42-cell) grid for a month, Sunday-first. The first cell is the Sunday on
- * or before the 1st, so the month's leading spillover fills the top row and the trailing spillover
- * fills whatever the last row does not; each cell says whether it is in the displayed month so the
- * component can grey the spillover. Six rows are fixed (not five-or-six) so the grid never changes
- * height as the operator pages.
+ * The always-**six-week** (42-cell) grid for a month. The first cell is the `weekStart` weekday on
+ * or before the 1st (Sunday by default, matching `/monitoring`; Monday for the Indonesian bar), so
+ * the month's leading spillover fills the top row and the trailing spillover fills whatever the
+ * last row does not; each cell says whether it is in the displayed month so the component can grey
+ * the spillover. Six rows are fixed (not five-or-six) so the grid never changes height as the
+ * operator pages.
  */
-export function monthGrid(m: CalendarMonth): CalendarDay[] {
+export function monthGrid(m: CalendarMonth, weekStart: WeekStart = "sunday"): CalendarDay[] {
   const firstOfMonth = Date.UTC(m.year, m.month - 1, 1);
   const leadingWeekday = new Date(firstOfMonth).getUTCDay(); // 0 = Sunday
-  const start = firstOfMonth - leadingWeekday * DAY_MS;
+  // How many days to reach back from the 1st to the week-start weekday: 0 when the 1st already is
+  // it, wrapping through the week otherwise. `"sunday"` collapses this to the historical
+  // `leadingWeekday` offset, so the default grid is byte-for-byte the old Sunday-first one.
+  const offset = (leadingWeekday - WEEK_START_INDEX[weekStart] + 7) % 7;
+  const start = firstOfMonth - offset * DAY_MS;
   const days: CalendarDay[] = [];
   for (let i = 0; i < 42; i++) {
     const at = new Date(start + i * DAY_MS);

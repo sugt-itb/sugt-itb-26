@@ -5,7 +5,7 @@ import {
   monthGrid,
   monthOf,
   monthTitle,
-} from "-/app/(app)/monitoring/calendar-grid";
+} from "-/app/(app)/_calendar/calendar-grid";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -48,6 +48,29 @@ describe("monthGrid", () => {
     expect(grid[0]).toEqual({ date: "2026-02-01", dayNumber: 1, inMonth: true });
     expect(grid.filter((d) => d.inMonth)).toHaveLength(28);
     expect(grid[41]).toEqual({ date: "2026-03-14", dayNumber: 14, inMonth: false });
+  });
+
+  it("opens on the Monday on or before the 1st when asked for a Monday-first week", () => {
+    // 1 Sep 2026 is a Tuesday, so a Monday-first grid opens on Monday 31 August (one day back),
+    // where the Sunday-first grid opened on Sunday 30 August (two days back).
+    const grid = monthGrid(SEPT, "monday");
+    expect(grid).toHaveLength(42);
+    expect(grid[0]).toEqual({ date: "2026-08-31", dayNumber: 31, inMonth: false });
+    expect(grid[1]).toEqual({ date: "2026-09-01", dayNumber: 1, inMonth: true });
+    expect(grid.filter((d) => d.inMonth)).toHaveLength(30);
+    expect(grid[41]).toEqual({ date: "2026-10-11", dayNumber: 11, inMonth: false });
+  });
+
+  it("reaches a full week back for a Monday-first grid when the 1st is a Sunday", () => {
+    // 1 Feb 2026 is a Sunday: Sunday-first opens on it, but Monday-first opens six days earlier,
+    // on Monday 26 January — the previous week's start.
+    const grid = monthGrid({ year: 2026, month: 2 }, "monday");
+    expect(grid[0]).toEqual({ date: "2026-01-26", dayNumber: 26, inMonth: false });
+    expect(grid.find((d) => d.date === "2026-02-01")).toEqual({
+      date: "2026-02-01",
+      dayNumber: 1,
+      inMonth: true,
+    });
   });
 
   it("yields 42 consecutive calendar days", () => {

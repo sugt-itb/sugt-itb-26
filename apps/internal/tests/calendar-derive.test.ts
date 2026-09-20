@@ -4,7 +4,7 @@ import {
   deriveCalendarMarkers,
   MAX_MARKERS_PER_DAY,
   type MarkerType,
-} from "-/app/(app)/monitoring/calendar-derive";
+} from "-/app/(app)/_calendar/calendar-derive";
 import type { MonitoringData, MonitoringSession, PerjadinSpan } from "@sugt/db/queries";
 import { describe, expect, it } from "vitest";
 

@@ -1,5 +1,16 @@
 "use client";
 
+import { type CalendarEvent, type MarkerType } from "-/app/(app)/_calendar/calendar-derive";
+import {
+  addMonths,
+  type CalendarDay,
+  longDateId,
+  monthGrid,
+  monthOf,
+  monthTitle,
+  WEEKDAY_LABELS,
+} from "-/app/(app)/_calendar/calendar-grid";
+import { DayEventList, Swatch } from "-/app/(app)/_calendar/calendar-ui";
 import { Button } from "@sugt/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@sugt/ui/components/card";
 import {
@@ -12,17 +23,6 @@ import {
 import { cn } from "@sugt/ui/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
-
-import { type CalendarEvent, MARKER_FILL, MARKER_STROKE, type MarkerType } from "./calendar-derive";
-import {
-  addMonths,
-  type CalendarDay,
-  longDateId,
-  monthGrid,
-  monthOf,
-  monthTitle,
-  WEEKDAY_LABELS,
-} from "./calendar-grid";
 
 /**
  * The `/monitoring` Calendar — a static month grid of the scheduled activity `calendar-derive.ts`
@@ -193,43 +193,9 @@ function DayCell({
         <PopoverHeader>
           <PopoverTitle className="tabular-nums">{longDateId(day.date)}</PopoverTitle>
         </PopoverHeader>
-        <ul className="flex flex-col gap-2">
-          {events.map((event, i) => (
-            <li
-              key={i}
-              className="flex items-start gap-2"
-            >
-              <Swatch
-                marker={event.markerType}
-                className="mt-1 size-2 shrink-0"
-              />
-              <div className="min-w-0">
-                <p className="font-medium">{event.name}</p>
-                <p className="text-xs text-muted-foreground tabular-nums">{eventDates(event)}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <DayEventList events={events} />
       </PopoverContent>
     </Popover>
-  );
-}
-
-/** An event's date line: a single long-form date, or `start – end` for a range. */
-function eventDates(event: CalendarEvent): string {
-  return event.endDate === null
-    ? longDateId(event.startDate)
-    : `${longDateId(event.startDate)} – ${longDateId(event.endDate)}`;
-}
-
-/** A coloured marker chip — the same fill/stroke the grid dots use, from `MARKER_FILL`. Shared by
- *  the day dots, the popup rows and the legend so all three stay one source of truth for colour. */
-function Swatch({ marker, className }: { marker: MarkerType; className?: string }) {
-  return (
-    <span
-      className={cn("rounded-full", className)}
-      style={{ backgroundColor: MARKER_FILL[marker], border: `1px solid ${MARKER_STROKE}` }}
-    />
   );
 }
 
