@@ -20,6 +20,11 @@ export const PRETEST_COLUMNS: readonly PretestColumn[] = STREAMS.flatMap((stream
   PRETEST_PARTICIPANT_TYPES.map((participantType) => ({ stream, participantType })),
 );
 
+/** A column's stable React key — `stream|participantType`, independent of any School. */
+export function columnKey(column: PretestColumn): string {
+  return `${column.stream}|${column.participantType}`;
+}
+
 /**
  * One box's key — `schoolId|stream|participantType`. The stable identity a completion is looked up
  * and toggled by; `kind` is not part of it because this screen is pretest-only.

@@ -1,6 +1,5 @@
 "use client";
 
-import { setPretestCompletionAction } from "-/app/(app)/pretest/actions";
 import type { PretestEditorData, PretestSchool } from "@sugt/db/queries";
 import { Checkbox } from "@sugt/ui/components/checkbox";
 import { Input } from "@sugt/ui/components/input";
@@ -14,7 +13,9 @@ import {
 } from "@sugt/ui/components/table";
 import { useMemo, useOptimistic, useState, useTransition } from "react";
 
+import { setPretestCompletionAction } from "./actions";
 import {
+  columnKey,
   completionKey,
   completionKeySet,
   groupSchoolsByCluster,
@@ -90,7 +91,7 @@ function PretestEditor({ clusters, schools, completions }: PretestEditorData) {
             <TableHead>Sekolah</TableHead>
             {PRETEST_COLUMNS.map((column) => (
               <TableHead
-                key={completionKey("", column.stream, column.participantType)}
+                key={columnKey(column)}
                 className="text-center whitespace-nowrap"
               >
                 {column.stream} · {column.participantType}
