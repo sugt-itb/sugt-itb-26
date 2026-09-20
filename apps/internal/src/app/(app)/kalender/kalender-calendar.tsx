@@ -2,18 +2,16 @@
 
 import { type CalendarEvent, MARKER_FILL } from "-/app/(app)/_calendar/calendar-derive";
 import {
-  addMonths,
   type CalendarDay,
   longDateId,
   monthGrid,
-  monthOf,
-  monthTitle,
   WEEKDAY_LABELS_ID_FULL,
 } from "-/app/(app)/_calendar/calendar-grid";
+import { CalendarMonthNav } from "-/app/(app)/_calendar/calendar-month-nav";
 import { DayEventList, Swatch } from "-/app/(app)/_calendar/calendar-ui";
 import { eventsOverflow } from "-/app/(app)/_calendar/events-overflow";
-import { Button } from "@sugt/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@sugt/ui/components/card";
+import { useMonthView } from "-/app/(app)/_calendar/use-month-view";
+import { Card, CardContent } from "@sugt/ui/components/card";
 import {
   Popover,
   PopoverContent,
@@ -22,8 +20,6 @@ import {
   PopoverTrigger,
 } from "@sugt/ui/components/popover";
 import { cn } from "@sugt/ui/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
 
 /** Named-event pills a cell shows before it collapses the rest into "+N": three on desktop, one on
  *  the narrow phone column where three would not fit. Both counts feed the shared `eventsOverflow`
@@ -47,42 +43,17 @@ export function KalenderCalendar({
   events: Record<string, CalendarEvent[]>;
   today: string;
 }) {
-  const [view, setView] = useState(() => monthOf(today));
-  // One selected date at a time, or none — the highlight persists across ‹ / › and **Hari ini**, so
-  // a date picked in one month stays lit if the operator pages back to it (matches `/monitoring`).
-  const [selected, setSelected] = useState<string | null>(null);
+  const { view, selected, select, goToday, prevMonth, nextMonth } = useMonthView(today);
   const days = monthGrid(view, "monday");
 
   return (
     <Card>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-        <CardTitle className="text-base tabular-nums">{monthTitle(view)}</CardTitle>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setView(monthOf(today))}
-          >
-            Hari ini
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Bulan sebelumnya"
-            onClick={() => setView((v) => addMonths(v, -1))}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Bulan berikutnya"
-            onClick={() => setView((v) => addMonths(v, 1))}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
-      </CardHeader>
+      <CalendarMonthNav
+        view={view}
+        onToday={goToday}
+        onPrev={prevMonth}
+        onNext={nextMonth}
+      />
       <CardContent>
         <div className="grid grid-cols-7 gap-1">
           {WEEKDAY_LABELS_ID_FULL.map((label, i) => (
@@ -100,7 +71,7 @@ export function KalenderCalendar({
               isToday={day.date === today}
               isSelected={day.date === selected}
               events={events[day.date] ?? []}
-              onSelect={() => setSelected(day.date)}
+              onSelect={() => select(day.date)}
             />
           ))}
         </div>
