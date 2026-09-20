@@ -1,5 +1,16 @@
 "use client";
 
+import { type CalendarEvent, type MarkerType } from "-/app/(app)/_calendar/calendar-derive";
+import {
+  addMonths,
+  type CalendarDay,
+  longDateId,
+  monthGrid,
+  monthOf,
+  monthTitle,
+  WEEKDAY_LABELS,
+} from "-/app/(app)/_calendar/calendar-grid";
+import { DayEventList, Swatch } from "-/app/(app)/_calendar/calendar-ui";
 import { Button } from "@sugt/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@sugt/ui/components/card";
 import {
@@ -12,18 +23,6 @@ import {
 import { cn } from "@sugt/ui/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
-
-import { type CalendarEvent, type MarkerType } from "../_calendar/calendar-derive";
-import {
-  addMonths,
-  type CalendarDay,
-  longDateId,
-  monthGrid,
-  monthOf,
-  monthTitle,
-  WEEKDAY_LABELS,
-} from "../_calendar/calendar-grid";
-import { DayEventList, Swatch } from "../_calendar/calendar-ui";
 
 /**
  * The `/monitoring` Calendar — a static month grid of the scheduled activity `calendar-derive.ts`

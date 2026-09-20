@@ -1,6 +1,6 @@
+import { longDateId } from "-/app/(app)/_calendar/calendar-grid";
 import type { PreparationCard, PreparationChecklistItem } from "@sugt/db/queries";
 
-import { longDateId } from "../_calendar/calendar-grid";
 import type { Warning } from "./monitoring-state";
 
 /**
