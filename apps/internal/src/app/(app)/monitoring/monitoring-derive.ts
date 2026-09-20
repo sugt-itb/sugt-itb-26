@@ -1,10 +1,14 @@
-import type { MonitoringData, MonitoringSession } from "@sugt/db/queries";
+import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
 import {
   LURING_SESI_WINDOWS,
+  PRETEST_PARTICIPANT_TYPES,
   PROGRAMME_BUDGET_IDR,
   SESSIONS_PER_SCHOOL,
+  STREAMS,
   TOTAL_SESSIONS_PER_SCHOOL,
+  type PretestParticipantType,
   type SessionMode,
+  type Stream,
 } from "@sugt/domain";
 
 import type { Warning } from "./monitoring-state";
@@ -39,6 +43,19 @@ export type TimelineStep = { label: string; window: string; status: "completed" 
 /** A Luring Sesi's calendar window — the shape `LURING_SESI_WINDOWS` holds, accepted read-only. */
 type SesiWindow = { sesi: number; startsOn: string; endsOn: string };
 
+/**
+ * One Pretest meter: how many Schools have that `(stream, participant-type)` Pretest box ticked, out
+ * of all Schools. `total` is `schools.length` (the always-42 denominator, never stored), and
+ * `percent` is `done/total` as a whole number, guarded at 0 Schools.
+ */
+export type PretestMeter = {
+  stream: Stream;
+  participantType: PretestParticipantType;
+  done: number;
+  total: number;
+  percent: number;
+};
+
 /** Everything the `/monitoring` view renders, assembled from the raw data by `deriveMonitoring`. */
 export type DerivedMonitoring = {
   activitiesPercent: number;
@@ -47,6 +64,7 @@ export type DerivedMonitoring = {
   luring: MatrixRow[];
   daring: MatrixRow[];
   timeline: TimelineStep[];
+  pretest: PretestMeter[];
   warnings: Warning[];
 };
 
@@ -173,12 +191,48 @@ export function overdueWarnings(
 }
 
 /**
- * Assemble the whole view from the raw data and today's date. The delivered total is every
- * `delivered` Session across both modes (the data already excludes cancelled), and the budget
- * percent is spend against `PROGRAMME_BUDGET_IDR` to one decimal — the same tiny fraction the
- * scaffold showed as `0.2`. Luring is `SESSIONS_PER_SCHOOL.offline` rows, Daring is `.online`.
+ * The four Pretest meters (#248), in the fixed order STEM·Siswa, STEM·GTK-MS, Research·Siswa,
+ * Research·GTK-MS — `STREAMS × PRETEST_PARTICIPANT_TYPES`, so the readout cannot drift from the
+ * vocabulary the CHECK constraints mirror. Each meter's `done` is the number of **distinct** Schools
+ * that hold that `(stream, participantType, kind=pretest)` completion; `posttest` rows are ignored.
+ * `total` is the always-42 denominator (`schoolCount`), and `percent` is guarded at 0 Schools.
  */
-export function deriveMonitoring(data: MonitoringData, today: string): DerivedMonitoring {
+export function pretestProgress(
+  completions: AssessmentCompletion[],
+  schoolCount: number,
+): PretestMeter[] {
+  return STREAMS.flatMap((stream) =>
+    PRETEST_PARTICIPANT_TYPES.map((participantType) => {
+      const schools = new Set<string>();
+      for (const c of completions) {
+        if (c.kind === "pretest" && c.stream === stream && c.participantType === participantType) {
+          schools.add(c.schoolId);
+        }
+      }
+      const done = schools.size;
+      return {
+        stream,
+        participantType,
+        done,
+        total: schoolCount,
+        percent: schoolCount === 0 ? 0 : Math.round((done / schoolCount) * 100),
+      };
+    }),
+  );
+}
+
+/**
+ * Assemble the whole view from the raw data, today's date and the Pretest completion rows. The
+ * delivered total is every `delivered` Session across both modes (the data already excludes
+ * cancelled), and the budget percent is spend against `PROGRAMME_BUDGET_IDR` to one decimal — the
+ * same tiny fraction the scaffold showed as `0.2`. Luring is `SESSIONS_PER_SCHOOL.offline` rows,
+ * Daring is `.online`; the four Pretest meters read against the same always-42 School denominator.
+ */
+export function deriveMonitoring(
+  data: MonitoringData,
+  today: string,
+  completions: AssessmentCompletion[],
+): DerivedMonitoring {
   const deliveredTotal = data.sessions.filter((s) => s.status === "delivered").length;
   const luring = deliveryMatrix(
     data.clusters,
@@ -203,6 +257,7 @@ export function deriveMonitoring(data: MonitoringData, today: string): DerivedMo
     luring,
     daring,
     timeline: timelineSteps(LURING_SESI_WINDOWS, today),
+    pretest: pretestProgress(completions, data.schools.length),
     warnings: overdueWarnings(luring, LURING_SESI_WINDOWS, today),
   };
 }

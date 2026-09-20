@@ -22,7 +22,7 @@ import { cn } from "@sugt/ui/lib/utils";
 import { Check } from "lucide-react";
 
 import { MonitoringCalendar } from "./monitoring-calendar";
-import type { MatrixRow, TimelineStep } from "./monitoring-derive";
+import type { MatrixRow, PretestMeter, TimelineStep } from "./monitoring-derive";
 
 /**
  * The `/monitoring` view — the presentational half of the screen, now fed **real** figures. Every
@@ -42,6 +42,7 @@ export function MonitoringView({
   luring,
   daring,
   timeline,
+  pretest,
   calendarMarkers,
   calendarEvents,
   today,
@@ -53,6 +54,7 @@ export function MonitoringView({
   luring: MatrixRow[];
   daring: MatrixRow[];
   timeline: TimelineStep[];
+  pretest: PretestMeter[];
   calendarMarkers: Record<string, MarkerType[]>;
   calendarEvents: Record<string, CalendarEvent[]>;
   today: string;
@@ -99,6 +101,9 @@ export function MonitoringView({
         )}
       </div>
 
+      {/* Pretest progress — four read-only meters, grouped STEM / Research (#248). */}
+      <PretestCard meters={pretest} />
+
       {/* Timeline / stepper — horizontal, derived from each step's status. */}
       <Card>
         <CardHeader>
@@ -136,6 +141,54 @@ export function MonitoringView({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The read-only Pretest tracker (#248): the four meters grouped into two labelled columns, STEM and
+ * Research, each with a Siswa and a GTK-MS row. Every row reads `done / total` (the always-42
+ * denominator), its percent, and a `Progress` bar — the same visual language as "Kegiatan
+ * terlaksana". The streams are taken from the meters in the order the derive emits them (STEM then
+ * Research), so this holds no vocabulary of its own. Editing lives on `/pretest`.
+ */
+function PretestCard({ meters }: { meters: PretestMeter[] }) {
+  const streams = [...new Set(meters.map((m) => m.stream))];
+  const total = meters[0]?.total ?? 0;
+  return (
+    <Card>
+      <CardHeader>
+        <CardDescription>Progress Pretest</CardDescription>
+        <CardTitle className="text-base">
+          Sekolah yang telah menyelesaikan Pretest, dari {total} sekolah
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {streams.map((stream) => (
+          <div
+            key={stream}
+            className="flex flex-col gap-3"
+          >
+            <div className="text-sm font-medium">{stream}</div>
+            {meters
+              .filter((m) => m.stream === stream)
+              .map((m) => (
+                <div
+                  key={m.participantType}
+                  className="flex flex-col gap-1.5"
+                >
+                  <div className="flex items-baseline justify-between gap-2 text-sm">
+                    <span className="text-muted-foreground">{m.participantType}</span>
+                    <span className="tabular-nums">
+                      {m.done} / {m.total} · {m.percent}%
+                    </span>
+                  </div>
+                  <Progress value={m.percent} />
+                </div>
+              ))}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
