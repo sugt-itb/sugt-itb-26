@@ -113,6 +113,12 @@ export {
   type SetAssessmentCompletionResult,
 } from "./assessment-completion";
 export {
+  pretestEditorData,
+  type PretestCluster,
+  type PretestEditorData,
+  type PretestSchool,
+} from "./pretest-editor";
+export {
   addChecklistItem,
   createPreparationCard,
   deletePreparationCard,

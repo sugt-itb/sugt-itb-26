@@ -26,11 +26,14 @@ import { Avatar, AvatarFallback } from "@sugt/ui/components/avatar";
 function AppShell({
   role,
   personName,
+  canEditMonitoring,
   footerAction,
   children,
 }: {
   role: Role;
   personName: string;
+  /** Whether the viewer holds the Monitoring Editor Grant — gates the `/pretest` nav link. */
+  canEditMonitoring: boolean;
   /** Sits beside the avatar block. Sign-out, once there is a session to end. */
   footerAction?: React.ReactNode;
   children: React.ReactNode;
@@ -39,6 +42,7 @@ function AppShell({
     <SidebarBody
       role={role}
       personName={personName}
+      canEditMonitoring={canEditMonitoring}
       footerAction={footerAction}
     />
   );
@@ -74,10 +78,12 @@ function AppShell({
 function SidebarBody({
   role,
   personName,
+  canEditMonitoring,
   footerAction,
 }: {
   role: Role;
   personName: string;
+  canEditMonitoring: boolean;
   footerAction?: React.ReactNode;
 }) {
   return (
@@ -86,7 +92,10 @@ function SidebarBody({
         <AppBrand />
       </div>
 
-      <AppSidebarNav role={role} />
+      <AppSidebarNav
+        role={role}
+        canEditMonitoring={canEditMonitoring}
+      />
 
       <div className="mt-auto flex items-center gap-2.5 border-t border-sidebar-border p-4">
         <Avatar>
