@@ -2,17 +2,15 @@
 
 import { type CalendarEvent, type MarkerType } from "-/app/(app)/_calendar/calendar-derive";
 import {
-  addMonths,
   type CalendarDay,
   longDateId,
   monthGrid,
-  monthOf,
-  monthTitle,
   WEEKDAY_LABELS_ID_SHORT,
 } from "-/app/(app)/_calendar/calendar-grid";
+import { CalendarMonthNav } from "-/app/(app)/_calendar/calendar-month-nav";
 import { DayEventList, Swatch } from "-/app/(app)/_calendar/calendar-ui";
-import { Button } from "@sugt/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@sugt/ui/components/card";
+import { useMonthView } from "-/app/(app)/_calendar/use-month-view";
+import { Card, CardContent } from "@sugt/ui/components/card";
 import {
   Popover,
   PopoverContent,
@@ -21,14 +19,13 @@ import {
   PopoverTrigger,
 } from "@sugt/ui/components/popover";
 import { cn } from "@sugt/ui/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 
 /**
  * The `/monitoring` Calendar — a static month grid of the scheduled activity `calendar-derive.ts`
- * folds into a `date → markers` map (the dots) and a `date → events` map (the popup rows). It owns
- * two pieces of client state: the month on view (seeded from the server's WIB "today"; ‹ / › and
- * **Hari ini** page it with pure `addMonths`/`monthOf`) and the one selected date. Because both maps
+ * folds into a `date → markers` map (the dots) and a `date → events` map (the popup rows). Its
+ * client state — the month on view and the one selected date — comes from the shared `useMonthView`
+ * hook (the same seam `/kalender` uses), and its header from `CalendarMonthNav`; because both maps
  * already cover every date in the data, paging is view-state only with no refetch. Everything
  * date-shaped is computed by the tested `calendar-grid.ts` seam; this component lays the cells out,
  * draws the dots, and — for a day that has events — anchors a popup listing them.
@@ -42,44 +39,19 @@ export function MonitoringCalendar({
   events: Record<string, CalendarEvent[]>;
   today: string;
 }) {
-  const [view, setView] = useState(() => monthOf(today));
-  // Exactly one selected date at a time, or none. The highlight persists across ‹ / › and **Hari
-  // ini** — paging never clears it — so a date picked in one month stays lit if the operator returns.
-  const [selected, setSelected] = useState<string | null>(null);
+  const { view, selected, select, goToday, prevMonth, nextMonth } = useMonthView(today);
   // Monday-first with the Indonesian one-letter labels (#241), the same week bar `/kalender` uses;
   // the shared core still defaults to Sunday-first for anything that has not flipped.
   const days = monthGrid(view, "monday");
 
   return (
     <Card>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-        <CardTitle className="text-base tabular-nums">{monthTitle(view)}</CardTitle>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setView(monthOf(today))}
-          >
-            Hari ini
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Bulan sebelumnya"
-            onClick={() => setView((v) => addMonths(v, -1))}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Bulan berikutnya"
-            onClick={() => setView((v) => addMonths(v, 1))}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
-      </CardHeader>
+      <CalendarMonthNav
+        view={view}
+        onToday={goToday}
+        onPrev={prevMonth}
+        onNext={nextMonth}
+      />
       <CardContent className="flex flex-col gap-4">
         <div className="grid grid-cols-7 gap-1">
           {WEEKDAY_LABELS_ID_SHORT.map((label, i) => (
@@ -98,7 +70,7 @@ export function MonitoringCalendar({
               isSelected={day.date === selected}
               markers={markers[day.date] ?? []}
               events={events[day.date] ?? []}
-              onSelect={() => setSelected(day.date)}
+              onSelect={() => select(day.date)}
             />
           ))}
         </div>
