@@ -5,7 +5,7 @@ import {
   monthGrid,
   monthOf,
   monthTitle,
-} from "-/app/(app)/monitoring/calendar-grid";
+} from "-/app/(app)/_calendar/calendar-grid";
 import { describe, expect, it } from "vitest";
 
 /**

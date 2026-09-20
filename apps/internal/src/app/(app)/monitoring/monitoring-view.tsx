@@ -20,7 +20,7 @@ import {
 import { cn } from "@sugt/ui/lib/utils";
 import { Check } from "lucide-react";
 
-import type { CalendarEvent, MarkerType } from "./calendar-derive";
+import type { CalendarEvent, MarkerType } from "../_calendar/calendar-derive";
 import { MonitoringCalendar } from "./monitoring-calendar";
 import type { MatrixRow, TimelineStep } from "./monitoring-derive";
 

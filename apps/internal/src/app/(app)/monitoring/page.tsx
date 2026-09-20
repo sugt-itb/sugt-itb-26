@@ -1,7 +1,7 @@
 import { requirePerson } from "-/lib/person";
 import { hasGrant, monitoringData, preparationCards } from "@sugt/db/queries";
 
-import { deriveCalendarEvents, deriveCalendarMarkers } from "./calendar-derive";
+import { deriveCalendarEvents, deriveCalendarMarkers } from "../_calendar/calendar-derive";
 import { deriveMonitoring } from "./monitoring-derive";
 import { showBudget } from "./monitoring-state";
 import { MonitoringTabs } from "./monitoring-tabs";
