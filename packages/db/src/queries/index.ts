@@ -106,6 +106,13 @@ export {
   type PerjadinSpan,
 } from "./monitoring";
 export {
+  assessmentCompletions,
+  setAssessmentCompletion,
+  type AssessmentCompletion,
+  type SetAssessmentCompletionInput,
+  type SetAssessmentCompletionResult,
+} from "./assessment-completion";
+export {
   addChecklistItem,
   createPreparationCard,
   deletePreparationCard,

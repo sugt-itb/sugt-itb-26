@@ -594,6 +594,52 @@ whole point of the name-based model ([ADR-0020](./adr/0020-teaching-team-members
 **Offline Class Records fall out of scope** as a consequence: their filers would be the teachers,
 and a name is not a Person who can sign in and file. See the open question in `CONTEXT.md`.
 
+### Pretest/Posttest completion
+
+Whether a **Pretest** — and later a **Posttest** — was **administered** to a cohort at a School,
+tracked as a bare tuple whose _presence_ means "done"
+([ADR-0031](./adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md)). This is
+**delivery, not outcome** ([ADR-0009](./adr/0009-the-tool-tracks-delivery-not-outcomes.md)): the row
+records that the assessment happened, never a score.
+
+```sql
+create table assessment_completion (
+  id                uuid primary key default gen_random_uuid(),
+  school_id         uuid not null references school (id) on delete cascade,
+  stream            text not null,
+  participant_type  text not null,
+  kind              text not null,
+
+  constraint assessment_completion_box_key
+    unique (school_id, stream, participant_type, kind),
+  constraint assessment_completion_stream_check
+    check (stream in ('STEM', 'Research')),
+  constraint assessment_completion_participant_type_check
+    check (participant_type in ('Siswa', 'GTK-MS')),
+  constraint assessment_completion_kind_check
+    check (kind in ('pretest', 'posttest'))
+);
+```
+
+The grain is **(School × Stream × participant-type × kind)**: one row per box on the `/monitoring`
+Pretest tracker. Ticking a box inserts the row, un-ticking deletes it — there is **no `done` column
+and no `recorded_at`/`recorded_by`**, because a completion needs no audit trail and "done" has one
+representation. The unique constraint gives one row per box; the three CHECKs mirror the domain
+consts `STREAMS`, `PRETEST_PARTICIPANT_TYPES` and `ASSESSMENT_KINDS` character for character, the
+same discipline as every other set-valued column (see _the glossary is not the schema_). `posttest`
+is a legal `kind` from the start though no UI surfaces it this iteration, so surfacing it is a
+UI-only change rather than a migration.
+
+`participant_type`'s `Siswa`/`GTK-MS` values coincide with `transaction.participant_type` today but
+sit on a **dedicated** const on purpose — the money axis and the assessment axis evolve
+independently.
+
+**The /42 denominator is never stored.** Any progress reading ("X / 42") derives its denominator
+from `schools.length` at read time, matching every existing "X / 42" pattern (`aggregates.ts`,
+`monitoring-derive.ts`) — a stored copy would be a second source of truth that could drift. Reads are
+open to any signed-in Person; the one write (tick/un-tick) opens with `requireGrant(caller,
+"Monitoring Editor")` (ADR-0028).
+
 ---
 
 ## The four evaluations
