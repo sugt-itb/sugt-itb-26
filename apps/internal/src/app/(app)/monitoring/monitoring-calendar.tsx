@@ -8,7 +8,7 @@ import {
   monthGrid,
   monthOf,
   monthTitle,
-  WEEKDAY_LABELS,
+  WEEKDAY_LABELS_ID_SHORT,
 } from "-/app/(app)/_calendar/calendar-grid";
 import { DayEventList, Swatch } from "-/app/(app)/_calendar/calendar-ui";
 import { Button } from "@sugt/ui/components/button";
@@ -46,7 +46,9 @@ export function MonitoringCalendar({
   // Exactly one selected date at a time, or none. The highlight persists across ‹ / › and **Hari
   // ini** — paging never clears it — so a date picked in one month stays lit if the operator returns.
   const [selected, setSelected] = useState<string | null>(null);
-  const days = monthGrid(view);
+  // Monday-first with the Indonesian one-letter labels (#241), the same week bar `/kalender` uses;
+  // the shared core still defaults to Sunday-first for anything that has not flipped.
+  const days = monthGrid(view, "monday");
 
   return (
     <Card>
@@ -80,7 +82,7 @@ export function MonitoringCalendar({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid grid-cols-7 gap-1">
-          {WEEKDAY_LABELS.map((label, i) => (
+          {WEEKDAY_LABELS_ID_SHORT.map((label, i) => (
             <div
               key={i}
               className="pb-1 text-center text-xs font-medium text-muted-foreground"
