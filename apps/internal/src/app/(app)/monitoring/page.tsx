@@ -1,6 +1,11 @@
 import { deriveCalendarEvents, deriveCalendarMarkers } from "-/app/(app)/_calendar/calendar-derive";
 import { requirePerson } from "-/lib/person";
-import { hasGrant, monitoringData, preparationCards } from "@sugt/db/queries";
+import {
+  assessmentCompletions,
+  hasGrant,
+  monitoringData,
+  preparationCards,
+} from "@sugt/db/queries";
 
 import { deriveMonitoring } from "./monitoring-derive";
 import { showBudget } from "./monitoring-state";
@@ -33,11 +38,14 @@ export default async function Page() {
   // controls. The Grant is re-checked in every write, so this only hides controls a non-holder could
   // not use anyway. An Administrator implies the Grant, which `hasGrant` already folds in.
   const cards = await preparationCards(person);
+  // The Pretest tracker card's rows (#248), read in the same request — open to any signed-in Person,
+  // folded into the derive against the always-42 School denominator. Editing lives on `/pretest`.
+  const completions = await assessmentCompletions(person);
   const canEdit = hasGrant(person, "Monitoring Editor");
   // `en-CA` formats as `YYYY-MM-DD`; `Asia/Jakarta` pins it to WIB so the date compares like-for-like
   // against the WIB window bounds in `LURING_SESI_WINDOWS`.
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
-  const derived = deriveMonitoring(data, today);
+  const derived = deriveMonitoring(data, today, completions);
   // The Calendar's markers — a date→markers map over every date in the data, so the client can page
   // to any month without a refetch. The grid seeds its view on `today` (the same WIB date the rest
   // of the screen turns over on).
@@ -71,6 +79,7 @@ export default async function Page() {
             luring={derived.luring}
             daring={derived.daring}
             timeline={derived.timeline}
+            pretest={derived.pretest}
             calendarMarkers={calendarMarkers}
             calendarEvents={calendarEvents}
             today={today}
