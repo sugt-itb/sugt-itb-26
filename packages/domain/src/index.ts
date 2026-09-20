@@ -36,6 +36,28 @@ export type Stream = (typeof STREAMS)[number];
 export const CLASS_KINDS = ["GTK", "MS", "Student"] as const;
 export type ClassKind = (typeof CLASS_KINDS)[number];
 
+/**
+ * Which cohort a Pretest/Posttest completion was administered to — one of the two Classes taken as
+ * a pair. `Siswa` is the Student Class; `GTK-MS` is the GTK and MS Classes together. The values
+ * coincide with `TRANSACTION_PARTICIPANT_TYPES` today, but this is a **dedicated** const on purpose
+ * (ticket #246): the money axis and the assessment axis must evolve independently, so a CHECK
+ * coupled to the other would ripple silently. Like the transaction participant types, these are
+ * **values a column may hold, not terms `CONTEXT.md` defines** — mirrored character for character by
+ * `assessment_completion_participant_type_check`; see `packages/db/src/schema/monitoring.ts`.
+ */
+export const PRETEST_PARTICIPANT_TYPES = ["Siswa", "GTK-MS"] as const;
+export type PretestParticipantType = (typeof PRETEST_PARTICIPANT_TYPES)[number];
+
+/**
+ * The two assessments whose administration this tool tracks — whether a Pretest or Posttest was
+ * *administered* to a cohort at a School (yes/no), never scores or outcomes (ADR-0031, reconciling
+ * ADR-0009's "delivery, not outcomes"). Only `pretest` is surfaced in the UI this iteration; the
+ * column and its CHECK carry `posttest` from the start so surfacing it later is a UI-only change,
+ * not a migration. Values a column may hold, mirrored by `assessment_completion_kind_check`.
+ */
+export const ASSESSMENT_KINDS = ["pretest", "posttest"] as const;
+export type AssessmentKind = (typeof ASSESSMENT_KINDS)[number];
+
 /** How a Session is delivered. Offline Sessions happen during a Perjadin; online ones have none. */
 export const SESSION_MODES = ["offline", "online"] as const;
 export type SessionMode = (typeof SESSION_MODES)[number];

@@ -1,6 +1,23 @@
-import type { PreparationJenis } from "@sugt/domain";
+import type {
+  AssessmentKind,
+  PreparationJenis,
+  PretestParticipantType,
+  Stream,
+} from "@sugt/domain";
 import { sql } from "drizzle-orm";
-import { boolean, check, date, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  check,
+  date,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+import { school } from "./reference";
 
 /**
  * **Monitoring Preparation** — the free-standing Preparation Cards on the `/monitoring` Persiapan
@@ -67,4 +84,45 @@ export const preparationChecklistItem = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check("preparation_checklist_item_label_not_empty", sql`length(trim(${t.label})) > 0`)],
+);
+
+/**
+ * **Pretest/Posttest completion** — one row per box on the `/monitoring` Pretest tracker, at the
+ * grain **(School × Stream × participant-type × kind)** (ticket #246,
+ * [ADR-0031](../../../../docs/adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md)).
+ *
+ * **Presence of a row *is* "done".** There is no `done` column and no `recorded_at`/`recorded_by`:
+ * a completion is a bare tuple, ticking a box inserts it and un-ticking deletes it. This records
+ * *whether* a Pretest was administered to a cohort at a School (yes/no), never scores or outcomes —
+ * so it stays delivery tracking under ADR-0009, not outcome tracking.
+ *
+ * The denominator for any progress reading is **always all 42 Schools**, derived from
+ * `schools.length` and never stored — the same "X / 42" pattern as `aggregates.ts` and
+ * `monitoring-derive.ts`.
+ *
+ * The unique constraint gives one row per box; the three CHECKs mirror the domain consts
+ * (`STREAMS`, `PRETEST_PARTICIPANT_TYPES`, `ASSESSMENT_KINDS`) character for character, exactly as
+ * `person_grant_grant_check` mirrors `GRANTS`. `posttest` is a legal `kind` from the start though no
+ * UI surfaces it yet, so surfacing it later is a UI-only change rather than a migration.
+ */
+export const assessmentCompletion = pgTable(
+  "assessment_completion",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    schoolId: uuid("school_id")
+      .notNull()
+      .references(() => school.id, { onDelete: "cascade" }),
+    stream: text("stream").$type<Stream>().notNull(),
+    participantType: text("participant_type").$type<PretestParticipantType>().notNull(),
+    kind: text("kind").$type<AssessmentKind>().notNull(),
+  },
+  (t) => [
+    unique("assessment_completion_box_key").on(t.schoolId, t.stream, t.participantType, t.kind),
+    check("assessment_completion_stream_check", sql`${t.stream} in ('STEM', 'Research')`),
+    check(
+      "assessment_completion_participant_type_check",
+      sql`${t.participantType} in ('Siswa', 'GTK-MS')`,
+    ),
+    check("assessment_completion_kind_check", sql`${t.kind} in ('pretest', 'posttest')`),
+  ],
 );

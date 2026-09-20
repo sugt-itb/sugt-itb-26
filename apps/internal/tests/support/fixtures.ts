@@ -677,6 +677,7 @@ export async function resetDatabase() {
       public."group_member",
       public."transaction",
       public."transaction_evidence",
+      public."assessment_completion",
       public."preparation_card",
       public."preparation_checklist_item"
     restart identity cascade

@@ -169,6 +169,13 @@
       "when": 1789105526278,
       "tag": "0023_violet_menace",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789918963056,
+      "tag": "0024_curvy_karen_page",
+      "breakpoints": true
     }
   ]
 }
