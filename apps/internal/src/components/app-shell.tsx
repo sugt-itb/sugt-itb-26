@@ -32,7 +32,7 @@ function AppShell({
 }: {
   role: Role;
   personName: string;
-  /** Whether the viewer holds the Monitoring Editor Grant — gates the `/pretest` nav link. */
+  /** Whether the viewer holds the Editor Grant — gates the `/pretest` nav link. */
   canEditMonitoring: boolean;
   /** Sits beside the avatar block. Sign-out, once there is a session to end. */
   footerAction?: React.ReactNode;

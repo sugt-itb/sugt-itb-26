@@ -258,16 +258,13 @@ describe("roster", () => {
       email: "diberi@ditsama.itb.ac.id",
       role: "Staff",
     });
-    await addGrant(granted.id, "Monitoring Editor");
+    await addGrant(granted.id, "Editor");
     await addGrant(granted.id, "Administrator");
     await seedPerson({ fullName: "Tanpa", email: "tanpa@ditsama.itb.ac.id", role: "Staff" });
 
     const list = await roster(staff);
     // array_agg orders on the grant, so the row's list is stable regardless of insert order.
-    expect(byEmail(list, "diberi@ditsama.itb.ac.id")?.grants).toEqual([
-      "Administrator",
-      "Monitoring Editor",
-    ]);
+    expect(byEmail(list, "diberi@ditsama.itb.ac.id")?.grants).toEqual(["Administrator", "Editor"]);
     expect(byEmail(list, "tanpa@ditsama.itb.ac.id")?.grants).toEqual([]);
   });
 });

@@ -18,7 +18,7 @@ import { PretestEditor } from "./pretest-editor";
  */
 export default async function Page() {
   const person = await requirePerson();
-  if (!hasGrant(person, "Monitoring Editor")) forbidden();
+  if (!hasGrant(person, "Editor")) forbidden();
 
   const data = await pretestEditorData(person);
 

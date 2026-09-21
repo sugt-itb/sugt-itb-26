@@ -142,7 +142,7 @@ One line of a **Preparation Checklist**. Seven are fixed for every Perjadin — 
 _Avoid_: task, step, todo (it is neither assigned nor sequenced)
 
 **Monitoring Preparation**:
-The free-standing **Preparation Cards** on the `/monitoring` **Persiapan** tab — a monitoring aid distinct from a Perjadin's **Preparation Checklist** despite both reading "Persiapan". Each is a standalone card (a title, a **Jenis**, a date or date-range, a variable **Checklist Item** list) with nothing behind it — no Perjadin, School, Cluster or Session. **Reading is open** to any signed-in Person, like the rest of `/monitoring`; **writing is gated by the Monitoring Editor Grant** (see **Grant**), and an **Administrator** may write it too. Its Jenis — Teknis, Kurikulum, LAPI, Pimpinan — is a category label; the **Pimpinan** Jenis is unrelated to the **Pimpinan** Role.
+The free-standing **Preparation Cards** on the `/monitoring` **Persiapan** tab — a monitoring aid distinct from a Perjadin's **Preparation Checklist** despite both reading "Persiapan". Each is a standalone card (a title, a **Jenis**, a date or date-range, a variable **Checklist Item** list) with nothing behind it — no Perjadin, School, Cluster or Session. **Reading is open** to any signed-in Person, like the rest of `/monitoring`; **writing is gated by the Editor Grant** (see **Grant**), and an **Administrator** may write it too. Its Jenis — Teknis, Kurikulum, LAPI, Pimpinan — is a category label; the **Pimpinan** Jenis is unrelated to the **Pimpinan** Role.
 _Avoid_: Preparation Checklist (the Perjadin's seven fixed boxes — a different concept), readiness, onboarding
 
 **Preparation Card**:
@@ -156,16 +156,16 @@ _Avoid_: Preparation Item (the Perjadin one), task, todo
 ### Access
 
 **Grant**:
-An optional, revocable, **Staff-only** capability a **Person** may hold — a **second, additive access axis** beside the write-once **Role** ([ADR-0028](./docs/adr/0028-grants-are-a-second-additive-access-axis.md)). A Role is exactly one and write-once (a Person is **Staff** or **Pimpinan**); a Grant is none, one or several, and can be taken away. Grants never touch a Person's Role, and being Staff-only they never let a **Pimpinan** — who writes nothing — write anything. Two Grants exist: **Administrator** and **Monitoring Editor**. Granted and revoked by an **Administrator** from **/orang**.
+An optional, revocable, **Staff-only** capability a **Person** may hold — a **second, additive access axis** beside the write-once **Role** ([ADR-0028](./docs/adr/0028-grants-are-a-second-additive-access-axis.md)). A Role is exactly one and write-once (a Person is **Staff** or **Pimpinan**); a Grant is none, one or several, and can be taken away. Grants never touch a Person's Role, and being Staff-only they never let a **Pimpinan** — who writes nothing — write anything. Two Grants exist: **Administrator** and **Editor**. Granted and revoked by an **Administrator** from **/orang**.
 _Avoid_: role (a Role is the one write-once axis; a Grant is the second, additive one), permission, scope, claim
 
 **Administrator**:
 The **Grant** that administers Grants — an Administrator assigns and revokes any Grant on any **Staff** Person, including making another Administrator — and that **implies every other Grant**, so an Administrator can do anything a Grant gates. The first Administrator is seeded outside the tool (the founding-Staff seed grants it), because there is otherwise no one who could grant it. Held only by Staff, like every Grant.
 _Avoid_: admin, superuser, owner (it is a Grant a Staff Person holds, not a Role or an account tier)
 
-**Monitoring Editor**:
+**Editor**:
 The **Grant** that lets a **Staff** Person **write Monitoring Preparation**. Without it a Staff Person reads **/monitoring** but does not edit its Preparation; an **Administrator** has it implicitly. It gates writing only — reading Monitoring is open to any signed-in Person like the rest of delivery.
-_Avoid_: monitor, editor (unqualified), reviewer
+_Avoid_: monitor, reviewer, Cerita "editor" (the Story-editing surface, unrelated)
 
 ### Reporting
 

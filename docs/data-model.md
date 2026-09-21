@@ -638,7 +638,7 @@ independently.
 from `schools.length` at read time, matching every existing "X / 47" pattern (`aggregates.ts`,
 `monitoring-derive.ts`) — a stored copy would be a second source of truth that could drift. Reads are
 open to any signed-in Person; the one write (tick/un-tick) opens with `requireGrant(caller,
-"Monitoring Editor")` (ADR-0028).
+"Editor")` (ADR-0028).
 
 ---
 

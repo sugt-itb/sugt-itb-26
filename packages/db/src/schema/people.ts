@@ -109,6 +109,6 @@ export const personGrant = pgTable(
   },
   (t) => [
     unique("person_grant_person_id_grant_key").on(t.personId, t.grant),
-    check("person_grant_grant_check", sql`${t.grant} in ('Administrator', 'Monitoring Editor')`),
+    check("person_grant_grant_check", sql`${t.grant} in ('Administrator', 'Editor')`),
   ],
 );

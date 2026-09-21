@@ -21,7 +21,7 @@ import { school } from "./reference";
 
 /**
  * **Monitoring Preparation** — the free-standing Preparation Cards on the `/monitoring` Persiapan
- * tab (ADR-0028's Monitoring Editor Grant gates writing them). A Card is a title, a Jenis, a date or
+ * tab (ADR-0028's Editor Grant gates writing them). A Card is a title, a Jenis, a date or
  * date-range, and a variable checklist.
  *
  * **This is a different concept from the Perjadin Preparation Checklist** ([ADR-0018](../../../../docs/adr/0018-the-preparation-checklist-stores-ticks-and-derives-the-list.md)),

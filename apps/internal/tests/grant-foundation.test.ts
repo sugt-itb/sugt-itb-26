@@ -36,12 +36,9 @@ describe("the requireGrant choke point", () => {
   beforeEach(resetDatabase);
 
   it("threads a Person's Grants onto the resolved caller, ordered and never null", async () => {
-    const staff = await resolved("Staff", "granted@ditsama.itb.ac.id", [
-      "Monitoring Editor",
-      "Administrator",
-    ]);
+    const staff = await resolved("Staff", "granted@ditsama.itb.ac.id", ["Editor", "Administrator"]);
     // array_agg orders on the grant, so the caller's list is stable regardless of insert order.
-    expect(staff.grants).toEqual(["Administrator", "Monitoring Editor"]);
+    expect(staff.grants).toEqual(["Administrator", "Editor"]);
 
     const bare = await resolved("Staff", "bare@ditsama.itb.ac.id");
     expect(bare.grants).toEqual([]);
@@ -50,26 +47,26 @@ describe("the requireGrant choke point", () => {
   it("has an Administrator satisfy every Grant check — Administrator implies all", async () => {
     const admin = await resolved("Staff", "admin@ditsama.itb.ac.id", ["Administrator"]);
 
-    // Holds Monitoring Editor without a Monitoring Editor row of its own.
-    expect(hasGrant(admin, "Monitoring Editor")).toBe(true);
+    // Holds Editor without an Editor row of its own.
+    expect(hasGrant(admin, "Editor")).toBe(true);
     expect(hasGrant(admin, "Administrator")).toBe(true);
-    expect(() => requireGrant(admin, "Monitoring Editor")).not.toThrow();
+    expect(() => requireGrant(admin, "Editor")).not.toThrow();
   });
 
   it("grants a Staff Person exactly the Grant they hold", async () => {
-    const editor = await resolved("Staff", "editor@ditsama.itb.ac.id", ["Monitoring Editor"]);
+    const editor = await resolved("Staff", "editor@ditsama.itb.ac.id", ["Editor"]);
 
-    expect(hasGrant(editor, "Monitoring Editor")).toBe(true);
+    expect(hasGrant(editor, "Editor")).toBe(true);
     expect(hasGrant(editor, "Administrator")).toBe(false);
   });
 
   it("refuses a Staff Person a Grant they do not hold, with a distinguishable typed error", async () => {
     const staff = await resolved("Staff", "nogrant@ditsama.itb.ac.id");
 
-    expect(hasGrant(staff, "Monitoring Editor")).toBe(false);
+    expect(hasGrant(staff, "Editor")).toBe(false);
 
     const refusal = await Promise.resolve()
-      .then(() => requireGrant(staff, "Monitoring Editor"))
+      .then(() => requireGrant(staff, "Editor"))
       .then(
         () => null,
         (error: unknown) => error,
@@ -83,8 +80,8 @@ describe("the requireGrant choke point", () => {
 
     expect(pimpinan.grants).toEqual(["Administrator"]);
     expect(hasGrant(pimpinan, "Administrator")).toBe(false);
-    expect(hasGrant(pimpinan, "Monitoring Editor")).toBe(false);
-    expect(() => requireGrant(pimpinan, "Monitoring Editor")).toThrow();
+    expect(hasGrant(pimpinan, "Editor")).toBe(false);
+    expect(() => requireGrant(pimpinan, "Editor")).toThrow();
   });
 });
 
@@ -103,12 +100,12 @@ describe("assigning and revoking Grants", () => {
     const admin = await anAdministrator();
     const target = await aStaffTarget();
 
-    await expect(assignGrant(admin, target.id, "Monitoring Editor")).resolves.toEqual({
+    await expect(assignGrant(admin, target.id, "Editor")).resolves.toEqual({
       outcome: "assigned",
     });
-    await expect(personGrants(admin, target.id)).resolves.toEqual(["Monitoring Editor"]);
+    await expect(personGrants(admin, target.id)).resolves.toEqual(["Editor"]);
 
-    await expect(revokeGrant(admin, target.id, "Monitoring Editor")).resolves.toEqual({
+    await expect(revokeGrant(admin, target.id, "Editor")).resolves.toEqual({
       outcome: "revoked",
     });
     await expect(personGrants(admin, target.id)).resolves.toEqual([]);
@@ -122,7 +119,7 @@ describe("assigning and revoking Grants", () => {
       role: "Pimpinan",
     });
 
-    await expect(assignGrant(admin, pimpinan.id, "Monitoring Editor")).resolves.toEqual({
+    await expect(assignGrant(admin, pimpinan.id, "Editor")).resolves.toEqual({
       outcome: "not-staff-target",
     });
     await expect(personGrants(admin, pimpinan.id)).resolves.toEqual([]);
@@ -133,11 +130,11 @@ describe("assigning and revoking Grants", () => {
     const target = await aStaffTarget();
     await revokePerson(target.id);
 
-    await expect(assignGrant(admin, target.id, "Monitoring Editor")).resolves.toEqual({
+    await expect(assignGrant(admin, target.id, "Editor")).resolves.toEqual({
       outcome: "no-such-person",
     });
     await expect(
-      assignGrant(admin, "00000000-0000-0000-0000-000000000000", "Monitoring Editor"),
+      assignGrant(admin, "00000000-0000-0000-0000-000000000000", "Editor"),
     ).resolves.toEqual({ outcome: "no-such-person" });
   });
 
@@ -145,21 +142,19 @@ describe("assigning and revoking Grants", () => {
     const admin = await anAdministrator();
     const target = await aStaffTarget();
 
-    await assignGrant(admin, target.id, "Monitoring Editor");
-    await expect(assignGrant(admin, target.id, "Monitoring Editor")).resolves.toEqual({
+    await assignGrant(admin, target.id, "Editor");
+    await expect(assignGrant(admin, target.id, "Editor")).resolves.toEqual({
       outcome: "assigned",
     });
-    await expect(personGrants(admin, target.id)).resolves.toEqual(["Monitoring Editor"]);
+    await expect(personGrants(admin, target.id)).resolves.toEqual(["Editor"]);
   });
 
   it("refuses the write to a Staff Person who is not an Administrator", async () => {
-    // A Monitoring Editor is Staff and holds a Grant, but administering Grants is Administrator-only.
-    const editor = await resolved("Staff", "editor@ditsama.itb.ac.id", ["Monitoring Editor"]);
+    // A Editor is Staff and holds a Grant, but administering Grants is Administrator-only.
+    const editor = await resolved("Staff", "editor@ditsama.itb.ac.id", ["Editor"]);
     const target = await aStaffTarget();
 
-    const refusal = await assignGrant(editor, target.id, "Monitoring Editor").catch(
-      (error: unknown) => error,
-    );
+    const refusal = await assignGrant(editor, target.id, "Editor").catch((error: unknown) => error);
     expect(isNotGrantedError(refusal)).toBe(true);
     // The read is Staff-only rather than Administrator-only, so the editor may confirm nothing wrote.
     await expect(personGrants(editor, target.id)).resolves.toEqual([]);

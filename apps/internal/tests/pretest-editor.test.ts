@@ -60,7 +60,7 @@ describe("pretestEditorData", () => {
 
   it("returns the ticked pretest completions and excludes posttest rows", async () => {
     const { bandung } = await seedSchools();
-    const editor = caller(["Monitoring Editor"]);
+    const editor = caller(["Editor"]);
 
     await setAssessmentCompletion(editor, {
       schoolId: bandung.id,
@@ -86,7 +86,7 @@ describe("pretestEditorData", () => {
 
   it("reflects an un-tick by dropping the row from completions", async () => {
     const { bandung } = await seedSchools();
-    const editor = caller(["Monitoring Editor"]);
+    const editor = caller(["Editor"]);
     const box = {
       schoolId: bandung.id,
       stream: "Research",

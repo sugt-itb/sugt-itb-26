@@ -11,7 +11,7 @@ import type { Person } from "./caller";
  * Pretest completions that are already ticked.
  *
  * **Reading is open** to any signed-in Person, like `/monitoring` — the page gates *rendering* on
- * the Monitoring Editor Grant as a courtesy, but the read itself carries no guard (the write does,
+ * the Editor Grant as a courtesy, but the read itself carries no guard (the write does,
  * via `setAssessmentCompletion`). It reuses the tested `assessmentCompletions` read and keeps only
  * the `pretest` rows: this screen never surfaces `posttest`, so the payload it hands the client is
  * pretest-only and the box grid cannot accidentally reflect a posttest row.

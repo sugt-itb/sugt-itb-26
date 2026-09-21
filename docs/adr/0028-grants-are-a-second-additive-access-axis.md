@@ -91,3 +91,22 @@ gitignored `founding-staff.sql` inserts, and runs after `db:migrate` so the tabl
   adding a Role value, and the `Record<Grant, string>` label map forces the new key at compile time.
 - Nothing about the Role changes: a Person is still `Staff` or `Pimpinan`, still write-once, still
   pinned by the composite keys. Grants sit entirely beside it.
+
+## Amendment (2026-09-21): `Monitoring Editor` → `Editor`
+
+The second named Grant, ratified above as **`Monitoring Editor`**, is renamed to **`Editor`** — both
+its stored value (the `GRANTS` const, the `GRANT_LABELS` label, the `person_grant_grant_check` CHECK)
+and its UI label. The set stays two, `["Administrator", "Editor"]`; the capability is unchanged (it
+still gates writing Preparation Cards). A migration drops the old CHECK, backfills
+`UPDATE person_grant SET grant='Editor' WHERE grant='Monitoring Editor'`, then adds the new CHECK — the
+backfill must sit **between** drop and add because the old CHECK forbids `'Editor'` and the new one
+forbids `'Monitoring Editor'`.
+
+The rename is the first step of **"Monitoring" retiring from the ubiquitous language**: the surface
+becomes **Dashboard** (Monitoring → `/`, Beranda → `/beranda`) and the feature it edits is the
+**Preparation Cards** — the surface swap is its own follow-on ticket, **#265**, which this rename
+unblocks. The body above keeps the original `Monitoring Editor` name as the point-in-time record of
+what was first ratified; the running tool — its `GRANTS` value, guards, gates and UI labels — now
+names the Grant `Editor` throughout. Earlier ADRs that mention `Monitoring Editor` in passing
+(e.g. [ADR-0031](./0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md)) are left
+as their own point-in-time records.

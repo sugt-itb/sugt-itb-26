@@ -43,7 +43,7 @@ import { usePathname } from "next/navigation";
  * data layer, which is issue #25 rather than this shell.
  *
  * `editorOnly` is a second, narrower dimension beside `staffOnly` (ADR-0028): a link shown only to a
- * Monitoring Editor (an Administrator implies it). `/pretest` carries it — its page `forbidden()`s a
+ * Editor (an Administrator implies it). `/pretest` carries it — its page `forbidden()`s a
  * non-holder, so linking a screen that would refuse them is the same "worse than no link" rule the
  * Staff-only entries follow. The shell resolves the Grant once and passes the boolean down.
  */
@@ -52,7 +52,7 @@ type NavItem = {
   label: string;
   icon: LucideIcon;
   staffOnly: boolean;
-  /** Shown only to a Monitoring Editor / Administrator. Absent means "no Grant gate". */
+  /** Shown only to an Editor / Administrator. Absent means "no Grant gate". */
   editorOnly?: boolean;
 };
 

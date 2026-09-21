@@ -23,7 +23,7 @@ function caller(grants: Grant[], id = "00000000-0000-0000-0000-0000000000e1"): P
   return { id, fullName: "Orang", email: "orang@ditsama.itb.ac.id", role: "Staff", grants };
 }
 
-const editor = () => caller(["Monitoring Editor"]);
+const editor = () => caller(["Editor"]);
 
 /** Build one School to hang completions off — its id is the only thing these tests need. */
 async function aSchool(slug = "sekolah-satu") {
@@ -159,7 +159,7 @@ describe("setAssessmentCompletion is Monitoring-Editor-guarded", () => {
     expect(isNotGrantedError(refusal)).toBe(true);
   });
 
-  it("lets an Administrator write — Administrator implies Monitoring Editor", async () => {
+  it("lets an Administrator write — Administrator implies Editor", async () => {
     const schoolId = await aSchool();
     expect(
       (await setAssessmentCompletion(caller(["Administrator"]), { schoolId, ...box })).outcome,
@@ -173,7 +173,7 @@ describe("setAssessmentCompletion is Monitoring-Editor-guarded", () => {
       fullName: "Bapak",
       email: "pimpinan@ditsama.itb.ac.id",
       role: "Pimpinan",
-      grants: ["Monitoring Editor"],
+      grants: ["Editor"],
     };
     const refusal = await setAssessmentCompletion(pimpinan, { schoolId, ...box }).catch(
       (error: unknown) => error,

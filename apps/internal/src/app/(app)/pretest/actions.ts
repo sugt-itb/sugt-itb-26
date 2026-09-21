@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 
 /**
  * **The `/pretest` grid's one write** — tick or un-tick a Pretest box, behind
- * `requireGrant(person, "Monitoring Editor")` inside the `@sugt/db` write (ADR-0028, #246).
+ * `requireGrant(person, "Editor")` inside the `@sugt/db` write (ADR-0028, #246).
  * `staffSurface` turns a non-holder's `NotGrantedError` into a 403 — the page hides the grid from
  * non-holders and its route gate refuses them, but a layout does not run before a Server Action, so
  * this guard is the real enforcement even against a direct call.
