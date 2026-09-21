@@ -14,7 +14,7 @@ export function DayEventList({ events }: { events: readonly JadwalEvent[] }) {
           key={i}
           className="min-w-0"
         >
-          <p className="font-medium">{event.school}</p>
+          <p className="font-semibold">{event.school}</p>
           <p className="text-sm whitespace-pre-line text-muted-foreground">{event.detail}</p>
         </li>
       ))}
