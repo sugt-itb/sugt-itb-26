@@ -53,7 +53,7 @@ drizzle-kit is invoked as a package script, outside turbo.
 ```sh
 pnpm --filter @sugt/db db:generate     # diff src/schema against the last snapshot
 pnpm --filter @sugt/db db:migrate      # apply pending migrations
-pnpm --filter @sugt/db db:seed         # Provinces, 4 Clusters, 42 Schools (idempotent)
+pnpm --filter @sugt/db db:seed         # Provinces, 4 Clusters, 47 Schools (idempotent)
 pnpm --filter @sugt/db db:seed:people  # the founding Staff, once, on a new environment
 ```
 
