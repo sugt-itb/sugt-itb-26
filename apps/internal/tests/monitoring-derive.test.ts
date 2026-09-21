@@ -43,7 +43,6 @@ function sess(
     startsAt: "09:00",
     id: crypto.randomUUID(),
     status: "delivered",
-    name: "SDN Contoh",
     ...overrides,
   };
 }
@@ -165,7 +164,6 @@ describe("deriveMonitoring", () => {
         sess({ schoolId: "s1", mode: "offline", status: "delivered" }),
         sess({ schoolId: "s2", mode: "online", status: "delivered" }),
       ],
-      perjadinSpans: [],
       budgetUsedIdr: 29_560_000,
     };
 
@@ -202,7 +200,6 @@ describe("deriveMonitoring", () => {
       clusters: CLUSTERS,
       schools: SCHOOLS,
       sessions: [],
-      perjadinSpans: [],
       budgetUsedIdr: 0,
     };
     expect(deriveMonitoring(data, "2026-09-01", s1FullPretest).activitiesPercent).toBe(3);

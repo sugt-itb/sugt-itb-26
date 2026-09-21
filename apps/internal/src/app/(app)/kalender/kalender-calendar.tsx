@@ -1,6 +1,5 @@
 "use client";
 
-import { type CalendarEvent, MARKER_FILL } from "-/app/(app)/_calendar/calendar-derive";
 import {
   type CalendarDay,
   longDateId,
@@ -8,18 +7,14 @@ import {
   WEEKDAY_LABELS_ID_FULL,
 } from "-/app/(app)/_calendar/calendar-grid";
 import { CalendarMonthNav } from "-/app/(app)/_calendar/calendar-month-nav";
-import { DayEventList, Swatch } from "-/app/(app)/_calendar/calendar-ui";
+import { DayEventList } from "-/app/(app)/_calendar/calendar-ui";
 import { eventsOverflow } from "-/app/(app)/_calendar/events-overflow";
 import { useMonthView } from "-/app/(app)/_calendar/use-month-view";
-import { Card, CardContent } from "@sugt/ui/components/card";
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@sugt/ui/components/popover";
+import type { JadwalEvent, JadwalSchedule } from "-/lib/jadwal-sheet";
+import { Card, CardContent, CardHeader, CardTitle } from "@sugt/ui/components/card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@sugt/ui/components/sheet";
 import { cn } from "@sugt/ui/lib/utils";
+import { useEffect, useState } from "react";
 
 /** Named-event pills a cell shows before it collapses the rest into "+N": three on desktop, one on
  *  the narrow phone column where three would not fit. Both counts feed the shared `eventsOverflow`
@@ -27,64 +22,153 @@ import { cn } from "@sugt/ui/lib/utils";
 const PILLS_DESKTOP = 3;
 const PILLS_MOBILE = 1;
 
+/** True at the `lg` breakpoint and up. Drives the one behaviour CSS cannot express: the detail panel
+ *  is a persistent aside on desktop, so a day click must NOT also open the mobile drawer there. */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return isDesktop;
+}
+
 /**
- * **The `/kalender` month view** — the full-width, GNOME-calendar-style sibling of `/monitoring`'s
- * compact dot grid. It reads the same `date → events` feed the shared `_calendar` core derives, so
- * the two calendars can never disagree, and shows each day's events as named, colour-swatched pills
- * inside the cell (with a "Lihat lebih banyak (+N)" link when a day carries more than fit). Like
- * `/monitoring` it owns only the month on view (‹ / › and **Hari ini** page it with the pure
- * `addMonths`/`monthOf` seam — the feed already covers every date, so paging never refetches) and
- * the one selected date. Monday-first, with the full Indonesian weekday bar.
+ * **The `/kalender` month view** — a full-width, GNOME-calendar-style grid whose events come **live
+ * from the Jadwal Google Sheet** (#258), not the database. Each day shows one neutral pill per
+ * School with a cell that day (School name only; the old Cluster colour coding is gone — it no longer
+ * maps to sheet data), collapsing to a "Selengkapnya (+N)" link past the per-breakpoint cap.
+ *
+ * Clicking anywhere on a day (or the "+N" link) selects it and opens a **detail panel**: a persistent
+ * right-side aside on desktop, a bottom drawer on mobile, both listing each School's name and its full
+ * schedule text with line breaks preserved. Paging (‹ / › and **Hari ini**) is pure view-state via
+ * the shared `_calendar` core — the sheet feed already covers every date, so it never refetches.
+ * A `null` `error` renders normally; a non-null one shows an inline banner above the grid.
  */
 export function KalenderCalendar({
-  events,
+  schedule,
+  error,
   today,
 }: {
-  events: Record<string, CalendarEvent[]>;
+  schedule: JadwalSchedule;
+  error: string | null;
   today: string;
 }) {
   const { view, selected, select, goToday, prevMonth, nextMonth } = useMonthView(today);
   const days = monthGrid(view, "monday");
+  const isDesktop = useIsDesktop();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const onSelect = (date: string) => {
+    select(date);
+    // Desktop shows the persistent aside, so only the narrow layout opens the drawer.
+    if (!isDesktop) setDrawerOpen(true);
+  };
+
+  const selectedEvents = selected ? (schedule[selected] ?? []) : [];
 
   return (
-    <Card>
-      <CalendarMonthNav
-        view={view}
-        onToday={goToday}
-        onPrev={prevMonth}
-        onNext={nextMonth}
-      />
-      <CardContent>
-        <div className="grid grid-cols-7 gap-1">
-          {WEEKDAY_LABELS_ID_FULL.map((label, i) => (
-            <div
-              key={i}
-              className="truncate pb-1 text-center text-xs font-medium text-muted-foreground"
-            >
-              {label}
-            </div>
-          ))}
-          {days.map((day) => (
-            <DayCell
-              key={day.date}
-              day={day}
-              isToday={day.date === today}
-              isSelected={day.date === selected}
-              events={events[day.date] ?? []}
-              onSelect={() => select(day.date)}
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <Card className="lg:flex-1">
+        {error && (
+          <div className="mx-6 mt-6 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+        <CalendarMonthNav
+          view={view}
+          onToday={goToday}
+          onPrev={prevMonth}
+          onNext={nextMonth}
+        />
+        <CardContent>
+          <div className="grid grid-cols-7 gap-1">
+            {WEEKDAY_LABELS_ID_FULL.map((label, i) => (
+              <div
+                key={i}
+                className="truncate pb-1 text-center text-xs font-medium text-muted-foreground"
+              >
+                {label}
+              </div>
+            ))}
+            {days.map((day) => (
+              <DayCell
+                key={day.date}
+                day={day}
+                isToday={day.date === today}
+                isSelected={day.date === selected}
+                events={schedule[day.date] ?? []}
+                onSelect={() => onSelect(day.date)}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Desktop: a persistent right-side detail panel that tracks the selected day. */}
+      <aside className="hidden lg:block lg:w-80 lg:shrink-0">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base tabular-nums">
+              {selected ? longDateId(selected) : "Kegiatan"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PanelBody
+              date={selected}
+              events={selectedEvents}
             />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      </aside>
+
+      {/* Mobile / narrow: the same panel content in a bottom drawer, opened on selection. */}
+      <Sheet
+        open={drawerOpen && !isDesktop}
+        onOpenChange={setDrawerOpen}
+      >
+        <SheetContent
+          side="bottom"
+          className="max-h-[80vh] overflow-y-auto"
+        >
+          <SheetHeader>
+            <SheetTitle className="tabular-nums">
+              {selected ? longDateId(selected) : "Kegiatan"}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="px-4 pb-6">
+            <PanelBody
+              date={selected}
+              events={selectedEvents}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
 
+/** The detail panel's body: a prompt when no day is selected, the empty-day line when the selected
+ *  day has no schedule, otherwise the per-School list. Shared by the desktop aside and mobile drawer
+ *  so the two never diverge. */
+function PanelBody({ date, events }: { date: string | null; events: readonly JadwalEvent[] }) {
+  if (!date) {
+    return <p className="text-sm text-muted-foreground">Pilih tanggal untuk melihat kegiatan.</p>;
+  }
+  if (events.length === 0) {
+    return <p className="text-sm text-muted-foreground">Tidak ada kegiatan pada tanggal ini.</p>;
+  }
+  return <DayEventList events={events} />;
+}
+
 /**
- * One month cell: the date number, then up to three named event pills (one on mobile) with a
- * "Lihat lebih banyak (+N)" link for the rest. A day with events is a Popover trigger — clicking the
- * cell, a pill or the link opens an anchored popup listing every event; an empty day is still a
- * selecting button but opens no popup, matching `/monitoring`.
+ * One month cell: the date number, then up to three School pills (one on mobile) with a
+ * "Selengkapnya (+N)" link for the rest. The whole cell is a button — clicking it, a pill or the
+ * link selects the day and opens the detail panel; an empty day selects too (its panel reads "no
+ * activity"), so there is no separate empty-vs-full behaviour.
  */
 function DayCell({
   day,
@@ -96,7 +180,7 @@ function DayCell({
   day: CalendarDay;
   isToday: boolean;
   isSelected: boolean;
-  events: CalendarEvent[];
+  events: JadwalEvent[];
   onSelect: () => void;
 }) {
   const cellClassName = cn(
@@ -107,8 +191,14 @@ function DayCell({
   const desktop = eventsOverflow(events, PILLS_DESKTOP);
   const mobile = eventsOverflow(events, PILLS_MOBILE);
   const label = `${day.dayNumber}${events.length > 0 ? `, ${events.length} kegiatan` : ""}`;
-  const inner = (
-    <>
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className={cellClassName}
+      onClick={onSelect}
+    >
       <span
         className={cn(
           "flex size-6 items-center justify-center rounded-full text-sm tabular-nums",
@@ -128,7 +218,7 @@ function DayCell({
             <EventPill
               key={i}
               event={event}
-              className={i >= PILLS_MOBILE ? "hidden md:flex" : undefined}
+              className={i >= PILLS_MOBILE ? "hidden md:block" : undefined}
             />
           ))}
           {mobile.overflow > 0 && (
@@ -145,76 +235,26 @@ function DayCell({
           )}
         </div>
       )}
-    </>
-  );
-
-  // Empty day — a plain selecting button, never a popup.
-  if (events.length === 0) {
-    return (
-      <button
-        type="button"
-        aria-label={label}
-        className={cellClassName}
-        onClick={onSelect}
-      >
-        {inner}
-      </button>
-    );
-  }
-
-  // Day with events — the cell is the Popover trigger; clicking it (or a pill, or the "+N" link)
-  // selects the day and opens the anchored popup. Base UI takes a custom trigger via `render`.
-  return (
-    <Popover>
-      <PopoverTrigger
-        render={
-          <button
-            type="button"
-            aria-label={label}
-            className={cellClassName}
-            onClick={onSelect}
-          />
-        }
-      >
-        {inner}
-      </PopoverTrigger>
-      {/* `w-72` can overflow a ~360px phone; cap it to the viewport so the popup always fits. */}
-      <PopoverContent className="w-72 max-w-[calc(100vw-2rem)] gap-3">
-        <PopoverHeader>
-          <PopoverTitle className="tabular-nums">{longDateId(day.date)}</PopoverTitle>
-        </PopoverHeader>
-        <DayEventList events={events} />
-      </PopoverContent>
-    </Popover>
+    </button>
   );
 }
 
-/** One named event pill: a colour swatch and the event's name, truncated with an ellipsis so a long
- *  name never widens the cell. Coloured from `MARKER_FILL` via the shared `Swatch`. */
-function EventPill({ event, className }: { event: CalendarEvent; className?: string }) {
+/** One School pill: the School's name, in a single uniform neutral style, truncated so a long name
+ *  never widens the cell. No colour coding — the sheet carries no Cluster taxonomy. */
+function EventPill({ event, className }: { event: JadwalEvent; className?: string }) {
   return (
-    <span
-      className={cn(
-        "flex min-w-0 items-center gap-1 rounded bg-muted px-1 py-0.5 text-xs",
-        className,
-      )}
-      style={{ borderLeft: `2px solid ${MARKER_FILL[event.markerType]}` }}
-    >
-      <Swatch
-        marker={event.markerType}
-        className="size-1.5 shrink-0"
-      />
-      <span className="truncate">{event.name}</span>
+    <span className={cn("block truncate rounded bg-muted px-1 py-0.5 text-xs", className)}>
+      {event.school}
     </span>
   );
 }
 
-/** The "Lihat lebih banyak (+N)" line beneath the pills. Presentational only — the whole cell is the
- *  Popover trigger, so a tap anywhere on it (this link included) opens the day's full list. */
+/** The "Selengkapnya (+N)" line beneath the pills. Presentational only — the whole cell is the
+ *  button, so a tap anywhere on it (this link included) opens the day's detail panel. */
 function OverflowLink({ count, className }: { count: number; className?: string }) {
   return (
     <span className={cn("px-1 text-xs font-medium text-muted-foreground", className)}>
-      Lihat lebih banyak (+{count})
+      Selengkapnya (+{count})
     </span>
   );
 }

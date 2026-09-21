@@ -6,7 +6,7 @@ import type { PretestParticipantType, Stream } from "@sugt/domain";
  * **The `/pretest` grid's pure seam** (ticket #247). Grouping the forty-seven Schools under their
  * Clusters, the name-search filter, and the completion-key helpers — all folded here so the client
  * component (`pretest-editor.tsx`) stays a thin optimistic shell and this logic is unit-testable
- * without a DOM, the same split `monitoring-derive.ts` and `_calendar/calendar-derive.ts` follow.
+ * without a DOM, the same split `monitoring-derive.ts` follows.
  */
 
 /**
