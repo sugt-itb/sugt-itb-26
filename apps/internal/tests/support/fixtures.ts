@@ -72,7 +72,7 @@ export async function authSessions() {
 /**
  * Reference data: a Province, then a Cluster, then Schools in it.
  *
- * **The test database has none of the real forty-two.** `migrate-from-empty.ts`
+ * **The test database has none of the real forty-seven.** `migrate-from-empty.ts`
  * applies the migrations and stops; `reference-data.sql` is a separate `db:seed`
  * against `$DIRECT_URL`. That is the right split — seeding the real roster here would
  * make every count assertion depend on a file nobody edits for a test — so a test

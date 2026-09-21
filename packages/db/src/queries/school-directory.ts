@@ -7,14 +7,14 @@ import type { Person } from "./caller";
 import { deliveredSessionCount, onDeliveredSessions } from "./delivered-sessions";
 
 /**
- * **Direktori Sekolah** — all forty-two Schools, and the route into Detail Sekolah.
+ * **Direktori Sekolah** — all forty-seven Schools, and the route into Detail Sekolah.
  *
  * Open to anyone signed in, so the signature takes a `Person` and applies no further
  * check: delivery data carries no money, and ADR-0004 opens it to both roles.
  *
  * **The filtering is not here.** The screen filters by name and by Cluster over the
  * payload it already has, which is what keeps this one function and one round trip:
- * forty-two rows is a fixed and small set, so narrowing it in the browser costs
+ * forty-seven rows is a fixed and small set, so narrowing it in the browser costs
  * nothing and a filtered query would cost a round trip per keystroke. It is the same
  * reasoning [#9](https://github.com/mafiefa02/sugt/issues/9) settled for Pencarian on
  * the public site.

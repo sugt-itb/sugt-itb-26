@@ -22,13 +22,13 @@ it exists at all.
 **At launch it leads with scope, not delivery.** Schools committed, Clusters, Topics,
 provinces covered, who is involved. Those are true on day one and impressive from the
 start. Delivery figures — Sessions delivered, Schools reached — appear as they accrue.
-Conflating the two means publishing "0 of 42 Schools reached" at launch, which is worse
+Conflating the two means publishing "0 of 47 Schools reached" at launch, which is worse
 than publishing nothing.
 
 **Scope figures are reference data.** Schools are fixed, and Clusters and Topics are
 fixed now they are allocated. They change rarely enough to be seeded by migration rather
 than edited — but the database is still their single source of truth, not a static file
-in this repository. Two authored copies of the same 42 Schools drift silently, and this
+in this repository. Two authored copies of the same 47 Schools drift silently, and this
 is the portfolio site.
 
 **Both scope and delivery figures come from an aggregates endpoint** served by the
@@ -42,7 +42,7 @@ endpoint and caches. That is what makes
 conventions.
 
 **Not everything on the scope band is a figure from the database.** Four stats lead the
-page, and only the first is fetched: 42 Schools across 15 provinces. Two Streams, three
+page, and only the first is fetched: 47 Schools across 16 provinces. Two Streams, three
 Classes per School and eight Sessions per School are `@sugt/domain` constants both apps
 already hold. Serving those over the endpoint would put the same fixed set in two places,
 which is the duplication the ADR-0008 amendment exists to remove — just pointing the
@@ -64,7 +64,7 @@ than a setting, which is why it has an ADR of its own:
 
 **There is a search page, and it queries nothing.** Schools, Clusters and Story titles are
 already on the page in the payloads the site fetched; searching them is a filter in the browser.
-Forty-two Schools and four Clusters is a browsable set, and a search box that reaches the
+Forty-seven Schools and four Clusters is a browsable set, and a search box that reaches the
 database would be the one hole in an app that deliberately holds no credentials. Story bodies
 are not searched — that would mean shipping every Story's full text to every visitor.
 

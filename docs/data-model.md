@@ -9,7 +9,7 @@ This assumes the vocabulary in [`CONTEXT.md`](../CONTEXT.md) and the surfaces in
 
 Postgres and object storage are Supabase; both apps deploy to Vercel.
 
-Every SQL block below was applied to a real Postgres, seeded with the actual forty-two Schools
+Every SQL block below was applied to a real Postgres, seeded with the actual forty-seven Schools
 from `packages/db/seed/reference-data.sql`, and then attacked with the case each constraint is
 meant to reject — 54 checks, all behaving as claimed. Where this document says a rule is
 enforced by the database, that was verified rather than assumed; where it says a rule is not,
@@ -303,8 +303,8 @@ create table school (
 );
 ```
 
-There are four Clusters and forty-two Schools. Cluster sizes are lopsided — six, seventeen,
-eleven, eight — which is worth knowing before anyone builds a screen assuming they are
+There are four Clusters and forty-seven Schools. Cluster sizes are lopsided — seven, eighteen,
+twelve, ten — which is worth knowing before anyone builds a screen assuming they are
 comparable.
 
 **Topic and Problem are columns, not tables.** Each Cluster carries exactly one of each and
@@ -332,7 +332,7 @@ on `sub_cluster` exists solely to be the target of that key.
 
 **`province.time_zone` is on the Province, not the School.** Indonesia has three zones —
 WIB, WITA, WIT — and **no Indonesian province straddles a boundary**, so a column on `school`
-would let forty-two rows express something only the Province list can vary by, and would admit
+would let forty-seven rows express something only the Province list can vary by, and would admit
 a state that cannot exist: two Schools in one Province disagreeing about the hour. This is the
 argument for Province being a table at all, applied again with more force — a wrong Province
 misspells a line, a wrong Time Zone puts a Session on screen at the wrong time and nothing
@@ -634,8 +634,8 @@ UI-only change rather than a migration.
 sit on a **dedicated** const on purpose — the money axis and the assessment axis evolve
 independently.
 
-**The /42 denominator is never stored.** Any progress reading ("X / 42") derives its denominator
-from `schools.length` at read time, matching every existing "X / 42" pattern (`aggregates.ts`,
+**The /47 denominator is never stored.** Any progress reading ("X / 47") derives its denominator
+from `schools.length` at read time, matching every existing "X / 47" pattern (`aggregates.ts`,
 `monitoring-derive.ts`) — a stored copy would be a second source of truth that could drift. Reads are
 open to any signed-in Person; the one write (tick/un-tick) opens with `requireGrant(caller,
 "Monitoring Editor")` (ADR-0028).

@@ -146,7 +146,7 @@ export function MonitoringView({
 
 /**
  * The read-only Pretest tracker (#248): the four meters grouped into two labelled columns, STEM and
- * Research, each with a Siswa and a GTK-MS row. Every row reads `done / total` (the always-42
+ * Research, each with a Siswa and a GTK-MS row. Every row reads `done / total` (the always-47
  * denominator), its percent, and a `Progress` bar — the same visual language as "Kegiatan
  * terlaksana". The streams are taken from the meters in the order the derive emits them (STEM then
  * Research), so this holds no vocabulary of its own. Editing lives on `/pretest`.

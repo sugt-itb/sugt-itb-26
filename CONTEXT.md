@@ -33,7 +33,7 @@ Direktorat Persiapan Bersama ITB — the organiser appointed to deliver the STEM
 ### Delivery
 
 **School**:
-A participating school receiving teaching under the Programme. Around 42, and the set is fixed.
+A participating school receiving teaching under the Programme. Around 47, and the set is fixed.
 
 **Province**:
 The Indonesian province a School sits in. Nothing is organised by Province — it is not a Cluster and does not group anything — but the number of them the Programme reaches is one of the figures the public site leads with, and it is what says which Time Zone a School keeps.

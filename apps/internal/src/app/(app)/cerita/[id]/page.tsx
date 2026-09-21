@@ -13,7 +13,7 @@ import { notFound } from "next/navigation";
  * whole editor and refused only on the first write. An id that names no Story is a 404 — a
  * hand-typed or stale link, not a state to render.
  *
- * The School name is looked up from the directory (all forty-two, open to anyone signed in) rather
+ * The School name is looked up from the directory (all forty-seven, open to anyone signed in) rather
  * than joined into `storyForEditor`, which returns the `school_id` a Story attaches to and no more.
  * Each photograph's public URL is built here so `SUPABASE_URL` never reaches the client.
  */
