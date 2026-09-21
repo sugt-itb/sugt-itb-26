@@ -4,7 +4,7 @@ import Link from "next/link";
 /**
  * **A list of Schools** — each with where it is, linking to its own page.
  *
- * Shared by Program (all forty-two) and a Cluster's page (that Cluster's). The Schools arrive already
+ * Shared by Program (all forty-seven) and a Cluster's page (that Cluster's). The Schools arrive already
  * ordered by name from the scope payload, so this preserves that order. No delivery figure sits
  * beside a School: ADR-0001 keeps per-School delivery off every public surface.
  */

@@ -18,7 +18,7 @@ import { notFound } from "next/navigation";
  * Scope only, and deliberately so: ADR-0001 keeps every per-School **delivery** figure off the public
  * site (a School's own `0 of 8` is exactly the kind of figure it forbids), so this page carries a
  * School's name, where it is and which Cluster it works within, and no count of what it has done.
- * `generateStaticParams` prebuilds all forty-two from the scope payload; an unknown slug is a 404.
+ * `generateStaticParams` prebuilds all forty-seven from the scope payload; an unknown slug is a 404.
  */
 export const revalidate = 86_400;
 

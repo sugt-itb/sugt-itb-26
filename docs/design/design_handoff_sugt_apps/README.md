@@ -41,7 +41,7 @@ The outcome signal is a **1–10 Rating against a named Aspect**, on four forms 
 - **Session Record was split** into **Class Record** (Teaching Team, 7 Aspects) and
   **Session Record** (PIC, 5 Aspects). Both are distinct tables in `docs/data-model.md`.
 - **No Final Project / Project Team tracking** internally — they appear only as curated
-  public showcase pieces. **Scope figures: 42 Schools · 15 provinces · 4 Clusters · 2
+  public showcase pieces. **Scope figures: 47 Schools · 16 provinces · 4 Clusters · 2
   Streams · 3 Classes/School · 10 Sessions/School (4 offline, 6 online).**
 
 ## The Rating component (the one genuinely new component)
@@ -71,7 +71,7 @@ Each `<section>` in the HTML is labelled with a small title + one-line purpose. 
 - **Program** — Streams, the three Classes, the 4-offline/6-online Session rhythm.
 - **Cerita (list + detail)** — authored field stories; list has Semua/STEM/Research filter.
 - **Cluster (listing + detail)** — Schools grouped by Cluster (one Topic + Problem each).
-- **Tentang** — about DITSAMA ITB; scope figure band (42 · 15 provinsi · 2 · 10).
+- **Tentang** — about DITSAMA ITB; scope figure band (47 · 16 provinsi · 2 · 10).
 - **Final Project (showcase)** — curated public pieces only (not internal records).
 - **School — public page** — Cluster → School → its published stories.
 - **Pencarian, 404** — search results and not-found.
@@ -83,7 +83,7 @@ Each `<section>` in the HTML is labelled with a small title + one-line purpose. 
   (Class Records + Perjadin Evaluation owed); upcoming Sessions taught; a concern from a
   Class they taught. **Sidebar omits Perjadin Report** (money is Staff-only).
 - **Dashboard — Staff** *(new)* — greeting + Staff/PIC badges; six programme-overview count
-  tiles; per-Cluster coverage bars (uneven cluster sizes 6/17/11/8); a **Staff-only** Advance
+  tiles; per-Cluster coverage bars (uneven cluster sizes 7/18/12/10); a **Staff-only** Advance
   strip; "Perlu Anda kerjakan"; a **PIC work** card (Perjadin Report days-remaining,
   transactions logged, member-receipt checklist, remainder to return). PIC work appears only
   because PICs are always Staff.

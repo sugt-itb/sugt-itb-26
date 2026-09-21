@@ -11,7 +11,7 @@ The launch homepage, which **leads with scope, not delivery** (per the spec):
 
 - Sticky header — SUGT wordmark, Indonesian nav, "Portal Internal" link.
 - Hero — Programme framing, commissioned by Kementerian Pendidikan Tinggi.
-- **Cakupan Program** — scope figures true on day one (42 Sekolah, 2 Stream, 3 Kelas, 10 Sesi).
+- **Cakupan Program** — scope figures true on day one (47 Sekolah, 2 Stream, 3 Kelas, 10 Sesi).
 - **Delivery strip** — accruing figures (Sesi terlaksana, Sekolah terjangkau), explicitly labelled as updating.
 - Streams (STEM / Research), field stories teaser, footer.
 

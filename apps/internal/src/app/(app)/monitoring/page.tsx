@@ -39,7 +39,7 @@ export default async function Page() {
   // not use anyway. An Administrator implies the Grant, which `hasGrant` already folds in.
   const cards = await preparationCards(person);
   // The Pretest tracker card's rows (#248), read in the same request — open to any signed-in Person,
-  // folded into the derive against the always-42 School denominator. Editing lives on `/pretest`.
+  // folded into the derive against the always-47 School denominator. Editing lives on `/pretest`.
   const completions = await assessmentCompletions(person);
   const canEdit = hasGrant(person, "Monitoring Editor");
   // `en-CA` formats as `YYYY-MM-DD`; `Asia/Jakarta` pins it to WIB so the date compares like-for-like

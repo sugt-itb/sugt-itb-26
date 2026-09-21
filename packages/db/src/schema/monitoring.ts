@@ -96,8 +96,8 @@ export const preparationChecklistItem = pgTable(
  * *whether* a Pretest was administered to a cohort at a School (yes/no), never scores or outcomes —
  * so it stays delivery tracking under ADR-0009, not outcome tracking.
  *
- * The denominator for any progress reading is **always all 42 Schools**, derived from
- * `schools.length` and never stored — the same "X / 42" pattern as `aggregates.ts` and
+ * The denominator for any progress reading is **always all 47 Schools**, derived from
+ * `schools.length` and never stored — the same "X / 47" pattern as `aggregates.ts` and
  * `monitoring-derive.ts`.
  *
  * The unique constraint gives one row per box; the three CHECKs mirror the domain consts

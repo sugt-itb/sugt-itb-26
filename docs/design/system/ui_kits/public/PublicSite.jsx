@@ -72,7 +72,7 @@ function Scope() {
       <div style={{ ...wrap, padding: "56px 32px" }}>
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-foreground)", marginBottom: 28 }}>Cakupan Program</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0 }}>
-          <Stat figure="42" label="Sekolah peserta" sub="tersebar di 15 provinsi" />
+          <Stat figure="47" label="Sekolah peserta" sub="tersebar di 16 provinsi" />
           <Stat figure="2" label="Stream" sub="STEM &amp; Research" />
           <Stat figure="3" label="Kelas / sekolah" sub="GTK · MS · Siswa" />
           <Stat figure="10" label="Sesi / sekolah" sub="4 luring · 6 daring" />

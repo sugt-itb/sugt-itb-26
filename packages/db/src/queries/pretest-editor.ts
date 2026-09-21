@@ -7,7 +7,7 @@ import type { Person } from "./caller";
 
 /**
  * **The `/pretest` editor's payload** (ticket #247). The one round trip behind the grant-gated
- * Pretest completion grid: the four Clusters, all forty-two Schools with their Cluster, and the
+ * Pretest completion grid: the four Clusters, all forty-seven Schools with their Cluster, and the
  * Pretest completions that are already ticked.
  *
  * **Reading is open** to any signed-in Person, like `/monitoring` — the page gates *rendering* on

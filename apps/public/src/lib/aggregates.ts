@@ -76,7 +76,7 @@ async function fetchPayload<T extends { version: number }>(
   return payload;
 }
 
-/** The scope payload: the four Clusters and all forty-two Schools. Cached a day. */
+/** The scope payload: the four Clusters and all forty-seven Schools. Cached a day. */
 export function getScope(): Promise<ScopePayload> {
   return fetchPayload<ScopePayload>("/api/aggregates/scope", ONE_DAY, EXPECTED_VERSION.scope);
 }

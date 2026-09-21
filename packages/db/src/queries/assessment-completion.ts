@@ -13,7 +13,7 @@ import { requireGrant } from "./staff-only";
  *
  * A completion is a bare tuple **(School × Stream × participant-type × kind)** — presence of the row
  * *is* "done" (see `assessment_completion` in `../schema/monitoring.ts`). This layer never derives
- * the "X / 42" progress reading: the denominator is always all 42 Schools, folded on the app side
+ * the "X / 47" progress reading: the denominator is always all 47 Schools, folded on the app side
  * from `schools.length` (ticket #248), so the suite drives the fold without a database — the same
  * split `preparationCards` keeps.
  *

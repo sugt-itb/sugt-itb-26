@@ -45,7 +45,7 @@ type SesiWindow = { sesi: number; startsOn: string; endsOn: string };
 
 /**
  * One Pretest meter: how many Schools have that `(stream, participant-type)` Pretest box ticked, out
- * of all Schools. `total` is `schools.length` (the always-42 denominator, never stored), and
+ * of all Schools. `total` is `schools.length` (the always-47 denominator, never stored), and
  * `percent` is `done/total` as a whole number, guarded at 0 Schools.
  */
 export type PretestMeter = {
@@ -222,7 +222,7 @@ export function overdueWarnings(
  * Research·GTK-MS — `STREAMS × PRETEST_PARTICIPANT_TYPES`, so the readout cannot drift from the
  * vocabulary the CHECK constraints mirror. Each meter's `done` is the number of **distinct** Schools
  * that hold that `(stream, participantType, kind=pretest)` completion; `posttest` rows are ignored.
- * `total` is the always-42 denominator (`schoolCount`), and `percent` is guarded at 0 Schools.
+ * `total` is the always-47 denominator (`schoolCount`), and `percent` is guarded at 0 Schools.
  */
 export function pretestProgress(
   completions: AssessmentCompletion[],
@@ -253,7 +253,7 @@ export function pretestProgress(
  * delivered total is every `delivered` Session across both modes (the data already excludes
  * cancelled), and the budget percent is spend against `PROGRAMME_BUDGET_IDR` to one decimal — the
  * same tiny fraction the scaffold showed as `0.2`. Luring is `SESSIONS_PER_SCHOOL.offline` rows,
- * Daring is `.online`; the four Pretest meters read against the same always-42 School denominator.
+ * Daring is `.online`; the four Pretest meters read against the same always-47 School denominator.
  */
 export function deriveMonitoring(
   data: MonitoringData,
