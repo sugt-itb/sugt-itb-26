@@ -52,7 +52,7 @@ type NavItem = {
   label: string;
   icon: LucideIcon;
   staffOnly: boolean;
-  /** Shown only to a Editor / Administrator. Absent means "no Grant gate". */
+  /** Shown only to an Editor / Administrator. Absent means "no Grant gate". */
   editorOnly?: boolean;
 };
 

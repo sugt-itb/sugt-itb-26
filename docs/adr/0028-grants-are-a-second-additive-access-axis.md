@@ -104,6 +104,9 @@ forbids `'Monitoring Editor'`.
 
 The rename is the first step of **"Monitoring" retiring from the ubiquitous language**: the surface
 becomes **Dashboard** (Monitoring → `/`, Beranda → `/beranda`) and the feature it edits is the
-**Preparation Cards** — the surface swap is its own follow-on ticket that this rename unblocks. The
-body above keeps the original `Monitoring Editor` name as the point-in-time record of what was first
-ratified; everywhere the tool speaks of the Grant now reads `Editor`.
+**Preparation Cards** — the surface swap is its own follow-on ticket, **#265**, which this rename
+unblocks. The body above keeps the original `Monitoring Editor` name as the point-in-time record of
+what was first ratified; the running tool — its `GRANTS` value, guards, gates and UI labels — now
+names the Grant `Editor` throughout. Earlier ADRs that mention `Monitoring Editor` in passing
+(e.g. [ADR-0031](./0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md)) are left
+as their own point-in-time records.

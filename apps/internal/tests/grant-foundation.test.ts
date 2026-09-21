@@ -47,7 +47,7 @@ describe("the requireGrant choke point", () => {
   it("has an Administrator satisfy every Grant check — Administrator implies all", async () => {
     const admin = await resolved("Staff", "admin@ditsama.itb.ac.id", ["Administrator"]);
 
-    // Holds Editor without a Editor row of its own.
+    // Holds Editor without an Editor row of its own.
     expect(hasGrant(admin, "Editor")).toBe(true);
     expect(hasGrant(admin, "Administrator")).toBe(true);
     expect(() => requireGrant(admin, "Editor")).not.toThrow();

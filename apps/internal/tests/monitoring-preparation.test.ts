@@ -23,7 +23,7 @@ import { resetDatabase } from "./support/fixtures";
  * nothing off the caller but `role` and `grants` (that is all `requireGrant` inspects), and that
  * resolution threads a real Person's grants onto the caller is proven in `grant-foundation.test.ts`.
  * So a literal caller is a faithful stand-in here, and it is the only way to drive the guard's every
- * branch — a Editor, an Administrator (who implies it), and a plain Staff who is refused.
+ * branch — an Editor, an Administrator (who implies it), and a plain Staff who is refused.
  */
 function caller(grants: Grant[], id = "00000000-0000-0000-0000-0000000000e1"): Person {
   return { id, fullName: "Orang", email: "orang@ditsama.itb.ac.id", role: "Staff", grants };
