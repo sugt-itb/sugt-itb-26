@@ -102,6 +102,11 @@ describe("parseCsv", () => {
       ["c", "d"],
     ]);
   });
+
+  it("keeps a lone quoted-empty final field as one empty cell, not nothing", () => {
+    expect(parseCsv('""')).toEqual([[""]]);
+    expect(parseCsv("")).toEqual([]);
+  });
 });
 
 describe("fetchJadwal", () => {

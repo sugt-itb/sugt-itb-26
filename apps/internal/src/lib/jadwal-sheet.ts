@@ -6,7 +6,7 @@ import { requireEnv } from "-/lib/env";
  * export endpoint. This module fetches that CSV per request and parses it into per-date events;
  * the `/kalender` UI that renders them is a separate ticket (#259).
  *
- * See [ADR-0033](../../../../../docs/adr/0033-kalender-schedule-is-a-link-shared-google-sheet.md)
+ * See [ADR-0033](../../../../docs/adr/0033-kalender-schedule-is-a-link-shared-google-sheet.md)
  * for why the source is an external sheet rather than the database, and the trade-offs it carries.
  *
  * No Google API, no `googleapis`, no service account: the sheet is link-shared, so a plain `GET`
@@ -55,18 +55,20 @@ const MONTH_ABBREV: Record<string, string> = {
  * Parse RFC-4180 CSV into a grid of rows of cells. Handles quoted fields containing commas,
  * newlines and doubled-quote (`""`) escapes — Google's export quotes any multi-line cell, so the
  * newlines inside a session's detail survive as part of one field rather than splitting the row.
- * `\r\n` and `\r` line endings are treated as `\n`. A trailing newline does not add an empty row.
+ * A `\r\n` or `\r` row break **outside** a quoted field is treated as one break (bytes inside a
+ * quoted field are kept verbatim). A trailing newline does not add an empty row.
  */
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
   let inQuotes = false;
-  let sawAny = false;
+  // Whether the current cell has been opened (a quote or a character seen). It lets the
+  // end-of-input flush tell a quoted empty final field (`""` → `[[""]]`) apart from no field at all.
+  let cellOpened = false;
 
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
-    sawAny = true;
 
     if (inQuotes) {
       if (char === '"') {
@@ -84,9 +86,11 @@ export function parseCsv(text: string): string[][] {
 
     if (char === '"') {
       inQuotes = true;
+      cellOpened = true;
     } else if (char === ",") {
       row.push(field);
       field = "";
+      cellOpened = false;
     } else if (char === "\n" || char === "\r") {
       // Collapse a `\r\n` pair into one row break.
       if (char === "\r" && text[i + 1] === "\n") i++;
@@ -94,18 +98,21 @@ export function parseCsv(text: string): string[][] {
       rows.push(row);
       row = [];
       field = "";
+      cellOpened = false;
     } else {
       field += char;
+      cellOpened = true;
     }
   }
 
-  // Flush the final field/row unless the text ended exactly on a row break (no dangling empty row).
-  if (field !== "" || row.length > 0) {
+  // Flush a final field/row — including a row whose only cell is a quoted empty string — but not a
+  // phantom row when the text ended exactly on a row break.
+  if (field !== "" || cellOpened || row.length > 0) {
     row.push(field);
     rows.push(row);
   }
 
-  return sawAny ? rows : [];
+  return rows;
 }
 
 /** `18-Sep-2026` → `2026-09-18`; `null` for anything that is not a `d-MMM-yyyy` date. */
