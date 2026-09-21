@@ -32,15 +32,22 @@ import { preparationWarnings } from "./preparation-derive";
  */
 export default async function Page() {
   const person = await requirePerson();
-  const data = await monitoringData(person);
-  // The Persiapan tab's cards (#221), read in the same request as the Pelaksanaan data. Reading is
-  // open to any signed-in Person; `canEdit` — the "Editor" Grant — gates the tab's editor
-  // controls. The Grant is re-checked in every write, so this only hides controls a non-holder could
-  // not use anyway. An Administrator implies the Grant, which `hasGrant` already folds in.
-  const cards = await preparationCards(person);
-  // The Pretest tracker card's rows (#248), read in the same request — open to any signed-in Person,
-  // folded into the derive against the always-47 School denominator. Editing lives on `/pretest`.
-  const completions = await assessmentCompletions(person);
+  // These three reads depend only on `person`, not on one another, so they run under a single
+  // `Promise.all` — one round of latency, not a three-deep request waterfall. `beranda/page.tsx`
+  // batches the same way; this brings the landing surface back in line with the codebase's
+  // `Promise.all` convention (#269). The destructured order matches the reads below.
+  const [data, cards, completions] = await Promise.all([
+    // The raw Pelaksanaan rows in one round trip, folded below by `deriveDashboard`.
+    monitoringData(person),
+    // The Persiapan tab's cards (#221). Reading is open to any signed-in Person; `canEdit` — the
+    // "Editor" Grant — gates the tab's editor controls. The Grant is re-checked in every write, so
+    // this only hides controls a non-holder could not use anyway. An Administrator implies the
+    // Grant, which `hasGrant` already folds in.
+    preparationCards(person),
+    // The Pretest tracker card's rows (#248) — open to any signed-in Person, folded into the derive
+    // against the always-47 School denominator. Editing lives on `/pretest`.
+    assessmentCompletions(person),
+  ]);
   const canEdit = hasGrant(person, "Editor");
   // `en-CA` formats as `YYYY-MM-DD`; `Asia/Jakarta` pins it to WIB so the date compares like-for-like
   // against the WIB window bounds in `LURING_SESI_WINDOWS`.
