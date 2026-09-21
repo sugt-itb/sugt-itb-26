@@ -1,4 +1,3 @@
-import { deriveCalendarEvents, deriveCalendarMarkers } from "-/app/(app)/_calendar/calendar-derive";
 import { requirePerson } from "-/lib/person";
 import {
   assessmentCompletions,
@@ -46,13 +45,6 @@ export default async function Page() {
   // against the WIB window bounds in `LURING_SESI_WINDOWS`.
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
   const derived = deriveMonitoring(data, today, completions);
-  // The Calendar's markers — a date→markers map over every date in the data, so the client can page
-  // to any month without a refetch. The grid seeds its view on `today` (the same WIB date the rest
-  // of the screen turns over on).
-  const calendarMarkers = deriveCalendarMarkers(data);
-  // The Calendar's per-date event list — the uncapped, named rows the click-to-open popup shows,
-  // ordered and dated by the same pure seam (#232). Same date coverage as the markers.
-  const calendarEvents = deriveCalendarEvents(data);
   // The Peringatan section's warnings, merged in a stable order — the server's Luring-overdue
   // warnings first, then the Persiapan due-date warnings (#234) folded from the same `cards` already
   // fetched above (no new query). Rendered once above the tabs so the section shows on both (#235).
@@ -80,9 +72,6 @@ export default async function Page() {
             daring={derived.daring}
             timeline={derived.timeline}
             pretest={derived.pretest}
-            calendarMarkers={calendarMarkers}
-            calendarEvents={calendarEvents}
-            today={today}
           />
         }
         persiapan={
