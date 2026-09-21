@@ -13,7 +13,7 @@ import { requireGrant } from "./staff-only";
  * Perjadin's seven fixed boxes — see `docs` / `CONTEXT.md` for the collision note.
  *
  * **Reading is open** to any signed-in Person, like the rest of `/monitoring` — a Pimpinan reads the
- * tab. **Every write opens with `requireGrant(caller, "Monitoring Editor")`**: writing Monitoring
+ * tab. **Every write opens with `requireGrant(caller, "Editor")`**: writing Monitoring
  * Preparation is the one thing that Grant gates, and an Administrator implies it. A non-holder is
  * refused with `NotGrantedError`, which `staffSurface` turns into a 403 (the UI hides the controls
  * as a courtesy; the guard is the enforcement, since a layout does not run before a Server Action).
@@ -116,7 +116,7 @@ export async function createPreparationCard(
   caller: Person,
   input: PreparationCardInput,
 ): Promise<CreatePreparationCardResult> {
-  requireGrant(caller, "Monitoring Editor");
+  requireGrant(caller, "Editor");
 
   const title = input.title.trim();
   if (title === "") return { outcome: "title-required" };
@@ -168,7 +168,7 @@ export async function editPreparationCard(
   cardId: string,
   input: PreparationCardInput,
 ): Promise<EditPreparationCardResult> {
-  requireGrant(caller, "Monitoring Editor");
+  requireGrant(caller, "Editor");
 
   const title = input.title.trim();
   if (title === "") return { outcome: "title-required" };
@@ -195,7 +195,7 @@ export async function deletePreparationCard(
   caller: Person,
   cardId: string,
 ): Promise<DeletePreparationCardResult> {
-  requireGrant(caller, "Monitoring Editor");
+  requireGrant(caller, "Editor");
 
   const [row] = await db
     .delete(preparationCard)
@@ -224,7 +224,7 @@ export async function addChecklistItem(
   cardId: string,
   label: string,
 ): Promise<AddChecklistItemResult> {
-  requireGrant(caller, "Monitoring Editor");
+  requireGrant(caller, "Editor");
 
   const trimmed = label.trim();
   if (trimmed === "") return { outcome: "label-required" };
@@ -266,7 +266,7 @@ export async function removeChecklistItem(
   caller: Person,
   itemId: string,
 ): Promise<RemoveChecklistItemResult> {
-  requireGrant(caller, "Monitoring Editor");
+  requireGrant(caller, "Editor");
 
   const [row] = await db
     .delete(preparationChecklistItem)
@@ -290,7 +290,7 @@ export async function reorderChecklistItems(
   cardId: string,
   orderedItemIds: string[],
 ): Promise<ReorderChecklistItemsResult> {
-  requireGrant(caller, "Monitoring Editor");
+  requireGrant(caller, "Editor");
 
   return db.transaction(async (tx) => {
     const [card] = await tx
@@ -328,7 +328,7 @@ export async function setChecklistItemChecked(
   itemId: string,
   checked: boolean,
 ): Promise<SetChecklistItemCheckedResult> {
-  requireGrant(caller, "Monitoring Editor");
+  requireGrant(caller, "Editor");
 
   const [row] = await db
     .update(preparationChecklistItem)

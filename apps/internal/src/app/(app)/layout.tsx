@@ -42,7 +42,7 @@ export default async function SignedInLayout({
     <AppShell
       role={person.role}
       personName={person.fullName}
-      canEditMonitoring={hasGrant(person, "Monitoring Editor")}
+      canEditMonitoring={hasGrant(person, "Editor")}
       footerAction={
         /* Sign-out sits in the shell's footer — the one `SidebarBody` the desktop sidebar and
            the mobile drawer both render (#122), so it is reachable in both. The theme toggle is

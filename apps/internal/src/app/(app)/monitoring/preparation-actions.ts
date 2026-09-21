@@ -23,7 +23,7 @@ import { revalidatePath } from "next/cache";
 
 /**
  * **Monitoring Preparation's writes** — create/edit/delete a Card and add/remove/reorder/tick its
- * items, every one behind `requireGrant(person, "Monitoring Editor")` inside the `@sugt/db` write
+ * items, every one behind `requireGrant(person, "Editor")` inside the `@sugt/db` write
  * (ADR-0028). `staffSurface` turns a non-holder's `NotGrantedError` into a 403 — the same
  * translation the Staff-only surfaces use — because a layout does not run before a Server Action, so
  * hiding the tab's controls (sibling UI ticket) is only a courtesy and the guard is the real gate.

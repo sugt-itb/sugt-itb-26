@@ -193,7 +193,7 @@ function PersonRow({
  *
  * Only an Administrator ever sees this (the column is gated), and `requireGrant("Administrator")`
  * inside each write is the real enforcement: a non-Administrator who calls the action directly is
- * refused with a 403. `Administrator` implies `Monitoring Editor`, so a Person holding Administrator
+ * refused with a 403. `Administrator` implies `Editor`, so a Person holding Administrator
  * shows only the Administrator box ticked — the implication is a guard rule, not a stored row.
  */
 function GrantToggles({ personId, grants }: { personId: string; grants: Grant[] }) {

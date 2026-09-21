@@ -227,14 +227,14 @@ export const PERJADIN_ROLE_LABELS: Record<Role, string> = {
  * - **Administrator** — administers Grants (assign/revoke any Grant on any Staff Person, including
  *   making another Administrator) and **implies every other Grant**, so an Administrator satisfies
  *   any grant check without holding that grant's own row.
- * - **Monitoring Editor** — may write Monitoring Preparation.
+ * - **Editor** — may write Preparation Cards.
  *
  * Unlike `TRANSACTION_CATEGORIES`, these **are** terms the Programme's language defines — `CONTEXT.md`
  * glosses them under **Access** — so they belong here beside `ROLES`. The list is mirrored by
  * `person_grant_grant_check` character for character (see `packages/db/src/schema/people.ts`); a
  * future Grant widens that CHECK the way `0018_widen_person_role_pimpinan.sql` widened the role one.
  */
-export const GRANTS = ["Administrator", "Monitoring Editor"] as const;
+export const GRANTS = ["Administrator", "Editor"] as const;
 export type Grant = (typeof GRANTS)[number];
 
 /**
@@ -245,7 +245,7 @@ export type Grant = (typeof GRANTS)[number];
  */
 export const GRANT_LABELS: Record<Grant, string> = {
   Administrator: "Administrator",
-  "Monitoring Editor": "Editor Monitoring",
+  Editor: "Editor",
 };
 
 /**

@@ -18,7 +18,7 @@ import { requireGrant } from "./staff-only";
  * split `preparationCards` keeps.
  *
  * **Reading is open** to any signed-in Person, like the rest of `/monitoring`. **The write opens
- * with `requireGrant(caller, "Monitoring Editor")`** (an Administrator implies it, ADR-0028): a
+ * with `requireGrant(caller, "Editor")`** (an Administrator implies it, ADR-0028): a
  * layout does not run before a Server Action, so this line is the enforcement, not the hidden UI
  * control.
  */
@@ -69,7 +69,7 @@ export async function setAssessmentCompletion(
   caller: Person,
   input: SetAssessmentCompletionInput,
 ): Promise<SetAssessmentCompletionResult> {
-  requireGrant(caller, "Monitoring Editor");
+  requireGrant(caller, "Editor");
 
   const { schoolId, stream, participantType, kind, done } = input;
 
