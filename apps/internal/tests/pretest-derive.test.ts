@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * **The `/pretest` grid's pure seam** (#247) — the four columns, the completion keys and the
- * cluster grouping + name filter, driven without a DOM the way `monitoring-derive.test.ts` drives
+ * cluster grouping + name filter, driven without a DOM the way `dashboard-derive.test.ts` drives
  * its fold.
  */
 

@@ -132,7 +132,7 @@ export {
   type RemoveChecklistItemResult,
   type ReorderChecklistItemsResult,
   type SetChecklistItemCheckedResult,
-} from "./monitoring-preparation";
+} from "./preparation-cards";
 export {
   arrangeOnlineSession,
   arrangeOnlineSessionAt,

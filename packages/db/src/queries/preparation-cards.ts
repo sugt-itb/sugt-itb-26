@@ -7,14 +7,14 @@ import type { Person } from "./caller";
 import { requireGrant } from "./staff-only";
 
 /**
- * **Monitoring Preparation** — the reads and writes behind the `/monitoring` Persiapan tab's
- * free-standing Preparation Cards (ADR-0028). A Card is a title, a Jenis, a date or date-range, and
+ * **Preparation Cards** — the reads and writes behind the Dashboard (`/`) Persiapan tab's
+ * free-standing cards (ADR-0028). A Card is a title, a Jenis, a date or date-range, and
  * a variable checklist; it is **not** the Perjadin Preparation Checklist (ADR-0018), which is a
  * Perjadin's seven fixed boxes — see `docs` / `CONTEXT.md` for the collision note.
  *
- * **Reading is open** to any signed-in Person, like the rest of `/monitoring` — a Pimpinan reads the
- * tab. **Every write opens with `requireGrant(caller, "Editor")`**: writing Monitoring
- * Preparation is the one thing that Grant gates, and an Administrator implies it. A non-holder is
+ * **Reading is open** to any signed-in Person, like the rest of the Dashboard — a Pimpinan reads the
+ * tab. **Every write opens with `requireGrant(caller, "Editor")`**: writing a Preparation
+ * Card is the one thing that Grant gates, and an Administrator implies it. A non-holder is
  * refused with `NotGrantedError`, which `staffSurface` turns into a 403 (the UI hides the controls
  * as a courtesy; the guard is the enforcement, since a layout does not run before a Server Action).
  *
@@ -108,7 +108,7 @@ export type CreatePreparationCardResult =
   | { outcome: "too-many-items"; count: number; limit: number };
 
 /**
- * Create a Card, optionally with initial checklist items — **Monitoring-Editor-guarded**. The Card
+ * Create a Card, optionally with initial checklist items — **Editor-guarded**. The Card
  * and its items commit together, items numbered `0..n-1` in the order given. Validation is here and
  * comes back as a value; only the missing Grant throws.
  */
@@ -159,7 +159,7 @@ export type EditPreparationCardResult =
   | { outcome: "no-such-card" };
 
 /**
- * Edit a Card's own fields — title, Jenis, dates. Monitoring-Editor-guarded. Its checklist is edited
+ * Edit a Card's own fields — title, Jenis, dates. Editor-guarded. Its checklist is edited
  * through the item writes below, not here. `updated_at` is bumped to record the edit — the list read
  * orders by `(starts_on, created_at)`, not recency, so this is an audit timestamp, not a sort key.
  */
@@ -190,7 +190,7 @@ export async function editPreparationCard(
 
 export type DeletePreparationCardResult = { outcome: "deleted" } | { outcome: "no-such-card" };
 
-/** Delete a Card — Monitoring-Editor-guarded. Its items go with it by `on delete cascade`. */
+/** Delete a Card — Editor-guarded. Its items go with it by `on delete cascade`. */
 export async function deletePreparationCard(
   caller: Person,
   cardId: string,
@@ -212,7 +212,7 @@ export type AddChecklistItemResult =
   | { outcome: "too-many-items"; count: number; limit: number };
 
 /**
- * Append one checklist item to a Card — Monitoring-Editor-guarded. It lands at the end
+ * Append one checklist item to a Card — Editor-guarded. It lands at the end
  * (`max(position) + 1`), and the `≤ 20` cap is enforced here as a value outcome. The card row is
  * locked `for update` so two concurrent adds **serialize** on it — without the lock, at READ
  * COMMITTED both could read a count of 19 and both insert, slipping the card to 21; the exemplar
@@ -261,7 +261,7 @@ export async function addChecklistItem(
 
 export type RemoveChecklistItemResult = { outcome: "removed" } | { outcome: "no-such-item" };
 
-/** Remove one checklist item — Monitoring-Editor-guarded. */
+/** Remove one checklist item — Editor-guarded. */
 export async function removeChecklistItem(
   caller: Person,
   itemId: string,
@@ -279,7 +279,7 @@ export async function removeChecklistItem(
 export type ReorderChecklistItemsResult = { outcome: "reordered" } | { outcome: "no-such-card" };
 
 /**
- * Rewrite the checklist order for the **unchecked** items of a Card — Monitoring-Editor-guarded.
+ * Rewrite the checklist order for the **unchecked** items of a Card — Editor-guarded.
  * `orderedItemIds` is the unchecked items in their new order; each is written `position = index`.
  * Checked items keep their positions and still sort after every unchecked one, because the read
  * orders `(checked, position)`. Only rows that belong to the Card **and** are unchecked are touched,
@@ -320,7 +320,7 @@ export async function reorderChecklistItems(
 export type SetChecklistItemCheckedResult = { outcome: "updated" } | { outcome: "no-such-item" };
 
 /**
- * Tick or untick one checklist item — Monitoring-Editor-guarded. Both directions: a checked item
+ * Tick or untick one checklist item — Editor-guarded. Both directions: a checked item
  * **can be unchecked**, which is what lets a Card's percentage go down as well as up.
  */
 export async function setChecklistItemChecked(

@@ -2,20 +2,20 @@ import {
   activitiesPercent,
   completedAssessmentUnits,
   deliveryMatrix,
-  deriveMonitoring,
+  deriveDashboard,
   overdueWarnings,
   pretestProgress,
   timelineSteps,
   type MatrixRow,
-} from "-/app/(app)/monitoring/monitoring-derive";
+} from "-/app/(app)/dashboard-derive";
 import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
 import { describe, expect, it } from "vitest";
 
 /**
- * **The pure `/monitoring` derive seam, tested with no database and no DOM.**
+ * **The pure Dashboard (`/`) derive seam, tested with no database and no DOM.**
  *
- * Like `monitoring.test.ts` (the warning reducer) and `theme-cycle.test.ts`, this file touches
- * neither Postgres nor a browser: it hands `monitoring-derive.ts` hand-built rows and a fixed date
+ * Like `dashboard-state.test.ts` (the warning reducer) and `theme-cycle.test.ts`, this file touches
+ * neither Postgres nor a browser: it hands `dashboard-derive.ts` hand-built rows and a fixed date
  * and asserts on the matrix, percentages, timeline and warnings it returns. Ranking a School's
  * Sessions into Sesi lives in TypeScript precisely so it can be pinned here — the cancelled-skip
  * rule and "X never exceeds Y" are assertions, not a query nobody can drive.
@@ -155,7 +155,7 @@ describe("overdueWarnings", () => {
   });
 });
 
-describe("deriveMonitoring", () => {
+describe("deriveDashboard", () => {
   it("assembles the whole view — matrices, budget percent, and delivered percent — from raw data", () => {
     const data: MonitoringData = {
       clusters: CLUSTERS,
@@ -167,7 +167,7 @@ describe("deriveMonitoring", () => {
       budgetUsedIdr: 29_560_000,
     };
 
-    const derived = deriveMonitoring(data, "2026-09-01", []);
+    const derived = deriveDashboard(data, "2026-09-01", []);
 
     // Two offline Sesi rows, six online — the per-mode Session counts.
     expect(derived.luring).toHaveLength(2);
@@ -202,7 +202,7 @@ describe("deriveMonitoring", () => {
       sessions: [],
       budgetUsedIdr: 0,
     };
-    expect(deriveMonitoring(data, "2026-09-01", s1FullPretest).activitiesPercent).toBe(3);
+    expect(deriveDashboard(data, "2026-09-01", s1FullPretest).activitiesPercent).toBe(3);
   });
 });
 

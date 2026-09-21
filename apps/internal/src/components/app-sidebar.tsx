@@ -42,7 +42,7 @@ import { usePathname } from "next/navigation";
  * Omitting a link is not access control. The gate is a Staff-only choke point in the
  * data layer, which is issue #25 rather than this shell.
  *
- * `editorOnly` is a second, narrower dimension beside `staffOnly` (ADR-0028): a link shown only to a
+ * `editorOnly` is a second, narrower dimension beside `staffOnly` (ADR-0028): a link shown only to an
  * Editor (an Administrator implies it). `/pretest` carries it — its page `forbidden()`s a
  * non-holder, so linking a screen that would refuse them is the same "worse than no link" rule the
  * Staff-only entries follow. The shell resolves the Grant once and passes the boolean down.
@@ -57,8 +57,8 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, staffOnly: false },
-  { href: "/monitoring", label: "Monitoring", icon: Gauge, staffOnly: false },
+  { href: "/", label: "Dashboard", icon: Gauge, staffOnly: false },
+  { href: "/beranda", label: "Beranda", icon: LayoutDashboard, staffOnly: true },
   { href: "/kalender", label: "Kalender", icon: CalendarDays, staffOnly: false },
   { href: "/pretest", label: "Pretest", icon: ClipboardCheck, staffOnly: false, editorOnly: true },
   { href: "/sekolah", label: "Direktori Sekolah", icon: School, staffOnly: false },

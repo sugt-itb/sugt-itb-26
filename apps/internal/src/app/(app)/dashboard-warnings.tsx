@@ -10,21 +10,21 @@ import { Alert, AlertAction, AlertDescription } from "@sugt/ui/components/alert"
 import { Button } from "@sugt/ui/components/button";
 import { useState } from "react";
 
-import { dismissWarning, initialWarningState, type Warning } from "./monitoring-state";
+import { dismissWarning, initialWarningState, type Warning } from "./dashboard-state";
 
 /**
- * **The `/monitoring` Peringatan section, hoisted to page level (#235).** It used to live inside
- * `MonitoringView`, so it showed only on the Pelaksanaan tab and vanished on Persiapan. Rendered
- * once in `page.tsx` **above** `MonitoringTabs`, it now shows identically on both tabs and survives a
+ * **The Dashboard (`/`) Peringatan section, hoisted to page level (#235).** It used to live inside
+ * `DashboardView`, so it showed only on the Pelaksanaan tab and vanished on Persiapan. Rendered
+ * once in `page.tsx` **above** `DashboardTabs`, it now shows identically on both tabs and survives a
  * tab switch (the tabs are the thing that changes below it; this does not remount).
  *
  * It owns the one piece of client state the section has: the dismiss lists. `useState` seeds them
  * once from the merged `warnings` prop (the server's Luring-overdue warnings followed by the
- * Persiapan due-date warnings) and the pure reducer (`dismissWarning`, `monitoring-state.ts`) moves
+ * Persiapan due-date warnings) and the pure reducer (`dismissWarning`, `dashboard-state.ts`) moves
  * an item from `active` to `ignored` on **Abaikan**. The state is deliberately ephemeral — it resets
  * on reload, which is right for warnings recomputed from the data every load.
  */
-export function MonitoringWarnings({ warnings }: { warnings: Warning[] }) {
+export function DashboardWarnings({ warnings }: { warnings: Warning[] }) {
   const [state, setState] = useState(() => initialWarningState(warnings));
 
   return (

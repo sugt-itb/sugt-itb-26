@@ -59,7 +59,7 @@ export type SetAssessmentCompletionInput = AssessmentCompletion & { done: boolea
 export type SetAssessmentCompletionResult = { outcome: "ticked" } | { outcome: "unticked" };
 
 /**
- * Tick or un-tick one box — **Monitoring-Editor-guarded**. Ticking inserts the tuple (a repeat tick
+ * Tick or un-tick one box — **Editor-guarded**. Ticking inserts the tuple (a repeat tick
  * is a no-op by the unique constraint, so the box cannot go to two rows); un-ticking deletes it (a
  * repeat un-tick removes nothing). Either way the write drives the box to the requested state and
  * reports which state that is, so a stale screen re-ticking or re-unticking is idempotent rather

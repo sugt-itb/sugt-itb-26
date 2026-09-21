@@ -3,16 +3,16 @@ import {
   initialWarningState,
   showBudget,
   type Warning,
-} from "-/app/(app)/monitoring/monitoring-state";
+} from "-/app/(app)/dashboard-state";
 import { describe, expect, it } from "vitest";
 
 /**
- * **The pure `/monitoring` logic, tested with no database and no DOM.**
+ * **The pure Dashboard (`/`) logic, tested with no database and no DOM.**
  *
  * Like `theme-cycle.test.ts` and `toolbar-state.test.ts`, this file touches neither Postgres nor a
  * browser — it asserts on `showBudget` (a pure `Role → boolean`) and the warning reducer (a pure
- * `(state, id) → state`). The `/monitoring` view is mock-only and never rendered by any test in this
- * repo; the moving parts are extracted into `monitoring-state.ts` precisely so they can be checked
+ * `(state, id) → state`). The Dashboard view is mock-only and never rendered by any test in this
+ * repo; the moving parts are extracted into `dashboard-state.ts` precisely so they can be checked
  * here. It sits with the rest of the suite only because `pnpm --filter @sugt/internal test` is one
  * Vitest project today; whoever later splits the pure tests off can lift it out untouched.
  */

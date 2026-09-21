@@ -42,13 +42,13 @@ import {
 import { preparationPercent } from "./preparation-derive";
 
 /**
- * **The /monitoring Persiapan tab** — the free-standing Preparation Cards (#221, ADR-0028), a Card
+ * **The Dashboard (`/`) Persiapan tab** — the free-standing Preparation Cards (#221, ADR-0028), a Card
  * being a title, a Jenis, a date or date-range, and a hand-ticked checklist that is *not* the
  * Perjadin Preparation Checklist (ADR-0018). The cards arrive read from the server; nothing here
  * fetches.
  *
- * **The Grant is the gate; `canEdit` is the courtesy.** `canEdit` is `hasGrant(person, "Monitoring
- * Editor")`, computed on the server. When false this is read-only — no "Persiapan Baru", no "Edit",
+ * **The Grant is the gate; `canEdit` is the courtesy.** `canEdit` is `hasGrant(person, "Editor")`,
+ * computed on the server. When false this is read-only — no "Persiapan Baru", no "Edit",
  * checkboxes disabled — but the Server Actions re-check the Grant regardless (a layout does not run
  * before a Server Action), so hiding the controls only spares a non-holder a 403 they would hit
  * anyway.
@@ -612,7 +612,7 @@ function CreateCardForm({ onDone }: { onDone: () => void }) {
  * **unchecked** items drag-reorder via native HTML5 drag, committing the new order with
  * `reorderChecklistItemsAction`. Checked items are shown but are neither draggable nor part of the
  * reorder, matching the write, which only ever renumbers unchecked rows. "Hapus Persiapan" deletes
- * the whole Card. Each item action revalidates `/monitoring`, so the `card` prop reflows and the
+ * the whole Card. Each item action revalidates `/`, so the `card` prop reflows and the
  * transient drag order falls back to the server truth.
  */
 function EditCardForm({ card, onDone }: { card: PreparationCard; onDone: () => void }) {

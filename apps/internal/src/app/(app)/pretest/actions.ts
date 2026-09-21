@@ -15,7 +15,7 @@ import { revalidatePath } from "next/cache";
  *
  * `kind` is fixed to `"pretest"`: this surface never writes a posttest row. On success it
  * revalidates `/pretest` (so a reload reflects the true state and the optimistic UI falls back to
- * it) and `/monitoring` (so the tracker card #248 re-reads once it lands).
+ * it) and `/` (the Dashboard, so the tracker card #248 re-reads once it lands).
  */
 export async function setPretestCompletionAction(input: {
   schoolId: string;
@@ -29,6 +29,6 @@ export async function setPretestCompletionAction(input: {
     setAssessmentCompletion(person, { ...input, kind: "pretest" }),
   );
   revalidatePath("/pretest");
-  revalidatePath("/monitoring");
+  revalidatePath("/");
   return result;
 }

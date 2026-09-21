@@ -169,7 +169,7 @@ export function formatIdr(n: number): string {
  * once online Sessions named their teachers as free-text `session_teacher_name` (ADR-0022) that
  * Person role had no purpose — and for a while Staff stood alone. **`Pimpinan` was then added as a
  * second signed-in role** ([#179](https://github.com/mafiefa02/sugt/issues/179)): a read-only
- * principal who reads every non-money delivery surface, writes nothing, and lands on `/monitoring`.
+ * principal who reads every non-money delivery surface, writes nothing, and lands on the Dashboard (`/`).
  * It is a Person role and nothing more — the widened CHECK admits it, but every composite `(id, role)`
  * FK still pins `'Staff'`, so a Pimpinan is never a Group member, a PIC, a Session-Record filer or a
  * Story author (see `docs/adr/0025-pimpinan-is-a-second-signed-in-read-only-person-role.md` and the

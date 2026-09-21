@@ -16,8 +16,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { resetDatabase } from "./support/fixtures";
 
 /**
- * **Monitoring Preparation — the data layer** (ticket #220, ADR-0028). The reads and the seven
- * guarded writes behind the `/monitoring` Persiapan tab's standalone Preparation Cards.
+ * **Preparation Cards — the data layer** (ticket #220, ADR-0028). The reads and the seven
+ * guarded writes behind the Dashboard (`/`) Persiapan tab's standalone cards.
  *
  * The write callers are **hand-built** `Person`s carrying the Grant under test: the writes read
  * nothing off the caller but `role` and `grants` (that is all `requireGrant` inspects), and that
@@ -230,7 +230,7 @@ describe("checklist item writes", () => {
   });
 });
 
-describe("Monitoring Preparation writes are Monitoring-Editor-guarded", () => {
+describe("Preparation Card writes are Editor-guarded", () => {
   beforeEach(resetDatabase);
 
   it("refuses a Staff Person without the Grant, with a distinguishable typed error", async () => {

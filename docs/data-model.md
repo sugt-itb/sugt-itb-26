@@ -621,7 +621,7 @@ create table assessment_completion (
 );
 ```
 
-The grain is **(School × Stream × participant-type × kind)**: one row per box on the `/monitoring`
+The grain is **(School × Stream × participant-type × kind)**: one row per box on the **Dashboard** (`/`)
 Pretest tracker. Ticking a box inserts the row, un-ticking deletes it — there is **no `done` column
 and no `recorded_at`/`recorded_by`**, because a completion needs no audit trail and "done" has one
 representation. The unique constraint gives one row per box; the three CHECKs mirror the domain
@@ -636,7 +636,7 @@ independently.
 
 **The /47 denominator is never stored.** Any progress reading ("X / 47") derives its denominator
 from `schools.length` at read time, matching every existing "X / 47" pattern (`aggregates.ts`,
-`monitoring-derive.ts`) — a stored copy would be a second source of truth that could drift. Reads are
+`dashboard-derive.ts`) — a stored copy would be a second source of truth that could drift. Reads are
 open to any signed-in Person; the one write (tick/un-tick) opens with `requireGrant(caller,
 "Editor")` (ADR-0028).
 

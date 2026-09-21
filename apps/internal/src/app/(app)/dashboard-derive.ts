@@ -11,11 +11,11 @@ import {
   type Stream,
 } from "@sugt/domain";
 
-import type { Warning } from "./monitoring-state";
+import type { Warning } from "./dashboard-state";
 
 /**
- * **The pure core of `/monitoring`**, with no React, no DOM and no database — the seam the suite
- * drives directly, the same way `monitoring-state.ts`'s reducer is tested. It takes the raw rows
+ * **The pure core of the Dashboard (`/`)**, with no React, no DOM and no database — the seam the suite
+ * drives directly, the same way `dashboard-state.ts`'s reducer is tested. It takes the raw rows
  * `monitoringData` reads (`@sugt/db/queries`) plus today's date and the programme constants, and
  * returns exactly the props the view renders. Nothing here queries; everything is a fold over its
  * arguments, so a hand-built fixture is a complete test.
@@ -56,8 +56,8 @@ export type PretestMeter = {
   percent: number;
 };
 
-/** Everything the `/monitoring` view renders, assembled from the raw data by `deriveMonitoring`. */
-export type DerivedMonitoring = {
+/** Everything the Dashboard view renders, assembled from the raw data by `deriveDashboard`. */
+export type DerivedDashboard = {
   activitiesPercent: number;
   budget: { usedIdr: number; totalIdr: number; percent: number };
   clusters: Cluster[];
@@ -255,11 +255,11 @@ export function pretestProgress(
  * same tiny fraction the scaffold showed as `0.2`. Luring is `SESSIONS_PER_SCHOOL.offline` rows,
  * Daring is `.online`; the four Pretest meters read against the same always-47 School denominator.
  */
-export function deriveMonitoring(
+export function deriveDashboard(
   data: MonitoringData,
   today: string,
   completions: AssessmentCompletion[],
-): DerivedMonitoring {
+): DerivedDashboard {
   const deliveredTotal = data.sessions.filter((s) => s.status === "delivered").length;
   // Kegiatan terlaksana now folds the all-or-nothing pretest/posttest units into the numerator, over
   // the ×10 denominator (ADR-0031/#249); posttest stays 0 until posttest rows exist.

@@ -1,7 +1,7 @@
 import type { Role } from "@sugt/domain";
 
 /**
- * **The pure core of `/monitoring`, with no React and no DOM**, so it is tested the way
+ * **The pure core of the Dashboard (`/`), with no React and no DOM**, so it is tested the way
  * `theme-cycle.ts` and `deriveToolbarState` are — by asserting on values, never by mounting a
  * component. The page's only moving parts are two small decisions, and both live here as plain
  * functions the browser calls and the suite drives directly:
@@ -15,7 +15,7 @@ import type { Role } from "@sugt/domain";
  *      `(state, id) → state`, with the view holding the current state in `useState`.
  */
 
-/** A single monitoring warning: a stable id and the human message shown in the banner. */
+/** A single Dashboard warning: a stable id and the human message shown in the banner. */
 export type Warning = { id: string; message: string };
 
 /** The two lists the banner and the "ignored" accordion read from. */
