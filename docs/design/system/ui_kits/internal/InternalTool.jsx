@@ -14,7 +14,7 @@ function Icon({ name, size = 18, color, style }) {
 }
 const rupiah = (n) => "Rp " + n.toLocaleString("id-ID");
 
-/* The real allocation — packages/db/seed/reference-data.sql. Four Clusters, 42
+/* The real allocation — packages/db/seed/reference-data.sql. Four Clusters, 47
    Schools, sizes 7 / 18 / 12 / 10. Abridged here to a few Schools each; the point
    is that the names and Topics are real, and that Clusters are not comparable
    in size. Cluster Problems in the seed are placeholders, so none are shown. */

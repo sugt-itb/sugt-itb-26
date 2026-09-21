@@ -1389,7 +1389,7 @@ point-in-time record; that is history and is left as written.)
 
 **`category` is a closed set read off DITSAMA's own approved budget**, not invented for a
 template nobody has read. The eleven named values are the line items the programme RAB repeats
-across all twenty-five travel groups; `Lainnya` is the escape hatch. They are in Indonesian
+across all twenty-three travel groups; `Lainnya` is the escape hatch. They are in Indonesian
 because that is what goes on the paperwork, and they are character-for-character
 `TRANSACTION_CATEGORIES` in `packages/domain/src/index.ts` — the same rule every other fixed
 set in this document follows.

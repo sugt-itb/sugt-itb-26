@@ -34,7 +34,7 @@ export type AssessmentCompletion = {
 /**
  * Every completion row, in a stable `(schoolId, stream, participantType, kind)` order so a caller —
  * and the suite — reads them deterministically. Open to any signed-in Person; the app folds these
- * into the /42 tracker.
+ * into the /47 tracker.
  */
 export async function assessmentCompletions(_caller: Person): Promise<AssessmentCompletion[]> {
   return db

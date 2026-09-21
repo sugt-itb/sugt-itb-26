@@ -25,7 +25,7 @@ function nonStaff() {
  * **Direktori Sekolah** — every School, filterable, and the route into Detail Sekolah.
  *
  * The filtering itself is not asserted here and deliberately: the payload carries all
- * forty-two and the browser narrows them, so there is no server-side filter to test.
+ * forty-seven and the browser narrows them, so there is no server-side filter to test.
  * What these assertions cover is the payload a filter would run over.
  *
  * The `Person` is a real one, produced the only way the app produces one — see
@@ -40,7 +40,7 @@ describe("the Direktori Sekolah payload", () => {
   /**
    * Three Schools across two Clusters, one of them carrying a Session of every status.
    *
-   * Deliberately not the real forty-two. "All 42" is a property of the seeded database
+   * Deliberately not the real forty-seven. "All 47" is a property of the seeded database
    * and not of a fixture, and a test whose numbers come from a seed file nobody edits
    * for it is a test whose failures are unreadable.
    */

@@ -95,7 +95,7 @@ describe("the scope payload", () => {
     ]);
   });
 
-  it("sends no figures — `42 Sekolah · 15 provinsi` is derived from the School list", async () => {
+  it("sends no figures — `47 Sekolah · 16 provinsi` is derived from the School list", async () => {
     await addProvince("JB", "Jawa Barat");
     await addProvince("DKI", "DKI Jakarta");
     const alpha = await addCluster({ slug: "alpha", name: "Cluster Alpha" });
