@@ -9,6 +9,7 @@ import {
   boolean,
   check,
   date,
+  index,
   integer,
   pgTable,
   text,
@@ -83,7 +84,12 @@ export const preparationChecklistItem = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [check("preparation_checklist_item_label_not_empty", sql`length(trim(${t.label})) > 0`)],
+  (t) => [
+    check("preparation_checklist_item_label_not_empty", sql`length(trim(${t.label})) > 0`),
+    // Every Card read and every reorder loads or rewrites its items by `card_id`
+    // (`preparation-cards.ts`), and the FK is not auto-indexed (#270).
+    index("preparation_checklist_item_card_id_idx").on(t.cardId),
+  ],
 );
 
 /**

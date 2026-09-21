@@ -183,6 +183,13 @@
       "when": 1789985549627,
       "tag": "0025_even_ravenous",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790004499507,
+      "tag": "0026_unknown_katie_power",
+      "breakpoints": true
     }
   ]
 }
