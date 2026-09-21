@@ -3,8 +3,8 @@ import { asc, eq, ne, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { session } from "../schema/delivery";
-import { cluster, school, subCluster } from "../schema/reference";
-import { perjadin, perjadinPimpinan, transaction } from "../schema/travel";
+import { cluster, school } from "../schema/reference";
+import { transaction } from "../schema/travel";
 import type { Person } from "./caller";
 
 /**
@@ -33,9 +33,6 @@ export type MonitoringSession = {
   startsAt: string;
   id: string;
   status: SessionStatus;
-  /** The School's name, the human label the Calendar's online-session events read (`Sesi Daring
-   *  {name}`). The rank fold ignores it; only the calendar event list uses it. */
-  name: string;
 };
 
 /**
@@ -54,28 +51,8 @@ export type MonitoringData = {
    * next Session take rank 1, exactly as the Sesi labelling means it (ADR-0027).
    */
   sessions: MonitoringSession[];
-  /**
-   * Every Perjadin as a date span the Calendar draws offline and Monev markers from — **all** rows,
-   * with no status filter (there is no cancel concept on a Perjadin). `clusterId` comes from the
-   * trip's `sub_cluster.cluster_id`; `startsOn`/`endsOn` are the `date` columns (`YYYY-MM-DD`);
-   * `hasPimpinan` is an EXISTS over `perjadin_pimpinan`, so a trip with any recorded Pimpinan draws
-   * the Monev marker across its span. The fold in `calendar-derive.ts` unions overlapping spans.
-   */
-  perjadinSpans: PerjadinSpan[];
   /** `SUM(transaction.amount_idr)` over every transaction, programme-wide. Coalesced to 0. */
   budgetUsedIdr: number;
-};
-
-/** One Perjadin as the Calendar reads it: its id and its Cluster, the human `destination` label the
- *  event popup shows, its inclusive date span, and whether any Pimpinan travels on it (the Monev
- *  marker). */
-export type PerjadinSpan = {
-  id: string;
-  clusterId: string;
-  destination: string;
-  startsOn: string;
-  endsOn: string;
-  hasPimpinan: boolean;
 };
 
 /**
@@ -104,34 +81,12 @@ export async function monitoringData(_caller: Person): Promise<MonitoringData> {
       startsAt: session.startsAt,
       id: session.id,
       status: session.status,
-      // The School's name, for the Calendar's `Sesi Daring {name}` online-session event.
-      name: school.name,
     })
     .from(session)
     .innerJoin(school, eq(school.id, session.schoolId))
     // Cancelled Sessions are excluded here, not in the seam, so the rank the seam computes never
     // has one to skip — a cancelled Session simply does not exist to it.
     .where(ne(session.status, "cancelled"));
-
-  const perjadinSpans = await db
-    .select({
-      id: perjadin.id,
-      // The trip's Cluster is its Sub-Cluster's Cluster — `sub_cluster.cluster_id` is NOT NULL, so
-      // the inner join never drops a Perjadin.
-      clusterId: subCluster.clusterId,
-      // The Surat Tugas destination line — the human label everywhere else names a trip by, and the
-      // name the Calendar's offline/Monev events show. There is no separate Perjadin name column.
-      destination: perjadin.destination,
-      startsOn: perjadin.startsOn,
-      endsOn: perjadin.endsOn,
-      // A trip carries the Monev marker iff any Pimpinan is recorded on it. EXISTS is a boolean the
-      // fold reads directly — it never needs the Pimpinan rows themselves.
-      hasPimpinan: sql<boolean>`exists (
-        select 1 from ${perjadinPimpinan} where ${perjadinPimpinan.perjadinId} = ${perjadin.id}
-      )`.mapWith(Boolean),
-    })
-    .from(perjadin)
-    .innerJoin(subCluster, eq(subCluster.id, perjadin.subClusterId));
 
   const [budget] = await db
     .select({
@@ -143,7 +98,6 @@ export async function monitoringData(_caller: Person): Promise<MonitoringData> {
     clusters,
     schools,
     sessions,
-    perjadinSpans,
     budgetUsedIdr: budget?.budgetUsedIdr ?? 0,
   };
 }

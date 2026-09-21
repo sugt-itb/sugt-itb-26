@@ -99,12 +99,7 @@ export {
   type PicReport,
   type StaffDashboard,
 } from "./dashboard";
-export {
-  monitoringData,
-  type MonitoringData,
-  type MonitoringSession,
-  type PerjadinSpan,
-} from "./monitoring";
+export { monitoringData, type MonitoringData, type MonitoringSession } from "./monitoring";
 export {
   assessmentCompletions,
   setAssessmentCompletion,
