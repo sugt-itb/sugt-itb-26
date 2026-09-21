@@ -92,6 +92,10 @@ _Avoid_: score, result, mark (a Pretest completion is that it happened, not how 
 **Posttest**:
 The counterpart to a **Pretest**, administered after the teaching, on the same grain and the same delivery-not-outcome footing. Its completions share the `assessment_completion` table (`kind = 'posttest'`), but **no UI surfaces it this iteration** — the column exists so surfacing it later is a UI-only change, not a migration (ADR-0031).
 
+**Jadwal**:
+The Programme's **activity schedule** — which School has which activity, and on which date, across the term. It is authored and kept by DITSAMA **outside the tool**, and the **Kalender** month view reads it rather than the tool owning it: the Jadwal is that calendar's single source of truth, not a record the tool creates ([ADR-0033](./docs/adr/0033-kalender-schedule-is-a-link-shared-google-sheet.md)).
+_Avoid_: Kalender (that is the on-screen month view; the Jadwal is the schedule it renders)
+
 ### People and travel
 
 **Person**:
