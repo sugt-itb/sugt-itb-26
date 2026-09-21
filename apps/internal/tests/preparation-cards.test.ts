@@ -228,6 +228,65 @@ describe("checklist item writes", () => {
     const [reread] = await preparationCards(me);
     expect(reread!.items.map((i) => i.label)).toEqual(["c", "a", "b"]);
   });
+
+  it("leaves a checked item in place — a checked id in the order list is ignored", async () => {
+    const me = editor();
+    const created = await createPreparationCard(me, { ...A_CARD, items: ["a", "b", "c", "d"] });
+    if (created.outcome !== "created") throw new Error("expected created");
+    const [card] = await preparationCards(me);
+    const [a, b, c, d] = card!.items;
+    // Check b — it must keep its position and stay after every unchecked item.
+    await setChecklistItemChecked(me, b!.id, true);
+
+    // Reorder the unchecked items to d, c, a; b's id is passed too and must be ignored (the batched
+    // UPDATE's `checked = false` guard drops it), not written to position 3.
+    expect(await reorderChecklistItems(me, card!.id, [d!.id, c!.id, a!.id, b!.id])).toEqual({
+      outcome: "reordered",
+    });
+
+    const [reread] = await preparationCards(me);
+    expect(reread!.items.map((i) => [i.label, i.checked])).toEqual([
+      ["d", false],
+      ["c", false],
+      ["a", false],
+      ["b", true],
+    ]);
+  });
+
+  it("ignores a stale id and an id belonging to another card", async () => {
+    const me = editor();
+    const created = await createPreparationCard(me, { ...A_CARD, items: ["a", "b", "c"] });
+    if (created.outcome !== "created") throw new Error("expected created");
+    // A second card whose item the first card's reorder must not touch (the `card_id` guard).
+    await createPreparationCard(me, { ...A_CARD, title: "Lain", items: ["x"] });
+    const cards = await preparationCards(me);
+    const target = cards.find((cd) => cd.title === A_CARD.title)!;
+    const other = cards.find((cd) => cd.title === "Lain")!;
+    const [a, b, c] = target.items;
+
+    // Mix a stale uuid and the other card's item id into the order — both ignored; only this card's
+    // unchecked items reorder.
+    expect(
+      await reorderChecklistItems(me, target.id, [
+        c!.id,
+        "00000000-0000-0000-0000-000000000000",
+        a!.id,
+        other.items[0]!.id,
+        b!.id,
+      ]),
+    ).toEqual({ outcome: "reordered" });
+
+    const reread = await preparationCards(me);
+    expect(reread.find((cd) => cd.title === A_CARD.title)!.items.map((i) => i.label)).toEqual([
+      "c",
+      "a",
+      "b",
+    ]);
+    // The other card's item is untouched — same label at the same position.
+    expect(
+      reread.find((cd) => cd.title === "Lain")!.items.map((i) => [i.label, i.position]),
+    ).toEqual([["x", 0]]);
+  });
 });
 
 describe("Preparation Card writes are Editor-guarded", () => {

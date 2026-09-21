@@ -1,5 +1,5 @@
 import { MAX_PREPARATION_CHECKLIST_ITEMS, type PreparationJenis } from "@sugt/domain";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { preparationCard, preparationChecklistItem } from "../schema/monitoring";
@@ -300,17 +300,25 @@ export async function reorderChecklistItems(
       .limit(1);
     if (!card) return { outcome: "no-such-card" };
 
-    for (const [position, itemId] of orderedItemIds.entries()) {
-      await tx
-        .update(preparationChecklistItem)
-        .set({ position, updatedAt: sql`now()` })
-        .where(
-          and(
-            eq(preparationChecklistItem.id, itemId),
-            eq(preparationChecklistItem.cardId, cardId),
-            eq(preparationChecklistItem.checked, false),
-          ),
-        );
+    // One UPDATE instead of N awaited in series: join the table to a `(id, position)` VALUES list by
+    // id, so every item's new position lands in a single round trip (the list is bounded ~20 by
+    // `MAX_PREPARATION_CHECKLIST_ITEMS`, but the loop's serial awaits were still needless latency).
+    // The Card and unchecked guards stay on the WHERE, so a stale or checked id in the list matches
+    // no row and is ignored — exactly the rows the loop touched. An empty list updates nothing,
+    // as the zero-iteration loop did.
+    if (orderedItemIds.length > 0) {
+      const rows = sql.join(
+        orderedItemIds.map((itemId, position) => sql`(${itemId}::uuid, ${position}::int)`),
+        sql`, `,
+      );
+      await tx.execute(sql`
+        update ${preparationChecklistItem} as t
+        set position = v.position, updated_at = now()
+        from (values ${rows}) as v(id, position)
+        where t.id = v.id
+          and t.card_id = ${cardId}::uuid
+          and t.checked = false
+      `);
     }
 
     return { outcome: "reordered" };
