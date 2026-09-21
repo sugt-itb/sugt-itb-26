@@ -20,7 +20,7 @@ import {
 import { school } from "./reference";
 
 /**
- * **Monitoring Preparation** — the free-standing Preparation Cards on the `/monitoring` Persiapan
+ * **Preparation Cards** — the free-standing cards on the Dashboard (`/`) Persiapan
  * tab (ADR-0028's Editor Grant gates writing them). A Card is a title, a Jenis, a date or
  * date-range, and a variable checklist.
  *
@@ -28,7 +28,7 @@ import { school } from "./reference";
  * despite both reading "Persiapan" in the UI. That one is a Perjadin's **seven fixed** boxes, stored
  * as ticks and derived against a fixed list; this one is a **standalone** Card with a **variable**,
  * ordered, hand-edited checklist and no Perjadin, School, Cluster or Session behind it. They share
- * no table and no code — see `CONTEXT.md`, **Monitoring Preparation** vs **Preparation Checklist**.
+ * no table and no code — see `CONTEXT.md`, **Preparation Cards** vs **Preparation Checklist**.
  */
 
 /**
@@ -98,7 +98,7 @@ export const preparationChecklistItem = pgTable(
  *
  * The denominator for any progress reading is **always all 47 Schools**, derived from
  * `schools.length` and never stored — the same "X / 47" pattern as `aggregates.ts` and
- * `monitoring-derive.ts`.
+ * `dashboard-derive.ts`.
  *
  * The unique constraint gives one row per box; the three CHECKs mirror the domain consts
  * (`STREAMS`, `PRETEST_PARTICIPANT_TYPES`, `ASSESSMENT_KINDS`) character for character, exactly as

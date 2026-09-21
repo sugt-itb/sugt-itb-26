@@ -20,19 +20,19 @@ import {
 import { cn } from "@sugt/ui/lib/utils";
 import { Check } from "lucide-react";
 
-import type { MatrixRow, PretestMeter, TimelineStep } from "./monitoring-derive";
+import type { MatrixRow, PretestMeter, TimelineStep } from "./dashboard-derive";
 
 /**
- * The `/monitoring` view — the presentational half of the screen, now fed **real** figures. Every
- * number is derived on the server by `deriveMonitoring` (`./monitoring-derive.ts`) from the rows
+ * The Dashboard view — the presentational half of the screen, now fed **real** figures. Every
+ * number is derived on the server by `deriveDashboard` (`./dashboard-derive.ts`) from the rows
  * `monitoringData` reads, and handed down as props; this component only lays them out — it holds no
  * client state of its own now.
  *
  * `showBudget` gates the money card (money reads are open, ADR-0026), decided on the server. The
- * Peringatan section that once lived here has moved to `MonitoringWarnings`, rendered above the tabs
+ * Peringatan section that once lived here has moved to `DashboardWarnings`, rendered above the tabs
  * so it shows on both (#235); this view is warnings-free now.
  */
-export function MonitoringView({
+export function DashboardView({
   showBudget,
   activitiesPercent,
   budget,

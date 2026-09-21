@@ -1,6 +1,6 @@
 /**
  * **The pure date arithmetic behind the `/monitoring` Calendar**, kept out of the component the
- * same way `monitoring-derive.ts` keeps the matrix fold out of the view. Building the month grid,
+ * same way `dashboard-derive.ts` keeps the matrix fold out of the view. Building the month grid,
  * naming the month, and paging forward/back are all deterministic functions over a `{ year, month }`
  * — no React, no `Date.now()`, no time zone — so the suite drives them directly and the component is
  * left only rendering. Everything works in **UTC** and steps whole days in milliseconds: UTC has no

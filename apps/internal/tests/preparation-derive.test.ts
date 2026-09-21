@@ -1,10 +1,10 @@
-import { preparationPercent, preparationWarnings } from "-/app/(app)/monitoring/preparation-derive";
+import { preparationPercent, preparationWarnings } from "-/app/(app)/preparation-derive";
 import type { PreparationCard } from "@sugt/db/queries";
 import { describe, expect, it } from "vitest";
 
 /**
- * **The Monitoring Preparation percentage fold, tested with no database and no DOM** — like the
- * other `/monitoring` derive seams. It hands `preparationPercent` a hand-built checklist and asserts
+ * **The Preparation Card percentage fold, tested with no database and no DOM** — like the
+ * other Dashboard (`/`) derive seams. It hands `preparationPercent` a hand-built checklist and asserts
  * the whole-number percent, including the empty-checklist zero and the recompute after an edit.
  */
 const items = (...checked: boolean[]) => checked.map((c) => ({ checked: c }));

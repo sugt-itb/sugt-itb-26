@@ -8,9 +8,9 @@ import { transaction } from "../schema/travel";
 import type { Person } from "./caller";
 
 /**
- * **`/monitoring`'s one round trip** — the four raw shapes the screen's overview reads from, and
- * nothing derived. **Rank, percentages and warnings are computed in TypeScript**, not here
- * (`apps/internal/.../monitoring/monitoring-derive.ts`, ADR-0027): a Session's Sesi is its
+ * **The Dashboard's one round trip** — the four raw shapes the screen's overview (`/`) reads from,
+ * and nothing derived. **Rank, percentages and warnings are computed in TypeScript**, not here
+ * (`apps/internal/.../dashboard-derive.ts`, ADR-0027): a Session's Sesi is its
  * per-School date **rank**, and keeping that in a pure function is what makes it unit-testable
  * against hand-built fixtures rather than a live database. So this module returns rows and one sum,
  * and the seam above turns them into the matrix.

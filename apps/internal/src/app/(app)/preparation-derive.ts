@@ -1,11 +1,11 @@
 import { longDateId } from "-/app/(app)/_calendar/calendar-grid";
 import type { PreparationCard, PreparationChecklistItem } from "@sugt/db/queries";
 
-import type { Warning } from "./monitoring-state";
+import type { Warning } from "./dashboard-state";
 
 /**
- * **The pure percentage fold for a Monitoring Preparation Card**, with no React, no DOM and no
- * database — the same shape as `monitoring-derive.ts`, so the suite drives it with a hand-built
+ * **The pure percentage fold for a Preparation Card**, with no React, no DOM and no
+ * database — the same shape as `dashboard-derive.ts`, so the suite drives it with a hand-built
  * array. A Card's completion is `checked ÷ total`, as a whole-number percent (like
  * `activitiesPercent`), and **an empty checklist is 0%**, not a division by zero: a Card with
  * nothing to do has done none of it, which is the reading the tab wants.
@@ -38,8 +38,8 @@ function addDays(isoDate: string, days: number): string {
 }
 
 /**
- * **The Monitoring Persiapan due-date warnings**, a pure derivation mirroring `overdueWarnings`
- * (`monitoring-derive.ts`) — no React, no DOM, no database, driven by a hand-built fixture.
+ * **The Persiapan due-date warnings**, a pure derivation mirroring `overdueWarnings`
+ * (`dashboard-derive.ts`) — no React, no DOM, no database, driven by a hand-built fixture.
  *
  * A Card warns when it is **incomplete** (`preparationPercent < 100`) **and** its `startsOn` is on
  * or before `today + PREPARATION_WARNING_LEAD_DAYS` — i.e. due within the next five days, today,
@@ -47,7 +47,7 @@ function addDays(isoDate: string, days: number): string {
  * warning until it reaches 100%. `endsOn` never affects the trigger — the Card has no separate due
  * date, so `startsOn` is the tenggat in every case. The message names the Card and its `startsOn`
  * in the shared long-Indonesian date form (`15 Oktober 2026`), and the `id` is stable per Card so
- * the dismiss reducer (`monitoring-state.ts`) can set one aside.
+ * the dismiss reducer (`dashboard-state.ts`) can set one aside.
  */
 export function preparationWarnings(cards: readonly PreparationCard[], today: string): Warning[] {
   const horizon = addDays(today, PREPARATION_WARNING_LEAD_DAYS);

@@ -11,11 +11,11 @@ import { addCluster, addProvince, addSchool, resetDatabase } from "./support/fix
 
 /**
  * **Pretest/Posttest completion — the data layer** (ticket #246, ADR-0031). The open read and the
- * one Monitoring-Editor-guarded write behind the `/monitoring` Pretest tracker.
+ * one Editor-guarded write behind the Dashboard (`/`) Pretest tracker.
  *
  * A completion is a bare tuple **(School × Stream × participant-type × kind)** whose *presence* means
  * "administered"; there is no `done` column. The write callers are **hand-built** `Person`s carrying
- * the Grant under test, for the reason `monitoring-preparation.test.ts` spells out: the write reads
+ * the Grant under test, for the reason `preparation-cards.test.ts` spells out: the write reads
  * nothing off the caller but `role` and `grants`, which is all `requireGrant` inspects, and
  * `grant-foundation.test.ts` proves resolution threads a real Person's grants onto the caller.
  */
@@ -141,7 +141,7 @@ describe("setAssessmentCompletion toggles a box", () => {
   });
 });
 
-describe("setAssessmentCompletion is Monitoring-Editor-guarded", () => {
+describe("setAssessmentCompletion is Editor-guarded", () => {
   beforeEach(resetDatabase);
 
   const box = {

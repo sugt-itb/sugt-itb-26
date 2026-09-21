@@ -22,13 +22,14 @@ import {
 import { revalidatePath } from "next/cache";
 
 /**
- * **Monitoring Preparation's writes** — create/edit/delete a Card and add/remove/reorder/tick its
+ * **The Preparation Cards' writes** — create/edit/delete a Card and add/remove/reorder/tick its
  * items, every one behind `requireGrant(person, "Editor")` inside the `@sugt/db` write
  * (ADR-0028). `staffSurface` turns a non-holder's `NotGrantedError` into a 403 — the same
  * translation the Staff-only surfaces use — because a layout does not run before a Server Action, so
  * hiding the tab's controls (sibling UI ticket) is only a courtesy and the guard is the real gate.
  *
- * Every write that changed something revalidates `/monitoring` so the tab re-reads the cards. The
+ * Every write that changed something revalidates `/` (the Dashboard, where the Persiapan tab lives)
+ * so the tab re-reads the cards. The
  * reachable refusals (`no-such-card`, `title-required`, `too-many-items`, …) come back as values for
  * the form to place on a field; only the missing Grant throws.
  */
@@ -39,7 +40,7 @@ export async function createPreparationCardAction(
   const person = await requirePerson();
 
   const result = await staffSurface(() => createPreparationCard(person, input));
-  if (result.outcome === "created") revalidatePath("/monitoring");
+  if (result.outcome === "created") revalidatePath("/");
   return result;
 }
 
@@ -50,7 +51,7 @@ export async function editPreparationCardAction(
   const person = await requirePerson();
 
   const result = await staffSurface(() => editPreparationCard(person, cardId, input));
-  if (result.outcome === "updated") revalidatePath("/monitoring");
+  if (result.outcome === "updated") revalidatePath("/");
   return result;
 }
 
@@ -60,7 +61,7 @@ export async function deletePreparationCardAction(
   const person = await requirePerson();
 
   const result = await staffSurface(() => deletePreparationCard(person, cardId));
-  if (result.outcome === "deleted") revalidatePath("/monitoring");
+  if (result.outcome === "deleted") revalidatePath("/");
   return result;
 }
 
@@ -71,7 +72,7 @@ export async function addChecklistItemAction(
   const person = await requirePerson();
 
   const result = await staffSurface(() => addChecklistItem(person, cardId, label));
-  if (result.outcome === "added") revalidatePath("/monitoring");
+  if (result.outcome === "added") revalidatePath("/");
   return result;
 }
 
@@ -81,7 +82,7 @@ export async function removeChecklistItemAction(
   const person = await requirePerson();
 
   const result = await staffSurface(() => removeChecklistItem(person, itemId));
-  if (result.outcome === "removed") revalidatePath("/monitoring");
+  if (result.outcome === "removed") revalidatePath("/");
   return result;
 }
 
@@ -92,7 +93,7 @@ export async function reorderChecklistItemsAction(
   const person = await requirePerson();
 
   const result = await staffSurface(() => reorderChecklistItems(person, cardId, orderedItemIds));
-  if (result.outcome === "reordered") revalidatePath("/monitoring");
+  if (result.outcome === "reordered") revalidatePath("/");
   return result;
 }
 
@@ -103,6 +104,6 @@ export async function setChecklistItemCheckedAction(
   const person = await requirePerson();
 
   const result = await staffSurface(() => setChecklistItemChecked(person, itemId, checked));
-  if (result.outcome === "updated") revalidatePath("/monitoring");
+  if (result.outcome === "updated") revalidatePath("/");
   return result;
 }
