@@ -14,7 +14,6 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { person } from "./people";
 import { school } from "./reference";
 import { perjadin, perjadinTeacher } from "./travel";
 
@@ -61,13 +60,13 @@ export const session = pgTable(
     // guarantee rather than this module's hope. `$type<>()` comes before `.default()` so
     // that the default is checked against the set too.
     mode: text("mode").$type<SessionMode>().notNull(),
-    // Every Session carries one Stream — STEM or Research — whatever its mode: the
-    // STEM/Research split is a property of the Session, not of who teaches (ADR-0019), and
-    // as of ADR-0022 an online Session is single-Stream too, exactly like an offline one.
-    // Still `text().$type<>()` rather than NOT NULL in the column type because the value set
-    // and the not-null rule are both CHECKs — `session_stream_check` pins the two allowed
-    // values and `session_stream_not_null` pins that it is present at all. The old
-    // mode-linkage (`session_offline_iff_stream`) is gone: Stream no longer tells you the mode.
+    // An **offline** Session carries one Stream — STEM or Research (ADR-0019); an **online** Session
+    // no longer does (#284, superseding ADR-0022). Online delivery is run by a third-party LMS and is
+    // no longer split by Stream, so `stream` is left null for online rows and required only for
+    // offline. Still `text().$type<>()` rather than NOT NULL in the column type because the value set
+    // and the presence rule are both CHECKs — `session_stream_check` pins the two allowed values and
+    // `session_offline_stream_not_null` pins that an offline row carries one. `mode`/`perjadin_id`
+    // tell you the mode; `stream` never did.
     stream: text("stream").$type<Stream>(),
     heldOn: date("held_on").notNull(),
     // A wall-clock start time local to the School, in the School's Time Zone. NOT NULL
@@ -98,41 +97,34 @@ export const session = pgTable(
     // against populated data. "Required for online" is an app-layer rule, not a DB one.
     participantType: text("participant_type").$type<PretestParticipantType>(),
 
-    onlinePicPersonId: uuid("online_pic_person_id"),
-    // Pinned to the single value 'Staff' by `session_online_pic_role_check`, so it reads
-    // back as the literal "Staff" rather than string — a narrower claim than the set
-    // columns above; see the header on single-literal columns.
-    onlinePicRole: text("online_pic_role").$type<"Staff">(),
-
+    // **No PIC columns any more (#284).** An online Session used to carry its own
+    // `online_pic_person_id`/`online_pic_role` because it had no Perjadin to take one from — but a
+    // third-party LMS provider now runs online delivery (the Zoom host is in WIB), so SUGT no longer
+    // tracks a PIC for online Sessions and they no longer produce a Session Record. Offline Sessions
+    // still take their PIC from their Perjadin (`perjadin.pic_person_id`), never from a column here.
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     check("session_mode_check", sql`${t.mode} in ('offline', 'online')`),
     check("session_status_check", sql`${t.status} in ('arranged', 'delivered', 'cancelled')`),
     check("session_stream_check", sql`${t.stream} in ('STEM', 'Research')`),
-    // Stream is now required for BOTH modes (ADR-0022): an online Session is single-Stream,
-    // like an offline one has been since ADR-0019. This replaces the old
-    // `session_offline_iff_stream` equivalence — `(mode = 'offline') = (stream is not null)` —
-    // which let online rows hold a null. The mode-linkage is dropped outright: `mode`/`perjadin_id`
-    // still tell you the mode, `stream` no longer does.
-    check("session_stream_not_null", sql`${t.stream} is not null`),
+    // Stream is required for **offline only** now (#284, superseding ADR-0022's unconditional rule):
+    // online delivery is no longer split by Stream, so an online row leaves `stream` null. Written as
+    // an implication rather than an equivalence — `mode <> 'offline' or stream is not null` — so it
+    // says "an offline Session has a Stream" without also claiming an online one has none for any
+    // reason but convention (nothing reads an online Stream). `session_stream_check` still pins the
+    // value set for the rows that do carry one.
+    check(
+      "session_offline_stream_not_null",
+      sql`${t.mode} <> 'offline' or ${t.stream} is not null`,
+    ),
     // The sharpest rule in the delivery half, and an equivalence in both directions:
-    // an offline Session has a Perjadin and an online Session has none.
+    // an offline Session has a Perjadin and an online Session has none. It is also what ties an
+    // offline Session to a PIC now the online PIC columns are gone (#284): the PIC of a Session is
+    // its Perjadin's, and only an offline Session has a Perjadin.
     check(
       "session_offline_iff_perjadin",
       sql`(${t.mode} = 'offline') = (${t.perjadinId} is not null)`,
-    ),
-    // Its exact mirror. Every Session has a PIC: an offline one takes its Perjadin's,
-    // an online one carries its own, so the six-in-ten online Sessions still have
-    // somebody to file the Session Record.
-    check(
-      "session_online_iff_pic",
-      sql`(${t.mode} = 'online') = (${t.onlinePicPersonId} is not null)`,
-    ),
-    check("session_online_pic_role_check", sql`${t.onlinePicRole} = 'Staff'`),
-    check(
-      "session_pic_pair_check",
-      sql`(${t.onlinePicPersonId} is null) = (${t.onlinePicRole} is null)`,
     ),
     check(
       "session_cancelled_iff_reason",
@@ -149,29 +141,21 @@ export const session = pgTable(
       "session_ends_after_starts_check",
       sql`${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`,
     ),
-    // MATCH SIMPLE: a row with NULLs in the referencing columns satisfies the
-    // constraint, so offline Sessions pass without a special case.
-    foreignKey({
-      name: "session_online_pic_is_staff",
-      columns: [t.onlinePicPersonId, t.onlinePicRole],
-      foreignColumns: [person.id, person.role],
-    }),
     // The gap the online index below cannot close. It keys on `perjadin_id`, which is NULL for
     // every online Session, and Postgres treats NULLs in a unique index as distinct — so
     // nothing stopped two online Sessions for one School on one day. Jadwalkan Sesi
     // daring arranges them from Coverage in a batch, one date across a multi-selection,
     // which moves that from theoretical to one mis-click away.
     //
-    // Keyed on Stream too since ADR-0022: an online Session is single-Stream, so a School may
-    // now hold a STEM and a Research online Session on the same date — those two do not collide,
-    // and only a second Session of the *same* Stream on that date does. Widening the index is
-    // what draws that line; without `stream` the STEM and Research pair would collide.
+    // **Keyed on `(school_id, held_on)` only (#284, superseding ADR-0022):** online Sessions are no
+    // longer single-Stream, so the rule is the plain one — **one online Session per School per day**,
+    // whatever else. It dropped `stream` from the key when Stream was dropped from online delivery.
     //
-    // Partial in both the ways the first index is, and for the same two reasons:
+    // Partial in both the ways it always was, and for the same two reasons:
     // cancelled rows accumulate and must not collide with the Session that replaced
     // them, and offline Sessions are untouched because their `perjadin_id` is not null.
     uniqueIndex("session_one_online_per_school_per_day")
-      .on(t.schoolId, t.heldOn, t.stream)
+      .on(t.schoolId, t.heldOn)
       .where(ONLINE_SESSION_STILL_STANDS),
     // Many offline Sessions per School per trip are now the point, not a collision (ADR-0019):
     // a School's participants are too many for one room, so a period splits into parallel rooms

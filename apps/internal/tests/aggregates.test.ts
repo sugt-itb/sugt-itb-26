@@ -117,7 +117,6 @@ describe("the delivery payload", () => {
   beforeEach(resetDatabase);
 
   it("carries a delivered total and a per-Cluster count, and counts delivered Sessions only", async () => {
-    const pic = await staff();
     await addProvince("JB", "Jawa Barat");
     const alpha = await addCluster({ slug: "alpha", name: "Cluster Alpha" });
     const beta = await addCluster({ slug: "beta", name: "Cluster Beta" });
@@ -138,31 +137,26 @@ describe("the delivery payload", () => {
       schoolId: busy.id,
       heldOn: "2026-09-01",
       status: "delivered",
-      onlinePicPersonId: pic.id,
     });
     await addSession({
       schoolId: busy.id,
       heldOn: "2026-09-08",
       status: "delivered",
-      onlinePicPersonId: pic.id,
     });
     await addSession({
       schoolId: busy.id,
       heldOn: "2026-09-15",
       status: "arranged",
-      onlinePicPersonId: pic.id,
     });
     await addSession({
       schoolId: busy.id,
       heldOn: "2026-09-22",
       status: "cancelled",
-      onlinePicPersonId: pic.id,
     });
     await addSession({
       schoolId: other.id,
       heldOn: "2026-09-02",
       status: "delivered",
-      onlinePicPersonId: pic.id,
     });
 
     const payload = await delivery(service);

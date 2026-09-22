@@ -66,19 +66,16 @@ describe("onlineSessionDirectory", () => {
       schoolId: a.id,
       heldOn: "2026-09-10",
       startsAt: "09:00",
-      onlinePicPersonId: pic.id,
     });
     await addSession({
       schoolId: b.id,
       heldOn: "2026-09-12",
       startsAt: "08:00",
-      onlinePicPersonId: pic.id,
     });
     await addSession({
       schoolId: a.id,
       heldOn: "2026-09-12",
       startsAt: "13:00",
-      onlinePicPersonId: pic.id,
     });
 
     const rows = await onlineSessionDirectory(pic);
@@ -90,7 +87,7 @@ describe("onlineSessionDirectory", () => {
     ]);
   });
 
-  it("carries the School, its Peserta, the PIC and the status on each row", async () => {
+  it("carries the School, its Peserta and the status on each row (no PIC, #284)", async () => {
     const pic = await staff();
     const school = await oneSchool();
     await addSession({
@@ -99,7 +96,6 @@ describe("onlineSessionDirectory", () => {
       startsAt: "09:00",
       status: "delivered",
       participantType: "GTK-MS",
-      onlinePicPersonId: pic.id,
     });
 
     const [row] = await onlineSessionDirectory(pic);
@@ -107,8 +103,9 @@ describe("onlineSessionDirectory", () => {
     expect(row?.schoolName).toBe("SMAN 1 Bandung");
     expect(row?.schoolSlug).toBe("sman-1-bandung");
     expect(row?.participantType).toBe("GTK-MS");
-    expect(row?.picFullName).toBe("Rina Nurhayati");
     expect(row?.status).toBe("delivered");
+    // No PIC on an online row any more (#284).
+    expect(row).not.toHaveProperty("picFullName");
   });
 
   /**
@@ -126,7 +123,7 @@ describe("onlineSessionDirectory", () => {
       clusterId: papua.id,
       provinceCode: "PA",
     });
-    await addSession({ schoolId: school.id, heldOn: "2026-09-10", onlinePicPersonId: pic.id });
+    await addSession({ schoolId: school.id, heldOn: "2026-09-10" });
 
     const [row] = await onlineSessionDirectory(pic);
 
@@ -140,7 +137,6 @@ describe("onlineSessionDirectory", () => {
       schoolId: school.id,
       heldOn: "2026-09-10",
       status: "cancelled",
-      onlinePicPersonId: pic.id,
     });
 
     const rows = await onlineSessionDirectory(pic);
@@ -152,7 +148,7 @@ describe("onlineSessionDirectory", () => {
   it("never lists an offline Session — those belong to a Perjadin", async () => {
     const pic = await staff();
     const school = await oneSchool();
-    await addSession({ schoolId: school.id, heldOn: "2026-09-10", onlinePicPersonId: pic.id });
+    await addSession({ schoolId: school.id, heldOn: "2026-09-10" });
     const trip = await addPerjadin({ advanceIdr: 5_000_000, picPersonId: pic.id });
     await addOfflineSession({ schoolId: school.id, heldOn: "2026-09-02", perjadinId: trip.id });
 

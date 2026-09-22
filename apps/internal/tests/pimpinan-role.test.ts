@@ -100,11 +100,6 @@ describe("Pimpinan is record-only", () => {
   });
 
   it("refuses a Pimpinan as a Session-Record filer — session_record_filed_by_staff pins Staff", async () => {
-    const pic = await addPerson({
-      fullName: "Rina Nurhayati",
-      email: "rina@ditsama.itb.ac.id",
-      role: "Staff",
-    });
     const pimpinan = await addPerson({
       fullName: "Prof. Pimpinan",
       email: "pimpinan@ditsama.itb.ac.id",
@@ -121,7 +116,6 @@ describe("Pimpinan is record-only", () => {
     const session = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-01",
-      onlinePicPersonId: pic.id,
     });
 
     // The five ratings are in-bounds and `filed_by_role` is 'Staff', so the role CHECK, the rating

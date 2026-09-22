@@ -1,14 +1,11 @@
 "use client";
 
 import { arrangeOnlineSessionAction } from "-/app/(app)/jadwalkan-sesi-daring/actions";
-import { PersonSelect } from "-/components/person-select";
-import type { ArrangePerson, SchoolOption } from "@sugt/db/queries";
+import type { SchoolOption } from "@sugt/db/queries";
 import {
   MAX_TEACHING_TEAM_PER_ONLINE_SESSION,
   PRETEST_PARTICIPANT_TYPES,
   type PretestParticipantType,
-  STREAMS,
-  type Stream,
 } from "@sugt/domain";
 import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
@@ -26,37 +23,28 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
 /**
- * Arrange **one** online Session (#70, ADR-0022). Two entry points share this component: the
+ * Arrange **one** online Session (#70). Two entry points share this component: the
  * standalone screen leads with a School picker (`schools`), and Detail Sekolah pins the School it
  * is on (`school`). Exactly one of the two is passed.
  *
- * An online Session is single-Stream now, so the form leads with a required **Aliran** and names
- * its Pengajar as **session-scoped free-text names** — typed in one at a time and shown as
+ * It names its Pengajar as **session-scoped free-text names** — typed in one at a time and shown as
  * removable chips, the same pattern the plan form uses for a Perjadin's trip-scoped Teaching Team
- * (ADR-0020). It no longer picks Teaching-Team People per Stream, so `teachingTeam` is gone from
- * this component; the `session_teacher` write it fed was retired in T3 (#153) along with the table.
- *
- * **#283 tightens it**: a required **Peserta** (Siswa / GTK-MS) and a required **Jam Selesai**
- * (strictly after Jam Mulai) join the fields, Pengajar becomes required (one or two), and both time
- * labels read **(WIB)** unconditionally — online Sessions are scheduled as WIB wall-clock nationally,
- * so the zone is no longer derived from the School's Province.
+ * (ADR-0020). The fields are Peserta (Siswa / GTK-MS), Tanggal, Jam Mulai and Jam Selesai (both
+ * **WIB**, strictly ordered), and Pengajar (required, one or two). **No Aliran and no PIC (#284):**
+ * a third-party LMS runs online delivery, so an online Session tracks neither Stream nor a PIC.
  *
  * A client component because every field is editable and none of that state is worth a URL. The
- * pickers and Schools arrive from the server as props; nothing here fetches. The Server Action
- * is called with a typed value rather than through a `<form action>`, because the payload is
- * nested — a list of teacher names — and `FormData` would mean flattening it out and parsing it
- * back with the type checker helping at neither end.
+ * Schools arrive from the server as props; nothing here fetches. The Server Action is called with a
+ * typed value rather than through a `<form action>`, because the payload is nested — a list of
+ * teacher names — and `FormData` would mean flattening it out and parsing it back with the type
+ * checker helping at neither end.
  */
-function ArrangeOnlineSessionForm({
-  school,
-  schools,
-  staff,
-}: {
-  staff: ArrangePerson[];
-} & (
-  | /** Detail Sekolah pins the School. */ { school: SchoolOption; schools?: never }
-  | /** The standalone screen offers a picker. */ { school?: never; schools: SchoolOption[] }
-)) {
+function ArrangeOnlineSessionForm(
+  props:
+    | /** Detail Sekolah pins the School. */ { school: SchoolOption; schools?: never }
+    | /** The standalone screen offers a picker. */ { school?: never; schools: SchoolOption[] },
+) {
+  const { school, schools } = props;
   const router = useRouter();
   const [schoolId, setSchoolId] = useState(school?.id ?? "");
   const [heldOn, setHeldOn] = useState("");
@@ -65,10 +53,6 @@ function ArrangeOnlineSessionForm({
   // Which cohort the Session teaches (#283). Required, `""` until chosen; the submit guard proves it
   // is set before the cast.
   const [participantType, setParticipantType] = useState<PretestParticipantType | "">("");
-  const [picPersonId, setPicPersonId] = useState("");
-  // The Session's Stream — STEM or Research (ADR-0022). Required now, `""` until chosen; the submit
-  // guard proves it is set before the cast.
-  const [stream, setStream] = useState<Stream | "">("");
   // The Pengajar as session-scoped names (ADR-0022): a list of plain strings, added one at a time
   // from `teacherDraft` and shown as removable chips. Required now (#283): one or two.
   const [teacherNames, setTeacherNames] = useState<string[]>([]);
@@ -82,8 +66,6 @@ function ArrangeOnlineSessionForm({
   const timeId = useId();
   const endTimeId = useId();
   const participantId = useId();
-  const picId = useId();
-  const streamId = useId();
   const teacherDraftId = useId();
 
   // Jam Selesai must be strictly after Jam Mulai — the app-layer half of the
@@ -91,9 +73,9 @@ function ArrangeOnlineSessionForm({
   // only meaningful once both are set.
   const endBeforeStart = startsAt !== "" && endsAt !== "" && endsAt <= startsAt;
 
-  // `held_on`/`starts_at` are NOT NULL and the PIC and Stream are required by CHECK; #283 adds a
-  // required Peserta, a required Jam Selesai after Jam Mulai, and at least one Pengajar — so the
-  // screen refuses a submit that could only be rejected.
+  // `held_on`/`starts_at` are NOT NULL by CHECK; #283 adds a required Peserta, a required Jam Selesai
+  // after Jam Mulai, and at least one Pengajar — so the screen refuses a submit that could only be
+  // rejected. There is no PIC or Aliran to require now (#284).
   const incomplete =
     schoolId === "" ||
     heldOn === "" ||
@@ -101,8 +83,6 @@ function ArrangeOnlineSessionForm({
     endsAt === "" ||
     endBeforeStart ||
     participantType === "" ||
-    picPersonId === "" ||
-    stream === "" ||
     teacherNames.length < 1;
 
   function reset() {
@@ -110,8 +90,6 @@ function ArrangeOnlineSessionForm({
     setStartsAt("");
     setEndsAt("");
     setParticipantType("");
-    setPicPersonId("");
-    setStream("");
     setTeacherNames([]);
     setTeacherDraft("");
     setArranged(false);
@@ -138,9 +116,6 @@ function ArrangeOnlineSessionForm({
         endsAt,
         // The guard proves Peserta is chosen; the query also treats `""` as a refusal.
         participantType,
-        picPersonId,
-        // The guard above proves a Stream is chosen, so the cast holds.
-        stream: stream as Stream,
         teacherNames: teacherNames.map((name) => name.trim()).filter((name) => name !== ""),
       });
 
@@ -180,8 +155,8 @@ function ArrangeOnlineSessionForm({
         <Alert variant="destructive">
           <AlertTitle>Sesi belum dijadwalkan.</AlertTitle>
           <AlertDescription>
-            Sekolah ini sudah punya Sesi daring Aliran ini pada {collidedOn}. Ubah tanggal atau
-            Aliran-nya, lalu simpan lagi.
+            Sekolah ini sudah punya Sesi daring pada {collidedOn}. Ubah tanggalnya, lalu simpan
+            lagi.
           </AlertDescription>
         </Alert>
       )}
@@ -224,53 +199,6 @@ function ArrangeOnlineSessionForm({
             <p className="text-sm font-medium">{school.name}</p>
           </div>
         )}
-
-        <Field
-          id={picId}
-          label="PIC"
-        >
-          <PersonSelect
-            id={picId}
-            people={staff}
-            value={picPersonId}
-            placeholder="Pilih PIC"
-            onSelect={(personId) => {
-              setPicPersonId(personId);
-              setCollidedOn(null);
-            }}
-          />
-        </Field>
-
-        <Field
-          id={streamId}
-          label="Aliran"
-        >
-          <Select
-            items={Object.fromEntries(STREAMS.map((entry) => [entry, entry]))}
-            value={stream === "" ? null : stream}
-            onValueChange={(value) => {
-              setStream((value as Stream | null) ?? "");
-              setCollidedOn(null);
-            }}
-          >
-            <SelectTrigger
-              id={streamId}
-              aria-label="Aliran"
-            >
-              <SelectValue placeholder="Pilih Aliran" />
-            </SelectTrigger>
-            <SelectContent>
-              {STREAMS.map((entry) => (
-                <SelectItem
-                  key={entry}
-                  value={entry}
-                >
-                  {entry}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
 
         <Field
           id={participantId}

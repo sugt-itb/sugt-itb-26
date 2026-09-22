@@ -1,14 +1,11 @@
 "use client";
 
 import { updateOnlineSessionAction } from "-/app/(app)/sesi-daring/[id]/actions";
-import { PersonSelect } from "-/components/person-select";
 import type { OnlineSessionDetail } from "@sugt/db/queries";
 import {
   formatSessionStartTimeWithWib,
   PRETEST_PARTICIPANT_TYPES,
   type PretestParticipantType,
-  STREAMS,
-  type Stream,
 } from "@sugt/domain";
 import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
@@ -33,17 +30,16 @@ import {
 import { useId, useState, useTransition } from "react";
 
 /**
- * An online Session's scalar fields — School, PIC, Aliran, Peserta, Tanggal, Jam Mulai, Jam Selesai
- * (#283) — shown, and for Staff editable through one "Ubah Sesi" dialog. The online counterpart of
- * the offline detail's per-Session edit (`perjadin-sessions.tsx`): the same fields the arrange form
- * set, corrected after the fact.
+ * An online Session's scalar fields — School, Peserta, Tanggal, Jam Mulai, Jam Selesai — shown, and
+ * for Staff editable through one "Ubah Sesi" dialog. The online counterpart of the offline detail's
+ * per-Session edit (`perjadin-sessions.tsx`): the same fields the arrange form set, corrected after
+ * the fact. **No PIC and no Aliran/Stream (#284):** a third-party LMS runs online delivery.
  *
  * One dialog for all of them, not one each, because they are one row and one write —
- * `updateOnlineSession` sets them together and re-checks the widened unique index on
- * School/date/Stream. Offered only while the Session is `arranged`; once delivered its fields record
- * something that happened. Read for everyone (no money); the "Ubah" trigger appears only for Staff,
- * whom the write re-checks. The two time labels read **(WIB)** unconditionally — online Sessions are
- * always WIB (#283).
+ * `updateOnlineSession` sets them together and re-checks the unique index on School/date. Offered
+ * only while the Session is `arranged`; once delivered its fields record something that happened.
+ * Read for everyone (no money); the "Ubah" trigger appears only for Staff, whom the write re-checks.
+ * The two time labels read **(WIB)** unconditionally — online Sessions are always WIB (#283).
  */
 function OnlineSessionFields({
   session,
@@ -63,8 +59,6 @@ function OnlineSessionFields({
 
       <dl className="mt-3 grid gap-x-8 gap-y-2.5 text-sm sm:grid-cols-2">
         <Row label="Sekolah">{session.schoolName}</Row>
-        <Row label="PIC">{session.picFullName}</Row>
-        <Row label="Aliran">{session.stream}</Row>
         <Row label="Peserta">{session.participantType ?? "—"}</Row>
         <Row label="Tanggal">
           <span className="tabular-nums">{session.heldOn}</span>
@@ -96,16 +90,14 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 /**
- * The edit dialog, seeded from the Session's current values. On save it hands all five fields to
- * `updateOnlineSession`, which refuses a collision with another still-standing online Session of the
- * same School, date and Stream — surfaced here beside the fields — and a Session someone else already
+ * The edit dialog, seeded from the Session's current values. On save it hands the fields to
+ * `updateOnlineSession`, which refuses a collision with another still-standing online Session at the
+ * same School on the same date — surfaced here beside the fields — and a Session someone else already
  * delivered or cancelled.
  */
 function EditDialog({ session }: { session: OnlineSessionDetail }) {
   const [open, setOpen] = useState(false);
   const [schoolId, setSchoolId] = useState(session.schoolId);
-  const [picPersonId, setPicPersonId] = useState(session.picPersonId);
-  const [stream, setStream] = useState<Stream | "">(session.stream);
   const [participantType, setParticipantType] = useState<PretestParticipantType | "">(
     session.participantType ?? "",
   );
@@ -123,8 +115,6 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
 
   const incomplete =
     schoolId === "" ||
-    picPersonId === "" ||
-    stream === "" ||
     participantType === "" ||
     heldOn === "" ||
     startsAt === "" ||
@@ -136,8 +126,6 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
     startSaving(async () => {
       const result = await updateOnlineSessionAction(session.id, {
         schoolId,
-        picPersonId,
-        stream: stream as Stream,
         participantType,
         heldOn,
         startsAt,
@@ -149,7 +137,7 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
       }
       setRefusal(
         result.outcome === "collided"
-          ? "Sekolah ini sudah punya Sesi daring Aliran ini pada tanggal tersebut. Ubah tanggal atau Aliran-nya."
+          ? "Sekolah ini sudah punya Sesi daring pada tanggal tersebut. Ubah tanggalnya."
           : result.outcome === "end-before-start"
             ? "Jam selesai harus setelah jam mulai."
             : "Sesi ini sudah tidak berstatus terjadwal. Muat ulang halaman untuk melihat keadaannya.",
@@ -176,7 +164,7 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
         <DialogHeader>
           <DialogTitle>Ubah Sesi daring</DialogTitle>
           <DialogDescription>
-            Sekolah, PIC, Aliran, Peserta, tanggal, jam mulai dan jam selesai.
+            Sekolah, Peserta, tanggal, jam mulai dan jam selesai.
           </DialogDescription>
         </DialogHeader>
 
@@ -211,49 +199,6 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
                     value={school.id}
                   >
                     {school.name} — {school.kabupatenKota}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor={`${idPrefix}-pic`}>PIC</Label>
-            <PersonSelect
-              id={`${idPrefix}-pic`}
-              people={session.staff}
-              value={picPersonId}
-              placeholder="Pilih PIC"
-              onSelect={(personId) => {
-                setPicPersonId(personId);
-                setRefusal(null);
-              }}
-            />
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor={`${idPrefix}-stream`}>Aliran</Label>
-            <Select
-              items={Object.fromEntries(STREAMS.map((entry) => [entry, entry]))}
-              value={stream === "" ? null : stream}
-              onValueChange={(value) => {
-                setStream((value as Stream | null) ?? "");
-                setRefusal(null);
-              }}
-            >
-              <SelectTrigger
-                id={`${idPrefix}-stream`}
-                aria-label="Aliran"
-              >
-                <SelectValue placeholder="Pilih Aliran" />
-              </SelectTrigger>
-              <SelectContent>
-                {STREAMS.map((entry) => (
-                  <SelectItem
-                    key={entry}
-                    value={entry}
-                  >
-                    {entry}
                   </SelectItem>
                 ))}
               </SelectContent>

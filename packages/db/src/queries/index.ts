@@ -141,7 +141,6 @@ export {
   type ArrangeOnlineSessionForm,
   type ArrangeOnlineSessionInput,
   type ArrangeOnlineSessionResult,
-  type ArrangePerson,
   type SchoolOption,
 } from "./arrange-online-session";
 export {
