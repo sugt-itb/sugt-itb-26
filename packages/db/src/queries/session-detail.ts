@@ -431,9 +431,9 @@ export async function moveSessionDate(
       return { outcome: "moved" };
     });
   } catch (error) {
-    // Named rather than caught wholesale: this row satisfies five CHECKs and two composite
-    // foreign keys, and swallowing any of those as "that date is taken" would report a bug
-    // as a user state.
+    // Named rather than caught wholesale: this row satisfies several CHECKs, and swallowing any of
+    // those as "that date is taken" would report a bug as a user state. (The `session` table has no
+    // composite foreign keys any more — the online PIC one was dropped in #284.)
     const constraint = (error as { cause?: { constraint_name?: string } }).cause?.constraint_name;
     if (constraint === "session_one_online_per_school_per_day") {
       return { outcome: "collided", constraint };

@@ -39,6 +39,16 @@ the teaching, so `stream` and its offline index are untouched.
 - Existing online rows keep whatever `stream` value ADR-0022 gave them; nothing reads it, and the
   offline-only CHECK does not constrain them. New online rows have a null `stream`. Nulling the old
   values was judged not worth a data migration.
+- **The narrowed unique index needs the data to already be unique.** ADR-0022 permitted a school to
+  hold a STEM _and_ a Research still-standing online Session on one day, so a populated database may
+  carry a same-day pair that `CREATE UNIQUE INDEX (school_id, held_on)` would reject. Migration 0028
+  therefore runs a **pre-index dedupe first**: it cancels the redundant still-standing _arranged_
+  online Sessions per (school, day) — keeping a delivered one, else the earliest — so at most one
+  still stands, then builds the index. Cancelled rows carry a reason and fall out of the partial
+  index; **delivered** rows are never auto-cancelled, so two delivered online Sessions on one
+  school-day (a genuine history conflict) surface as a duplicate-key error for a human rather than
+  the migration rewriting a delivered record. This is what makes the migration apply against
+  populated data, not only from empty.
 - This ships with [ADR-0035](./0035-online-sessions-track-no-pic-and-file-no-session-record.md) (online
   Sessions track no PIC and file no Session Record) as the two halves of the same #284 change; it is
   the **subtractive** follow-up to the additive #283 (Peserta, Jam Selesai, WIB, Pengajar cap).
