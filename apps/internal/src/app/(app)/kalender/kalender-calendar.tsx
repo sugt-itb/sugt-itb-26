@@ -51,11 +51,12 @@ function useIsDesktop(): boolean {
  *
  * **Desktop (`lg+`) is fit-to-viewport (#278), which diverges from the app-wide document-scroll
  * pattern.** The page root (see `page.tsx`) clamps to `h-dvh`; here the layout fills that height and
- * splits it into two internal scroll regions — the calendar body (the six week rows share the height
- * as `1fr`, falling back to a `6rem` floor + internal scroll on a short viewport) and the detail
- * panel (a long event list scrolls inside the aside). The document itself never scrolls on desktop.
- * Below `lg` this is unchanged: a natural-height stack that scrolls the page, with the detail panel
- * in a bottom drawer.
+ * splits it into two internal scroll regions — the calendar body and the detail panel (a long event
+ * list scrolls inside the aside). In the calendar body the **weekday bar is a pinned header** and only
+ * the day grid beneath it scrolls (#285): the six week rows share the height as `1fr`, falling back to
+ * a `6rem` floor + internal scroll on a short viewport, while the weekday bar stays put at every
+ * viewport height and zoom. The document itself never scrolls on desktop. Below `lg` this is
+ * unchanged: a natural-height stack that scrolls the page, with the detail panel in a bottom drawer.
  */
 export function KalenderCalendar({
   schedule,
@@ -96,22 +97,30 @@ export function KalenderCalendar({
           onPrev={prevMonth}
           onNext={nextMonth}
         />
-        {/* On `lg+` the body is the calendar's scroll region: it fills the card's remaining height
-            (`lg:flex-1 lg:min-h-0`) and, only on a short viewport where the row floor overflows,
-            scrolls internally (`lg:overflow-y-auto`) — never the page. */}
-        <CardContent className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-y-auto">
-          {/* `lg:min-h-full` lets the six week rows share the available height (each `1fr`) when
-              there is room, and grow to their `6rem` floor and overflow the scroll body when there
-              is not. `auto` keeps the weekday-label row its natural height. */}
-          <div className="grid grid-cols-7 gap-1 lg:min-h-full lg:grid-rows-[auto_repeat(6,minmax(6rem,1fr))]">
+        {/* On `lg+` the body is a flex column: the weekday bar is a non-scrolling header and the day
+            grid below it is the one scroll region. The body itself does not scroll — clipping it was
+            what hid the weekday bar at 100% zoom (#285). */}
+        <CardContent className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+          {/* The weekday bar, a **pinned header** kept outside the scroll region so it is always
+              visible on desktop, whatever the viewport height or zoom (#285). Its own `grid-cols-7`
+              matches the day grid below, so the seven labels stay column-aligned with the cells.
+              `lg:shrink-0` keeps it at its natural height while the day grid takes the rest. */}
+          <div className="grid grid-cols-7 gap-1 border-b border-border pb-1 lg:shrink-0">
             {WEEKDAY_LABELS_ID_FULL.map((label, i) => (
               <div
                 key={i}
-                className="truncate pb-1 text-center text-xs font-medium text-muted-foreground"
+                className="truncate text-center text-xs font-medium text-muted-foreground"
               >
                 {label}
               </div>
             ))}
+          </div>
+          {/* The day grid — the calendar's scroll region on `lg+`. `lg:min-h-0` lets it flex-shrink
+              so `lg:overflow-y-auto` actually engages: on a short viewport the six `minmax(6rem,1fr)`
+              rows exceed the space, so the grid scrolls **beneath the pinned bar** rather than pushing
+              it off-screen (#285). With room to spare the rows share the height as `1fr`. Below `lg`
+              this is a plain natural-height grid that scrolls with the document. */}
+          <div className="mt-1 grid grid-cols-7 gap-1 lg:min-h-0 lg:flex-1 lg:grid-rows-[repeat(6,minmax(6rem,1fr))] lg:overflow-y-auto">
             {days.map((day) => (
               <DayCell
                 key={day.date}
