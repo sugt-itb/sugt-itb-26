@@ -34,7 +34,7 @@ import {
  * once `session_teacher` was dropped and the `Teaching Team` role retired; `person_role_check`
  * now widens to `role in ('Staff', 'Pimpinan')` to admit a second signed-in, read-only principal.
  * **Only that one CHECK widens.** The composite FKs that remain are the PIC-is-Staff family —
- * `group_member`, `perjadin.pic`, `session.online_pic`, `session_record` and `story` — and each
+ * `group_member`, `perjadin.pic`, `session_record` and `story` — and each
  * still pins `role = 'Staff'`, so the widened role can never satisfy one: a Pimpinan is kept out of
  * every working position (Group member, PIC, Session-Record filer, Story author) by exactly those
  * untouched composite keys, which is what makes the role record-only (ADR-0025). `class_record`'s

@@ -39,7 +39,7 @@ async function signedIn(email = "rina@ditsama.itb.ac.id") {
   return addPerson({ fullName: "Rina Nurhayati", email, role: "Staff" });
 }
 
-async function oneSession(picPersonId: string) {
+async function oneSession() {
   await addProvince("JB", "Jawa Barat");
   const cluster = await addCluster({ slug: "alpha", name: "Cluster Alpha" });
   const school = await addSchool({
@@ -52,7 +52,6 @@ async function oneSession(picPersonId: string) {
     schoolId: school.id,
     heldOn: "2026-09-10",
     status: "delivered",
-    onlinePicPersonId: picPersonId,
   });
 }
 
@@ -71,7 +70,7 @@ describe("participantFeedbackPage", () => {
 
   it("sorts lowest-average-first, then newest, by default", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     // Two distinct averages plus a tied pair on distinct instants, so the assertion turns on both
     // the average (primary) and the newest-first date tiebreak (secondary).
     await addParticipantFeedback({
@@ -115,7 +114,7 @@ describe("participantFeedbackPage", () => {
 
   it("sorts highest-average-first under score desc (Tertinggi)", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     await addParticipantFeedback({
       sessionId: session.id,
       classKind: "Student",
@@ -139,7 +138,7 @@ describe("participantFeedbackPage", () => {
 
   it("breaks equal-average ties oldest-first under date asc (Terlama)", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     // Same average, distinct instants — so only the date tiebreak decides, and date asc is oldest-first.
     await addParticipantFeedback({
       sessionId: session.id,
@@ -166,7 +165,7 @@ describe("participantFeedbackPage", () => {
 
   it("carries the row's shape, the joins, and the session time/zone and filed date", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     await addParticipantFeedback({
       sessionId: session.id,
       classKind: "GTK",
@@ -198,7 +197,7 @@ describe("participantFeedbackPage", () => {
 
   it("filters on the instructor column with le7 and gt7", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     await addParticipantFeedback({
       sessionId: session.id,
       classKind: "Student",
@@ -229,7 +228,7 @@ describe("participantFeedbackPage", () => {
 
   it("filters on the materials column", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     await addParticipantFeedback({
       sessionId: session.id,
       classKind: "Student",
@@ -253,7 +252,7 @@ describe("participantFeedbackPage", () => {
 
   it("filters on the relevance column", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     await addParticipantFeedback({
       sessionId: session.id,
       classKind: "Student",
@@ -284,7 +283,7 @@ describe("participantFeedbackPage", () => {
 
   it("gates reviewType on the raw row average, not any single Aspect", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     // Average (8 + 8 + 6) / 3 = 7.33 — above 7 — so gt7 keeps it and le7 drops it, even though
     // one Aspect (relevance = 6) is below the threshold on its own.
     await addParticipantFeedback({
@@ -312,7 +311,7 @@ describe("participantFeedbackPage", () => {
 
   it("ANDs two filters together", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     // Only this row is low on BOTH instructor and materials.
     await addParticipantFeedback({
       sessionId: session.id,
@@ -345,7 +344,7 @@ describe("participantFeedbackPage", () => {
 
   it("pages the whole set under the default sort with no repeat or gap (score asc)", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     // 12 rows spread across averages and instants, so paging must cross a boundary mid-order.
     for (let i = 0; i < 12; i++) {
       const rating = (i % 10) + 1; // 1..10, so the averages vary and some tie
@@ -388,7 +387,7 @@ describe("participantFeedbackPage", () => {
 
   it("pages the whole set under score desc with no repeat or gap", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     for (let i = 0; i < 12; i++) {
       const rating = (i % 10) + 1;
       await addParticipantFeedback({
@@ -426,7 +425,7 @@ describe("participantFeedbackPage", () => {
 
   it("pages the whole set under date asc with no repeat or gap, oldest-first within ties", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     // Every row shares one average, so the date direction is the operative order across the page
     // boundary — the combination the score-direction paging tests above do not exercise.
     for (let i = 0; i < 12; i++) {
@@ -468,7 +467,7 @@ describe("participantFeedbackPage", () => {
 
   it("composes a filter with a non-default sort", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     // Three low-average rows kept by le7 and one high row dropped, so the WHERE cuts and the
     // non-default score-desc ORDER BY orders what remains — the two applied together.
     for (const [name, rating] of [
@@ -515,7 +514,7 @@ describe("participantFeedbackAverages", () => {
 
   it("averages every row, dataset-wide", async () => {
     const person = await signedIn();
-    const session = await oneSession(person.id);
+    const session = await oneSession();
     await addParticipantFeedback({
       sessionId: session.id,
       classKind: "Student",

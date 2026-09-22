@@ -162,18 +162,9 @@ export type SessionFixture = {
    * `session_ends_after_starts_check` whatever `startsAt` a test picks; overridable.
    */
   endsAt?: string;
-  /**
-   * The Session's Stream — STEM or Research. An online Session is single-Stream now (ADR-0022) and
-   * `session_stream_not_null` refuses a null, so this defaults to STEM to keep tests that do not
-   * care about the Stream terse, and is overridable — a School may hold one STEM and one Research
-   * online Session on a date, so a test wanting two on one day varies it.
-   */
-  stream?: Stream;
   /** Which cohort the Session teaches (#283). Defaults to `Siswa`, overridable. */
   participantType?: PretestParticipantType;
   status?: SessionStatus;
-  /** A Staff Person. An online Session carries its own PIC, since it has no Perjadin. */
-  onlinePicPersonId: string;
 };
 
 /** One hour after a `HH:MM` time, clamped so it never wraps past `23:59` — the fixture default end. */
@@ -185,9 +176,10 @@ function oneHourAfter(startsAt: string): string {
 
 /**
  * An **online** Session, which is the cheap one to build: `mode = 'online'` means no
- * Perjadin, so it needs nothing but a School, a Stream and a Staff PIC. The Perjadin CHECKs are
- * exact mirrors — an offline Session has a Perjadin and an online one has none — so
- * an offline fixture would have to build a whole Perjadin first.
+ * Perjadin, so it needs nothing but a School. It carries **no PIC and no Stream (#284)** — a
+ * third-party LMS runs online delivery — so it does not even need a Staff Person. The Perjadin CHECK
+ * (`session_offline_iff_perjadin`) is an exact mirror — an offline Session has a Perjadin and an
+ * online one has none — so an offline fixture would have to build a whole Perjadin first.
  *
  * A cancelled Session needs its reason in the same statement, by CHECK.
  */
@@ -199,15 +191,12 @@ export async function addSession(fixture: SessionFixture) {
     .values({
       schoolId: fixture.schoolId,
       mode: "online",
-      stream: fixture.stream ?? "STEM",
       heldOn: fixture.heldOn,
       startsAt,
       endsAt: fixture.endsAt ?? oneHourAfter(startsAt),
       participantType: fixture.participantType ?? "Siswa",
       status,
       cancelledReason: status === "cancelled" ? "Sekolah meminta penjadwalan ulang" : null,
-      onlinePicPersonId: fixture.onlinePicPersonId,
-      onlinePicRole: "Staff",
     })
     .returning();
   return session!;

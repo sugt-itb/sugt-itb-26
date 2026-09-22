@@ -90,19 +90,16 @@ describe("the Detail Sekolah payload", () => {
       schoolId: school.id,
       heldOn: "2026-09-10",
       status: "delivered",
-      onlinePicPersonId: picPersonId,
     });
     const upcoming = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-17",
       status: "arranged",
-      onlinePicPersonId: picPersonId,
     });
     const calledOff = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-24",
       status: "cancelled",
-      onlinePicPersonId: picPersonId,
     });
 
     return { cluster, school, neighbour, onSite, online, upcoming, calledOff };
@@ -180,7 +177,6 @@ describe("the Detail Sekolah payload", () => {
       schoolId: neighbour.id,
       heldOn: "2026-09-03",
       status: "delivered",
-      onlinePicPersonId: person.id,
     });
 
     const detail = await schoolDetail(person, "sman-1-bandung");

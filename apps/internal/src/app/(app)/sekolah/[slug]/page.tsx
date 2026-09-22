@@ -63,10 +63,7 @@ export default async function Page({ params }: PageProps<"/sekolah/[slug]">) {
       {arrange !== null && (
         <section className="border-t border-border">
           <h2 className="px-7 pt-5 font-heading text-sm font-medium">Jadwalkan Sesi daring</h2>
-          <ArrangeOnlineSessionForm
-            school={arrange.school}
-            staff={arrange.staff}
-          />
+          <ArrangeOnlineSessionForm school={arrange.school} />
         </section>
       )}
     </div>

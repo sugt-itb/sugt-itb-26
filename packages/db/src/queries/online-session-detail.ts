@@ -2,25 +2,24 @@ import {
   MAX_TEACHING_TEAM_PER_ONLINE_SESSION,
   type PretestParticipantType,
   type SessionStatus,
-  type Stream,
   type TimeZone,
 } from "@sugt/domain";
 import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "../client";
 import { session, sessionTeacherName } from "../schema/delivery";
-import { person } from "../schema/people";
 import { province, school } from "../schema/reference";
-import type { ArrangePerson, SchoolOption } from "./arrange-online-session";
+import type { SchoolOption } from "./arrange-online-session";
 import type { Person } from "./caller";
 import type { PastArranged } from "./session-detail";
 import { requireStaff } from "./staff-only";
 
 /**
- * **Detail Sesi daring** — one online Session, and the edits it offers (#152, ADR-0022). The online
+ * **Detail Sesi daring** — one online Session, and the edits it offers (#152). The online
  * counterpart of `/perjadin/[id]`'s per-item editing (#138): it edits every field the arrange form
- * sets — School, PIC, Tanggal (`held_on`), Jam Mulai (`starts_at`), Aliran (`stream`) — and the
- * `session_teacher_name` Pengajar list, one name at a time.
+ * sets — School, Peserta, Tanggal (`held_on`), Jam Mulai (`starts_at`), Jam Selesai (`ends_at`) — and
+ * the `session_teacher_name` Pengajar list, one name at a time. **No PIC and no Aliran/Stream (#284):
+ * a third-party LMS runs online delivery, so an online Session tracks neither.**
  *
  * A separate module from `./session-detail.ts` for convention 3's reason — one module per surface's
  * payload — and because this one is online-only: `/sesi/[id]` stays the offline detail surface and an
@@ -55,17 +54,10 @@ export type OnlineSessionDetail = {
   status: SessionStatus;
   /** Set on a cancelled Session and null on every other, by CHECK. */
   cancelledReason: string | null;
-  /** The Session's Stream — non-null for an online Session, by `session_stream_not_null` (ADR-0022). */
-  stream: Stream;
-  /** An online Session carries its own PIC, since it has no Perjadin to take one from. */
-  picPersonId: string;
-  picFullName: string;
   /** The session-scoped Pengajar names (ADR-0022), in a stable order, for the per-item editor. */
   teachers: OnlineSessionTeacher[];
   /** Every School, for the School picker — the arrange form's set, since a Session may move School. */
   schools: SchoolOption[];
-  /** Active Staff, for the PIC picker. Revoked People are not offered — naming one is a future act. */
-  staff: ArrangePerson[];
 };
 
 /**
@@ -83,16 +75,16 @@ export type OnlineSessionLookup =
 /**
  * One online Session and everything the screen renders, or a marker the page routes on.
  *
- * The pickers ride on this open payload — `schools` and `staff` carry no money, exactly as
- * `perjadinDetail` returns its `eligibleSchools` and `staff` — so a professor's read fetches them
- * too and the page simply does not render the edit affordances. `Promise.all` keeps the four reads
- * concurrent; the branch on the session row happens after, discarding the rest for a stale or offline id.
+ * The School picker rides on this open payload — `schools` carries no money, exactly as
+ * `perjadinDetail` returns its `eligibleSchools` — so a professor's read fetches it too and the page
+ * simply does not render the edit affordances. `Promise.all` keeps the three reads concurrent; the
+ * branch on the session row happens after, discarding the rest for a stale or offline id.
  *
- * The PIC join is **left**, not inner: an offline Session's `online_pic_person_id` is null (by
- * `session_online_iff_pic`), so an inner join would drop it and report `not-found` where the answer is
- * `offline`. `mode` off the session row draws that line.
+ * **No PIC and no Stream (#284):** an online Session tracks neither, so the read joins no `person`
+ * for a PIC and fetches no Staff roster, and there is no null-PIC/null-Stream invariant to assert.
+ * `mode` off the session row still draws the offline/online line for the page to route on.
  *
- * **The main row no longer joins `province` (#283)**: an online Session's zone is always WIB, folded
+ * **The main row does not join `province` (#283)**: an online Session's zone is always WIB, folded
  * in below rather than read from the School's Province. The schools-picker sub-query still joins it,
  * since a `SchoolOption` carries the picker's own zone.
  */
@@ -100,7 +92,7 @@ export async function onlineSessionDetail(
   _caller: Person,
   id: string,
 ): Promise<OnlineSessionLookup> {
-  const [rows, teacherRows, schools, staffRows] = await Promise.all([
+  const [rows, teacherRows, schools] = await Promise.all([
     db
       .select({
         mode: session.mode,
@@ -113,13 +105,9 @@ export async function onlineSessionDetail(
         participantType: session.participantType,
         status: session.status,
         cancelledReason: session.cancelledReason,
-        stream: session.stream,
-        picPersonId: person.id,
-        picFullName: person.fullName,
       })
       .from(session)
       .innerJoin(school, eq(school.id, session.schoolId))
-      .leftJoin(person, eq(person.id, session.onlinePicPersonId))
       .where(eq(session.id, id)),
     db
       .select({ id: sessionTeacherName.id, name: sessionTeacherName.name })
@@ -138,25 +126,11 @@ export async function onlineSessionDetail(
       .from(school)
       .innerJoin(province, eq(province.code, school.provinceCode))
       .orderBy(asc(school.name)),
-    db
-      .select({ id: person.id, fullName: person.fullName })
-      .from(person)
-      .where(and(eq(person.active, true), eq(person.role, "Staff")))
-      .orderBy(asc(person.fullName)),
   ]);
 
   const [first] = rows;
   if (!first) return { outcome: "not-found" };
   if (first.mode === "offline") return { outcome: "offline" };
-
-  // Online, so the PIC and the Stream are present by CHECK (`session_online_iff_pic`,
-  // `session_stream_not_null`). A null here is a bug the database should have refused, not a user
-  // state, so it throws rather than coming back as a value.
-  if (first.picPersonId === null || first.picFullName === null || first.stream === null) {
-    throw new Error(
-      `Online Session ${id} is missing its PIC or Stream, which the delivery CHECKs forbid.`,
-    );
-  }
 
   return {
     outcome: "online",
@@ -173,12 +147,8 @@ export async function onlineSessionDetail(
       participantType: first.participantType,
       status: first.status,
       cancelledReason: first.cancelledReason,
-      stream: first.stream,
-      picPersonId: first.picPersonId,
-      picFullName: first.picFullName,
       teachers: teacherRows,
       schools,
-      staff: staffRows,
     },
   };
 }
@@ -186,15 +156,12 @@ export async function onlineSessionDetail(
 /** The scalar fields the edit dialog sets — everything on the Session row the arrange form does. */
 export type OnlineSessionInput = {
   schoolId: string;
-  picPersonId: string;
   /** `YYYY-MM-DD`. */
   heldOn: string;
   /** Local wall-clock start time (`HH:MM`), always WIB for an online Session (#283). */
   startsAt: string;
   /** Local wall-clock end time (`HH:MM`), strictly after `startsAt`. Required for online (#283). */
   endsAt: string;
-  /** STEM or Research (ADR-0022) — an online Session is single-Stream and must carry one. */
-  stream: Stream;
   /** Which cohort the Session teaches — `'Siswa'` or `'GTK-MS'` (#283). Required for online. */
   participantType: PretestParticipantType | "";
 };
@@ -204,9 +171,9 @@ export type UpdateOnlineSessionResult =
   /** A Session past `arranged` — its fields are settled once it happened. */
   | { outcome: "not-arranged"; status: PastArranged }
   /**
-   * The School already has an online Session of this Stream on this date that still stands, so the
-   * widened unique index refuses the edit. The row being edited is excluded automatically — an
-   * `UPDATE` that leaves the keys where they are conflicts with no other row.
+   * The School already has an online Session on this date that still stands (#284: one per day), so
+   * the unique index refuses the edit. The row being edited is excluded automatically — an `UPDATE`
+   * that leaves the keys where they are conflicts with no other row.
    */
   | { outcome: "collided"; constraint: "session_one_online_per_school_per_day" }
   /**
@@ -221,18 +188,17 @@ export type UpdateOnlineSessionResult =
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
- * Edit an online Session's School, PIC, date, time and Stream — the online counterpart of
+ * Edit an online Session's School, date, times and Peserta — the online counterpart of
  * `editPerjadinSession`. Staff-only, and offered only while `arranged`: a delivered Session records
- * something that happened, so its fields are fixed.
+ * something that happened, so its fields are fixed. **No PIC and no Stream (#284).**
  *
- * **Any change to School, date or Stream re-checks the widened unique index**
- * `session_one_online_per_school_per_day` on `(school_id, held_on, stream)` — the same rule
+ * **Any change to School or date re-checks the unique index**
+ * `session_one_online_per_school_per_day` on `(school_id, held_on)` — the same rule
  * `arrangeOnlineSession` and `moveSessionDate` meet — so a School holds at most one still-standing
- * online Session of each Stream on a date. The index is left to refuse the write rather than
+ * online Session on a date. The index is left to refuse the write rather than
  * pre-read: a pre-read is a race and the index is not. It is caught **by name**, because this row
- * satisfies several CHECKs and two composite foreign keys, and swallowing any of those as "that date
- * is taken" would report a bug as a user state. A PIC who is not Staff is refused by
- * `session_online_pic_is_staff` — not reachable from the picker, so it throws.
+ * satisfies several CHECKs, and swallowing one as "that date is taken" would report a bug as a user
+ * state.
  *
  * A missing or **offline** id **throws** rather than returning a value: Detail Sesi daring 404s an
  * unknown id and redirects an offline one before offering any write, and nothing deletes a Session,
@@ -274,11 +240,9 @@ export async function updateOnlineSession(
         .update(session)
         .set({
           schoolId: input.schoolId,
-          onlinePicPersonId: input.picPersonId,
           heldOn: input.heldOn,
           startsAt: input.startsAt,
           endsAt: input.endsAt,
-          stream: input.stream,
           participantType,
         })
         .where(eq(session.id, sessionId));

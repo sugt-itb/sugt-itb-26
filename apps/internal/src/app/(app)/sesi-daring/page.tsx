@@ -57,7 +57,6 @@ export default async function Page() {
                 {session.heldOn} ·{" "}
                 {formatSessionStartTimeWithWib(session.startsAt, session.timeZone)}
               </span>
-              <span className="text-xs text-muted-foreground">PIC {session.picFullName}</span>
               <SessionStatusBadge status={session.status} />
               <Link
                 href={`/sesi-daring/${session.id}`}

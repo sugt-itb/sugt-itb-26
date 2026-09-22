@@ -23,8 +23,8 @@
  * `packages/db` already depends on the package and `src/queries/` imports it freely, so
  * the arrow is one that exists — this only extends it to the layer under the queries.
  *
- * **Five more carry a single literal, not a set.** `session.online_pic_role`,
- * `perjadin.pic_role`, `story.written_by_role` and the two `filed_by_role` columns are each
+ * **Four more carry a single literal, not a set.** `perjadin.pic_role`,
+ * `story.written_by_role` and the two `filed_by_role` columns are each
  * CHECKed against **one** value — `'Staff'`, or `'Teaching Team'` on the now-dead
  * `class_record.filed_by_role` — so each reads back as
  * that literal via `$type<"Staff">()` rather than `string`, the guarantee the composite

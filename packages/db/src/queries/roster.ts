@@ -3,7 +3,6 @@ import { and, asc, eq, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { user } from "../schema/auth";
-import { session } from "../schema/delivery";
 import { classRecord, sessionRecord } from "../schema/evaluations";
 import { person, personGrant } from "../schema/people";
 import { story } from "../schema/stories";
@@ -66,8 +65,9 @@ const OUTER_PERSON_EMAIL = sql.raw(`"person"."email"`);
 /**
  * Whether a Person is used anywhere their `(id, role)` is a composite foreign key's target.
  *
- * **Six references now** (T3, #153): `session_teacher` is dropped, so its composite FK is gone.
- * `class_record`'s FK stays in the check — the table stands as a dead surface — but nothing
+ * **Five references now** (#284): the online-Session PIC is dropped, so `session.online_pic_person_id`
+ * — the sixth — is gone from this check along with the column. `session_teacher` went earlier (T3,
+ * #153). `class_record`'s FK stays in the check — the table stands as a dead surface — but nothing
  * satisfies it, because a Class Record filer would be a `Teaching Team` Person and that role is
  * retired; every active Person is Staff. The single-column references to `person(id)` —
  * `transaction.created_by`, `session_feedback_token.issued_by`, `perjadin_evaluation.filed_by`
@@ -76,7 +76,6 @@ const OUTER_PERSON_EMAIL = sql.raw(`"person"."email"`);
 const usedByComposite = sql<boolean>`(
   exists (select 1 from ${groupMember} gm where gm.person_id = ${OUTER_PERSON_ID})
   or exists (select 1 from ${perjadin} pj where pj.pic_person_id = ${OUTER_PERSON_ID})
-  or exists (select 1 from ${session} s where s.online_pic_person_id = ${OUTER_PERSON_ID})
   or exists (select 1 from ${classRecord} cr where cr.filed_by_person_id = ${OUTER_PERSON_ID})
   or exists (select 1 from ${sessionRecord} sr where sr.filed_by_person_id = ${OUTER_PERSON_ID})
   or exists (select 1 from ${story} sy where sy.written_by_person_id = ${OUTER_PERSON_ID})
