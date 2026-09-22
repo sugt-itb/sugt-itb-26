@@ -104,12 +104,15 @@ export function KalenderCalendar({
           {/* The weekday bar, a **pinned header** kept outside the scroll region so it is always
               visible on desktop, whatever the viewport height or zoom (#285). Its own `grid-cols-7`
               matches the day grid below, so the seven labels stay column-aligned with the cells.
-              `lg:shrink-0` keeps it at its natural height while the day grid takes the rest. */}
-          <div className="grid grid-cols-7 gap-1 border-b border-border pb-1 lg:shrink-0">
+              `lg:shrink-0` keeps it at its natural height while the day grid takes the rest. The
+              divider (`lg:border-b`) is desktop-only: below `lg` this is visually the original single
+              grid — the per-label `pb-1` plus the day grid's `mt-1` reproduce the old row gap, and no
+              divider is drawn, so the mobile layout is unchanged. */}
+          <div className="grid grid-cols-7 gap-1 lg:shrink-0 lg:border-b lg:border-border">
             {WEEKDAY_LABELS_ID_FULL.map((label, i) => (
               <div
                 key={i}
-                className="truncate text-center text-xs font-medium text-muted-foreground"
+                className="truncate pb-1 text-center text-xs font-medium text-muted-foreground"
               >
                 {label}
               </div>
