@@ -85,12 +85,17 @@ export const session = pgTable(
     endsAt: time("ends_at"),
     status: text("status").$type<SessionStatus>().notNull().default("arranged"),
     cancelledReason: text("cancelled_reason"),
-    // Which cohort an online Session teaches (#283) — `'Siswa'` or `'GTK-MS'`, the same value set
-    // `PRETEST_PARTICIPANT_TYPES` names, reused here as a column-value set rather than a glossary
-    // term (like `assessment_completion` and `transaction` already carry a `participant_type`).
-    // **Nullable with a value-domain CHECK only**, for the same migration-safety reason as `ends_at`:
-    // existing rows have no value and a strict CHECK would fail against populated data. "Required for
-    // online" is an app-layer rule, not a DB one.
+    // Which cohort an online Session teaches (#283) — `'Siswa'` or `'GTK-MS'`, a column-value set,
+    // not a glossary term. Ticket #283 **deliberately reuses** `PRETEST_PARTICIPANT_TYPES`: the
+    // online-cohort set coincides with the pretest-cohort set today. This is a knowing exception to
+    // the #246 rule that independent axes each get their OWN dedicated const so a CHECK coupled to
+    // another cannot ripple silently — `transaction` and `assessment_completion` each carry their own
+    // `participant_type` const precisely for that reason. The coupling here is only at the TS type
+    // level (the CHECK DDL below is an independent string), so if the online-Session cohort set is
+    // ever meant to move apart from the pretest set, give it a `SESSION_PARTICIPANT_TYPES` of its own
+    // rather than keep borrowing this one. **Nullable with a value-domain CHECK only**, for the same
+    // migration-safety reason as `ends_at`: existing rows have no value and a strict CHECK would fail
+    // against populated data. "Required for online" is an app-layer rule, not a DB one.
     participantType: text("participant_type").$type<PretestParticipantType>(),
 
     onlinePicPersonId: uuid("online_pic_person_id"),

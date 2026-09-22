@@ -453,7 +453,8 @@ describe("Detail Sesi daring — Pengajar per item", () => {
     expect(await teacherNamesOf(session.id)).toEqual([]);
   });
 
-  /** The cap is app-enforced (ADR-0022): the database holds no rule, so the query refuses the eleventh. */
+  /** The cap is app-enforced (ADR-0022): the database holds no rule, so the query refuses the one past
+   *  `MAX_TEACHING_TEAM_PER_ONLINE_SESSION` — the third now the cap is two (#283). */
   it("refuses the name past the cap", async () => {
     const { pic, session } = await arrangedSession();
     for (let index = 0; index < MAX_TEACHING_TEAM_PER_ONLINE_SESSION; index++) {

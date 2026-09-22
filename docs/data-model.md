@@ -523,11 +523,16 @@ and carry only value/range CHECKs (`ends_at is null or ends_at > starts_at`; `pa
 null or participant_type in ('Siswa', 'GTK-MS')`), and "required for an online Session" is enforced
 at the application layer — the arrange form's submit guard and `arrangeOnlineSession`/
 `updateOnlineSession`, the same layer the PIC and Stream requirements sit behind on the write path.
-`ends_at` is a wall-clock `time` local to the School exactly like `starts_at`; `participant_type`
-reuses the `PRETEST_PARTICIPANT_TYPES` value set as a column-value set, the way
-`assessment_completion` and `transaction` already carry a `participant_type`, not as a glossary term.
-Both are online-only in practice — the arrange and detail-edit surfaces are online-only — while
-offline rows leave them null and pass the CHECKs untouched.
+`ends_at` is a wall-clock `time` local to the School exactly like `starts_at`; `participant_type` is
+a column-value set, not a glossary term. #283 **deliberately reuses** the `PRETEST_PARTICIPANT_TYPES`
+values because the online-cohort set coincides with the pretest-cohort set today — a knowing
+exception to the #246 rule that independent axes each get a dedicated const (`transaction` and
+`assessment_completion` each carry their own `participant_type` const so a CHECK coupled to another
+axis cannot ripple silently). The coupling is only at the TypeScript type level; the CHECK is
+independent DDL. If the online-Session cohort ever needs to move apart from the pretest one, it
+should get its own `SESSION_PARTICIPANT_TYPES`. Both columns are online-only in practice — the
+arrange and detail-edit surfaces are online-only — while offline rows leave them null and pass the
+CHECKs untouched.
 
 **An online Session's time is always WIB (#283), and this is a rendering choice, not a column.**
 `starts_at`/`ends_at` are still stored as a bare wall-clock `time`, but for an _online_ Session the

@@ -32,7 +32,7 @@ import { revalidatePath } from "next/cache";
  * the outcome that wrote something, since a refused write left the page correct.
  */
 
-/** Edit the Session's School, PIC, date, time and Stream — the five scalar fields, in one write. */
+/** Edit the Session's scalar fields — School, PIC, Aliran, Peserta, date, start and end time (#283) — in one write. */
 export async function updateOnlineSessionAction(
   sessionId: string,
   input: OnlineSessionInput,
