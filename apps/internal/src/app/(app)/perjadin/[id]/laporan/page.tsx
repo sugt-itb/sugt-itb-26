@@ -60,7 +60,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
       <div className="border-b border-border px-7 py-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-heading text-sm font-medium">Uang muka</h2>
+            <h2 className="font-heading text-sm font-medium">Uang Perjalanan</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Jatuh tempo <span className="tabular-nums">{acquittal.reportDueOn}</span> ·{" "}
               <Deadline daysRemaining={acquittal.daysRemaining} />
@@ -107,8 +107,9 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
             amountIdr={acquittal.gtkMsSpentIdr}
           />
           {/*
-            Derived and never stored: the Advance less every transaction against it. Negative
-            means the Group overspent, which is a real state and not an error.
+            Derived and never stored: the Advance less the travel-float draw-down — only Konsumsi and
+            Lainnya draw down (ADR-0029), so this can differ from Diterima − Terpakai. Negative means
+            the Group overspent the float, which is a real state and not an error.
           */}
           <Figure
             label="Sisa"

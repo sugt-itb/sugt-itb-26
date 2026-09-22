@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
     // `@sugt/db`'s Staff-only refusal render as a **403** rather than as a crash
     // page. See `src/lib/staff-surface.ts`.
     authInterrupts: true,
+    // Belt-and-suspenders for the Milkdown editor stack (#271). It is already imported by
+    // submodule (`@milkdown/kit/core`, …) and code-split off `/cerita/[id]`'s first load via
+    // `next/dynamic` (#268), so the win here is near-zero — this only tree-shakes `@milkdown/react`'s
+    // small barrel. Verified not to pull the stack back onto the route's first load: the ProseMirror
+    // chunk stays lazy.
+    optimizePackageImports: ["@milkdown/react", "@milkdown/kit"],
   },
 };
 

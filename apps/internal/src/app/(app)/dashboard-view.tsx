@@ -2,14 +2,6 @@
 
 import { formatIdr } from "@sugt/domain";
 import {
-  Accordion,
-  AccordionItem,
-  AccordionPanel,
-  AccordionTrigger,
-} from "@sugt/ui/components/accordion";
-import { Alert, AlertAction, AlertDescription } from "@sugt/ui/components/alert";
-import { Button } from "@sugt/ui/components/button";
-import {
   Card,
   CardContent,
   CardDescription,
@@ -27,24 +19,20 @@ import {
 } from "@sugt/ui/components/table";
 import { cn } from "@sugt/ui/lib/utils";
 import { Check } from "lucide-react";
-import { useState } from "react";
 
-import type { MatrixRow, TimelineStep } from "./monitoring-derive";
-import { dismissWarning, initialWarningState, type Warning } from "./monitoring-state";
+import type { MatrixRow, PretestMeter, TimelineStep } from "./dashboard-derive";
 
 /**
- * The `/monitoring` view — the presentational half of the screen, now fed **real** figures. Every
- * number is derived on the server by `deriveMonitoring` (`./monitoring-derive.ts`) from the rows
- * `monitoringData` reads, and handed down as props; this component only lays them out and moves the
- * one piece of client state — the operator setting a warning aside.
+ * The Dashboard view — the presentational half of the screen, now fed **real** figures. Every
+ * number is derived on the server by `deriveDashboard` (`./dashboard-derive.ts`) from the rows
+ * `monitoringData` reads, and handed down as props; this component only lays them out — it holds no
+ * client state of its own now.
  *
- * That state is deliberately ephemeral. `useState` seeds the two warning lists once from the
- * `warnings` prop and the reducer (`dismissWarning`, the pure seam in `monitoring-state.ts`) moves
- * an item from `active` to `ignored` on **Abaikan** — a browser-only interaction with no
- * persistence, which is right for a warning that is recomputed from the data on the next load.
- * `showBudget` gates the money card (money reads are open, ADR-0026), decided on the server.
+ * `showBudget` gates the money card (money reads are open, ADR-0026), decided on the server. The
+ * Peringatan section that once lived here has moved to `DashboardWarnings`, rendered above the tabs
+ * so it shows on both (#235); this view is warnings-free now.
  */
-export function MonitoringView({
+export function DashboardView({
   showBudget,
   activitiesPercent,
   budget,
@@ -52,7 +40,7 @@ export function MonitoringView({
   luring,
   daring,
   timeline,
-  warnings,
+  pretest,
 }: {
   showBudget: boolean;
   activitiesPercent: number;
@@ -61,49 +49,10 @@ export function MonitoringView({
   luring: MatrixRow[];
   daring: MatrixRow[];
   timeline: TimelineStep[];
-  warnings: Warning[];
+  pretest: PretestMeter[];
 }) {
-  const [state, setState] = useState(() => initialWarningState(warnings));
-
   return (
     <div className="flex flex-col gap-6 px-7 py-6">
-      {/* Active warnings — one destructive Alert each; Abaikan sets it aside. */}
-      {state.active.map((w) => (
-        <Alert
-          key={w.id}
-          variant="destructive"
-        >
-          <AlertDescription>{w.message}</AlertDescription>
-          <AlertAction>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setState((s) => dismissWarning(s, w.id))}
-            >
-              Abaikan
-            </Button>
-          </AlertAction>
-        </Alert>
-      ))}
-
-      {/* Ignored warnings — always rendered, populates live as warnings are set aside. */}
-      <Accordion>
-        <AccordionItem>
-          <AccordionTrigger>Peringatan yang diabaikan</AccordionTrigger>
-          <AccordionPanel>
-            {state.ignored.length === 0 ? (
-              <p>Belum ada.</p>
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {state.ignored.map((w) => (
-                  <li key={w.id}>{w.message}</li>
-                ))}
-              </ul>
-            )}
-          </AccordionPanel>
-        </AccordionItem>
-      </Accordion>
-
       {/* KPI cards. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card>
@@ -144,6 +93,9 @@ export function MonitoringView({
         )}
       </div>
 
+      {/* Pretest progress — four read-only meters, grouped STEM / Research (#248). */}
+      <PretestCard meters={pretest} />
+
       {/* Timeline / stepper — horizontal, derived from each step's status. */}
       <Card>
         <CardHeader>
@@ -154,18 +106,69 @@ export function MonitoringView({
         </CardContent>
       </Card>
 
-      {/* Delivery matrices, one Card each. */}
-      <MatrixCard
-        title="Luring Terlaksana"
-        clusters={clusters}
-        rows={luring}
-      />
-      <MatrixCard
-        title="Daring Terlaksana"
-        clusters={clusters}
-        rows={daring}
-      />
+      {/* The two delivery matrices — stacked on mobile, side by side on `md`. The calendar that
+          once spanned the right column has moved to `/kalender` (#257). */}
+      <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start">
+        <MatrixCard
+          title="Luring Terlaksana"
+          clusters={clusters}
+          rows={luring}
+        />
+        <MatrixCard
+          title="Daring Terlaksana"
+          clusters={clusters}
+          rows={daring}
+        />
+      </div>
     </div>
+  );
+}
+
+/**
+ * The read-only Pretest tracker (#248): the four meters grouped into two labelled columns, STEM and
+ * Research, each with a Siswa and a GTK-MS row. Every row reads `done / total` (the always-47
+ * denominator), its percent, and a `Progress` bar — the same visual language as "Kegiatan
+ * terlaksana". The streams are taken from the meters in the order the derive emits them (STEM then
+ * Research), so this holds no vocabulary of its own. Editing lives on `/pretest`.
+ */
+function PretestCard({ meters }: { meters: PretestMeter[] }) {
+  const streams = [...new Set(meters.map((m) => m.stream))];
+  const total = meters[0]?.total ?? 0;
+  return (
+    <Card>
+      <CardHeader>
+        <CardDescription>Progress Pretest</CardDescription>
+        <CardTitle className="text-base">
+          Sekolah yang telah menyelesaikan Pretest, dari {total} sekolah
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {streams.map((stream) => (
+          <div
+            key={stream}
+            className="flex flex-col gap-3"
+          >
+            <div className="text-sm font-medium">{stream}</div>
+            {meters
+              .filter((m) => m.stream === stream)
+              .map((m) => (
+                <div
+                  key={m.participantType}
+                  className="flex flex-col gap-1.5"
+                >
+                  <div className="flex items-baseline justify-between gap-2 text-sm">
+                    <span className="text-muted-foreground">{m.participantType}</span>
+                    <span className="tabular-nums">
+                      {m.done} / {m.total} · {m.percent}%
+                    </span>
+                  </div>
+                  <Progress value={m.percent} />
+                </div>
+              ))}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 

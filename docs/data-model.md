@@ -9,7 +9,7 @@ This assumes the vocabulary in [`CONTEXT.md`](../CONTEXT.md) and the surfaces in
 
 Postgres and object storage are Supabase; both apps deploy to Vercel.
 
-Every SQL block below was applied to a real Postgres, seeded with the actual forty-two Schools
+Every SQL block below was applied to a real Postgres, seeded with the actual forty-seven Schools
 from `packages/db/seed/reference-data.sql`, and then attacked with the case each constraint is
 meant to reject — 54 checks, all behaving as claimed. Where this document says a rule is
 enforced by the database, that was verified rather than assumed; where it says a rule is not,
@@ -81,8 +81,8 @@ the two is visible by reading them side by side. A new fixed set belongs in both
 neither.
 
 A column CHECKed against a **whole** set is read back as that set's type rather than as
-`string`. A column CHECKed against a **single member** of one — `perjadin.pic_role`,
-`session.online_pic_role` and the two `filed_by_role` columns — now carries that member as a
+`string`. A column CHECKed against a **single member** of one — `perjadin.pic_role`
+and the two `filed_by_role` columns — now carries that member as a
 literal type too: [#52](https://github.com/mafiefa02/sugt/issues/52) settled it, so each reads
 back as `"Staff"` — or `"Teaching Team"` on the now-dead `class_record.filed_by_role` — via
 `$type<"Staff">()` rather than `string`. (`session_teacher.person_role` was one of these until T3
@@ -193,12 +193,13 @@ then widened `role` to `check (role in ('Staff', 'Pimpinan'))` to admit a second
 Person, kept out of Group membership, the PIC seat, a Session Record and a Story authorship by
 exactly those untouched keys ([ADR-0025](./adr/0025-pimpinan-is-a-second-signed-in-read-only-person-role.md)).
 
-**`role` is write-once, and the database already enforces it.** Six composite foreign
+**`role` is write-once, and the database already enforces it.** Five composite foreign
 keys point at `person (id, role)` — from `group_member`, `class_record`, `session_record`,
-`story.written_by_person_id`, `perjadin.pic_person_id` and `session.online_pic_person_id` — and
+`story.written_by_person_id` and `perjadin.pic_person_id` — and
 none declares `on update`, so all default to `NO ACTION`. The moment a Person has been on a trip,
 filed a record or authored a Story, Postgres refuses to change their role. (`session_teacher` was a
-seventh until T3 dropped it.) `class_record`'s FK still pins `'Teaching Team'`, but that table is
+sixth until T3 dropped it, [#153](https://github.com/mafiefa02/sugt/issues/153); `session.online_pic`
+another until #284 dropped the online PIC.) `class_record`'s FK still pins `'Teaching Team'`, but that table is
 dead — no Person can hold that role now, so nothing satisfies it. This is not a policy anyone
 added; it falls out of the composite keys, and it is written here because an unwritten enforced
 constraint reads as a bug the first time it fires.
@@ -303,8 +304,8 @@ create table school (
 );
 ```
 
-There are four Clusters and forty-two Schools. Cluster sizes are lopsided — six, seventeen,
-eleven, eight — which is worth knowing before anyone builds a screen assuming they are
+There are four Clusters and forty-seven Schools. Cluster sizes are lopsided — seven, eighteen,
+twelve, ten — which is worth knowing before anyone builds a screen assuming they are
 comparable.
 
 **Topic and Problem are columns, not tables.** Each Cluster carries exactly one of each and
@@ -332,7 +333,7 @@ on `sub_cluster` exists solely to be the target of that key.
 
 **`province.time_zone` is on the Province, not the School.** Indonesia has three zones —
 WIB, WITA, WIT — and **no Indonesian province straddles a boundary**, so a column on `school`
-would let forty-two rows express something only the Province list can vary by, and would admit
+would let forty-seven rows express something only the Province list can vary by, and would admit
 a state that cannot exist: two Schools in one Province disagreeing about the hour. This is the
 argument for Province being a table at all, applied again with more force — a wrong Province
 misspells a line, a wrong Time Zone puts a Session on screen at the wrong time and nothing
@@ -376,26 +377,23 @@ create table session (
   stream            text check (stream in ('STEM', 'Research')),
   held_on           date not null,
   starts_at         time not null,
+  ends_at           time,
   status            text not null default 'arranged'
                       check (status in ('arranged', 'delivered', 'cancelled')),
   cancelled_reason  text,
-
-  online_pic_person_id  uuid,
-  online_pic_role       text check (online_pic_role = 'Staff'),
+  participant_type  text,
 
   created_at        timestamptz not null default now(),
 
   check ((mode = 'offline') = (perjadin_id is not null)),
-  check (stream is not null),
-  check ((mode = 'online') = (online_pic_person_id is not null)),
-  check ((online_pic_person_id is null) = (online_pic_role is null)),
+  check (mode <> 'offline' or stream is not null),
   check ((status = 'cancelled') = (cancelled_reason is not null)),
-
-  foreign key (online_pic_person_id, online_pic_role) references person (id, role)
+  check (participant_type is null or participant_type in ('Siswa', 'GTK-MS')),
+  check (ends_at is null or ends_at > starts_at)
 );
 
 create unique index session_one_online_per_school_per_day
-  on session (school_id, held_on, stream)
+  on session (school_id, held_on)
   where perjadin_id is null and status <> 'cancelled';
 
 create unique index session_no_duplicate_offline_per_school_per_perjadin
@@ -403,22 +401,24 @@ create unique index session_no_duplicate_offline_per_school_per_perjadin
   where status <> 'cancelled';
 ```
 
-**`stream` carries the STEM/Research division of a Session, whichever its mode**
-([ADR-0019](./adr/0019-offline-sessions-carry-a-stream-and-a-school-gets-many-per-trip.md),
-[ADR-0022](./adr/0022-online-sessions-carry-a-stream-and-name-teachers-as-session-scoped-names.md)).
+**`stream` carries the STEM/Research division of an _offline_ Session**
+([ADR-0019](./adr/0019-offline-sessions-carry-a-stream-and-a-school-gets-many-per-trip.md)).
 The split used to be a property of who taught — the two `session_teacher` rows, one per Stream —
-but a Session now teaches _one_ Stream, so the Stream moved onto the Session itself. It went there
-for the offline half first (ADR-0019); ADR-0022 made the online half single-Stream too. The second
-CHECK is therefore a plain `stream is not null` for **both** modes — it replaced the old
-`(mode = 'offline') = (stream is not null)` equivalence, which let online rows hold a null. Stream
-no longer tells you the mode; `mode`/`perjadin_id` still do. The column type stays nullable and the
-not-null rule is the CHECK, the same shape as the value-set CHECK beside it.
+but an offline Session now teaches _one_ Stream, so the Stream moved onto the Session itself.
+ADR-0022 briefly made online Sessions single-Stream too, but
+[ADR-0034](./adr/0034-online-sessions-are-no-longer-single-stream.md) **superseded that**: online
+delivery is run by a third-party LMS and is no longer split by Stream, so an **online** Session
+leaves `stream` null. The presence CHECK is therefore the implication
+`mode <> 'offline' or stream is not null` (`session_offline_stream_not_null`) — an offline Session
+carries a Stream, an online one need not — replacing ADR-0022's unconditional `stream is not null`.
+`session_stream_check` still pins the value set for the rows that do carry one. `mode`/`perjadin_id`
+tell you the mode; `stream` never did.
 
-**The online index now keys on Stream too** (ADR-0022). Online Sessions are arranged one at a time,
-so "the same School twice on the same day" is a mis-click away — but an online Session is
-single-Stream now, so a School may legitimately hold a STEM _and_ a Research online Session on one
-date. Widening the index to `(school_id, held_on, stream)` draws that line: those two do not
-collide, and only a second Session of the _same_ Stream on that date does. It stays partial on
+**The online index keys on `(school_id, held_on)`**
+([ADR-0034](./adr/0034-online-sessions-are-no-longer-single-stream.md), superseding ADR-0022). Online
+Sessions are arranged one at a time, so "the same School twice on the same day" is a mis-click away;
+the index makes the rule the plain one — **one online Session per School per day**, whatever the hour.
+It dropped `stream` from the key when Stream was dropped from online delivery. It stays partial on
 `perjadin_id is null`, so it touches online Sessions only; offline ones are untouched because their
 `perjadin_id` is not null. Partial the usual way besides: cancelled rows accumulate and must not
 collide with their replacements.
@@ -469,20 +469,26 @@ Perjadin and an online Session has none.** Six of every eight Sessions are invis
 anything trip-shaped, which is why counting Perjadins never tells you how much teaching has
 happened.
 
-**Every Session has a PIC, but they come from different places.** An offline Session's is its
-Perjadin's; an online Session has no Perjadin, so it carries its own — which is what the next
-two CHECKs enforce, in exact mirror of the first. The column is named `online_pic_person_id`
-rather than `pic_person_id` precisely so nobody reads it as "the PIC of this Session" and
-finds it null for every offline row — the PIC of a Session is
-`coalesce(session.online_pic_person_id, perjadin.pic_person_id)`, a query rather than a
-column.
+**Only an offline Session has a PIC now ([ADR-0035](./adr/0035-online-sessions-track-no-pic-and-file-no-session-record.md)).**
+An offline Session's PIC is its **Perjadin's** (`perjadin.pic_person_id`); an **online** Session has
+none — a third-party LMS runs online delivery, so DITSAMA staffs no PIC. The old
+`online_pic_person_id`/`online_pic_role` columns, their CHECKs (`session_online_iff_pic` and the
+PIC-role pair) and the composite foreign key `session_online_pic_is_staff` are **dropped**. "The PIC
+of a Session" is therefore simply `perjadin.pic_person_id` reached through the Session's `perjadin_id`
+— a plain left join (null for an online Session), not the old
+`coalesce(online_pic_person_id, perjadin.pic_person_id)`. `session_offline_iff_perjadin` is now the
+whole of "which Sessions have a PIC".
 
-This matters because the PIC is the one person whose Session Record is required rather than
-optional. Without it, six of every eight Sessions would have nobody who owed anything.
+This is why an **online Session produces no Session Record**: the Session Record is the PIC's account
+of the visit, and online Sessions have no PIC. Only offline Sessions owe one. The `session_record`
+table itself is unchanged — offline Sessions file records exactly as before, filed by the Perjadin's
+Staff PIC.
 
-The composite foreign key uses the default `MATCH SIMPLE`, under which a row with NULLs in
-the referencing columns satisfies the constraint — so offline Sessions, which have neither
-column set, pass without a special case.
+**The load-bearing consequence:** the offline `/sesi/[id]` detail read must resolve an online
+Session's row (with a null PIC) rather than drop it, so the page can redirect the online id to
+`/sesi-daring/[id]`. Before this change its `coalesce(...)` inner join would have gone null for an
+online row and 404'd every online Session; the left join on `perjadin.pic_person_id` is what makes
+dropping the columns safe.
 
 `held_on` is the date the Session is arranged for, and the date it happened once delivered.
 It is a `date`, not a `timestamptz` — Indonesia spans three time zones and a Session is a
@@ -510,6 +516,32 @@ Nothing stores the second number.
 `starts_at` is NOT NULL. It is affordable because no Session exists yet in any live database, and
 it is worth spending that one-off affordance on: a nullable start time acquires a null on the
 first row written and keeps it forever, and every screen then has to render "time unknown".
+
+**`ends_at` and `participant_type` are online-required but nullable at the database (#283).** Both
+were added after online Sessions existed in a populated database, so unlike `starts_at` the one-off
+NOT-NULL affordance is spent — a strict column, or a NOT-NULL-for-online CHECK, would fail the
+migration against rows that carry no value and have no correct backfill. So the columns are nullable
+and carry only value/range CHECKs (`ends_at is null or ends_at > starts_at`; `participant_type is
+null or participant_type in ('Siswa', 'GTK-MS')`), and "required for an online Session" is enforced
+at the application layer — the arrange form's submit guard and `arrangeOnlineSession`/
+`updateOnlineSession`, the same layer the PIC and Stream requirements sit behind on the write path.
+`ends_at` is a wall-clock `time` local to the School exactly like `starts_at`; `participant_type` is
+a column-value set, not a glossary term. #283 **deliberately reuses** the `PRETEST_PARTICIPANT_TYPES`
+values because the online-cohort set coincides with the pretest-cohort set today — a knowing
+exception to the #246 rule that independent axes each get a dedicated const (`transaction` and
+`assessment_completion` each carry their own `participant_type` const so a CHECK coupled to another
+axis cannot ripple silently). The coupling is only at the TypeScript type level; the CHECK is
+independent DDL. If the online-Session cohort ever needs to move apart from the pretest one, it
+should get its own `SESSION_PARTICIPANT_TYPES`. Both columns are online-only in practice — the
+arrange and detail-edit surfaces are online-only — while offline rows leave them null and pass the
+CHECKs untouched.
+
+**An online Session's time is always WIB (#283), and this is a rendering choice, not a column.**
+`starts_at`/`ends_at` are still stored as a bare wall-clock `time`, but for an _online_ Session the
+number is a WIB wall-clock time nationally — the Zoom host is in WIB — so the online surfaces label
+and render it "(WIB)" unconditionally rather than deriving the zone from `province.time_zone` through
+the School the way offline Sessions do. Nothing about the storage changed; the online reads simply
+stopped joining `province` for the zone and treat it as the constant WIB.
 
 **An arranged offline Session's `held_on` lies inside its Perjadin's `starts_on`–`ends_on`.**
 Nothing holds that — not this schema, and until now not any document either. It is scoped to
@@ -593,6 +625,52 @@ whole point of the name-based model ([ADR-0020](./adr/0020-teaching-team-members
 
 **Offline Class Records fall out of scope** as a consequence: their filers would be the teachers,
 and a name is not a Person who can sign in and file. See the open question in `CONTEXT.md`.
+
+### Pretest/Posttest completion
+
+Whether a **Pretest** — and later a **Posttest** — was **administered** to a cohort at a School,
+tracked as a bare tuple whose _presence_ means "done"
+([ADR-0031](./adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md)). This is
+**delivery, not outcome** ([ADR-0009](./adr/0009-the-tool-tracks-delivery-not-outcomes.md)): the row
+records that the assessment happened, never a score.
+
+```sql
+create table assessment_completion (
+  id                uuid primary key default gen_random_uuid(),
+  school_id         uuid not null references school (id) on delete cascade,
+  stream            text not null,
+  participant_type  text not null,
+  kind              text not null,
+
+  constraint assessment_completion_box_key
+    unique (school_id, stream, participant_type, kind),
+  constraint assessment_completion_stream_check
+    check (stream in ('STEM', 'Research')),
+  constraint assessment_completion_participant_type_check
+    check (participant_type in ('Siswa', 'GTK-MS')),
+  constraint assessment_completion_kind_check
+    check (kind in ('pretest', 'posttest'))
+);
+```
+
+The grain is **(School × Stream × participant-type × kind)**: one row per box on the **Dashboard** (`/`)
+Pretest tracker. Ticking a box inserts the row, un-ticking deletes it — there is **no `done` column
+and no `recorded_at`/`recorded_by`**, because a completion needs no audit trail and "done" has one
+representation. The unique constraint gives one row per box; the three CHECKs mirror the domain
+consts `STREAMS`, `PRETEST_PARTICIPANT_TYPES` and `ASSESSMENT_KINDS` character for character, the
+same discipline as every other set-valued column (see _the glossary is not the schema_). `posttest`
+is a legal `kind` from the start though no UI surfaces it this iteration, so surfacing it is a
+UI-only change rather than a migration.
+
+`participant_type`'s `Siswa`/`GTK-MS` values coincide with `transaction.participant_type` today but
+sit on a **dedicated** const on purpose — the money axis and the assessment axis evolve
+independently.
+
+**The /47 denominator is never stored.** Any progress reading ("X / 47") derives its denominator
+from `schools.length` at read time, matching every existing "X / 47" pattern (`aggregates.ts`,
+`dashboard-derive.ts`) — a stored copy would be a second source of truth that could drift. Reads are
+open to any signed-in Person; the one write (tick/un-tick) opens with `requireGrant(caller,
+"Editor")` (ADR-0028).
 
 ---
 

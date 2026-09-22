@@ -1,19 +1,21 @@
 import {
   activitiesPercent,
+  completedAssessmentUnits,
   deliveryMatrix,
-  deriveMonitoring,
+  deriveDashboard,
   overdueWarnings,
+  pretestProgress,
   timelineSteps,
   type MatrixRow,
-} from "-/app/(app)/monitoring/monitoring-derive";
-import type { MonitoringData, MonitoringSession } from "@sugt/db/queries";
+} from "-/app/(app)/dashboard-derive";
+import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
 import { describe, expect, it } from "vitest";
 
 /**
- * **The pure `/monitoring` derive seam, tested with no database and no DOM.**
+ * **The pure Dashboard (`/`) derive seam, tested with no database and no DOM.**
  *
- * Like `monitoring.test.ts` (the warning reducer) and `theme-cycle.test.ts`, this file touches
- * neither Postgres nor a browser: it hands `monitoring-derive.ts` hand-built rows and a fixed date
+ * Like `dashboard-state.test.ts` (the warning reducer) and `theme-cycle.test.ts`, this file touches
+ * neither Postgres nor a browser: it hands `dashboard-derive.ts` hand-built rows and a fixed date
  * and asserts on the matrix, percentages, timeline and warnings it returns. Ranking a School's
  * Sessions into Sesi lives in TypeScript precisely so it can be pinned here — the cancelled-skip
  * rule and "X never exceeds Y" are assertions, not a query nobody can drive.
@@ -83,11 +85,11 @@ describe("deliveryMatrix", () => {
 });
 
 describe("activitiesPercent", () => {
-  it("is delivered over Schools times eight, rounded", () => {
-    // 4 delivered of 2 Schools × 8 = 16 possible → 25%.
-    expect(activitiesPercent(4, 2)).toBe(25);
-    // 1 of 3 × 8 = 24 → 4.16… rounds to 4.
-    expect(activitiesPercent(1, 3)).toBe(4);
+  it("is completed units over Schools times ten, rounded", () => {
+    // 4 units of 2 Schools × 10 = 20 possible → 20%.
+    expect(activitiesPercent(4, 2)).toBe(20);
+    // 1 of 3 × 10 = 30 → 3.33… rounds to 3.
+    expect(activitiesPercent(1, 3)).toBe(3);
   });
 
   it("guards a zero School count", () => {
@@ -153,7 +155,7 @@ describe("overdueWarnings", () => {
   });
 });
 
-describe("deriveMonitoring", () => {
+describe("deriveDashboard", () => {
   it("assembles the whole view — matrices, budget percent, and delivered percent — from raw data", () => {
     const data: MonitoringData = {
       clusters: CLUSTERS,
@@ -165,17 +167,140 @@ describe("deriveMonitoring", () => {
       budgetUsedIdr: 29_560_000,
     };
 
-    const derived = deriveMonitoring(data, "2026-09-01");
+    const derived = deriveDashboard(data, "2026-09-01", []);
 
     // Two offline Sesi rows, six online — the per-mode Session counts.
     expect(derived.luring).toHaveLength(2);
     expect(derived.daring).toHaveLength(6);
-    // 2 delivered of 3 Schools × 8 = 24 possible → 8%.
-    expect(derived.activitiesPercent).toBe(8);
+    // 2 delivered units (no assessment units) of 3 Schools × 10 = 30 possible → 6.67 rounds to 7%.
+    expect(derived.activitiesPercent).toBe(7);
     // The columns pass through in order; total is the programme budget; the tiny fraction is 0.2.
     expect(derived.clusters).toEqual(CLUSTERS);
     expect(derived.budget.totalIdr).toBe(15_000_000_000);
     expect(derived.budget.usedIdr).toBe(29_560_000);
     expect(derived.budget.percent).toBe(0.2);
+    // No completions handed in → four Pretest meters, all zero out of the 3 Schools.
+    expect(derived.pretest).toEqual([
+      { stream: "STEM", participantType: "Siswa", done: 0, total: 3, percent: 0 },
+      { stream: "STEM", participantType: "GTK-MS", done: 0, total: 3, percent: 0 },
+      { stream: "Research", participantType: "Siswa", done: 0, total: 3, percent: 0 },
+      { stream: "Research", participantType: "GTK-MS", done: 0, total: 3, percent: 0 },
+    ]);
+  });
+
+  it("folds a School's complete pretest unit into Kegiatan terlaksana over the ×10 denominator", () => {
+    // No delivered Sessions; s1 has all four pretest boxes → 1 completed unit of 3 × 10 = 30 → 3%.
+    const s1FullPretest: AssessmentCompletion[] = [
+      { schoolId: "s1", stream: "STEM", participantType: "Siswa", kind: "pretest" },
+      { schoolId: "s1", stream: "STEM", participantType: "GTK-MS", kind: "pretest" },
+      { schoolId: "s1", stream: "Research", participantType: "Siswa", kind: "pretest" },
+      { schoolId: "s1", stream: "Research", participantType: "GTK-MS", kind: "pretest" },
+    ];
+    const data: MonitoringData = {
+      clusters: CLUSTERS,
+      schools: SCHOOLS,
+      sessions: [],
+      budgetUsedIdr: 0,
+    };
+    expect(deriveDashboard(data, "2026-09-01", s1FullPretest).activitiesPercent).toBe(3);
+  });
+});
+
+describe("completedAssessmentUnits", () => {
+  const box = (
+    schoolId: string,
+    stream: "STEM" | "Research",
+    participantType: "Siswa" | "GTK-MS",
+    kind: "pretest" | "posttest",
+  ): AssessmentCompletion => ({ schoolId, stream, participantType, kind });
+
+  /** All four boxes of one kind for one School. */
+  const allFour = (schoolId: string, kind: "pretest" | "posttest"): AssessmentCompletion[] => [
+    box(schoolId, "STEM", "Siswa", kind),
+    box(schoolId, "STEM", "GTK-MS", kind),
+    box(schoolId, "Research", "Siswa", kind),
+    box(schoolId, "Research", "GTK-MS", kind),
+  ];
+
+  it("counts a School's kind only when all four boxes are present — three of four is zero", () => {
+    expect(completedAssessmentUnits(allFour("s1", "pretest"))).toBe(1);
+    // Drop one box → the unit no longer counts.
+    expect(completedAssessmentUnits(allFour("s1", "pretest").slice(0, 3))).toBe(0);
+  });
+
+  it("counts posttest generically — the same all-four rule, so it is 0 until posttest rows exist", () => {
+    expect(completedAssessmentUnits([])).toBe(0);
+    // A fully-pretested School plus a fully-posttested School → two units.
+    expect(
+      completedAssessmentUnits([...allFour("s1", "pretest"), ...allFour("s2", "posttest")]),
+    ).toBe(2);
+  });
+
+  it("sums independent per-(School, kind) units and ignores a partial one", () => {
+    const completions = [
+      ...allFour("s1", "pretest"),
+      ...allFour("s2", "pretest"),
+      ...allFour("s1", "posttest"),
+      box("s3", "STEM", "Siswa", "pretest"), // partial → contributes 0
+    ];
+    expect(completedAssessmentUnits(completions)).toBe(3);
+  });
+});
+
+describe("pretestProgress", () => {
+  const pretest = (
+    schoolId: string,
+    stream: "STEM" | "Research",
+    participantType: "Siswa" | "GTK-MS",
+  ): AssessmentCompletion => ({ schoolId, stream, participantType, kind: "pretest" });
+
+  it("returns the four meters in the fixed STEM/Research × Siswa/GTK-MS order", () => {
+    expect(pretestProgress([], 42).map((m) => `${m.stream}·${m.participantType}`)).toEqual([
+      "STEM·Siswa",
+      "STEM·GTK-MS",
+      "Research·Siswa",
+      "Research·GTK-MS",
+    ]);
+  });
+
+  it("counts distinct schools per box and computes the rounded percent out of the school count", () => {
+    const completions = [
+      pretest("s1", "STEM", "Siswa"),
+      pretest("s2", "STEM", "Siswa"),
+      pretest("s3", "Research", "GTK-MS"),
+    ];
+    const meters = pretestProgress(completions, 42);
+    const byBox = (stream: "STEM" | "Research", pt: "Siswa" | "GTK-MS") =>
+      meters.find((m) => m.stream === stream && m.participantType === pt)!;
+
+    // 2 of 42 → 5% (rounded from 4.76).
+    expect(byBox("STEM", "Siswa")).toEqual({
+      stream: "STEM",
+      participantType: "Siswa",
+      done: 2,
+      total: 42,
+      percent: 5,
+    });
+    // 1 of 42 → 2%.
+    expect(byBox("Research", "GTK-MS")).toMatchObject({ done: 1, percent: 2 });
+    // An untouched box is zero.
+    expect(byBox("STEM", "GTK-MS")).toMatchObject({ done: 0, percent: 0 });
+  });
+
+  it("ignores posttest rows — only pretest counts", () => {
+    const completions: AssessmentCompletion[] = [
+      { schoolId: "s1", stream: "STEM", participantType: "Siswa", kind: "posttest" },
+    ];
+    expect(pretestProgress(completions, 42).find((m) => m.stream === "STEM")!.done).toBe(0);
+  });
+
+  it("guards a zero school count at 0% rather than dividing by zero", () => {
+    const completions = [pretest("s1", "STEM", "Siswa")];
+    expect(pretestProgress(completions, 0)).toEqual([
+      { stream: "STEM", participantType: "Siswa", done: 1, total: 0, percent: 0 },
+      { stream: "STEM", participantType: "GTK-MS", done: 0, total: 0, percent: 0 },
+      { stream: "Research", participantType: "Siswa", done: 0, total: 0, percent: 0 },
+      { stream: "Research", participantType: "GTK-MS", done: 0, total: 0, percent: 0 },
+    ]);
   });
 });

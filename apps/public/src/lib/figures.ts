@@ -9,13 +9,13 @@ import { TOTAL_SESSIONS_PER_SCHOOL } from "@sugt/domain";
 /**
  * **The figures the site derives rather than fetches.**
  *
- * `docs/product.md` is emphatic that a count never travels beside the list it summarises: `42 Sekolah`
- * is `schools.length`, `15 provinsi` is the number of distinct Provinces among them, and the delivery
+ * `docs/product.md` is emphatic that a count never travels beside the list it summarises: `47 Sekolah`
+ * is `schools.length`, `16 provinsi` is the number of distinct Provinces among them, and the delivery
  * denominator is `10 × schools.length` — each computed by the reader so it can never disagree with the
  * data it describes. These are the pure helpers that do that computing.
  */
 
-/** How many distinct Provinces the Schools span — the `15 provinsi` beside `42 Sekolah`. */
+/** How many distinct Provinces the Schools span — the `16 provinsi` beside `47 Sekolah`. */
 export function provinceCount(schools: ScopeSchool[]): number {
   return new Set(schools.map((school) => school.provinceCode)).size;
 }

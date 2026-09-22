@@ -620,7 +620,8 @@ export type UpdatePerjadinAdvanceResult =
  *
  * **No lifecycle gate.** The correction is allowed at any time, *including after the Perjadin
  * Report is filed* — it is a correction affordance, and the acquittal derives the remainder live
- * (`remainderIdr = advance − spent`), so a fixed Advance fixes the remainder for free.
+ * (`remainderIdr = advance − drawn-down`, only `ADVANCE_DRAWDOWN_CATEGORIES` spend — ADR-0029), so a
+ * fixed Advance fixes the remainder for free.
  *
  * **The only validation is the DB floor** (`advance_idr >= 0`). It is deliberately *not* coupled
  * to what has already been spent: setting the Advance below current spend yields a negative

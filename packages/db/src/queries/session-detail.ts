@@ -66,21 +66,21 @@ export type SessionDetail = {
   /** Set on a cancelled Session and null on every other, by CHECK. */
   cancelledReason: string | null;
   /**
-   * **A `coalesce`, so a query rather than a column.** An offline Session takes its
-   * Perjadin's PIC and carries no PIC columns of its own — the composite foreign key is
-   * `MATCH SIMPLE` precisely so it may not — while an online Session has no Perjadin and
-   * carries its own.
+   * The Session's PIC — **only an offline Session has one now (#284)**: it is the PIC of the
+   * Perjadin the Session sits on. An **online** Session no longer tracks a PIC (a third-party LMS
+   * runs online delivery), so both are `null` for it. This is the offline detail surface, and an
+   * online id is redirected away before it renders, so in practice the rendered case always has one.
    */
-  picPersonId: string;
-  picFullName: string;
+  picPersonId: string | null;
+  picFullName: string | null;
   /** Null for an online Session, which by CHECK has no Perjadin. */
   perjadin: SessionPerjadin | null;
   /**
-   * **Empty until the Session is delivered, and empty when the PIC has already filed.** The
-   * one thing owed is the PIC's Session Record; Class Records are deferred for both modes
-   * (T3, #153), so nothing is owed off the back of who taught. Filtering on `delivered` keeps
-   * the list from reporting a Record owed for a visit that has not happened — the
-   * overdue-shaped state ADR-0006 exists to prevent.
+   * **Empty until the Session is delivered, empty when the PIC has already filed, and always empty
+   * for an online Session (#284).** The one thing owed is the offline PIC's Session Record; online
+   * Sessions have no PIC and owe no Record, and Class Records are deferred for both modes (T3, #153).
+   * Filtering on `delivered` keeps the list from reporting a Record owed for a visit that has not
+   * happened — the overdue-shaped state ADR-0006 exists to prevent.
    */
   owed: OwedRecord[];
 };
@@ -122,7 +122,8 @@ export function heldOnWithinPerjadin(
  *
  * One statement, one row: since `session_teacher` was dropped (T3, #153) there is no teacher
  * join to fan the Session columns out across, and the only fact still derived is whether the
- * PIC has filed their Session Record.
+ * offline PIC has filed their Session Record. **This surface renders offline Sessions (#152); an
+ * online id resolves here with a null PIC and is redirected to `/sesi-daring/[id]` by the page.**
  */
 export async function sessionDetail(_caller: Person, id: string): Promise<SessionDetail | null> {
   const pic = alias(person, "pic");
@@ -145,12 +146,13 @@ export async function sessionDetail(_caller: Person, id: string): Promise<Sessio
       perjadinStartsOn: perjadin.startsOn,
       perjadinEndsOn: perjadin.endsOn,
 
-      // Whether the PIC's Session Record exists — the one thing still owed on a delivered
-      // Session now Class Records are deferred (T3, #153).
+      // Whether the offline PIC's Session Record exists — the one thing still owed on a delivered
+      // offline Session now Class Records are deferred (T3, #153). An online Session has no PIC
+      // (#284), so `perjadin.pic_person_id` is null for it and this is simply false.
       sessionRecordFiled: sql<boolean>`exists (
         select 1 from session_record sr
         where sr.session_id = ${session.id}
-          and sr.filed_by_person_id = coalesce(${session.onlinePicPersonId}, ${perjadin.picPersonId})
+          and sr.filed_by_person_id = ${perjadin.picPersonId}
       )`,
     })
     .from(session)
@@ -160,21 +162,20 @@ export async function sessionDetail(_caller: Person, id: string): Promise<Sessio
     .innerJoin(province, eq(province.code, school.provinceCode))
     // Outer: six of every ten Sessions have no Perjadin.
     .leftJoin(perjadin, eq(perjadin.id, session.perjadinId))
-    // The `coalesce` the criterion names, resolved in the join rather than in TypeScript.
-    // Every Session has exactly one of the two, by the pair of mirror CHECKs, so this is
-    // an inner join on a value that is never null.
-    .innerJoin(
-      pic,
-      eq(pic.id, sql`coalesce(${session.onlinePicPersonId}, ${perjadin.picPersonId})`),
-    )
+    // **The PIC is the Perjadin's, and only offline Sessions have one (#284).** A LEFT join, not
+    // the old `coalesce(online_pic, perjadin.pic)` inner join: an online Session has no PIC now, so
+    // it must resolve here with `pic` null rather than be dropped from the read — the page needs the
+    // online row back so it can redirect it to `/sesi-daring/[id]`.
+    .leftJoin(pic, eq(pic.id, perjadin.picPersonId))
     .where(eq(session.id, id));
 
   if (!row) return null;
 
-  // The only thing owed is the PIC's Session Record, and only once the visit has happened.
+  // The only thing owed is the offline PIC's Session Record, once the visit has happened. An online
+  // Session has no PIC (#284) — `picPersonId` is null — so it never owes one.
   const owed: OwedRecord[] =
-    row.status === "delivered" && !row.sessionRecordFiled
-      ? [{ kind: "session-record", personId: row.picPersonId, fullName: row.picFullName }]
+    row.status === "delivered" && row.picPersonId !== null && !row.sessionRecordFiled
+      ? [{ kind: "session-record", personId: row.picPersonId, fullName: row.picFullName! }]
       : [];
 
   return {
@@ -335,6 +336,24 @@ export async function cancelSession(
   });
 }
 
+/** `HH:MM[:SS]` → minutes since midnight; seconds are dropped, a Session's time is hour-and-minute. */
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(":");
+  return Number(hours) * 60 + Number(minutes);
+}
+
+/**
+ * A new time that keeps `end`'s distance from `oldStart` when the start moves to `newStart` — used to
+ * carry a Session's end time along with its start so the duration is preserved. Returns `HH:MM`; the
+ * inputs are wall-clock times within one day and the delta small, so no wrap handling is needed.
+ */
+function shiftTime(end: string, newStart: string, oldStart: string): string {
+  const shifted = timeToMinutes(newStart) + (timeToMinutes(end) - timeToMinutes(oldStart));
+  const hh = String(Math.floor(shifted / 60)).padStart(2, "0");
+  const mm = String(shifted % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 /**
  * Move an arranged Session's date. **A slipped date is not a cancellation** — it demands
  * no reason and leaves no dead row on the School's list.
@@ -355,6 +374,12 @@ export async function cancelSession(
  * moving a Session is one act, and a dialog that changed the date while silently keeping a
  * time nobody can see would be a trap. The index keys on `(school_id, held_on)`, not
  * `starts_at`, so the collision rule is unaffected by carrying the time.
+ *
+ * **`ends_at` (#283) moves with the start, preserving the Session's duration.** Offline Sessions
+ * hold no end time (it is an online-only field), so this is a no-op for them — but the query is not
+ * mode-gated, and an online Session's `session_ends_after_starts_check` would otherwise reject a new
+ * start later than the old end. Shifting the end by the same delta keeps the row valid whatever the
+ * new start, without the move dialog having to ask for an end it does not show.
  */
 export async function moveSessionDate(
   caller: Person,
@@ -369,6 +394,8 @@ export async function moveSessionDate(
       const [row] = await tx
         .select({
           status: session.status,
+          startsAt: session.startsAt,
+          endsAt: session.endsAt,
           startsOn: perjadin.startsOn,
           endsOn: perjadin.endsOn,
         })
@@ -396,13 +423,17 @@ export async function moveSessionDate(
         }
       }
 
-      await tx.update(session).set({ heldOn, startsAt }).where(eq(session.id, sessionId));
+      // Carry the end time with the start, preserving the duration, so an online Session's
+      // `session_ends_after_starts_check` cannot reject the move. Null for an offline Session, which
+      // has no end time — a no-op, since the column was already null.
+      const endsAt = row.endsAt === null ? null : shiftTime(row.endsAt, startsAt, row.startsAt);
+      await tx.update(session).set({ heldOn, startsAt, endsAt }).where(eq(session.id, sessionId));
       return { outcome: "moved" };
     });
   } catch (error) {
-    // Named rather than caught wholesale: this row satisfies five CHECKs and two composite
-    // foreign keys, and swallowing any of those as "that date is taken" would report a bug
-    // as a user state.
+    // Named rather than caught wholesale: this row satisfies several CHECKs, and swallowing any of
+    // those as "that date is taken" would report a bug as a user state. (The `session` table has no
+    // composite foreign keys any more — the online PIC one was dropped in #284.)
     const constraint = (error as { cause?: { constraint_name?: string } }).cause?.constraint_name;
     if (constraint === "session_one_online_per_school_per_day") {
       return { outcome: "collided", constraint };

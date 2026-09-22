@@ -156,15 +156,16 @@ function TripCard({ trip }: { trip: MyUpcomingPerjadin }) {
 
       <div className="mt-2.5 grid gap-1 text-sm">
         <span className="text-muted-foreground">
-          Uang Muka:{" "}
+          Uang Perjalanan:{" "}
           <span className="text-foreground tabular-nums">Rp {formatIdr(trip.advanceIdr)}</span>
         </span>
-        {/* The same remainder math the acquittal derives (`advanceIdr - spentIdr`), pinned equal by a
-            query test so the two screens never show two answers. */}
+        {/* The same travel-float remainder the acquittal derives (`advanceIdr - drawnDownIdr`, only
+            ADVANCE_DRAWDOWN_CATEGORIES draw down — ADR-0029), pinned equal by a query test so the two
+            screens never show two answers. */}
         <span className="text-muted-foreground">
           Tersisa:{" "}
           <span className="text-foreground tabular-nums">
-            Rp {formatIdr(trip.advanceIdr - trip.spentIdr)}
+            Rp {formatIdr(trip.advanceIdr - trip.drawnDownIdr)}
           </span>
         </span>
       </div>

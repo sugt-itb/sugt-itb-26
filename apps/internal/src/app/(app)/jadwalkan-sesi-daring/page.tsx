@@ -26,17 +26,14 @@ export default async function Page() {
       <header className="border-b border-border px-7 py-5">
         <h1 className="font-heading text-lg font-medium">Jadwalkan Sesi daring</h1>
         <p className="text-sm text-muted-foreground">
-          Satu Sesi daring untuk satu Sekolah — tanggalnya, jam mulainya, dan PIC-nya sendiri.
+          Satu Sesi daring untuk satu Sekolah — tanggalnya, jam mulai dan jam selesainya.
         </p>
       </header>
 
       {form.schools.length === 0 ? (
         <p className="p-7 text-sm text-muted-foreground">Belum ada Sekolah.</p>
       ) : (
-        <ArrangeOnlineSessionForm
-          schools={form.schools}
-          staff={form.staff}
-        />
+        <ArrangeOnlineSessionForm schools={form.schools} />
       )}
     </div>
   );

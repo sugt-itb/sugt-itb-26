@@ -48,11 +48,15 @@ export default async function Page() {
               >
                 {session.schoolName}
               </Link>
+              {/* Peserta as inline muted text beside the School, not a badge (#283). Absent on a
+                  Session arranged before the column existed. */}
+              {session.participantType !== null && (
+                <span className="text-sm text-muted-foreground">{session.participantType}</span>
+              )}
               <span className="text-sm text-muted-foreground tabular-nums">
                 {session.heldOn} ·{" "}
                 {formatSessionStartTimeWithWib(session.startsAt, session.timeZone)}
               </span>
-              <span className="text-xs text-muted-foreground">PIC {session.picFullName}</span>
               <SessionStatusBadge status={session.status} />
               <Link
                 href={`/sesi-daring/${session.id}`}

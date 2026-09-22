@@ -145,7 +145,7 @@ function EditGroup({
         <DialogHeader>
           <DialogTitle>Ubah Group</DialogTitle>
           <DialogDescription>
-            PIC dan Pendamping tambahan. Sesi, uang muka dan transaksi Perjadin ini tidak ikut
+            PIC dan Pendamping tambahan. Sesi, Uang Perjalanan dan transaksi Perjadin ini tidak ikut
             berubah.
           </DialogDescription>
         </DialogHeader>

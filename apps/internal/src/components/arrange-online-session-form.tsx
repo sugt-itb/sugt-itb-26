@@ -1,13 +1,11 @@
 "use client";
 
 import { arrangeOnlineSessionAction } from "-/app/(app)/jadwalkan-sesi-daring/actions";
-import { PersonSelect } from "-/components/person-select";
-import type { ArrangePerson, SchoolOption } from "@sugt/db/queries";
+import type { SchoolOption } from "@sugt/db/queries";
 import {
   MAX_TEACHING_TEAM_PER_ONLINE_SESSION,
-  STREAMS,
-  type Stream,
-  timeZoneSuffix,
+  PRETEST_PARTICIPANT_TYPES,
+  type PretestParticipantType,
 } from "@sugt/domain";
 import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
@@ -25,42 +23,38 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
 /**
- * Arrange **one** online Session (#70, ADR-0022). Two entry points share this component: the
+ * Arrange **one** online Session (#70). Two entry points share this component: the
  * standalone screen leads with a School picker (`schools`), and Detail Sekolah pins the School it
  * is on (`school`). Exactly one of the two is passed.
  *
- * An online Session is single-Stream now, so the form leads with a required **Aliran** and names
- * its Pengajar as **session-scoped free-text names** — typed in one at a time and shown as
+ * It names its Pengajar as **session-scoped free-text names** — typed in one at a time and shown as
  * removable chips, the same pattern the plan form uses for a Perjadin's trip-scoped Teaching Team
- * (ADR-0020). It no longer picks Teaching-Team People per Stream, so `teachingTeam` is gone from
- * this component; the `session_teacher` write it fed was retired in T3 (#153) along with the table.
+ * (ADR-0020). The fields are Peserta (Siswa / GTK-MS), Tanggal, Jam Mulai and Jam Selesai (both
+ * **WIB**, strictly ordered), and Pengajar (required, one or two). **No Aliran and no PIC (#284):**
+ * a third-party LMS runs online delivery, so an online Session tracks neither Stream nor a PIC.
  *
  * A client component because every field is editable and none of that state is worth a URL. The
- * pickers and Schools arrive from the server as props; nothing here fetches. The Server Action
- * is called with a typed value rather than through a `<form action>`, because the payload is
- * nested — a list of teacher names — and `FormData` would mean flattening it out and parsing it
- * back with the type checker helping at neither end.
+ * Schools arrive from the server as props; nothing here fetches. The Server Action is called with a
+ * typed value rather than through a `<form action>`, because the payload is nested — a list of
+ * teacher names — and `FormData` would mean flattening it out and parsing it back with the type
+ * checker helping at neither end.
  */
-function ArrangeOnlineSessionForm({
-  school,
-  schools,
-  staff,
-}: {
-  staff: ArrangePerson[];
-} & (
-  | /** Detail Sekolah pins the School. */ { school: SchoolOption; schools?: never }
-  | /** The standalone screen offers a picker. */ { school?: never; schools: SchoolOption[] }
-)) {
+function ArrangeOnlineSessionForm(
+  props:
+    | /** Detail Sekolah pins the School. */ { school: SchoolOption; schools?: never }
+    | /** The standalone screen offers a picker. */ { school?: never; schools: SchoolOption[] },
+) {
+  const { school, schools } = props;
   const router = useRouter();
   const [schoolId, setSchoolId] = useState(school?.id ?? "");
   const [heldOn, setHeldOn] = useState("");
   const [startsAt, setStartsAt] = useState("");
-  const [picPersonId, setPicPersonId] = useState("");
-  // The Session's Stream — STEM or Research (ADR-0022). Required now, `""` until chosen; the submit
-  // guard proves it is set before the cast.
-  const [stream, setStream] = useState<Stream | "">("");
+  const [endsAt, setEndsAt] = useState("");
+  // Which cohort the Session teaches (#283). Required, `""` until chosen; the submit guard proves it
+  // is set before the cast.
+  const [participantType, setParticipantType] = useState<PretestParticipantType | "">("");
   // The Pengajar as session-scoped names (ADR-0022): a list of plain strings, added one at a time
-  // from `teacherDraft` and shown as removable chips. Optional, capped at ten.
+  // from `teacherDraft` and shown as removable chips. Required now (#283): one or two.
   const [teacherNames, setTeacherNames] = useState<string[]>([]);
   const [teacherDraft, setTeacherDraft] = useState("");
   const [collidedOn, setCollidedOn] = useState<string | null>(null);
@@ -70,26 +64,32 @@ function ArrangeOnlineSessionForm({
   const schoolFieldId = useId();
   const dateId = useId();
   const timeId = useId();
-  const picId = useId();
-  const streamId = useId();
+  const endTimeId = useId();
+  const participantId = useId();
   const teacherDraftId = useId();
 
-  // `held_on` and `starts_at` are NOT NULL, every online Session must name a PIC and now carries a
-  // Stream, all by CHECK — so the screen refuses a submit that could only be rejected. Pengajar are
-  // optional at arrangement (mandatory at Tandai terlaksana), so they are not required here.
-  const incomplete =
-    schoolId === "" || heldOn === "" || startsAt === "" || picPersonId === "" || stream === "";
+  // Jam Selesai must be strictly after Jam Mulai — the app-layer half of the
+  // `session_ends_after_starts_check` CHECK. Both are `HH:MM`, so the string compare is chronological;
+  // only meaningful once both are set.
+  const endBeforeStart = startsAt !== "" && endsAt !== "" && endsAt <= startsAt;
 
-  // The picked School's Time Zone, for the Jam Mulai label (#165). The pinned entry point carries
-  // one School; the picker looks its zone up by the current selection, so the suffix appears and
-  // flips as the School changes, and is absent before one is chosen (standalone screen).
-  const timeZone = school?.timeZone ?? schools?.find((option) => option.id === schoolId)?.timeZone;
+  // `held_on`/`starts_at` are NOT NULL by CHECK; #283 adds a required Peserta, a required Jam Selesai
+  // after Jam Mulai, and at least one Pengajar — so the screen refuses a submit that could only be
+  // rejected. There is no PIC or Aliran to require now (#284).
+  const incomplete =
+    schoolId === "" ||
+    heldOn === "" ||
+    startsAt === "" ||
+    endsAt === "" ||
+    endBeforeStart ||
+    participantType === "" ||
+    teacherNames.length < 1;
 
   function reset() {
     setHeldOn("");
     setStartsAt("");
-    setPicPersonId("");
-    setStream("");
+    setEndsAt("");
+    setParticipantType("");
     setTeacherNames([]);
     setTeacherDraft("");
     setArranged(false);
@@ -113,9 +113,9 @@ function ArrangeOnlineSessionForm({
         schoolId,
         heldOn,
         startsAt,
-        picPersonId,
-        // The guard above proves a Stream is chosen, so the cast holds.
-        stream: stream as Stream,
+        endsAt,
+        // The guard proves Peserta is chosen; the query also treats `""` as a refusal.
+        participantType,
         teacherNames: teacherNames.map((name) => name.trim()).filter((name) => name !== ""),
       });
 
@@ -155,8 +155,8 @@ function ArrangeOnlineSessionForm({
         <Alert variant="destructive">
           <AlertTitle>Sesi belum dijadwalkan.</AlertTitle>
           <AlertDescription>
-            Sekolah ini sudah punya Sesi daring Aliran ini pada {collidedOn}. Ubah tanggal atau
-            Aliran-nya, lalu simpan lagi.
+            Sekolah ini sudah punya Sesi daring pada {collidedOn}. Ubah tanggalnya, lalu simpan
+            lagi.
           </AlertDescription>
         </Alert>
       )}
@@ -201,41 +201,25 @@ function ArrangeOnlineSessionForm({
         )}
 
         <Field
-          id={picId}
-          label="PIC"
-        >
-          <PersonSelect
-            id={picId}
-            people={staff}
-            value={picPersonId}
-            placeholder="Pilih PIC"
-            onSelect={(personId) => {
-              setPicPersonId(personId);
-              setCollidedOn(null);
-            }}
-          />
-        </Field>
-
-        <Field
-          id={streamId}
-          label="Aliran"
+          id={participantId}
+          label="Peserta"
         >
           <Select
-            items={Object.fromEntries(STREAMS.map((entry) => [entry, entry]))}
-            value={stream === "" ? null : stream}
+            items={Object.fromEntries(PRETEST_PARTICIPANT_TYPES.map((entry) => [entry, entry]))}
+            value={participantType === "" ? null : participantType}
             onValueChange={(value) => {
-              setStream((value as Stream | null) ?? "");
+              setParticipantType((value as PretestParticipantType | null) ?? "");
               setCollidedOn(null);
             }}
           >
             <SelectTrigger
-              id={streamId}
-              aria-label="Aliran"
+              id={participantId}
+              aria-label="Peserta"
             >
-              <SelectValue placeholder="Pilih Aliran" />
+              <SelectValue placeholder="Pilih Peserta" />
             </SelectTrigger>
             <SelectContent>
-              {STREAMS.map((entry) => (
+              {PRETEST_PARTICIPANT_TYPES.map((entry) => (
                 <SelectItem
                   key={entry}
                   value={entry}
@@ -265,9 +249,9 @@ function ArrangeOnlineSessionForm({
 
         <Field
           id={timeId}
-          label={`Jam Mulai${timeZoneSuffix(timeZone)}`}
+          label="Jam Mulai (WIB)"
         >
-          {/* Local wall-clock time, in the School's Time Zone. */}
+          {/* Online Sessions are always WIB (#283), so the zone is fixed, not School-derived. */}
           <Input
             id={timeId}
             type="time"
@@ -278,12 +262,30 @@ function ArrangeOnlineSessionForm({
             }}
           />
         </Field>
+
+        <Field
+          id={endTimeId}
+          label="Jam Selesai (WIB)"
+        >
+          <Input
+            id={endTimeId}
+            type="time"
+            className="w-32"
+            value={endsAt}
+            onChange={(event) => {
+              setEndsAt(event.target.value);
+            }}
+          />
+          {endBeforeStart && (
+            <p className="text-xs text-destructive">Jam selesai harus setelah jam mulai.</p>
+          )}
+        </Field>
       </div>
 
       <div>
-        <Label htmlFor={teacherDraftId}>Pengajar (opsional)</Label>
+        <Label htmlFor={teacherDraftId}>Pengajar</Label>
         <p className="mt-1 text-sm text-muted-foreground">
-          Nama Pengajar untuk Sesi ini. Tambahkan satu per satu; hingga{" "}
+          Nama Pengajar untuk Sesi ini. Tambahkan satu per satu; minimal satu, hingga{" "}
           {MAX_TEACHING_TEAM_PER_ONLINE_SESSION} nama.
         </p>
 

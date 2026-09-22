@@ -1,5 +1,6 @@
 import {
   REPORT_DEADLINE_DAYS_AFTER_RETURN,
+  sumAdvanceDrawdownIdr,
   type TransactionCategory,
   type TransactionParticipantType,
 } from "@sugt/domain";
@@ -72,13 +73,22 @@ export type PerjadinAcquittal = {
   endsOn: string;
   /** Fixed at planning and transferred before departure, so never null and never absent. */
   advanceIdr: number;
-  /** The sum of every transaction against the Advance. Zero when none has been entered. */
+  /**
+   * The sum of **every** transaction against the Advance — the "Terpakai" total and the full spend
+   * log. Zero when none has been entered. Not the same as what draws the float down (ADR-0029): the
+   * remainder below is `advance − drawn-down`, which only `ADVANCE_DRAWDOWN_CATEGORIES` reduce.
+   */
   spentIdr: number;
-  /** Of `spentIdr`, the spend attributed to the Siswa cohort. */
+  /** Of `spentIdr`, the spend attributed to the Siswa cohort — every category, like `spentIdr`. */
   siswaSpentIdr: number;
-  /** Of `spentIdr`, the spend attributed to the GTK-MS cohort. */
+  /** Of `spentIdr`, the spend attributed to the GTK-MS cohort — every category, like `spentIdr`. */
   gtkMsSpentIdr: number;
-  /** What is left of the Advance to hand back. Negative means the Group overspent. */
+  /**
+   * What is left of the **travel float** to hand back: `advance − drawn-down`, where only
+   * `ADVANCE_DRAWDOWN_CATEGORIES` (Konsumsi, Lainnya) draw down (ADR-0029). Not `advance − spentIdr`
+   * — other categories are recorded but paid outside the float. Negative means the Group overspent
+   * the float.
+   */
   remainderIdr: number;
   /**
    * **Derived, never stored.** Two days after the Group gets back, so it cannot be typed
@@ -176,7 +186,12 @@ export async function perjadinAcquittal(
 
   // Summed here rather than in a second `sum()` round trip: every row is already loaded, and
   // two sources for one figure is a way for the screen's total to disagree with its own list.
+  // `spentIdr` stays **every** category — it is the "Terpakai" total and the full spend log.
   const spentIdr = transactions.reduce((total, line) => total + line.amountIdr, 0);
+  // The **travel-float draw-down** (ADR-0029): only `ADVANCE_DRAWDOWN_CATEGORIES` reduce what is
+  // left, so the remainder is `advance − drawn-down`, not `advance − spentIdr`. The full spend still
+  // shows as Terpakai and every row stays in the log; these are two different numbers by design.
+  const drawnDownIdr = sumAdvanceDrawdownIdr(transactions);
   // The two cohort subtotals, summed off the same loaded rows for the same reason `spentIdr` is:
   // a second `sum()` round trip is a second place for the screen's split to disagree with its list.
   const siswaSpentIdr = transactions
@@ -191,7 +206,7 @@ export async function perjadinAcquittal(
     spentIdr,
     siswaSpentIdr,
     gtkMsSpentIdr,
-    remainderIdr: trip.advanceIdr - spentIdr,
+    remainderIdr: trip.advanceIdr - drawnDownIdr,
     transactions,
     pimpinan,
   };

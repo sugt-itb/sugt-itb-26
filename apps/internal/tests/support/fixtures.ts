@@ -3,9 +3,11 @@ import { randomUUID } from "node:crypto";
 import { db, schema } from "@sugt/db";
 import type {
   ClassKind,
+  Grant,
   ParticipantFeedbackAspect,
   PerjadinAspect,
   PerjadinEvaluationRole,
+  PretestParticipantType,
   SessionStatus,
   Stream,
   Role,
@@ -22,7 +24,15 @@ export type PersonFixture = {
   active?: boolean;
 };
 
-/** Put a Person on the invite list. A row **is** the invitation. */
+/**
+ * Put a Person on the invite list. A row **is** the invitation.
+ *
+ * The return carries `grants: []` on top of the row so a freshly-added Person is directly usable as
+ * a query **caller** — the caller `Person` gained a `grants` axis (ADR-0028), and a Person just
+ * added holds none. A test that needs a caller *with* grants resolves one through
+ * `findActivePersonByEmail` after `addGrant`, which reads the real rows; this default is the empty
+ * case every existing caller already was.
+ */
 export async function addPerson(fixture: PersonFixture) {
   const [person] = await db
     .insert(schema.person)
@@ -33,12 +43,21 @@ export async function addPerson(fixture: PersonFixture) {
       active: fixture.active ?? true,
     })
     .returning();
-  return person!;
+  return { ...person!, grants: [] as Grant[] };
 }
 
 /** Revoke a Person. One write — this is the whole revocation mechanism. */
 export async function revokePerson(id: string) {
   await db.update(schema.person).set({ active: false }).where(eq(schema.person.id, id));
+}
+
+/**
+ * Grant a Person a Grant directly — a `person_grant` row (ADR-0028). The Staff-only rule lives in
+ * the guard and the assign path, not the FK, so this writes the row a test needs without going
+ * through `assignGrant`; a test of the write path itself calls `assignGrant`.
+ */
+export async function addGrant(personId: string, grant: Grant) {
+  await db.insert(schema.personGrant).values({ personId, grant }).onConflictDoNothing();
 }
 
 /** Every `better_auth.user` row. The invite gate's job is to leave this empty. */
@@ -54,7 +73,7 @@ export async function authSessions() {
 /**
  * Reference data: a Province, then a Cluster, then Schools in it.
  *
- * **The test database has none of the real forty-two.** `migrate-from-empty.ts`
+ * **The test database has none of the real forty-seven.** `migrate-from-empty.ts`
  * applies the migrations and stops; `reference-data.sql` is a separate `db:seed`
  * against `$DIRECT_URL`. That is the right split — seeding the real roster here would
  * make every count assertion depend on a file nobody edits for a test — so a test
@@ -139,39 +158,45 @@ export type SessionFixture = {
   /** Local wall-clock start time, in the School's Time Zone. Defaults to a mid-morning hour. */
   startsAt?: string;
   /**
-   * The Session's Stream — STEM or Research. An online Session is single-Stream now (ADR-0022) and
-   * `session_stream_not_null` refuses a null, so this defaults to STEM to keep tests that do not
-   * care about the Stream terse, and is overridable — a School may hold one STEM and one Research
-   * online Session on a date, so a test wanting two on one day varies it.
+   * Local wall-clock end time (#283). Defaults to one hour after `startsAt`, so it always satisfies
+   * `session_ends_after_starts_check` whatever `startsAt` a test picks; overridable.
    */
-  stream?: Stream;
+  endsAt?: string;
+  /** Which cohort the Session teaches (#283). Defaults to `Siswa`, overridable. */
+  participantType?: PretestParticipantType;
   status?: SessionStatus;
-  /** A Staff Person. An online Session carries its own PIC, since it has no Perjadin. */
-  onlinePicPersonId: string;
 };
+
+/** One hour after a `HH:MM` time, clamped so it never wraps past `23:59` — the fixture default end. */
+function oneHourAfter(startsAt: string): string {
+  const [hours, minutes] = startsAt.split(":");
+  const hour = Math.min(Number(hours) + 1, 23);
+  return `${String(hour).padStart(2, "0")}:${minutes}`;
+}
 
 /**
  * An **online** Session, which is the cheap one to build: `mode = 'online'` means no
- * Perjadin, so it needs nothing but a School, a Stream and a Staff PIC. The Perjadin CHECKs are
- * exact mirrors — an offline Session has a Perjadin and an online one has none — so
- * an offline fixture would have to build a whole Perjadin first.
+ * Perjadin, so it needs nothing but a School. It carries **no PIC and no Stream (#284)** — a
+ * third-party LMS runs online delivery — so it does not even need a Staff Person. The Perjadin CHECK
+ * (`session_offline_iff_perjadin`) is an exact mirror — an offline Session has a Perjadin and an
+ * online one has none — so an offline fixture would have to build a whole Perjadin first.
  *
  * A cancelled Session needs its reason in the same statement, by CHECK.
  */
 export async function addSession(fixture: SessionFixture) {
   const status: SessionStatus = fixture.status ?? "arranged";
+  const startsAt = fixture.startsAt ?? "09:00";
   const [session] = await db
     .insert(schema.session)
     .values({
       schoolId: fixture.schoolId,
       mode: "online",
-      stream: fixture.stream ?? "STEM",
       heldOn: fixture.heldOn,
-      startsAt: fixture.startsAt ?? "09:00",
+      startsAt,
+      endsAt: fixture.endsAt ?? oneHourAfter(startsAt),
+      participantType: fixture.participantType ?? "Siswa",
       status,
       cancelledReason: status === "cancelled" ? "Sekolah meminta penjadwalan ulang" : null,
-      onlinePicPersonId: fixture.onlinePicPersonId,
-      onlinePicRole: "Staff",
     })
     .returning();
   return session!;
@@ -642,6 +667,7 @@ export async function resetDatabase() {
       better_auth."account",
       better_auth."verification",
       public."person",
+      public."person_grant",
       public."province",
       public."cluster",
       public."sub_cluster",
@@ -657,7 +683,10 @@ export async function resetDatabase() {
       public."perjadin",
       public."group_member",
       public."transaction",
-      public."transaction_evidence"
+      public."transaction_evidence",
+      public."assessment_completion",
+      public."preparation_card",
+      public."preparation_checklist_item"
     restart identity cascade
   `);
 }

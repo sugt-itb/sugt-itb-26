@@ -1,11 +1,10 @@
-import { type Role } from "@sugt/domain";
+import { type Grant, type Role } from "@sugt/domain";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { user } from "../schema/auth";
-import { session } from "../schema/delivery";
 import { classRecord, sessionRecord } from "../schema/evaluations";
-import { person } from "../schema/people";
+import { person, personGrant } from "../schema/people";
 import { story } from "../schema/stories";
 import { groupMember, perjadin } from "../schema/travel";
 import type { Person } from "./caller";
@@ -43,6 +42,12 @@ export type RosterEntry = {
   signedIn: boolean;
   /** Referenced by one of the six composite foreign keys, so their `role` is now write-once. */
   used: boolean;
+  /**
+   * The Grants this Person holds (ADR-0028), ordered, so the roster's Grant-management controls
+   * render each toggle's state without a per-row round trip. Empty for anyone with none — and always
+   * empty for a Pimpinan, who holds none by construction (Grants are Staff-only).
+   */
+  grants: Grant[];
 };
 
 /**
@@ -60,8 +65,9 @@ const OUTER_PERSON_EMAIL = sql.raw(`"person"."email"`);
 /**
  * Whether a Person is used anywhere their `(id, role)` is a composite foreign key's target.
  *
- * **Six references now** (T3, #153): `session_teacher` is dropped, so its composite FK is gone.
- * `class_record`'s FK stays in the check — the table stands as a dead surface — but nothing
+ * **Five references now** (#284): the online-Session PIC is dropped, so `session.online_pic_person_id`
+ * — the sixth — is gone from this check along with the column. `session_teacher` went earlier (T3,
+ * #153). `class_record`'s FK stays in the check — the table stands as a dead surface — but nothing
  * satisfies it, because a Class Record filer would be a `Teaching Team` Person and that role is
  * retired; every active Person is Staff. The single-column references to `person(id)` —
  * `transaction.created_by`, `session_feedback_token.issued_by`, `perjadin_evaluation.filed_by`
@@ -70,7 +76,6 @@ const OUTER_PERSON_EMAIL = sql.raw(`"person"."email"`);
 const usedByComposite = sql<boolean>`(
   exists (select 1 from ${groupMember} gm where gm.person_id = ${OUTER_PERSON_ID})
   or exists (select 1 from ${perjadin} pj where pj.pic_person_id = ${OUTER_PERSON_ID})
-  or exists (select 1 from ${session} s where s.online_pic_person_id = ${OUTER_PERSON_ID})
   or exists (select 1 from ${classRecord} cr where cr.filed_by_person_id = ${OUTER_PERSON_ID})
   or exists (select 1 from ${sessionRecord} sr where sr.filed_by_person_id = ${OUTER_PERSON_ID})
   or exists (select 1 from ${story} sy where sy.written_by_person_id = ${OUTER_PERSON_ID})
@@ -79,6 +84,22 @@ const usedByComposite = sql<boolean>`(
 /** A `better_auth.user` row for this email, compared case-insensitively as the invite gate does. */
 const hasSignedIn = sql<boolean>`exists (
   select 1 from ${user} u where lower(u.email) = lower(${OUTER_PERSON_EMAIL})
+)`;
+
+/**
+ * The Grants this Person holds, as an ordered array (ADR-0028) — a correlated `array_agg` so the
+ * whole roster's grant state comes back in the one read the screen already makes. `coalesce(…, '{}')`
+ * makes a Person with none an empty array, never `null`. A non-Staff Person holds none by
+ * construction, so this is empty for a Pimpinan; the roster still renders no Grant controls on those
+ * rows regardless, since Grants are Staff-only.
+ */
+const grantsHeld = sql<Grant[]>`coalesce(
+  (
+    select array_agg(pg.grant order by pg.grant)
+    from ${personGrant} pg
+    where pg.person_id = ${OUTER_PERSON_ID}
+  ),
+  '{}'::text[]
 )`;
 
 /**
@@ -99,6 +120,7 @@ export async function roster(_caller: Person): Promise<RosterEntry[]> {
       active: person.active,
       signedIn: hasSignedIn,
       used: usedByComposite,
+      grants: grantsHeld,
     })
     .from(person)
     .orderBy(asc(person.fullName));

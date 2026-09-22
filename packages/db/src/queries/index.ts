@@ -101,6 +101,39 @@ export {
 } from "./dashboard";
 export { monitoringData, type MonitoringData, type MonitoringSession } from "./monitoring";
 export {
+  assessmentCompletions,
+  setAssessmentCompletion,
+  type AssessmentCompletion,
+  type SetAssessmentCompletionInput,
+  type SetAssessmentCompletionResult,
+} from "./assessment-completion";
+export {
+  pretestEditorData,
+  type PretestCluster,
+  type PretestEditorData,
+  type PretestSchool,
+} from "./pretest-editor";
+export {
+  addChecklistItem,
+  createPreparationCard,
+  deletePreparationCard,
+  editPreparationCard,
+  preparationCards,
+  removeChecklistItem,
+  reorderChecklistItems,
+  setChecklistItemChecked,
+  type AddChecklistItemResult,
+  type CreatePreparationCardResult,
+  type DeletePreparationCardResult,
+  type EditPreparationCardResult,
+  type PreparationCard,
+  type PreparationCardInput,
+  type PreparationChecklistItem,
+  type RemoveChecklistItemResult,
+  type ReorderChecklistItemsResult,
+  type SetChecklistItemCheckedResult,
+} from "./preparation-cards";
+export {
   arrangeOnlineSession,
   arrangeOnlineSessionAt,
   arrangeOnlineSessionForm,
@@ -108,7 +141,6 @@ export {
   type ArrangeOnlineSessionForm,
   type ArrangeOnlineSessionInput,
   type ArrangeOnlineSessionResult,
-  type ArrangePerson,
   type SchoolOption,
 } from "./arrange-online-session";
 export {
@@ -262,7 +294,16 @@ export {
   type NotDelivered,
   type SessionRecordRatings,
 } from "./session-records";
-export { isNotStaffError, NotStaffError, requireStaff } from "./staff-only";
+export { assignGrant, personGrants, revokeGrant, type SetGrantResult } from "./grants";
+export {
+  hasGrant,
+  isNotGrantedError,
+  isNotStaffError,
+  NotGrantedError,
+  NotStaffError,
+  requireGrant,
+  requireStaff,
+} from "./staff-only";
 export {
   createSubCluster,
   deleteSubCluster,

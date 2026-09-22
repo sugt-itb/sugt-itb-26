@@ -5,6 +5,7 @@ import {
   bigint,
   check,
   foreignKey,
+  index,
   pgTable,
   text,
   timestamp,
@@ -87,17 +88,23 @@ export const story = pgTable(
  * `person` alone, not the pair — uploading is not role-gated; the Story it hangs off carries the
  * Staff constraint.
  */
-export const storyPhoto = pgTable("story_photo", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  storyId: uuid("story_id")
-    .notNull()
-    .references((): AnyPgColumn => story.id, { onDelete: "cascade" }),
-  storagePath: text("storage_path").notNull().unique(),
-  contentType: text("content_type").notNull(),
-  byteSize: bigint("byte_size", { mode: "number" }).notNull(),
-  caption: text("caption"),
-  uploadedByPersonId: uuid("uploaded_by_person_id")
-    .notNull()
-    .references(() => person.id),
-  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const storyPhoto = pgTable(
+  "story_photo",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storyId: uuid("story_id")
+      .notNull()
+      .references((): AnyPgColumn => story.id, { onDelete: "cascade" }),
+    storagePath: text("storage_path").notNull().unique(),
+    contentType: text("content_type").notNull(),
+    byteSize: bigint("byte_size", { mode: "number" }).notNull(),
+    caption: text("caption"),
+    uploadedByPersonId: uuid("uploaded_by_person_id")
+      .notNull()
+      .references(() => person.id),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  // A Story's gallery loads its photographs by `story_id` — the editor read (`cerita.ts`) and the
+  // public aggregate (`aggregates.ts`) — and the FK is not auto-indexed (#270).
+  (t) => [index("story_photo_story_id_idx").on(t.storyId)],
+);

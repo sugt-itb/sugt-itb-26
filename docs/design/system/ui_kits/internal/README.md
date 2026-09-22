@@ -32,6 +32,6 @@ Composes `Button`, `Card`, `Badge`, `Rating`, `Input`. Icons are Lucide via CDN 
 canonical icon set for this design system).
 
 Coverage and Concerns data follows the real allocation in
-`packages/db/seed/reference-data.sql` — four Clusters at 6 / 17 / 11 / 8 Schools, with
+`packages/db/seed/reference-data.sql` — four Clusters at 7 / 18 / 12 / 10 Schools, with
 real names and Topics — abridged to a few Schools each. Cluster Problems are placeholders
 in the seed, so none are shown here. Everything else is fabricated for demonstration.

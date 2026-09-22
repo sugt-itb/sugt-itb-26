@@ -39,7 +39,7 @@ export type ScopeSchool = {
   clusterSlug: string;
 };
 
-/** The scope payload: the four Clusters and all forty-two Schools, each stamped with a version. */
+/** The scope payload: the four Clusters and all forty-seven Schools, each stamped with a version. */
 export type ScopePayload = {
   version: number;
   clusters: ScopeCluster[];

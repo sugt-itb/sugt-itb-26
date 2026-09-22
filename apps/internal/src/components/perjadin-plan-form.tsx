@@ -305,7 +305,7 @@ function PerjadinPlanForm({
 
         <Field
           id={advanceId}
-          label="Uang muka (Rp)"
+          label="Uang Perjalanan (Rp)"
         >
           {/*
             Fixed at planning and transferred before departure, so a Perjadin is never in an

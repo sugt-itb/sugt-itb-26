@@ -10,7 +10,7 @@ import { CLASS_KINDS, STREAMS, TOTAL_SESSIONS_PER_SCHOOL } from "@sugt/domain";
  * **Beranda — the landing page.**
  *
  * It **leads with scope, not delivery** (ADR-0001): four stats, of which only the first is fetched —
- * `42 Sekolah di 15 provinsi` from the scope payload, and then the three fixed figures that are
+ * `47 Sekolah di 16 provinsi` from the scope payload, and then the three fixed figures that are
  * `@sugt/domain` constants both apps hold, never sent over the wire. The Clusters follow. The
  * **delivery band appears only once there is delivery to report**, so launch day is scope → Streams →
  * Clusters with no `0 Sesi terlaksana` gap, and the band arrives by itself after the first trip.

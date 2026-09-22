@@ -21,7 +21,7 @@ import { useMemo, useState } from "react";
  * Every School, narrowed by a search box and a Cluster.
  *
  * **The filtering happens here and not in the query**, which is what keeps the screen
- * one round trip: forty-two is a fixed and small set, so the payload carries all of
+ * one round trip: forty-seven is a fixed and small set, so the payload carries all of
  * them and the browser narrows them as you type. A filtered query would cost a round
  * trip per keystroke to search a list that fits in memory twice over.
  *

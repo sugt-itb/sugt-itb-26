@@ -4,10 +4,13 @@ import type { Role } from "@sugt/domain";
 import { cn } from "@sugt/ui/lib/utils";
 import {
   Boxes,
+  CalendarDays,
   CalendarPlus,
+  ClipboardCheck,
   Gauge,
   LayoutDashboard,
   ListVideo,
+  type LucideIcon,
   MessageSquare,
   Newspaper,
   Plane,
@@ -15,6 +18,7 @@ import {
   Users,
   Video,
 } from "lucide-react";
+import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -37,10 +41,26 @@ import { usePathname } from "next/navigation";
  *
  * Omitting a link is not access control. The gate is a Staff-only choke point in the
  * data layer, which is issue #25 rather than this shell.
+ *
+ * `editorOnly` is a second, narrower dimension beside `staffOnly` (ADR-0028): a link shown only to an
+ * Editor (an Administrator implies it). `/pretest` carries it — its page `forbidden()`s a
+ * non-holder, so linking a screen that would refuse them is the same "worse than no link" rule the
+ * Staff-only entries follow. The shell resolves the Grant once and passes the boolean down.
  */
-const NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, staffOnly: false },
-  { href: "/monitoring", label: "Monitoring", icon: Gauge, staffOnly: false },
+type NavItem = {
+  href: Route;
+  label: string;
+  icon: LucideIcon;
+  staffOnly: boolean;
+  /** Shown only to an Editor / Administrator. Absent means "no Grant gate". */
+  editorOnly?: boolean;
+};
+
+const NAV: NavItem[] = [
+  { href: "/", label: "Dashboard", icon: Gauge, staffOnly: false },
+  { href: "/beranda", label: "Beranda", icon: LayoutDashboard, staffOnly: true },
+  { href: "/kalender", label: "Kalender", icon: CalendarDays, staffOnly: false },
+  { href: "/pretest", label: "Pretest", icon: ClipboardCheck, staffOnly: false, editorOnly: true },
   { href: "/sekolah", label: "Direktori Sekolah", icon: School, staffOnly: false },
   { href: "/kelompok-sekolah", label: "Kelompok Sekolah", icon: Boxes, staffOnly: false },
   { href: "/feedback", label: "Feedback", icon: MessageSquare, staffOnly: false },
@@ -60,7 +80,7 @@ const NAV = [
   },
   { href: "/cerita", label: "Cerita", icon: Newspaper, staffOnly: true },
   { href: "/orang", label: "Orang", icon: Users, staffOnly: false },
-] as const;
+];
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -71,9 +91,11 @@ function isActive(pathname: string, href: string) {
  * The sidebar's links. A client component because the current section is read from the
  * URL; the shell around it stays on the server.
  */
-function AppSidebarNav({ role }: { role: Role }) {
+function AppSidebarNav({ role, canEditMonitoring }: { role: Role; canEditMonitoring: boolean }) {
   const pathname = usePathname();
-  const visible = NAV.filter((item) => !item.staffOnly || role === "Staff");
+  const visible = NAV.filter(
+    (item) => (!item.staffOnly || role === "Staff") && (!item.editorOnly || canEditMonitoring),
+  );
 
   return (
     <nav className="flex flex-col gap-0.5 p-3">

@@ -17,6 +17,7 @@ function nonStaff() {
     fullName: "Budi Santoso",
     email: "budi@gmail.com",
     role: "Teaching Team" as unknown as Role,
+    grants: [],
   };
 }
 
@@ -24,7 +25,7 @@ function nonStaff() {
  * **Direktori Sekolah** — every School, filterable, and the route into Detail Sekolah.
  *
  * The filtering itself is not asserted here and deliberately: the payload carries all
- * forty-two and the browser narrows them, so there is no server-side filter to test.
+ * forty-seven and the browser narrows them, so there is no server-side filter to test.
  * What these assertions cover is the payload a filter would run over.
  *
  * The `Person` is a real one, produced the only way the app produces one — see
@@ -39,11 +40,11 @@ describe("the Direktori Sekolah payload", () => {
   /**
    * Three Schools across two Clusters, one of them carrying a Session of every status.
    *
-   * Deliberately not the real forty-two. "All 42" is a property of the seeded database
+   * Deliberately not the real forty-seven. "All 47" is a property of the seeded database
    * and not of a fixture, and a test whose numbers come from a seed file nobody edits
    * for it is a test whose failures are unreadable.
    */
-  async function seedThreeSchools(picPersonId: string) {
+  async function seedThreeSchools() {
     await addProvince("JB", "Jawa Barat");
 
     const alpha = await addCluster({ slug: "alpha", name: "Cluster Alpha" });
@@ -78,13 +79,12 @@ describe("the Direktori Sekolah payload", () => {
       ["2026-09-15", "arranged"],
       ["2026-09-22", "cancelled"],
     ] as const) {
-      await addSession({ schoolId: busy.id, heldOn, status, onlinePicPersonId: picPersonId });
+      await addSession({ schoolId: busy.id, heldOn, status });
     }
     await addSession({
       schoolId: other.id,
       heldOn: "2026-09-02",
       status: "delivered",
-      onlinePicPersonId: picPersonId,
     });
 
     return { alpha, beta, busy, untouched, other };
@@ -92,7 +92,7 @@ describe("the Direktori Sekolah payload", () => {
 
   it("lists every School with where it is and which Cluster it belongs to", async () => {
     const person = await signInAsStaff();
-    const { alpha } = await seedThreeSchools(person.id);
+    const { alpha } = await seedThreeSchools();
 
     const schools = await schoolDirectory(person);
 
@@ -112,7 +112,7 @@ describe("the Direktori Sekolah payload", () => {
 
   it("counts delivered Sessions only — arranged and cancelled count for nothing", async () => {
     const person = await signInAsStaff();
-    await seedThreeSchools(person.id);
+    await seedThreeSchools();
 
     const schools = await schoolDirectory(person);
     const counts = schools.map((school) => [school.name, school.deliveredSessions] as const);
@@ -132,7 +132,7 @@ describe("the Direktori Sekolah payload", () => {
      * WHERE rather than in the JOIN.
      */
     const person = await signInAsStaff();
-    const { untouched } = await seedThreeSchools(person.id);
+    const { untouched } = await seedThreeSchools();
 
     const schools = await schoolDirectory(person);
 
@@ -150,7 +150,7 @@ describe("the Direktori Sekolah payload", () => {
      * non-Staff caller stands in for the retired Teaching Team member.
      */
     const staff = await signInAsStaff();
-    await seedThreeSchools(staff.id);
+    await seedThreeSchools();
 
     await expect(schoolDirectory(nonStaff())).resolves.toEqual(await schoolDirectory(staff));
   });

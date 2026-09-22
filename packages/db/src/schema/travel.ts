@@ -12,6 +12,7 @@ import {
   check,
   date,
   foreignKey,
+  index,
   pgTable,
   primaryKey,
   text,
@@ -171,6 +172,10 @@ export const groupMember = pgTable(
       columns: [t.personId, t.role],
       foreignColumns: [person.id, person.role],
     }),
+    // The primary key `(perjadin_id, person_id)` leads with `perjadin_id`, so it cannot serve a
+    // lookup keyed on `person_id` alone. `my-perjadin.ts` joins Groups by `person_id` — "Perjalanan
+    // Saya", the Staff home strip — so that path needs its own index (#270).
+    index("group_member_person_id_idx").on(t.personId),
   ],
 );
 
@@ -186,13 +191,19 @@ export const groupMember = pgTable(
  * spirit as the Group caps. `on delete cascade`: the names are the trip's and outlive nothing.
  * Which of them taught each offline Session is recorded through `session_teaching_team`.
  */
-export const perjadinTeacher = pgTable("perjadin_teacher", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  perjadinId: uuid("perjadin_id")
-    .notNull()
-    .references(() => perjadin.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-});
+export const perjadinTeacher = pgTable(
+  "perjadin_teacher",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    perjadinId: uuid("perjadin_id")
+      .notNull()
+      .references(() => perjadin.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+  },
+  // The trip's teacher names are read by `perjadin_id` on every trip detail — `perjadin-detail.ts`,
+  // `my-perjadin.ts` — and Postgres does not index the FK on its own (#270).
+  (t) => [index("perjadin_teacher_perjadin_id_idx").on(t.perjadinId)],
+);
 
 /**
  * The **Pimpinan** recorded on a Perjadin — record-only (ADR-0020, and the Pimpinan entry in
@@ -265,6 +276,9 @@ export const transaction = pgTable(
       sql`${t.category} in ('Tiket Pesawat/Kereta PP', 'Uang Harian', 'Honorarium Narasumber', 'Akomodasi', 'Transport Bandara/Stasiun', 'Transport Lokal Dalam Provinsi', 'Konsumsi', 'Modul', 'ATK', 'Alat dan Bahan Research Project', 'Seminar kit', 'Lainnya')`,
     ),
     check("transaction_participant_type_check", sql`${t.participantType} in ('Siswa', 'GTK-MS')`),
+    // Postgres does not index a foreign key on its own. Every acquittal read filters the line items
+    // by their Perjadin — `perjadin-report.ts`, `my-perjadin.ts` — so index the FK (#270).
+    index("transaction_perjadin_id_idx").on(t.perjadinId),
   ],
 );
 
@@ -311,16 +325,23 @@ export const perjadinPreparationItem = pgTable(
  *
  * `unique` on it means one uploaded object can be attached exactly once.
  */
-export const transactionEvidence = pgTable("transaction_evidence", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  transactionId: uuid("transaction_id")
-    .notNull()
-    .references(() => transaction.id, { onDelete: "cascade" }),
-  storagePath: text("storage_path").notNull().unique(),
-  contentType: text("content_type").notNull(),
-  byteSize: bigint("byte_size", { mode: "number" }).notNull(),
-  uploadedByPersonId: uuid("uploaded_by_person_id")
-    .notNull()
-    .references(() => person.id),
-  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const transactionEvidence = pgTable(
+  "transaction_evidence",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    transactionId: uuid("transaction_id")
+      .notNull()
+      .references(() => transaction.id, { onDelete: "cascade" }),
+    storagePath: text("storage_path").notNull().unique(),
+    contentType: text("content_type").notNull(),
+    byteSize: bigint("byte_size", { mode: "number" }).notNull(),
+    uploadedByPersonId: uuid("uploaded_by_person_id")
+      .notNull()
+      .references(() => person.id),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  // Evidence is fetched per transaction on the Laporan (`perjadin-report.ts`), and the FK is not
+  // auto-indexed. `storage_path`'s unique index does not help — it keys the object path, not the FK
+  // (#270).
+  (t) => [index("transaction_evidence_transaction_id_idx").on(t.transactionId)],
+);

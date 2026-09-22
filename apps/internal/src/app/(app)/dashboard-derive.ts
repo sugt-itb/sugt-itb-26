@@ -1,17 +1,21 @@
-import type { MonitoringData, MonitoringSession } from "@sugt/db/queries";
+import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
 import {
+  KEGIATAN_UNITS_PER_SCHOOL,
   LURING_SESI_WINDOWS,
+  PRETEST_PARTICIPANT_TYPES,
   PROGRAMME_BUDGET_IDR,
   SESSIONS_PER_SCHOOL,
-  TOTAL_SESSIONS_PER_SCHOOL,
+  STREAMS,
+  type PretestParticipantType,
   type SessionMode,
+  type Stream,
 } from "@sugt/domain";
 
-import type { Warning } from "./monitoring-state";
+import type { Warning } from "./dashboard-state";
 
 /**
- * **The pure core of `/monitoring`**, with no React, no DOM and no database — the seam the suite
- * drives directly, the same way `monitoring-state.ts`'s reducer is tested. It takes the raw rows
+ * **The pure core of the Dashboard (`/`)**, with no React, no DOM and no database — the seam the suite
+ * drives directly, the same way `dashboard-state.ts`'s reducer is tested. It takes the raw rows
  * `monitoringData` reads (`@sugt/db/queries`) plus today's date and the programme constants, and
  * returns exactly the props the view renders. Nothing here queries; everything is a fold over its
  * arguments, so a hand-built fixture is a complete test.
@@ -39,14 +43,28 @@ export type TimelineStep = { label: string; window: string; status: "completed" 
 /** A Luring Sesi's calendar window — the shape `LURING_SESI_WINDOWS` holds, accepted read-only. */
 type SesiWindow = { sesi: number; startsOn: string; endsOn: string };
 
-/** Everything the `/monitoring` view renders, assembled from the raw data by `deriveMonitoring`. */
-export type DerivedMonitoring = {
+/**
+ * One Pretest meter: how many Schools have that `(stream, participant-type)` Pretest box ticked, out
+ * of all Schools. `total` is `schools.length` (the always-47 denominator, never stored), and
+ * `percent` is `done/total` as a whole number, guarded at 0 Schools.
+ */
+export type PretestMeter = {
+  stream: Stream;
+  participantType: PretestParticipantType;
+  done: number;
+  total: number;
+  percent: number;
+};
+
+/** Everything the Dashboard view renders, assembled from the raw data by `deriveDashboard`. */
+export type DerivedDashboard = {
   activitiesPercent: number;
   budget: { usedIdr: number; totalIdr: number; percent: number };
   clusters: Cluster[];
   luring: MatrixRow[];
   daring: MatrixRow[];
   timeline: TimelineStep[];
+  pretest: PretestMeter[];
   warnings: Warning[];
 };
 
@@ -115,13 +133,40 @@ export function deliveryMatrix(
 }
 
 /**
- * How much of the programme has been delivered, as a whole-number percent of every School's eight
- * Sessions (`TOTAL_SESSIONS_PER_SCHOOL`). Guards a zero School count — an empty programme is 0%,
- * not a division by zero.
+ * How much of the programme is done — **Kegiatan terlaksana** — as a whole-number percent of every
+ * School's ten units (`KEGIATAN_UNITS_PER_SCHOOL`: 8 Sessions + a pretest unit + a posttest unit,
+ * ADR-0031/#249). `completedUnits` is the numerator the caller assembles — delivered Sessions plus
+ * the assessment units from `completedAssessmentUnits`. Guards a zero School count — an empty
+ * programme is 0%, not a division by zero.
  */
-export function activitiesPercent(deliveredTotal: number, schoolCount: number): number {
+export function activitiesPercent(completedUnits: number, schoolCount: number): number {
   if (schoolCount === 0) return 0;
-  return Math.round((deliveredTotal / (schoolCount * TOTAL_SESSIONS_PER_SCHOOL)) * 100);
+  return Math.round((completedUnits / (schoolCount * KEGIATAN_UNITS_PER_SCHOOL)) * 100);
+}
+
+/** Every `(stream, participant-type)` box a School must tick for one assessment kind to count. */
+const BOXES_PER_ASSESSMENT_UNIT = STREAMS.length * PRETEST_PARTICIPANT_TYPES.length;
+
+/**
+ * The **all-or-nothing** assessment units complete across all Schools, summed over both kinds
+ * (ADR-0031/#249). A School earns one unit for a kind only when **all four** of that kind's boxes
+ * (STREAMS × PRETEST_PARTICIPANT_TYPES) are present; three of four contributes nothing. Written
+ * generically over `ASSESSMENT_KINDS`, so **posttest is already counted** — it simply stays 0 until
+ * posttest rows exist, which is what caps the KPI near 90% this iteration. The unique constraint on
+ * the completion row means a `(school, kind)` count of `BOXES_PER_ASSESSMENT_UNIT` is exactly "all
+ * four distinct boxes", so a plain per-`(school, kind)` tally is the rollup.
+ */
+export function completedAssessmentUnits(completions: AssessmentCompletion[]): number {
+  const boxesBySchoolKind = new Map<string, number>();
+  for (const c of completions) {
+    const key = `${c.schoolId}|${c.kind}`;
+    boxesBySchoolKind.set(key, (boxesBySchoolKind.get(key) ?? 0) + 1);
+  }
+  let units = 0;
+  for (const count of boxesBySchoolKind.values()) {
+    if (count >= BOXES_PER_ASSESSMENT_UNIT) units++;
+  }
+  return units;
 }
 
 /**
@@ -173,13 +218,52 @@ export function overdueWarnings(
 }
 
 /**
- * Assemble the whole view from the raw data and today's date. The delivered total is every
- * `delivered` Session across both modes (the data already excludes cancelled), and the budget
- * percent is spend against `PROGRAMME_BUDGET_IDR` to one decimal — the same tiny fraction the
- * scaffold showed as `0.2`. Luring is `SESSIONS_PER_SCHOOL.offline` rows, Daring is `.online`.
+ * The four Pretest meters (#248), in the fixed order STEM·Siswa, STEM·GTK-MS, Research·Siswa,
+ * Research·GTK-MS — `STREAMS × PRETEST_PARTICIPANT_TYPES`, so the readout cannot drift from the
+ * vocabulary the CHECK constraints mirror. Each meter's `done` is the number of **distinct** Schools
+ * that hold that `(stream, participantType, kind=pretest)` completion; `posttest` rows are ignored.
+ * `total` is the always-47 denominator (`schoolCount`), and `percent` is guarded at 0 Schools.
  */
-export function deriveMonitoring(data: MonitoringData, today: string): DerivedMonitoring {
+export function pretestProgress(
+  completions: AssessmentCompletion[],
+  schoolCount: number,
+): PretestMeter[] {
+  return STREAMS.flatMap((stream) =>
+    PRETEST_PARTICIPANT_TYPES.map((participantType) => {
+      const schools = new Set<string>();
+      for (const c of completions) {
+        if (c.kind === "pretest" && c.stream === stream && c.participantType === participantType) {
+          schools.add(c.schoolId);
+        }
+      }
+      const done = schools.size;
+      return {
+        stream,
+        participantType,
+        done,
+        total: schoolCount,
+        percent: schoolCount === 0 ? 0 : Math.round((done / schoolCount) * 100),
+      };
+    }),
+  );
+}
+
+/**
+ * Assemble the whole view from the raw data, today's date and the Pretest completion rows. The
+ * delivered total is every `delivered` Session across both modes (the data already excludes
+ * cancelled), and the budget percent is spend against `PROGRAMME_BUDGET_IDR` to one decimal — the
+ * same tiny fraction the scaffold showed as `0.2`. Luring is `SESSIONS_PER_SCHOOL.offline` rows,
+ * Daring is `.online`; the four Pretest meters read against the same always-47 School denominator.
+ */
+export function deriveDashboard(
+  data: MonitoringData,
+  today: string,
+  completions: AssessmentCompletion[],
+): DerivedDashboard {
   const deliveredTotal = data.sessions.filter((s) => s.status === "delivered").length;
+  // Kegiatan terlaksana now folds the all-or-nothing pretest/posttest units into the numerator, over
+  // the ×10 denominator (ADR-0031/#249); posttest stays 0 until posttest rows exist.
+  const completedUnits = deliveredTotal + completedAssessmentUnits(completions);
   const luring = deliveryMatrix(
     data.clusters,
     data.schools,
@@ -197,12 +281,13 @@ export function deriveMonitoring(data: MonitoringData, today: string): DerivedMo
   const usedIdr = data.budgetUsedIdr;
   const totalIdr = PROGRAMME_BUDGET_IDR;
   return {
-    activitiesPercent: activitiesPercent(deliveredTotal, data.schools.length),
+    activitiesPercent: activitiesPercent(completedUnits, data.schools.length),
     budget: { usedIdr, totalIdr, percent: Math.round((usedIdr / totalIdr) * 1000) / 10 },
     clusters: data.clusters,
     luring,
     daring,
     timeline: timelineSteps(LURING_SESI_WINDOWS, today),
+    pretest: pretestProgress(completions, data.schools.length),
     warnings: overdueWarnings(luring, LURING_SESI_WINDOWS, today),
   };
 }

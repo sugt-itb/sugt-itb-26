@@ -5,6 +5,7 @@ import { db } from "../client";
 import { session } from "../schema/delivery";
 import { cluster, school } from "../schema/reference";
 import { groupMember, perjadin, transaction } from "../schema/travel";
+import { advanceDrawdownCategoryList } from "./advance-drawdown";
 import type { Person } from "./caller";
 import { deliveredSessionCount, onDeliveredSessions } from "./delivered-sessions";
 import { requireStaff } from "./staff-only";
@@ -50,7 +51,11 @@ export type PicReport = {
   endsOn: string;
   groupCount: number;
   transactionCount: number;
-  /** Advance minus everything spent. Negative means the Group overspent. */
+  /**
+   * Advance minus the **travel-float draw-down** — only `ADVANCE_DRAWDOWN_CATEGORIES` spend reduces
+   * it (ADR-0029), the same figure the acquittal's `remainderIdr` derives. Negative means the Group
+   * overspent the float.
+   */
   remainderIdr: number;
   /**
    * Two days after the Group gets back — derived, never stored. Shown as an absolute date, not a
@@ -131,8 +136,11 @@ export async function staffDashboard(caller: Person): Promise<StaffDashboard> {
           sql<number>`(select count(*) from ${transaction} tx where tx.perjadin_id = ${OUTER_PERJADIN_ID})`.mapWith(
             Number,
           ),
+        // Travel-float remainder (ADR-0029): the subquery sums only the drawdown categories, so this
+        // is `advance − drawn-down`, the same figure `perjadinAcquittal.remainderIdr` derives. The
+        // `in (…)` list is the shared `advanceDrawdownCategoryList()` so the two SQL sites cannot drift.
         remainderIdr:
-          sql<number>`${perjadin.advanceIdr} - coalesce((select sum(tx.amount_idr) from ${transaction} tx where tx.perjadin_id = ${OUTER_PERJADIN_ID}), 0)`.mapWith(
+          sql<number>`${perjadin.advanceIdr} - coalesce((select sum(tx.amount_idr) from ${transaction} tx where tx.perjadin_id = ${OUTER_PERJADIN_ID} and tx.category in (${advanceDrawdownCategoryList()})), 0)`.mapWith(
             Number,
           ),
         // Two calendar days after return, the way `perjadinAcquittal` derives it. The day count is

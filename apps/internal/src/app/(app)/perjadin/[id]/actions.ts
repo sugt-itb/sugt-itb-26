@@ -229,10 +229,10 @@ export async function updatePerjadinLogisticsAction(
 }
 
 /**
- * **Correct a Perjadin's Advance (uang muka)** — the one write that changes the amount after
+ * **Correct a Perjadin's Advance (Uang Perjalanan)** — the one write that changes the amount after
  * planning (#192). Money writes stay Staff-only (ADR-0026), so it goes through `staffSurface`.
  *
- * **This revalidates two routes.** The Advance shows on the trip page's Uang muka strip *and* on
+ * **This revalidates two routes.** The Advance shows on the trip page's Uang Perjalanan strip *and* on
  * `/perjadin/[id]/laporan` (the acquittal derives its remainder from it), so both are stale the
  * moment it is corrected — a deliberate exception to the one-route convention, the same shape
  * `togglePreparationItemAction` above documents.
