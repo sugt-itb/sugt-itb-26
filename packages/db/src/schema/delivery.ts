@@ -1,4 +1,4 @@
-import type { SessionMode, SessionStatus, Stream } from "@sugt/domain";
+import type { PretestParticipantType, SessionMode, SessionStatus, Stream } from "@sugt/domain";
 import { sql } from "drizzle-orm";
 import {
   check,
@@ -75,8 +75,23 @@ export const session = pgTable(
     // backfill, and a nullable column would take a null on the first row written and keep
     // it. `time` without a zone by design: the zone is the Province's, joined not stored.
     startsAt: time("starts_at").notNull(),
+    // An online Session's end time (#283), a wall-clock `time` local to the School exactly like
+    // `starts_at`. **Nullable, and required only for online at the app layer** — every Session that
+    // existed before this column had none, and a strict NOT NULL (or a NOT-NULL-for-online CHECK)
+    // would fail the migration against that populated data with no correct value to backfill. The
+    // one DB rule is a value-range CHECK: an end after its start, or absent. "Required for online"
+    // lives in the arrange form's submit guard and `arrangeOnlineSession`, the same layer the other
+    // online-required fields are gated at.
+    endsAt: time("ends_at"),
     status: text("status").$type<SessionStatus>().notNull().default("arranged"),
     cancelledReason: text("cancelled_reason"),
+    // Which cohort an online Session teaches (#283) — `'Siswa'` or `'GTK-MS'`, the same value set
+    // `PRETEST_PARTICIPANT_TYPES` names, reused here as a column-value set rather than a glossary
+    // term (like `assessment_completion` and `transaction` already carry a `participant_type`).
+    // **Nullable with a value-domain CHECK only**, for the same migration-safety reason as `ends_at`:
+    // existing rows have no value and a strict CHECK would fail against populated data. "Required for
+    // online" is an app-layer rule, not a DB one.
+    participantType: text("participant_type").$type<PretestParticipantType>(),
 
     onlinePicPersonId: uuid("online_pic_person_id"),
     // Pinned to the single value 'Staff' by `session_online_pic_role_check`, so it reads
@@ -117,6 +132,17 @@ export const session = pgTable(
     check(
       "session_cancelled_iff_reason",
       sql`(${t.status} = 'cancelled') = (${t.cancelledReason} is not null)`,
+    ),
+    // Value-domain and range CHECKs for the two #283 columns, both written `is null or …` so they
+    // are backstops the migration applies cleanly against populated data — a legacy row with a null
+    // in either passes, and the app layer is what makes both required on an online Session.
+    check(
+      "session_participant_type_check",
+      sql`${t.participantType} is null or ${t.participantType} in ('Siswa', 'GTK-MS')`,
+    ),
+    check(
+      "session_ends_after_starts_check",
+      sql`${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`,
     ),
     // MATCH SIMPLE: a row with NULLs in the referencing columns satisfies the
     // constraint, so offline Sessions pass without a special case.

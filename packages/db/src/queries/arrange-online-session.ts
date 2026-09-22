@@ -1,4 +1,8 @@
-import { MAX_TEACHING_TEAM_PER_ONLINE_SESSION, type Stream } from "@sugt/domain";
+import {
+  MAX_TEACHING_TEAM_PER_ONLINE_SESSION,
+  type PretestParticipantType,
+  type Stream,
+} from "@sugt/domain";
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "../client";
@@ -37,8 +41,26 @@ export type ArrangeOnlineSessionInput = {
   schoolId: string;
   /** `YYYY-MM-DD`. */
   heldOn: string;
-  /** Local wall-clock start time (`HH:MM`), in the School's Time Zone. `starts_at` is NOT NULL. */
+  /**
+   * Local wall-clock start time (`HH:MM`), in the School's Time Zone. `starts_at` is NOT NULL. An
+   * online Session is always WIB now (#283) — the Zoom host is in WIB, so the hour is a WIB
+   * wall-clock time nationally — but the storage is unchanged; only the label and the read-back drop
+   * the province-derived zone.
+   */
   startsAt: string;
+  /**
+   * Local wall-clock end time (`HH:MM`), in the same zone as `startsAt`. Required for online at this
+   * layer (#283) — the column is nullable so the migration is safe, so the not-null-for-online rule
+   * lives here — and must be strictly after `startsAt`, which the `session_ends_after_starts_check`
+   * CHECK backstops. `""` when the caller has not chosen one; refused as `end-time-required`.
+   */
+  endsAt: string;
+  /**
+   * Which cohort this Session teaches — `'Siswa'` or `'GTK-MS'` (#283). Required for online at this
+   * layer, `""` until chosen and refused as `participant-type-required`, the same shape `startsAt`'s
+   * required-ness takes on the form.
+   */
+  participantType: PretestParticipantType | "";
   /**
    * The Staff member accountable for this Session. Every online Session has its own, since it
    * has no Perjadin to take one from — otherwise six of every ten Sessions would have nobody to
@@ -54,9 +76,10 @@ export type ArrangeOnlineSessionInput = {
   stream: Stream;
   /**
    * The Pengajar who teach this Session, as **session-scoped free-text names** (ADR-0022) — the
-   * online mirror of a Perjadin's trip-scoped teacher names. Optional and zero-to-cap
-   * (`MAX_TEACHING_TEAM_PER_ONLINE_SESSION`): the professors are not yet always fixed at
-   * arrangement, so an empty list is ordinary rather than a missing value.
+   * online mirror of a Perjadin's trip-scoped teacher names. **Required now (#283): at least one,
+   * up to `MAX_TEACHING_TEAM_PER_ONLINE_SESSION` (two).** An empty list is refused as
+   * `teachers-required` rather than accepted — a Session with no named professor is no longer an
+   * ordinary state.
    */
   teacherNames: string[];
 };
@@ -78,7 +101,18 @@ export type ArrangeOnlineSessionResult =
    * refusals. The form's chip input caps at the same number, so this is only reachable through a
    * hand-edited payload.
    */
-  | { outcome: "too-many-teachers"; count: number; limit: number };
+  | { outcome: "too-many-teachers"; count: number; limit: number }
+  /**
+   * The three online-required fields (#283), each refused as a value the way `too-many-teachers`
+   * is. The form's `incomplete` guard blocks all of them, so like the cap these are reachable only
+   * through a hand-edited payload — but the not-null-for-online rule lives at this layer (the
+   * columns are nullable for migration safety), so this is where it is enforced rather than assumed.
+   */
+  | { outcome: "participant-type-required" }
+  | { outcome: "end-time-required" }
+  | { outcome: "teachers-required" }
+  /** `ends_at` was not strictly after `starts_at` — the app-layer half of `session_ends_after_starts_check`. */
+  | { outcome: "end-before-start" };
 
 /**
  * Arrange one online Session, and its optional session-scoped `session_teacher_name` rows, in one
@@ -106,6 +140,16 @@ export async function arrangeOnlineSession(
 ): Promise<ArrangeOnlineSessionResult> {
   requireStaff(caller);
 
+  // The online-required fields the nullable columns cannot enforce (#283), refused up front as
+  // values exactly like the cap below — the form guards all of them, so these catch a hand-edited
+  // payload rather than an ordinary submit.
+  if (input.participantType === "") return { outcome: "participant-type-required" };
+  if (input.endsAt === "") return { outcome: "end-time-required" };
+  if (input.teacherNames.length < 1) return { outcome: "teachers-required" };
+  // Capture the narrowed value: TypeScript drops the `!== ""` narrowing inside the transaction
+  // callback below, since it cannot prove `input` is unchanged across the closure boundary.
+  const participantType = input.participantType;
+
   // The app-enforced cap the database does not hold: a count across sibling rows, the same shape
   // as `planPerjadin`'s teacher cap, so it is checked here where the whole list is in hand rather
   // than left to a constraint that cannot see the set.
@@ -117,6 +161,11 @@ export async function arrangeOnlineSession(
     };
   }
 
+  // `starts_at`/`ends_at` are both zero-padded `HH:MM`, so a lexicographic compare is chronological.
+  // The `session_ends_after_starts_check` CHECK is the backstop; refusing it here gives a value the
+  // form can render rather than a thrown constraint.
+  if (input.endsAt <= input.startsAt) return { outcome: "end-before-start" };
+
   return db.transaction(async (tx) => {
     const [created] = await tx
       .insert(session)
@@ -126,6 +175,8 @@ export async function arrangeOnlineSession(
         stream: input.stream,
         heldOn: input.heldOn,
         startsAt: input.startsAt,
+        endsAt: input.endsAt,
+        participantType,
         onlinePicPersonId: input.picPersonId,
         onlinePicRole: "Staff",
       })

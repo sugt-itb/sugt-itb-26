@@ -376,9 +376,11 @@ create table session (
   stream            text check (stream in ('STEM', 'Research')),
   held_on           date not null,
   starts_at         time not null,
+  ends_at           time,
   status            text not null default 'arranged'
                       check (status in ('arranged', 'delivered', 'cancelled')),
   cancelled_reason  text,
+  participant_type  text,
 
   online_pic_person_id  uuid,
   online_pic_role       text check (online_pic_role = 'Staff'),
@@ -390,6 +392,8 @@ create table session (
   check ((mode = 'online') = (online_pic_person_id is not null)),
   check ((online_pic_person_id is null) = (online_pic_role is null)),
   check ((status = 'cancelled') = (cancelled_reason is not null)),
+  check (participant_type is null or participant_type in ('Siswa', 'GTK-MS')),
+  check (ends_at is null or ends_at > starts_at),
 
   foreign key (online_pic_person_id, online_pic_role) references person (id, role)
 );
@@ -510,6 +514,27 @@ Nothing stores the second number.
 `starts_at` is NOT NULL. It is affordable because no Session exists yet in any live database, and
 it is worth spending that one-off affordance on: a nullable start time acquires a null on the
 first row written and keeps it forever, and every screen then has to render "time unknown".
+
+**`ends_at` and `participant_type` are online-required but nullable at the database (#283).** Both
+were added after online Sessions existed in a populated database, so unlike `starts_at` the one-off
+NOT-NULL affordance is spent — a strict column, or a NOT-NULL-for-online CHECK, would fail the
+migration against rows that carry no value and have no correct backfill. So the columns are nullable
+and carry only value/range CHECKs (`ends_at is null or ends_at > starts_at`; `participant_type is
+null or participant_type in ('Siswa', 'GTK-MS')`), and "required for an online Session" is enforced
+at the application layer — the arrange form's submit guard and `arrangeOnlineSession`/
+`updateOnlineSession`, the same layer the PIC and Stream requirements sit behind on the write path.
+`ends_at` is a wall-clock `time` local to the School exactly like `starts_at`; `participant_type`
+reuses the `PRETEST_PARTICIPANT_TYPES` value set as a column-value set, the way
+`assessment_completion` and `transaction` already carry a `participant_type`, not as a glossary term.
+Both are online-only in practice — the arrange and detail-edit surfaces are online-only — while
+offline rows leave them null and pass the CHECKs untouched.
+
+**An online Session's time is always WIB (#283), and this is a rendering choice, not a column.**
+`starts_at`/`ends_at` are still stored as a bare wall-clock `time`, but for an _online_ Session the
+number is a WIB wall-clock time nationally — the Zoom host is in WIB — so the online surfaces label
+and render it "(WIB)" unconditionally rather than deriving the zone from `province.time_zone` through
+the School the way offline Sessions do. Nothing about the storage changed; the online reads simply
+stopped joining `province` for the zone and treat it as the constant WIB.
 
 **An arranged offline Session's `held_on` lies inside its Perjadin's `starts_on`–`ends_on`.**
 Nothing holds that — not this schema, and until now not any document either. It is scoped to

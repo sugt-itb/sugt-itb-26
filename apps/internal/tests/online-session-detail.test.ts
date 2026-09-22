@@ -83,6 +83,8 @@ async function sessionRow(sessionId: string) {
       onlinePicPersonId: schema.session.onlinePicPersonId,
       heldOn: schema.session.heldOn,
       startsAt: schema.session.startsAt,
+      endsAt: schema.session.endsAt,
+      participantType: schema.session.participantType,
       stream: schema.session.stream,
       status: schema.session.status,
     })
@@ -109,7 +111,9 @@ describe("Detail Sesi daring — read", () => {
       schoolId: first.id,
       heldOn: "2026-09-10",
       startsAt: "09:00",
+      endsAt: "10:30",
       stream: "Research",
+      participantType: "GTK-MS",
       onlinePicPersonId: pic.id,
     });
     await db.insert(schema.sessionTeacherName).values([
@@ -126,7 +130,11 @@ describe("Detail Sesi daring — read", () => {
       schoolName: "SMAN 1 Bandung",
       heldOn: "2026-09-10",
       startsAt: "09:00:00",
+      endsAt: "10:30:00",
       stream: "Research",
+      participantType: "GTK-MS",
+      // Online Sessions are always WIB (#283), regardless of the School's Province.
+      timeZone: "WIB",
       picPersonId: pic.id,
       picFullName: "Rina Nurhayati",
     });
@@ -184,7 +192,7 @@ describe("Detail Sesi daring — read", () => {
 describe("Detail Sesi daring — editing the fields", () => {
   beforeEach(resetDatabase);
 
-  it("persists a change to School, PIC, date, time and Stream", async () => {
+  it("persists a change to School, PIC, date, times, Stream and Peserta", async () => {
     const pic = await staff();
     const other = await staff("dewi@ditsama.itb.ac.id", "Dewi Lestari");
     const { first, second } = await twoSchools();
@@ -193,6 +201,7 @@ describe("Detail Sesi daring — editing the fields", () => {
       heldOn: "2026-09-10",
       startsAt: "09:00",
       stream: "STEM",
+      participantType: "Siswa",
       onlinePicPersonId: pic.id,
     });
 
@@ -201,7 +210,9 @@ describe("Detail Sesi daring — editing the fields", () => {
       picPersonId: other.id,
       heldOn: "2026-09-17",
       startsAt: "13:30",
+      endsAt: "15:00",
       stream: "Research",
+      participantType: "GTK-MS",
     });
 
     expect(result).toEqual({ outcome: "updated" });
@@ -210,7 +221,9 @@ describe("Detail Sesi daring — editing the fields", () => {
       onlinePicPersonId: other.id,
       heldOn: "2026-09-17",
       startsAt: "13:30:00",
+      endsAt: "15:00:00",
       stream: "Research",
+      participantType: "GTK-MS",
       status: "arranged",
     });
   });
@@ -241,7 +254,9 @@ describe("Detail Sesi daring — editing the fields", () => {
       picPersonId: pic.id,
       heldOn: "2026-09-17",
       startsAt: "09:00",
+      endsAt: "10:30",
       stream: "STEM",
+      participantType: "Siswa",
     });
 
     expect(result).toEqual({
@@ -276,7 +291,9 @@ describe("Detail Sesi daring — editing the fields", () => {
       picPersonId: pic.id,
       heldOn: "2026-09-17",
       startsAt: "09:00",
+      endsAt: "10:30",
       stream: "STEM",
+      participantType: "Siswa",
     });
 
     expect(result).toEqual({ outcome: "updated" });
@@ -299,11 +316,50 @@ describe("Detail Sesi daring — editing the fields", () => {
       picPersonId: pic.id,
       heldOn: "2026-09-10",
       startsAt: "10:30",
+      endsAt: "12:00",
       stream: "STEM",
+      participantType: "Siswa",
     });
 
     expect(result).toEqual({ outcome: "updated" });
     expect((await sessionRow(session.id))?.startsAt).toBe("10:30:00");
+  });
+
+  it("refuses an end time at or before the start, and a missing Peserta or Jam Selesai (#283)", async () => {
+    const pic = await staff();
+    const { first } = await twoSchools();
+    const session = await addSession({
+      schoolId: first.id,
+      heldOn: "2026-09-10",
+      startsAt: "09:00",
+      stream: "STEM",
+      onlinePicPersonId: pic.id,
+    });
+
+    const base = {
+      schoolId: first.id,
+      picPersonId: pic.id,
+      heldOn: "2026-09-10",
+      startsAt: "09:00",
+      stream: "STEM" as const,
+    };
+
+    expect(
+      await updateOnlineSession(pic, session.id, {
+        ...base,
+        endsAt: "09:00",
+        participantType: "Siswa",
+      }),
+    ).toEqual({ outcome: "end-before-start" });
+    expect(
+      await updateOnlineSession(pic, session.id, { ...base, endsAt: "", participantType: "Siswa" }),
+    ).toEqual({ outcome: "end-time-required" });
+    expect(
+      await updateOnlineSession(pic, session.id, { ...base, endsAt: "10:30", participantType: "" }),
+    ).toEqual({ outcome: "participant-type-required" });
+
+    // None of the refused edits wrote — the Session keeps its original time.
+    expect((await sessionRow(session.id))?.startsAt).toBe("09:00:00");
   });
 
   it("refuses to edit a delivered Session, whose fields are settled", async () => {
@@ -322,7 +378,9 @@ describe("Detail Sesi daring — editing the fields", () => {
       picPersonId: pic.id,
       heldOn: "2026-09-17",
       startsAt: "09:00",
+      endsAt: "10:30",
       stream: "Research",
+      participantType: "Siswa",
     });
 
     expect(result).toEqual({ outcome: "not-arranged", status: "delivered" });
@@ -344,7 +402,9 @@ describe("Detail Sesi daring — editing the fields", () => {
         picPersonId: pic.id,
         heldOn: "2026-09-10",
         startsAt: "09:00",
+        endsAt: "10:30",
         stream: "STEM",
+        participantType: "Siswa",
       }),
     ).rejects.toSatisfy(isNotStaffError);
   });

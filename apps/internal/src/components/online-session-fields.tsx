@@ -3,7 +3,13 @@
 import { updateOnlineSessionAction } from "-/app/(app)/sesi-daring/[id]/actions";
 import { PersonSelect } from "-/components/person-select";
 import type { OnlineSessionDetail } from "@sugt/db/queries";
-import { formatSessionStartTimeWithWib, STREAMS, type Stream, timeZoneSuffix } from "@sugt/domain";
+import {
+  formatSessionStartTimeWithWib,
+  PRETEST_PARTICIPANT_TYPES,
+  type PretestParticipantType,
+  STREAMS,
+  type Stream,
+} from "@sugt/domain";
 import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
 import {
@@ -27,15 +33,17 @@ import {
 import { useId, useState, useTransition } from "react";
 
 /**
- * An online Session's five scalar fields — School, PIC, Aliran, Tanggal, Jam Mulai — shown, and for
- * Staff editable through one "Ubah Sesi" dialog. The online counterpart of the offline detail's
- * per-Session edit (`perjadin-sessions.tsx`): the same fields the arrange form set, corrected after
- * the fact.
+ * An online Session's scalar fields — School, PIC, Aliran, Peserta, Tanggal, Jam Mulai, Jam Selesai
+ * (#283) — shown, and for Staff editable through one "Ubah Sesi" dialog. The online counterpart of
+ * the offline detail's per-Session edit (`perjadin-sessions.tsx`): the same fields the arrange form
+ * set, corrected after the fact.
  *
- * One dialog for all five, not five, because they are one row and one write — `updateOnlineSession`
- * sets them together and re-checks the widened unique index on School/date/Stream. Offered only while
- * the Session is `arranged`; once delivered its fields record something that happened. Read for
- * everyone (no money); the "Ubah" trigger appears only for Staff, whom the write re-checks.
+ * One dialog for all of them, not one each, because they are one row and one write —
+ * `updateOnlineSession` sets them together and re-checks the widened unique index on
+ * School/date/Stream. Offered only while the Session is `arranged`; once delivered its fields record
+ * something that happened. Read for everyone (no money); the "Ubah" trigger appears only for Staff,
+ * whom the write re-checks. The two time labels read **(WIB)** unconditionally — online Sessions are
+ * always WIB (#283).
  */
 function OnlineSessionFields({
   session,
@@ -57,12 +65,20 @@ function OnlineSessionFields({
         <Row label="Sekolah">{session.schoolName}</Row>
         <Row label="PIC">{session.picFullName}</Row>
         <Row label="Aliran">{session.stream}</Row>
+        <Row label="Peserta">{session.participantType ?? "—"}</Row>
         <Row label="Tanggal">
           <span className="tabular-nums">{session.heldOn}</span>
         </Row>
         <Row label="Jam Mulai">
           <span className="tabular-nums">
             {formatSessionStartTimeWithWib(session.startsAt, session.timeZone)}
+          </span>
+        </Row>
+        <Row label="Jam Selesai">
+          <span className="tabular-nums">
+            {session.endsAt === null
+              ? "—"
+              : formatSessionStartTimeWithWib(session.endsAt, session.timeZone)}
           </span>
         </Row>
       </dl>
@@ -90,14 +106,30 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
   const [schoolId, setSchoolId] = useState(session.schoolId);
   const [picPersonId, setPicPersonId] = useState(session.picPersonId);
   const [stream, setStream] = useState<Stream | "">(session.stream);
+  const [participantType, setParticipantType] = useState<PretestParticipantType | "">(
+    session.participantType ?? "",
+  );
   const [heldOn, setHeldOn] = useState(session.heldOn);
   const [startsAt, setStartsAt] = useState(session.startsAt.slice(0, 5));
+  // A legacy Session may hold no end time (#283) — seed the field empty so the Staff editing it must
+  // supply one, the same required-ness the arrange form has.
+  const [endsAt, setEndsAt] = useState(session.endsAt?.slice(0, 5) ?? "");
   const [refusal, setRefusal] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const idPrefix = useId();
 
+  // Jam Selesai must be strictly after Jam Mulai; both `HH:MM`, so the string compare is chronological.
+  const endBeforeStart = startsAt !== "" && endsAt !== "" && endsAt <= startsAt;
+
   const incomplete =
-    schoolId === "" || picPersonId === "" || stream === "" || heldOn === "" || startsAt === "";
+    schoolId === "" ||
+    picPersonId === "" ||
+    stream === "" ||
+    participantType === "" ||
+    heldOn === "" ||
+    startsAt === "" ||
+    endsAt === "" ||
+    endBeforeStart;
 
   function submit() {
     if (incomplete) return;
@@ -106,8 +138,10 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
         schoolId,
         picPersonId,
         stream: stream as Stream,
+        participantType,
         heldOn,
         startsAt,
+        endsAt,
       });
       if (result.outcome === "updated") {
         setOpen(false);
@@ -116,7 +150,9 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
       setRefusal(
         result.outcome === "collided"
           ? "Sekolah ini sudah punya Sesi daring Aliran ini pada tanggal tersebut. Ubah tanggal atau Aliran-nya."
-          : "Sesi ini sudah tidak berstatus terjadwal. Muat ulang halaman untuk melihat keadaannya.",
+          : result.outcome === "end-before-start"
+            ? "Jam selesai harus setelah jam mulai."
+            : "Sesi ini sudah tidak berstatus terjadwal. Muat ulang halaman untuk melihat keadaannya.",
       );
     });
   }
@@ -139,7 +175,9 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Ubah Sesi daring</DialogTitle>
-          <DialogDescription>Sekolah, PIC, Aliran, tanggal dan jam mulai.</DialogDescription>
+          <DialogDescription>
+            Sekolah, PIC, Aliran, Peserta, tanggal, jam mulai dan jam selesai.
+          </DialogDescription>
         </DialogHeader>
 
         {refusal !== null && (
@@ -222,6 +260,35 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
             </Select>
           </div>
 
+          <div className="grid gap-1.5">
+            <Label htmlFor={`${idPrefix}-participant`}>Peserta</Label>
+            <Select
+              items={Object.fromEntries(PRETEST_PARTICIPANT_TYPES.map((entry) => [entry, entry]))}
+              value={participantType === "" ? null : participantType}
+              onValueChange={(value) => {
+                setParticipantType((value as PretestParticipantType | null) ?? "");
+                setRefusal(null);
+              }}
+            >
+              <SelectTrigger
+                id={`${idPrefix}-participant`}
+                aria-label="Peserta"
+              >
+                <SelectValue placeholder="Pilih Peserta" />
+              </SelectTrigger>
+              <SelectContent>
+                {PRETEST_PARTICIPANT_TYPES.map((entry) => (
+                  <SelectItem
+                    key={entry}
+                    value={entry}
+                  >
+                    {entry}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor={`${idPrefix}-date`}>Tanggal</Label>
@@ -236,10 +303,8 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor={`${idPrefix}-time`}>
-                Jam Mulai{timeZoneSuffix(session.timeZone)}
-              </Label>
-              {/* Local wall-clock time, in the School's Time Zone. */}
+              <Label htmlFor={`${idPrefix}-time`}>Jam Mulai (WIB)</Label>
+              {/* Online Sessions are always WIB (#283), so the zone is fixed, not School-derived. */}
               <Input
                 id={`${idPrefix}-time`}
                 type="time"
@@ -249,6 +314,21 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
                   setRefusal(null);
                 }}
               />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor={`${idPrefix}-end-time`}>Jam Selesai (WIB)</Label>
+              <Input
+                id={`${idPrefix}-end-time`}
+                type="time"
+                value={endsAt}
+                onChange={(event) => {
+                  setEndsAt(event.target.value);
+                  setRefusal(null);
+                }}
+              />
+              {endBeforeStart && (
+                <p className="text-xs text-destructive">Jam selesai harus setelah jam mulai.</p>
+              )}
             </div>
           </div>
         </div>

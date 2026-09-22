@@ -63,6 +63,8 @@ async function sessionsAt(schoolId: string) {
       stream: schema.session.stream,
       heldOn: schema.session.heldOn,
       startsAt: schema.session.startsAt,
+      endsAt: schema.session.endsAt,
+      participantType: schema.session.participantType,
       status: schema.session.status,
       perjadinId: schema.session.perjadinId,
       onlinePicPersonId: schema.session.onlinePicPersonId,
@@ -75,7 +77,7 @@ async function sessionsAt(schoolId: string) {
 describe("arrangeOnlineSession", () => {
   beforeEach(resetDatabase);
 
-  it("arranges one online Session with its Stream, date, time and Staff PIC", async () => {
+  it("arranges one online Session with its Stream, date, times, Peserta and Staff PIC", async () => {
     const staff = await staffCaller();
     const school = await oneSchool();
 
@@ -83,9 +85,11 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:30",
+      endsAt: "11:00",
+      participantType: "GTK-MS",
       picPersonId: staff.id,
       stream: "Research",
-      teacherNames: [],
+      teacherNames: ["Prof. Bagus"],
     });
 
     expect(result.outcome).toBe("arranged");
@@ -94,12 +98,14 @@ describe("arrangeOnlineSession", () => {
       mode: "online",
       stream: "Research",
       heldOn: "2026-09-01",
+      participantType: "GTK-MS",
       status: "arranged",
       perjadinId: null,
       onlinePicPersonId: staff.id,
       onlinePicRole: "Staff",
     });
     expect(row?.startsAt).toMatch(/^09:30/);
+    expect(row?.endsAt).toMatch(/^11:00/);
   });
 
   it("writes session_teacher_name rows for the named Pengajar", async () => {
@@ -110,6 +116,8 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:00",
+      endsAt: "10:30",
+      participantType: "Siswa",
       picPersonId: staff.id,
       stream: "STEM",
       teacherNames: ["Prof. Bagus", "Dr. Sari"],
@@ -125,20 +133,100 @@ describe("arrangeOnlineSession", () => {
     expect(names.map((row) => row.name).sort()).toEqual(["Dr. Sari", "Prof. Bagus"]);
   });
 
-  it("writes no session_teacher_name rows when no Pengajar is named", async () => {
+  it("refuses when no Pengajar is named (required now, #283), writing nothing", async () => {
     const staff = await staffCaller();
     const school = await oneSchool();
 
-    await arrangeOnlineSession(staff, {
+    const result = await arrangeOnlineSession(staff, {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:00",
+      endsAt: "10:30",
+      participantType: "Siswa",
       picPersonId: staff.id,
       stream: "STEM",
       teacherNames: [],
     });
 
+    expect(result).toEqual({ outcome: "teachers-required" });
+    // Refused before the transaction — no Session, no names.
+    expect(await db.select().from(schema.session)).toEqual([]);
     expect(await db.select().from(schema.sessionTeacherName)).toEqual([]);
+  });
+
+  it("refuses a missing Peserta and a missing Jam Selesai, writing nothing", async () => {
+    const staff = await staffCaller();
+    const school = await oneSchool();
+
+    expect(
+      await arrangeOnlineSession(staff, {
+        schoolId: school.id,
+        heldOn: "2026-09-01",
+        startsAt: "09:00",
+        endsAt: "10:30",
+        participantType: "",
+        picPersonId: staff.id,
+        stream: "STEM",
+        teacherNames: ["Prof. Bagus"],
+      }),
+    ).toEqual({ outcome: "participant-type-required" });
+
+    expect(
+      await arrangeOnlineSession(staff, {
+        schoolId: school.id,
+        heldOn: "2026-09-01",
+        startsAt: "09:00",
+        endsAt: "",
+        participantType: "Siswa",
+        picPersonId: staff.id,
+        stream: "STEM",
+        teacherNames: ["Prof. Bagus"],
+      }),
+    ).toEqual({ outcome: "end-time-required" });
+
+    expect(await db.select().from(schema.session)).toEqual([]);
+  });
+
+  it("refuses Jam Selesai at or before Jam Mulai, writing nothing", async () => {
+    const staff = await staffCaller();
+    const school = await oneSchool();
+
+    const result = await arrangeOnlineSession(staff, {
+      schoolId: school.id,
+      heldOn: "2026-09-01",
+      startsAt: "10:00",
+      endsAt: "10:00",
+      participantType: "Siswa",
+      picPersonId: staff.id,
+      stream: "STEM",
+      teacherNames: ["Prof. Bagus"],
+    });
+
+    expect(result).toEqual({ outcome: "end-before-start" });
+    expect(await db.select().from(schema.session)).toEqual([]);
+  });
+
+  it("the CHECK rejects an end time at or before the start time", async () => {
+    const staff = await staffCaller();
+    const school = await oneSchool();
+
+    // Straight at the table, bypassing the query's own guard — the point is that the database, not
+    // just the application, refuses an end that is not after the start (#283).
+    const refusal = await refusedBy(
+      db.insert(schema.session).values({
+        schoolId: school.id,
+        mode: "online",
+        stream: "STEM",
+        heldOn: "2026-09-01",
+        startsAt: "10:00",
+        endsAt: "09:00",
+        participantType: "Siswa",
+        onlinePicPersonId: staff.id,
+        onlinePicRole: "Staff",
+      }),
+    );
+
+    expect(refusal).toBe("session_ends_after_starts_check");
   });
 
   it("allows a second online Session on one day when the Stream differs", async () => {
@@ -155,9 +243,11 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "13:00",
+      endsAt: "14:30",
+      participantType: "Siswa",
       picPersonId: staff.id,
       stream: "Research",
-      teacherNames: [],
+      teacherNames: ["Prof. Bagus"],
     });
 
     expect(result.outcome).toBe("arranged");
@@ -178,9 +268,11 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "13:00",
+      endsAt: "14:30",
+      participantType: "Siswa",
       picPersonId: staff.id,
       stream: "STEM",
-      teacherNames: [],
+      teacherNames: ["Prof. Bagus"],
     });
 
     expect(result).toEqual({ outcome: "collided", heldOn: "2026-09-01" });
@@ -203,9 +295,11 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "15:00",
+      endsAt: "16:30",
+      participantType: "Siswa",
       picPersonId: staff.id,
       stream: "STEM",
-      teacherNames: [],
+      teacherNames: ["Prof. Bagus"],
     });
 
     expect(result.outcome).toBe("collided");
@@ -227,9 +321,11 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:00",
+      endsAt: "10:30",
+      participantType: "Siswa",
       picPersonId: staff.id,
       stream: "STEM",
-      teacherNames: [],
+      teacherNames: ["Prof. Bagus"],
     });
 
     expect(result.outcome).toBe("arranged");
@@ -251,6 +347,8 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:00",
+      endsAt: "10:30",
+      participantType: "Siswa",
       picPersonId: staff.id,
       stream: "STEM",
       teacherNames: tooMany,
@@ -295,9 +393,11 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:00",
+      endsAt: "10:30",
+      participantType: "Siswa",
       picPersonId: teacher.id,
       stream: "STEM",
-      teacherNames: [],
+      teacherNames: ["Prof. Bagus"],
     }).catch((error: unknown) => error);
 
     expect(isNotStaffError(refusal)).toBe(true);

@@ -90,7 +90,7 @@ describe("onlineSessionDirectory", () => {
     ]);
   });
 
-  it("carries the School, its Time Zone, the PIC and the status on each row", async () => {
+  it("carries the School, its Peserta, the PIC and the status on each row", async () => {
     const pic = await staff();
     const school = await oneSchool();
     await addSession({
@@ -98,6 +98,7 @@ describe("onlineSessionDirectory", () => {
       heldOn: "2026-09-10",
       startsAt: "09:00",
       status: "delivered",
+      participantType: "GTK-MS",
       onlinePicPersonId: pic.id,
     });
 
@@ -105,9 +106,31 @@ describe("onlineSessionDirectory", () => {
 
     expect(row?.schoolName).toBe("SMAN 1 Bandung");
     expect(row?.schoolSlug).toBe("sman-1-bandung");
-    expect(row?.timeZone).toBe("WIB");
+    expect(row?.participantType).toBe("GTK-MS");
     expect(row?.picFullName).toBe("Rina Nurhayati");
     expect(row?.status).toBe("delivered");
+  });
+
+  /**
+   * Online Sessions are always WIB (#283), not derived from the School's Province — so a School in a
+   * WIT Province still reports WIB. A hardcoded-anywhere `WIB` passes the WIB-Province test above by
+   * accident; this one proves the row does not read `province.time_zone`.
+   */
+  it("reports WIB even for a School in a non-WIB Province", async () => {
+    const pic = await staff();
+    await addProvince("PA", "Papua", "WIT");
+    const papua = await addCluster({ slug: "cluster-papua", name: "Cluster Papua" });
+    const school = await addSchool({
+      slug: "sman-jayapura",
+      name: "SMAN Jayapura",
+      clusterId: papua.id,
+      provinceCode: "PA",
+    });
+    await addSession({ schoolId: school.id, heldOn: "2026-09-10", onlinePicPersonId: pic.id });
+
+    const [row] = await onlineSessionDirectory(pic);
+
+    expect(row?.timeZone).toBe("WIB");
   });
 
   it("lists every status, including cancelled — this is the calendar, not a count", async () => {
