@@ -38,6 +38,7 @@ import {
   removeChecklistItemAction,
   reorderChecklistItemsAction,
   setChecklistItemCheckedAction,
+  setChecklistItemJenisAction,
 } from "./preparation-actions";
 import { preparationPercent } from "./preparation-derive";
 
@@ -65,6 +66,54 @@ const SORT_OPTIONS: Record<SortKey, string> = {
   tanggal: "Tanggal: Terdekat",
   persiapan: "Persiapan: Terendah",
 };
+
+/** The four Jenis as a value→label map for the `Select`s below; the label is the value itself. */
+const JENIS_ITEMS = Object.fromEntries(PREPARATION_JENIS.map((jenis) => [jenis, jenis]));
+
+/** The default Jenis for a freshly added checklist item — "Teknis", the first of the four. */
+const DEFAULT_JENIS: PreparationJenis = PREPARATION_JENIS[0];
+
+/**
+ * One Jenis `Select`, shared by every place a checklist item's category is chosen — the create form's
+ * draft rows, the edit form's add control, and each existing item's inline control (#292). A thin
+ * wrapper so the four-value list and its rendering live in one spot.
+ */
+function JenisSelect({
+  value,
+  onValueChange,
+  disabled,
+  ariaLabel,
+}: {
+  value: PreparationJenis;
+  onValueChange: (jenis: PreparationJenis) => void;
+  disabled?: boolean;
+  ariaLabel: string;
+}) {
+  return (
+    <Select
+      items={JENIS_ITEMS}
+      value={value}
+      onValueChange={(next) => {
+        onValueChange(next as PreparationJenis);
+      }}
+      disabled={disabled}
+    >
+      <SelectTrigger aria-label={ariaLabel}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {PREPARATION_JENIS.map((jenis) => (
+          <SelectItem
+            key={jenis}
+            value={jenis}
+          >
+            {jenis}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 function PersiapanTab({ cards, canEdit }: { cards: PreparationCard[]; canEdit: boolean }) {
   const [sort, setSort] = useState<SortKey>("tanggal");
@@ -187,7 +236,8 @@ function PreparationRing({ percent }: { percent: number }) {
 
 /**
  * One Preparation Card on the tab: the completion ring, the title, the Kegiatan date (single or a
- * range), a Jenis pill, and the checklist — with "Edit" in the corner for a holder.
+ * range), and the checklist — each item carrying its own Jenis badge (#292) — with "Edit" in the
+ * corner for a holder.
  *
  * **Ticking is optimistic and live-re-sorts.** The boxes read a `useOptimistic` copy of the items;
  * a click flips the box, moves it between the unchecked-top and checked-bottom groups, and moves the
@@ -226,7 +276,6 @@ function PreparationCardView({ card, canEdit }: { card: PreparationCard; canEdit
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-sm font-medium">{card.title}</span>
-              <Badge variant="secondary">{card.jenis}</Badge>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {card.endsOn === null ? card.startsOn : `${card.startsOn} – ${card.endsOn}`}
@@ -268,6 +317,12 @@ function PreparationCardView({ card, canEdit }: { card: PreparationCard; canEdit
                   >
                     {item.label}
                   </label>
+                  <Badge
+                    variant="secondary"
+                    className="ml-auto shrink-0"
+                  >
+                    {item.jenis}
+                  </Badge>
                 </li>
               );
             })}
@@ -278,8 +333,11 @@ function PreparationCardView({ card, canEdit }: { card: PreparationCard; canEdit
   );
 }
 
-/** A draft checklist line on the create form — a label with no id yet; the write numbers them. */
-type DraftItem = string;
+/**
+ * A draft checklist line on the create form — a label and its Jenis, with no id yet; the write numbers
+ * them (#292). Jenis defaults to "Teknis" and is editable per row before "Buat".
+ */
+type DraftItem = { label: string; jenis: PreparationJenis };
 
 /**
  * **The create/edit popup.** One dialog in two modes, since the fields — Judul, the Tanggal /
@@ -335,17 +393,16 @@ function CardFormDialog(props: { mode: "create" } | { mode: "edit"; card: Prepar
 }
 
 /**
- * The shared header fields — Judul, the Tanggal / Rentang tanggal pair, Jenis. Both forms drive the
- * same controlled shape, so the popup looks identical whichever mode it is in. `range` toggles
- * between a single "Tanggal" and a "Mulai"/"Selesai" pair using native date inputs; unchecking it
- * drops the end date at save.
+ * The shared header fields — Judul and the Tanggal / Rentang tanggal pair (a Card carries no Jenis
+ * since #292 — that lives on each checklist item). Both forms drive the same controlled shape, so the
+ * popup looks identical whichever mode it is in. `range` toggles between a single "Tanggal" and a
+ * "Mulai"/"Selesai" pair using native date inputs; unchecking it drops the end date at save.
  */
 type CardFields = {
   title: string;
   range: boolean;
   startsOn: string;
   endsOn: string;
-  jenis: PreparationJenis;
 };
 
 function CardFieldset({
@@ -359,7 +416,6 @@ function CardFieldset({
   const rangeId = useId();
   const startId = useId();
   const endId = useId();
-  const jenisId = useId();
 
   return (
     <div className="grid gap-4">
@@ -431,35 +487,6 @@ function CardFieldset({
           </div>
         )}
       </div>
-
-      <div className="grid gap-1.5">
-        <Label htmlFor={jenisId}>Jenis</Label>
-        <Select
-          items={Object.fromEntries(PREPARATION_JENIS.map((jenis) => [jenis, jenis]))}
-          value={fields.jenis}
-          onValueChange={(value) => {
-            onChange({ jenis: value as PreparationJenis });
-          }}
-        >
-          <SelectTrigger
-            id={jenisId}
-            aria-label="Jenis"
-            className="w-full"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PREPARATION_JENIS.map((jenis) => (
-              <SelectItem
-                key={jenis}
-                value={jenis}
-              >
-                {jenis}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
     </div>
   );
 }
@@ -468,7 +495,6 @@ function CardFieldset({
 function toInput(fields: CardFields) {
   return {
     title: fields.title,
-    jenis: fields.jenis,
     startsOn: fields.startsOn,
     endsOn: fields.range ? fields.endsOn : null,
   };
@@ -493,7 +519,6 @@ function CreateCardForm({ onDone }: { onDone: () => void }) {
     range: false,
     startsOn: "",
     endsOn: "",
-    jenis: PREPARATION_JENIS[0],
   });
   const [items, setItems] = useState<DraftItem[]>([]);
   const [draft, setDraft] = useState("");
@@ -506,7 +531,7 @@ function CreateCardForm({ onDone }: { onDone: () => void }) {
   function addDraft() {
     const label = draft.trim();
     if (label === "" || atCap) return;
-    setItems((previous) => [...previous, label]);
+    setItems((previous) => [...previous, { label, jenis: DEFAULT_JENIS }]);
     setDraft("");
   }
 
@@ -514,7 +539,9 @@ function CreateCardForm({ onDone }: { onDone: () => void }) {
     startSaving(async () => {
       const result = await createPreparationCardAction({
         ...toInput(fields),
-        items: items.map((label) => label.trim()).filter((label) => label !== ""),
+        items: items
+          .map((item) => ({ label: item.label.trim(), jenis: item.jenis }))
+          .filter((item) => item.label !== ""),
       });
       if (result.outcome === "created") {
         onDone();
@@ -568,18 +595,27 @@ function CreateCardForm({ onDone }: { onDone: () => void }) {
 
         {items.length > 0 && (
           <ul className="mt-1 space-y-1.5">
-            {items.map((label, index) => (
+            {items.map((item, index) => (
               <li
                 // The list only grows at the end or shrinks by removal, so a positional key is stable.
                 key={`draft-${index}`}
                 className="flex items-center gap-2 text-sm"
               >
-                <span className="flex-1">{label}</span>
+                <span className="flex-1">{item.label}</span>
+                <JenisSelect
+                  value={item.jenis}
+                  ariaLabel={`Jenis ${item.label}`}
+                  onValueChange={(jenis) => {
+                    setItems((previous) =>
+                      previous.map((it, i) => (i === index ? { ...it, jenis } : it)),
+                    );
+                  }}
+                />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Hapus ${label}`}
+                  aria-label={`Hapus ${item.label}`}
                   onClick={() => {
                     setItems((previous) => previous.filter((_, i) => i !== index));
                   }}
@@ -621,9 +657,9 @@ function EditCardForm({ card, onDone }: { card: PreparationCard; onDone: () => v
     range: card.endsOn !== null,
     startsOn: card.startsOn,
     endsOn: card.endsOn ?? "",
-    jenis: card.jenis,
   });
   const [draft, setDraft] = useState("");
+  const [draftJenis, setDraftJenis] = useState<PreparationJenis>(DEFAULT_JENIS);
   const [refusal, setRefusal] = useState<string | null>(null);
   // While a drag is mid-flight this holds the unchecked ids in their new order; null falls back to
   // the server order (which the reorder's revalidate makes authoritative once it lands).
@@ -657,9 +693,15 @@ function EditCardForm({ card, onDone }: { card: PreparationCard; onDone: () => v
     const label = draft.trim();
     if (label === "" || atCap) return;
     startItemAction(async () => {
-      const result = await addChecklistItemAction(card.id, label);
+      const result = await addChecklistItemAction(card.id, label, draftJenis);
       if (result.outcome === "added") setDraft("");
       else setRefusal(refusalMessage(result.outcome));
+    });
+  }
+
+  function setItemJenis(itemId: string, jenis: PreparationJenis) {
+    startItemAction(async () => {
+      await setChecklistItemJenisAction(itemId, jenis);
     });
   }
 
@@ -727,6 +769,12 @@ function EditCardForm({ card, onDone }: { card: PreparationCard; onDone: () => v
               }
             }}
           />
+          <JenisSelect
+            value={draftJenis}
+            ariaLabel="Jenis checklist baru"
+            disabled={atCap || itemPending}
+            onValueChange={setDraftJenis}
+          />
           <Button
             type="button"
             variant="outline"
@@ -761,6 +809,14 @@ function EditCardForm({ card, onDone }: { card: PreparationCard; onDone: () => v
               >
                 <GripVerticalIcon className="size-4 shrink-0 cursor-grab text-muted-foreground" />
                 <span className="flex-1">{item.label}</span>
+                <JenisSelect
+                  value={item.jenis}
+                  ariaLabel={`Jenis ${item.label}`}
+                  disabled={itemPending}
+                  onValueChange={(jenis) => {
+                    setItemJenis(item.id, jenis);
+                  }}
+                />
                 <Button
                   type="button"
                   variant="ghost"
@@ -783,6 +839,14 @@ function EditCardForm({ card, onDone }: { card: PreparationCard; onDone: () => v
                 {/* Checked rows keep their place at the bottom and are not draggable — the write
                     only ever renumbers unchecked items. */}
                 <span className="flex-1 text-muted-foreground line-through">{item.label}</span>
+                <JenisSelect
+                  value={item.jenis}
+                  ariaLabel={`Jenis ${item.label}`}
+                  disabled={itemPending}
+                  onValueChange={(jenis) => {
+                    setItemJenis(item.id, jenis);
+                  }}
+                />
                 <Button
                   type="button"
                   variant="ghost"

@@ -142,15 +142,15 @@ One line of a **Preparation Checklist**. Seven are fixed for every Perjadin — 
 _Avoid_: task, step, todo (it is neither assigned nor sequenced)
 
 **Preparation Cards**:
-The free-standing cards on the **Dashboard** (`/`) **Persiapan** tab — a monitoring aid distinct from a Perjadin's **Preparation Checklist** despite both reading "Persiapan". Each is a standalone card (a title, a **Jenis**, a date or date-range, a variable **Checklist Item** list) with nothing behind it — no Perjadin, School, Cluster or Session. **Reading is open** to any signed-in Person, like the rest of the Dashboard; **writing is gated by the Editor Grant** (see **Grant**), and an **Administrator** may write it too. Its Jenis — Teknis, Kurikulum, LAPI, Pimpinan — is a category label; the **Pimpinan** Jenis is unrelated to the **Pimpinan** Role.
+The free-standing cards on the **Dashboard** (`/`) **Persiapan** tab — a monitoring aid distinct from a Perjadin's **Preparation Checklist** despite both reading "Persiapan". Each is a standalone card (a title, a date or date-range, a variable **Checklist Item** list) with nothing behind it — no Perjadin, School, Cluster or Session. **Reading is open** to any signed-in Person, like the rest of the Dashboard; **writing is gated by the Editor Grant** (see **Grant**), and an **Administrator** may write it too. Each **Checklist Item** carries a **Jenis** — Teknis, Kurikulum, LAPI, Pimpinan — a category label; the **Pimpinan** Jenis is unrelated to the **Pimpinan** Role.
 _Avoid_: Monitoring Preparation (the retired name), Preparation Checklist (the Perjadin's seven fixed boxes — a different concept), readiness, onboarding
 
 **Preparation Card**:
-One of the **Preparation Cards**: a title, a **Jenis**, a `starts_on` and an optional `ends_on` (null ⇒ a single date), and an ordered **Checklist Item** list. Standalone — it references no domain row. Its completion shows as a percentage — checked ÷ total items, **0 items ⇒ 0%**.
+One of the **Preparation Cards**: a title, a `starts_on` and an optional `ends_on` (null ⇒ a single date), and an ordered **Checklist Item** list. Standalone — it references no domain row. It carries no Jenis of its own — that lives on each **Checklist Item**. Its completion shows as a percentage — checked ÷ total items, **0 items ⇒ 0%**.
 _Avoid_: Perjadin, Preparation Checklist, task board
 
 **Checklist Item**:
-One line of a **Preparation Card**'s checklist — a label, a position, and a checked flag that toggles **both ways** (a ticked item can be unticked). A Card holds at most twenty. Not to be confused with a **Preparation Item**, which is one of a Perjadin Preparation Checklist's seven fixed boxes.
+One line of a **Preparation Card**'s checklist — a label, a **Jenis** (Teknis, Kurikulum, LAPI, Pimpinan — the category, moved here from the Card), a position, and a checked flag that toggles **both ways** (a ticked item can be unticked). A Card holds at most twenty. Not to be confused with a **Preparation Item**, which is one of a Perjadin Preparation Checklist's seven fixed boxes.
 _Avoid_: Preparation Item (the Perjadin one), task, todo
 
 ### Access
