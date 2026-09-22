@@ -209,8 +209,15 @@ function DayCell({
   // fills the row (`lg:h-full`) and clips its own overflow (`lg:overflow-hidden`) rather than
   // widening or spilling the shared grid.
   const cellClassName = cn(
-    "flex min-h-16 w-full min-w-0 cursor-pointer flex-col gap-1 rounded-md p-1 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:min-h-24 lg:h-full lg:min-h-0 lg:overflow-hidden",
-    isSelected && "bg-accent ring-1 ring-primary",
+    "flex min-h-16 w-full min-w-0 cursor-pointer flex-col gap-1 rounded-md p-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:min-h-24 lg:h-full lg:min-h-0 lg:overflow-hidden",
+    // Selection and hover are **outline only, no fill** (#279): the old `bg-accent` fill hurt the
+    // contrast of the cell's own content. Hover draws a thin neutral inset ring, but only on a cell
+    // that is not selected — a `:hover` rule out-specifies the plain selected ring, so applying it to
+    // a selected cell would shrink its thick primary ring to the neutral one on hover. Scoping the
+    // hover ring to `!isSelected` keeps hovered-selected reading as selected. `ring-inset` keeps both
+    // rings off the `gap-1` grid gutter and inside the rounded corners.
+    !isSelected && "hover:ring-1 hover:ring-ring hover:ring-inset",
+    isSelected && "ring-2 ring-primary ring-inset",
   );
   // The two breakpoint caps, each via the shared helper so a pill count and its "+N" never drift.
   const desktop = eventsOverflow(events, PILLS_DESKTOP);
