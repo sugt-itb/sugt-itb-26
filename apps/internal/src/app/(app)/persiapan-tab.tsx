@@ -83,13 +83,11 @@ function JenisSelect({
   onValueChange,
   disabled,
   ariaLabel,
-  className,
 }: {
   value: PreparationJenis;
   onValueChange: (jenis: PreparationJenis) => void;
   disabled?: boolean;
   ariaLabel: string;
-  className?: string;
 }) {
   return (
     <Select
@@ -100,10 +98,7 @@ function JenisSelect({
       }}
       disabled={disabled}
     >
-      <SelectTrigger
-        aria-label={ariaLabel}
-        className={className}
-      >
+      <SelectTrigger aria-label={ariaLabel}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
