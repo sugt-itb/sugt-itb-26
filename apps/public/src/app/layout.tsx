@@ -1,6 +1,7 @@
 import { SiteShell } from "-/components/site-shell";
 import { ThemeProvider } from "-/components/theme-provider";
 import { cn } from "@sugt/ui/lib/utils";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 
 import "@sugt/ui/globals.css";
@@ -37,6 +38,7 @@ export default function RootLayout({
         <ThemeProvider>
           <SiteShell>{children}</SiteShell>
         </ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   );

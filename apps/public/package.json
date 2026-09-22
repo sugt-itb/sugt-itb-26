@@ -15,6 +15,7 @@
     "@sugt/domain": "workspace:*",
     "@sugt/story-format": "workspace:*",
     "@sugt/ui": "workspace:*",
+    "@vercel/speed-insights": "catalog:",
     "lucide-react": "catalog:",
     "next": "catalog:",
     "next-themes": "catalog:",
