@@ -7,6 +7,7 @@ import type {
   ParticipantFeedbackAspect,
   PerjadinAspect,
   PerjadinEvaluationRole,
+  PretestParticipantType,
   SessionStatus,
   Stream,
   Role,
@@ -157,16 +158,30 @@ export type SessionFixture = {
   /** Local wall-clock start time, in the School's Time Zone. Defaults to a mid-morning hour. */
   startsAt?: string;
   /**
+   * Local wall-clock end time (#283). Defaults to one hour after `startsAt`, so it always satisfies
+   * `session_ends_after_starts_check` whatever `startsAt` a test picks; overridable.
+   */
+  endsAt?: string;
+  /**
    * The Session's Stream — STEM or Research. An online Session is single-Stream now (ADR-0022) and
    * `session_stream_not_null` refuses a null, so this defaults to STEM to keep tests that do not
    * care about the Stream terse, and is overridable — a School may hold one STEM and one Research
    * online Session on a date, so a test wanting two on one day varies it.
    */
   stream?: Stream;
+  /** Which cohort the Session teaches (#283). Defaults to `Siswa`, overridable. */
+  participantType?: PretestParticipantType;
   status?: SessionStatus;
   /** A Staff Person. An online Session carries its own PIC, since it has no Perjadin. */
   onlinePicPersonId: string;
 };
+
+/** One hour after a `HH:MM` time, clamped so it never wraps past `23:59` — the fixture default end. */
+function oneHourAfter(startsAt: string): string {
+  const [hours, minutes] = startsAt.split(":");
+  const hour = Math.min(Number(hours) + 1, 23);
+  return `${String(hour).padStart(2, "0")}:${minutes}`;
+}
 
 /**
  * An **online** Session, which is the cheap one to build: `mode = 'online'` means no
@@ -178,6 +193,7 @@ export type SessionFixture = {
  */
 export async function addSession(fixture: SessionFixture) {
   const status: SessionStatus = fixture.status ?? "arranged";
+  const startsAt = fixture.startsAt ?? "09:00";
   const [session] = await db
     .insert(schema.session)
     .values({
@@ -185,7 +201,9 @@ export async function addSession(fixture: SessionFixture) {
       mode: "online",
       stream: fixture.stream ?? "STEM",
       heldOn: fixture.heldOn,
-      startsAt: fixture.startsAt ?? "09:00",
+      startsAt,
+      endsAt: fixture.endsAt ?? oneHourAfter(startsAt),
+      participantType: fixture.participantType ?? "Siswa",
       status,
       cancelledReason: status === "cancelled" ? "Sekolah meminta penjadwalan ulang" : null,
       onlinePicPersonId: fixture.onlinePicPersonId,

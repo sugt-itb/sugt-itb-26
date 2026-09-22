@@ -335,6 +335,24 @@ export async function cancelSession(
   });
 }
 
+/** `HH:MM[:SS]` → minutes since midnight; seconds are dropped, a Session's time is hour-and-minute. */
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(":");
+  return Number(hours) * 60 + Number(minutes);
+}
+
+/**
+ * A new time that keeps `end`'s distance from `oldStart` when the start moves to `newStart` — used to
+ * carry a Session's end time along with its start so the duration is preserved. Returns `HH:MM`; the
+ * inputs are wall-clock times within one day and the delta small, so no wrap handling is needed.
+ */
+function shiftTime(end: string, newStart: string, oldStart: string): string {
+  const shifted = timeToMinutes(newStart) + (timeToMinutes(end) - timeToMinutes(oldStart));
+  const hh = String(Math.floor(shifted / 60)).padStart(2, "0");
+  const mm = String(shifted % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 /**
  * Move an arranged Session's date. **A slipped date is not a cancellation** — it demands
  * no reason and leaves no dead row on the School's list.
@@ -355,6 +373,12 @@ export async function cancelSession(
  * moving a Session is one act, and a dialog that changed the date while silently keeping a
  * time nobody can see would be a trap. The index keys on `(school_id, held_on)`, not
  * `starts_at`, so the collision rule is unaffected by carrying the time.
+ *
+ * **`ends_at` (#283) moves with the start, preserving the Session's duration.** Offline Sessions
+ * hold no end time (it is an online-only field), so this is a no-op for them — but the query is not
+ * mode-gated, and an online Session's `session_ends_after_starts_check` would otherwise reject a new
+ * start later than the old end. Shifting the end by the same delta keeps the row valid whatever the
+ * new start, without the move dialog having to ask for an end it does not show.
  */
 export async function moveSessionDate(
   caller: Person,
@@ -369,6 +393,8 @@ export async function moveSessionDate(
       const [row] = await tx
         .select({
           status: session.status,
+          startsAt: session.startsAt,
+          endsAt: session.endsAt,
           startsOn: perjadin.startsOn,
           endsOn: perjadin.endsOn,
         })
@@ -396,7 +422,11 @@ export async function moveSessionDate(
         }
       }
 
-      await tx.update(session).set({ heldOn, startsAt }).where(eq(session.id, sessionId));
+      // Carry the end time with the start, preserving the duration, so an online Session's
+      // `session_ends_after_starts_check` cannot reject the move. Null for an offline Session, which
+      // has no end time — a no-op, since the column was already null.
+      const endsAt = row.endsAt === null ? null : shiftTime(row.endsAt, startsAt, row.startsAt);
+      await tx.update(session).set({ heldOn, startsAt, endsAt }).where(eq(session.id, sessionId));
       return { outcome: "moved" };
     });
   } catch (error) {

@@ -1,5 +1,6 @@
 import {
   MAX_TEACHING_TEAM_PER_ONLINE_SESSION,
+  type PretestParticipantType,
   type SessionStatus,
   type Stream,
   type TimeZone,
@@ -39,13 +40,18 @@ export type OnlineSessionDetail = {
   /** The School's page is where this Session is reached from, and the way back to it. */
   schoolSlug: string;
   heldOn: string;
-  /** Wall-clock start time local to the School (`HH:MM:SS`), rendered with its zone. */
+  /** Wall-clock start time (`HH:MM:SS`), rendered as WIB (#283 — online Sessions are always WIB). */
   startsAt: string;
+  /** Wall-clock end time (`HH:MM:SS`), or `null` on a Session arranged before the column existed (#283). */
+  endsAt: string | null;
   /**
-   * The School's Province's Time Zone, for rendering `startsAt` — no Indonesian Province straddles
-   * a boundary, so the zone lives on `province`, not `school`, as every other Session surface reads it.
+   * Always `"WIB"` for an online Session (#283): online Sessions are stored and shown as WIB
+   * wall-clock nationally, no longer derived from the School's Province. Kept as a `TimeZone` so the
+   * surfaces render it through `formatSessionStartTimeWithWib`, which shows `"HH:MM WIB"`.
    */
   timeZone: TimeZone;
+  /** Which cohort the Session teaches (#283); `null` on a Session arranged before the column existed. */
+  participantType: PretestParticipantType | null;
   status: SessionStatus;
   /** Set on a cancelled Session and null on every other, by CHECK. */
   cancelledReason: string | null;
@@ -85,6 +91,10 @@ export type OnlineSessionLookup =
  * The PIC join is **left**, not inner: an offline Session's `online_pic_person_id` is null (by
  * `session_online_iff_pic`), so an inner join would drop it and report `not-found` where the answer is
  * `offline`. `mode` off the session row draws that line.
+ *
+ * **The main row no longer joins `province` (#283)**: an online Session's zone is always WIB, folded
+ * in below rather than read from the School's Province. The schools-picker sub-query still joins it,
+ * since a `SchoolOption` carries the picker's own zone.
  */
 export async function onlineSessionDetail(
   _caller: Person,
@@ -99,7 +109,8 @@ export async function onlineSessionDetail(
         schoolSlug: school.slug,
         heldOn: session.heldOn,
         startsAt: session.startsAt,
-        timeZone: province.timeZone,
+        endsAt: session.endsAt,
+        participantType: session.participantType,
         status: session.status,
         cancelledReason: session.cancelledReason,
         stream: session.stream,
@@ -108,7 +119,6 @@ export async function onlineSessionDetail(
       })
       .from(session)
       .innerJoin(school, eq(school.id, session.schoolId))
-      .innerJoin(province, eq(province.code, school.provinceCode))
       .leftJoin(person, eq(person.id, session.onlinePicPersonId))
       .where(eq(session.id, id)),
     db
@@ -157,7 +167,10 @@ export async function onlineSessionDetail(
       schoolSlug: first.schoolSlug,
       heldOn: first.heldOn,
       startsAt: first.startsAt,
-      timeZone: first.timeZone,
+      endsAt: first.endsAt,
+      // Online Sessions are always WIB (#283), so the zone is a constant, not a joined column.
+      timeZone: "WIB",
+      participantType: first.participantType,
       status: first.status,
       cancelledReason: first.cancelledReason,
       stream: first.stream,
@@ -170,16 +183,20 @@ export async function onlineSessionDetail(
   };
 }
 
-/** The five scalar fields the edit dialog sets — everything on the Session row the arrange form does. */
+/** The scalar fields the edit dialog sets — everything on the Session row the arrange form does. */
 export type OnlineSessionInput = {
   schoolId: string;
   picPersonId: string;
   /** `YYYY-MM-DD`. */
   heldOn: string;
-  /** Local wall-clock start time (`HH:MM`), in the School's Time Zone. */
+  /** Local wall-clock start time (`HH:MM`), always WIB for an online Session (#283). */
   startsAt: string;
+  /** Local wall-clock end time (`HH:MM`), strictly after `startsAt`. Required for online (#283). */
+  endsAt: string;
   /** STEM or Research (ADR-0022) — an online Session is single-Stream and must carry one. */
   stream: Stream;
+  /** Which cohort the Session teaches — `'Siswa'` or `'GTK-MS'` (#283). Required for online. */
+  participantType: PretestParticipantType | "";
 };
 
 export type UpdateOnlineSessionResult =
@@ -191,7 +208,15 @@ export type UpdateOnlineSessionResult =
    * widened unique index refuses the edit. The row being edited is excluded automatically — an
    * `UPDATE` that leaves the keys where they are conflicts with no other row.
    */
-  | { outcome: "collided"; constraint: "session_one_online_per_school_per_day" };
+  | { outcome: "collided"; constraint: "session_one_online_per_school_per_day" }
+  /**
+   * The #283 online-required fields, refused as values before the write — the same rule
+   * `arrangeOnlineSession` enforces, since the columns are nullable for migration safety. The edit
+   * dialog's `incomplete` and its time guard block all three, so these catch a hand-edited request.
+   */
+  | { outcome: "participant-type-required" }
+  | { outcome: "end-time-required" }
+  | { outcome: "end-before-start" };
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -221,6 +246,15 @@ export async function updateOnlineSession(
 ): Promise<UpdateOnlineSessionResult> {
   requireStaff(caller);
 
+  // The online-required fields the nullable columns cannot enforce (#283), refused before the write
+  // exactly as `arrangeOnlineSession` does. The dialog guards all three, so these catch a hand-edited
+  // request. Both times are `HH:MM`, so the lexicographic compare is chronological.
+  if (input.participantType === "") return { outcome: "participant-type-required" };
+  if (input.endsAt === "") return { outcome: "end-time-required" };
+  if (input.endsAt <= input.startsAt) return { outcome: "end-before-start" };
+  // Capture the narrowed value: the `!== ""` narrowing is dropped inside the transaction callback.
+  const participantType = input.participantType;
+
   try {
     return await db.transaction(async (tx) => {
       const [row] = await tx
@@ -243,7 +277,9 @@ export async function updateOnlineSession(
           onlinePicPersonId: input.picPersonId,
           heldOn: input.heldOn,
           startsAt: input.startsAt,
+          endsAt: input.endsAt,
           stream: input.stream,
+          participantType,
         })
         .where(eq(session.id, sessionId));
 
