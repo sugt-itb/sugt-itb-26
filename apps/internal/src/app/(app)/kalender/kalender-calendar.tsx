@@ -48,6 +48,14 @@ function useIsDesktop(): boolean {
  * schedule text with line breaks preserved. Paging (‹ / › and **Hari ini**) is pure view-state via
  * the shared `_calendar` core — the sheet feed already covers every date, so it never refetches.
  * A `null` `error` renders normally; a non-null one shows an inline banner above the grid.
+ *
+ * **Desktop (`lg+`) is fit-to-viewport (#278), which diverges from the app-wide document-scroll
+ * pattern.** The page root (see `page.tsx`) clamps to `h-dvh`; here the layout fills that height and
+ * splits it into two internal scroll regions — the calendar body (the six week rows share the height
+ * as `1fr`, falling back to a `6rem` floor + internal scroll on a short viewport) and the detail
+ * panel (a long event list scrolls inside the aside). The document itself never scrolls on desktop.
+ * Below `lg` this is unchanged: a natural-height stack that scrolls the page, with the detail panel
+ * in a bottom drawer.
  */
 export function KalenderCalendar({
   schedule,
@@ -72,8 +80,11 @@ export function KalenderCalendar({
   const selectedEvents = selected ? (schedule[selected] ?? []) : [];
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-      <Card className="lg:flex-1">
+    // Desktop (`lg+`) fit-to-viewport (#278): fill the page-root's clamped height (`lg:flex-1
+    // lg:min-h-0`) and stretch the two columns to equal height (`lg:items-stretch`) so the calendar
+    // body and the detail panel become their own scroll regions. Below `lg` this is a plain stack.
+    <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:flex-row lg:items-stretch">
+      <Card className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
         {error && (
           <div className="mx-6 mt-6 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
@@ -85,8 +96,14 @@ export function KalenderCalendar({
           onPrev={prevMonth}
           onNext={nextMonth}
         />
-        <CardContent>
-          <div className="grid grid-cols-7 gap-1">
+        {/* On `lg+` the body is the calendar's scroll region: it fills the card's remaining height
+            (`lg:flex-1 lg:min-h-0`) and, only on a short viewport where the row floor overflows,
+            scrolls internally (`lg:overflow-y-auto`) — never the page. */}
+        <CardContent className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-y-auto">
+          {/* `lg:min-h-full` lets the six week rows share the available height (each `1fr`) when
+              there is room, and grow to their `6rem` floor and overflow the scroll body when there
+              is not. `auto` keeps the weekday-label row its natural height. */}
+          <div className="grid grid-cols-7 gap-1 lg:min-h-full lg:grid-rows-[auto_repeat(6,minmax(6rem,1fr))]">
             {WEEKDAY_LABELS_ID_FULL.map((label, i) => (
               <div
                 key={i}
@@ -109,15 +126,18 @@ export function KalenderCalendar({
         </CardContent>
       </Card>
 
-      {/* Desktop: a persistent right-side detail panel that tracks the selected day. */}
-      <aside className="hidden lg:block lg:w-80 lg:shrink-0">
-        <Card>
+      {/* Desktop: a persistent right-side detail panel that tracks the selected day. On `lg+` it
+          matches the calendar's height (`lg:items-stretch` above) and becomes its own scroll region:
+          the header (selected date) stays pinned while a long event list scrolls inside the body
+          (`lg:overflow-y-auto`), so the page never moves. */}
+      <aside className="hidden lg:flex lg:min-h-0 lg:w-80 lg:shrink-0 lg:flex-col">
+        <Card className="lg:flex lg:h-full lg:min-h-0 lg:flex-col">
           <CardHeader>
             <CardTitle className="text-base tabular-nums">
               {selected ? longDateId(selected) : "Kegiatan"}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="lg:min-h-0 lg:overflow-y-auto">
             <PanelBody
               date={selected}
               events={selectedEvents}
@@ -184,8 +204,12 @@ function DayCell({
   events: JadwalEvent[];
   onSelect: () => void;
 }) {
+  // Below `lg` the cell keeps its fixed min-height (`min-h-16`, `md:min-h-24`). On `lg+` the grid
+  // row's `minmax(6rem,1fr)` owns the height, so the cell relaxes its own min-height (`lg:min-h-0`),
+  // fills the row (`lg:h-full`) and clips its own overflow (`lg:overflow-hidden`) rather than
+  // widening or spilling the shared grid.
   const cellClassName = cn(
-    "flex min-h-16 w-full min-w-0 cursor-pointer flex-col gap-1 rounded-md p-1 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:min-h-24",
+    "flex min-h-16 w-full min-w-0 cursor-pointer flex-col gap-1 rounded-md p-1 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:min-h-24 lg:h-full lg:min-h-0 lg:overflow-hidden",
     isSelected && "bg-accent ring-1 ring-primary",
   );
   // The two breakpoint caps, each via the shared helper so a pill count and its "+N" never drift.
