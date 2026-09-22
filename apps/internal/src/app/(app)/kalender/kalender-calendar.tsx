@@ -213,8 +213,8 @@ function DayCell({
       </span>
       {events.length > 0 && (
         <div className="flex min-w-0 flex-col gap-0.5">
-          {/* Render the desktop set of pills; the ones past the first collapse away on mobile, where
-              the one-pill cap and the mobile "+N" link take over. */}
+          {/* Render the desktop set of pills; each is desktop-only (mobile cap is 0), so below `md`
+              they all collapse away and the mobile "(+N)" link carries the whole day's count. */}
           {desktop.shown.map((event, i) => (
             <EventPill
               key={i}
