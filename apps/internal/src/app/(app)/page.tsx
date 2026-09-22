@@ -60,13 +60,6 @@ export default async function Page() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="border-b border-border px-7 py-5">
-        <h1 className="font-heading text-lg font-medium">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Ringkasan kemajuan pelaksanaan Sesi dan penyerapan anggaran Program di seluruh Klaster.
-        </p>
-      </header>
-
       <DashboardWarnings warnings={warnings} />
 
       <DashboardTabs
