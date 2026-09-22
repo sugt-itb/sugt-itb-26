@@ -10,7 +10,7 @@ const sans = Montserrat({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: {
-    default: "Beranda",
+    default: "Pendamping",
     template: "%s | SUGT Internal",
   },
 };

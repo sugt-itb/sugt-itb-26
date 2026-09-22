@@ -5,7 +5,6 @@ import { cn } from "@sugt/ui/lib/utils";
 import {
   Boxes,
   CalendarDays,
-  CalendarPlus,
   ClipboardCheck,
   Gauge,
   LayoutDashboard,
@@ -16,7 +15,6 @@ import {
   Plane,
   School,
   Users,
-  Video,
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
@@ -29,9 +27,10 @@ import { usePathname } from "next/navigation";
  * money is not** (ADR-0004). The Perjadin list and detail stay open, because a professor
  * gets a money-free variant of both and needs it to file a Perjadin Evaluation. Cerita is
  * Staff-only for a different reason: publishing is (ADR-0008), and a link to a screen
- * that will refuse you is worse than no link. Rencanakan Perjadin and Jadwalkan Sesi daring are
- * Staff-only by the same "worse than no link" rule: arranging delivery is Staff-only (the surface
- * list, #9/#70), so their reads are Staff-only too and a Teaching Team member gets no link.
+ * that will refuse you is worse than no link. Arranging delivery — Rencanakan Perjadin and
+ * Jadwalkan Sesi Daring — is Staff-only too (the surface list, #9/#70), but those two create-actions
+ * are no longer sidebar entries: each is a Staff-only button on its list page (`/perjadin`,
+ * `/sesi-daring`) instead (#294), so the sidebar shows only the always-open list links.
  *
  * **Perjadin Report is not here, and its absence is the answer to a question issue #30
  * owned.** The Report is the acquittal state on one `perjadin` row — there is no
@@ -58,26 +57,14 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: Gauge, staffOnly: false },
-  { href: "/beranda", label: "Beranda", icon: LayoutDashboard, staffOnly: true },
+  { href: "/pendamping", label: "Pendamping", icon: LayoutDashboard, staffOnly: true },
   { href: "/kalender", label: "Kalender", icon: CalendarDays, staffOnly: false },
   { href: "/pretest", label: "Pretest", icon: ClipboardCheck, staffOnly: false, editorOnly: true },
   { href: "/sekolah", label: "Direktori Sekolah", icon: School, staffOnly: false },
   { href: "/kelompok-sekolah", label: "Kelompok Sekolah", icon: Boxes, staffOnly: false },
   { href: "/feedback", label: "Feedback", icon: MessageSquare, staffOnly: false },
   { href: "/perjadin", label: "Perjadin", icon: Plane, staffOnly: false },
-  {
-    href: "/rencanakan-perjadin",
-    label: "Rencanakan Perjadin",
-    icon: CalendarPlus,
-    staffOnly: true,
-  },
-  { href: "/sesi-daring", label: "Sesi daring", icon: ListVideo, staffOnly: false },
-  {
-    href: "/jadwalkan-sesi-daring",
-    label: "Jadwalkan Sesi daring",
-    icon: Video,
-    staffOnly: true,
-  },
+  { href: "/sesi-daring", label: "Sesi Daring", icon: ListVideo, staffOnly: false },
   { href: "/cerita", label: "Cerita", icon: Newspaper, staffOnly: true },
   { href: "/orang", label: "Orang", icon: Users, staffOnly: false },
 ];
