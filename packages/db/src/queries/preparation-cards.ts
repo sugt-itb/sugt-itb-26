@@ -8,9 +8,10 @@ import { requireGrant } from "./staff-only";
 
 /**
  * **Preparation Cards** — the reads and writes behind the Dashboard (`/`) Persiapan tab's
- * free-standing cards (ADR-0028). A Card is a title, a Jenis, a date or date-range, and
- * a variable checklist; it is **not** the Perjadin Preparation Checklist (ADR-0018), which is a
- * Perjadin's seven fixed boxes — see `docs` / `CONTEXT.md` for the collision note.
+ * free-standing cards (ADR-0028). A Card is a title, a date or date-range, and a variable checklist
+ * whose **items each carry a Jenis** (#292); it is **not** the Perjadin Preparation Checklist
+ * (ADR-0018), which is a Perjadin's seven fixed boxes — see `docs` / `CONTEXT.md` for the collision
+ * note.
  *
  * **Reading is open** to any signed-in Person, like the rest of the Dashboard — a Pimpinan reads the
  * tab. **Every write opens with `requireGrant(caller, "Editor")`**: writing a Preparation
@@ -23,10 +24,14 @@ import { requireGrant } from "./staff-only";
  * column constraint at all.
  */
 
-/** One line of a Card's checklist. Ordered `(checked, position)` by the read: unchecked first. */
+/**
+ * One line of a Card's checklist. Ordered `(checked, position)` by the read: unchecked first.
+ * `jenis` is the item's category (#292) — one of the four `PREPARATION_JENIS`.
+ */
 export type PreparationChecklistItem = {
   id: string;
   label: string;
+  jenis: PreparationJenis;
   position: number;
   checked: boolean;
 };
@@ -35,7 +40,6 @@ export type PreparationChecklistItem = {
 export type PreparationCard = {
   id: string;
   title: string;
-  jenis: PreparationJenis;
   startsOn: string;
   endsOn: string | null;
   items: PreparationChecklistItem[];
@@ -53,7 +57,6 @@ export async function preparationCards(_caller: Person): Promise<PreparationCard
     .select({
       id: preparationCard.id,
       title: preparationCard.title,
-      jenis: preparationCard.jenis,
       startsOn: preparationCard.startsOn,
       endsOn: preparationCard.endsOn,
     })
@@ -69,6 +72,7 @@ export async function preparationCards(_caller: Person): Promise<PreparationCard
       id: preparationChecklistItem.id,
       cardId: preparationChecklistItem.cardId,
       label: preparationChecklistItem.label,
+      jenis: preparationChecklistItem.jenis,
       position: preparationChecklistItem.position,
       checked: preparationChecklistItem.checked,
     })
@@ -89,13 +93,15 @@ export async function preparationCards(_caller: Person): Promise<PreparationCard
   return cards.map((card) => ({ ...card, items: byCard.get(card.id) ?? [] }));
 }
 
-/** The fields a Card write collects. `endsOn` optional (null ⇒ single-date); `items` are labels. */
+/**
+ * The fields a Card write collects. `endsOn` optional (null ⇒ single-date); each initial `item`
+ * carries its own `label` and `jenis` (#292 — Jenis moved off the Card onto its items).
+ */
 export type PreparationCardInput = {
   title: string;
-  jenis: PreparationJenis;
   startsOn: string;
   endsOn?: string | null;
-  items?: string[];
+  items?: { label: string; jenis: PreparationJenis }[];
 };
 
 export type CreatePreparationCardResult =
@@ -121,12 +127,15 @@ export async function createPreparationCard(
   const title = input.title.trim();
   if (title === "") return { outcome: "title-required" };
 
-  const labels = (input.items ?? []).map((label) => label.trim());
-  if (labels.some((label) => label === "")) return { outcome: "label-required" };
-  if (labels.length > MAX_PREPARATION_CHECKLIST_ITEMS) {
+  const items = (input.items ?? []).map((item) => ({
+    label: item.label.trim(),
+    jenis: item.jenis,
+  }));
+  if (items.some((item) => item.label === "")) return { outcome: "label-required" };
+  if (items.length > MAX_PREPARATION_CHECKLIST_ITEMS) {
     return {
       outcome: "too-many-items",
-      count: labels.length,
+      count: items.length,
       limit: MAX_PREPARATION_CHECKLIST_ITEMS,
     };
   }
@@ -136,16 +145,20 @@ export async function createPreparationCard(
       .insert(preparationCard)
       .values({
         title,
-        jenis: input.jenis,
         startsOn: input.startsOn,
         endsOn: input.endsOn ?? null,
       })
       .returning({ id: preparationCard.id });
 
-    if (labels.length > 0) {
-      await tx
-        .insert(preparationChecklistItem)
-        .values(labels.map((label, position) => ({ cardId: card!.id, label, position })));
+    if (items.length > 0) {
+      await tx.insert(preparationChecklistItem).values(
+        items.map((item, position) => ({
+          cardId: card!.id,
+          label: item.label,
+          jenis: item.jenis,
+          position,
+        })),
+      );
     }
 
     return { outcome: "created", cardId: card!.id };
@@ -159,9 +172,10 @@ export type EditPreparationCardResult =
   | { outcome: "no-such-card" };
 
 /**
- * Edit a Card's own fields — title, Jenis, dates. Editor-guarded. Its checklist is edited
- * through the item writes below, not here. `updated_at` is bumped to record the edit — the list read
- * orders by `(starts_on, created_at)`, not recency, so this is an audit timestamp, not a sort key.
+ * Edit a Card's own fields — title and dates (a Card carries no Jenis since #292). Editor-guarded. Its
+ * checklist, including each item's Jenis, is edited through the item writes below, not here.
+ * `updated_at` is bumped to record the edit — the list read orders by `(starts_on, created_at)`, not
+ * recency, so this is an audit timestamp, not a sort key.
  */
 export async function editPreparationCard(
   caller: Person,
@@ -177,7 +191,6 @@ export async function editPreparationCard(
     .update(preparationCard)
     .set({
       title,
-      jenis: input.jenis,
       startsOn: input.startsOn,
       endsOn: input.endsOn ?? null,
       updatedAt: sql`now()`,
@@ -223,6 +236,7 @@ export async function addChecklistItem(
   caller: Person,
   cardId: string,
   label: string,
+  jenis: PreparationJenis,
 ): Promise<AddChecklistItemResult> {
   requireGrant(caller, "Editor");
 
@@ -252,7 +266,7 @@ export async function addChecklistItem(
 
     const [item] = await tx
       .insert(preparationChecklistItem)
-      .values({ cardId, label: trimmed, position: nextPosition })
+      .values({ cardId, label: trimmed, jenis, position: nextPosition })
       .returning({ id: preparationChecklistItem.id });
 
     return { outcome: "added", itemId: item!.id };
@@ -341,6 +355,30 @@ export async function setChecklistItemChecked(
   const [row] = await db
     .update(preparationChecklistItem)
     .set({ checked, updatedAt: sql`now()` })
+    .where(eq(preparationChecklistItem.id, itemId))
+    .returning({ id: preparationChecklistItem.id });
+
+  return row ? { outcome: "updated" } : { outcome: "no-such-item" };
+}
+
+export type SetChecklistItemJenisResult = { outcome: "updated" } | { outcome: "no-such-item" };
+
+/**
+ * Set one checklist item's Jenis — Editor-guarded (#292). A single-column UPDATE on its own row, the
+ * same shape as `setChecklistItemChecked`: the row is matched by id and the DB
+ * `preparation_checklist_item_jenis_check` backstops the four-value set, so nothing else is read or
+ * written. `jenis` is typed `PreparationJenis` at the Server Action boundary.
+ */
+export async function setChecklistItemJenis(
+  caller: Person,
+  itemId: string,
+  jenis: PreparationJenis,
+): Promise<SetChecklistItemJenisResult> {
+  requireGrant(caller, "Editor");
+
+  const [row] = await db
+    .update(preparationChecklistItem)
+    .set({ jenis, updatedAt: sql`now()` })
     .where(eq(preparationChecklistItem.id, itemId))
     .returning({ id: preparationChecklistItem.id });
 

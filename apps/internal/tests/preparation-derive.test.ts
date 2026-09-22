@@ -49,9 +49,8 @@ function card(over: Partial<PreparationCard> & Pick<PreparationCard, "startsOn">
   return {
     id: crypto.randomUUID(),
     title: "Rapat koordinasi",
-    jenis: "Teknis",
     endsOn: null,
-    items: [{ id: "i1", label: "Undang narasumber", position: 0, checked: false }],
+    items: [{ id: "i1", label: "Undang narasumber", jenis: "Teknis", position: 0, checked: false }],
     ...over,
   };
 }
@@ -83,7 +82,9 @@ describe("preparationWarnings", () => {
   it("never warns for a 100%-complete card, even when overdue", () => {
     const complete = card({
       startsOn: "2026-09-01",
-      items: [{ id: "i1", label: "Undang narasumber", position: 0, checked: true }],
+      items: [
+        { id: "i1", label: "Undang narasumber", jenis: "Teknis", position: 0, checked: true },
+      ],
     });
     expect(preparationWarnings([complete], TODAY)).toEqual([]);
   });
