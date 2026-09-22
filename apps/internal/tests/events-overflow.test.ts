@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * **The `/kalender` day-cell overflow helper, tested with no DOM.** `eventsOverflow` decides how
- * many event names a cell prints and what the "Lihat lebih banyak (+N)" link counts. The rules —
+ * many event names a cell prints and what the "(+N)" link counts. The rules —
  * everything fits below the cap, the exact-fit boundary, the spill, the empty day and the clamped
  * bad cap — are assertions here rather than pixels.
  */

@@ -16,11 +16,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@sugt/ui/component
 import { cn } from "@sugt/ui/lib/utils";
 import { useEffect, useState } from "react";
 
-/** Named-event pills a cell shows before it collapses the rest into "+N": three on desktop, one on
- *  the narrow phone column where three would not fit. Both counts feed the shared `eventsOverflow`
- *  helper, so the "+N" link never disagrees with how many pills are actually on screen. */
-const PILLS_DESKTOP = 3;
-const PILLS_MOBILE = 1;
+/** Named-event pills a cell shows before it collapses the rest into "(+N)": two on desktop, none on
+ *  the narrow phone column, where the "(+N)" count carries the whole day. Both counts feed the shared
+ *  `eventsOverflow` helper, so the "(+N)" link never disagrees with how many pills are actually on
+ *  screen. */
+const PILLS_DESKTOP = 2;
+const PILLS_MOBILE = 0;
 
 /** True at the `lg` breakpoint and up. Drives the one behaviour CSS cannot express: the detail panel
  *  is a persistent aside on desktop, so a day click must NOT also open the mobile drawer there. */
@@ -40,7 +41,7 @@ function useIsDesktop(): boolean {
  * **The `/kalender` month view** — a full-width, GNOME-calendar-style grid whose events come **live
  * from the Jadwal Google Sheet** (#258), not the database. Each day shows one neutral pill per
  * School with a cell that day (School name only; the old Cluster colour coding is gone — it no longer
- * maps to sheet data), collapsing to a "Selengkapnya (+N)" link past the per-breakpoint cap.
+ * maps to sheet data), collapsing to a "(+N)" link past the per-breakpoint cap.
  *
  * Clicking anywhere on a day (or the "+N" link) selects it and opens a **detail panel**: a persistent
  * right-side aside on desktop, a bottom drawer on mobile, both listing each School's name and its full
@@ -165,8 +166,8 @@ function PanelBody({ date, events }: { date: string | null; events: readonly Jad
 }
 
 /**
- * One month cell: the date number, then up to three School pills (one on mobile) with a
- * "Selengkapnya (+N)" link for the rest. The whole cell is a button — clicking it, a pill or the
+ * One month cell: the date number, then up to two School pills (none on mobile) with a
+ * "(+N)" link for the rest. The whole cell is a button — clicking it, a pill or the
  * link selects the day and opens the detail panel; an empty day selects too (its panel reads "no
  * activity"), so there is no separate empty-vs-full behaviour.
  */
@@ -249,12 +250,12 @@ function EventPill({ event, className }: { event: JadwalEvent; className?: strin
   );
 }
 
-/** The "Selengkapnya (+N)" line beneath the pills. Presentational only — the whole cell is the
- *  button, so a tap anywhere on it (this link included) opens the day's detail panel. */
+/** The "(+N)" line beneath the pills. Presentational only — the whole cell is the button, so a tap
+ *  anywhere on it (this link included) opens the day's detail panel. */
 function OverflowLink({ count, className }: { count: number; className?: string }) {
   return (
     <span className={cn("px-1 text-xs font-medium text-muted-foreground", className)}>
-      Selengkapnya (+{count})
+      (+{count})
     </span>
   );
 }
