@@ -33,7 +33,7 @@ import { preparationWarnings } from "./preparation-derive";
 export default async function Page() {
   const person = await requirePerson();
   // These three reads depend only on `person`, not on one another, so they run under a single
-  // `Promise.all` — one round of latency, not a three-deep request waterfall. `beranda/page.tsx`
+  // `Promise.all` — one round of latency, not a three-deep request waterfall. `pendamping/page.tsx`
   // batches the same way; this brings the landing surface back in line with the codebase's
   // `Promise.all` convention (#269). The destructured order matches the reads below.
   const [data, cards, completions] = await Promise.all([
@@ -60,13 +60,6 @@ export default async function Page() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="border-b border-border px-7 py-5">
-        <h1 className="font-heading text-lg font-medium">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Ringkasan kemajuan pelaksanaan Sesi dan penyerapan anggaran Program di seluruh Klaster.
-        </p>
-      </header>
-
       <DashboardWarnings warnings={warnings} />
 
       <DashboardTabs

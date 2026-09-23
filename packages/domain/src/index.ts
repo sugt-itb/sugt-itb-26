@@ -519,13 +519,14 @@ export const TRANSPORT_MODES = ["Pesawat", "Kereta", "Travel", "Mobil Dalam Kota
 export type TransportMode = (typeof TRANSPORT_MODES)[number];
 
 /**
- * The **Jenis** a Monitoring Preparation Card carries — the kind of preparation the card tracks, on
- * the `/monitoring` Persiapan tab. A closed set of four, mirrored by `preparation_card_jenis_check`
- * character for character (see `packages/db/src/schema/monitoring.ts`).
+ * The **Jenis** a Preparation **Checklist Item** carries — the kind of preparation that item tracks,
+ * on the Dashboard (`/`) Persiapan tab. Moved down from the Card to each item (#292). A closed set of
+ * four, mirrored by `preparation_checklist_item_jenis_check` character for character (see
+ * `packages/db/src/schema/monitoring.ts`).
  *
  * **`Pimpinan` here is a category label, not the Person Role.** It names a kind of preparation
  * (leadership-facing), and has nothing to do with the signed-in read-only `Pimpinan` role in `ROLES`
- * or with `requireGrant`/Grants — a Card's Jenis never gates access. Like `TRANSACTION_CATEGORIES`
+ * or with `requireGrant`/Grants — an item's Jenis never gates access. Like `TRANSACTION_CATEGORIES`
  * and `TRANSPORT_MODES`, these are **values a column may hold, not terms `CONTEXT.md` defines**, so
  * they live here without a glossary entry; only the Monitoring Preparation *concepts* are glossed.
  */

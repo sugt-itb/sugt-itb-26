@@ -1,6 +1,7 @@
 import {
   dismissWarning,
   initialWarningState,
+  restoreWarning,
   showBudget,
   type Warning,
 } from "-/app/(app)/dashboard-state";
@@ -65,5 +66,57 @@ describe("dismissWarning", () => {
     expect(start.ignored).toBe(ignoredBefore);
     expect(start.active).toEqual([w1, w2]);
     expect(start.ignored).toEqual([]);
+  });
+});
+
+describe("restoreWarning", () => {
+  const w1: Warning = { id: "w1", message: "satu" };
+  const w2: Warning = { id: "w2", message: "dua" };
+
+  it("moves an ignored warning back to the end of active, leaving the rest ignored", () => {
+    // Dismiss both, then restore the first: it returns to active while the second stays ignored.
+    let state = initialWarningState([w1, w2]);
+    state = dismissWarning(state, "w1");
+    state = dismissWarning(state, "w2");
+    const next = restoreWarning(state, "w1");
+    expect(next.active).toEqual([w1]);
+    expect(next.ignored).toEqual([w2]);
+  });
+
+  it("appends to the end of active, not back to its original slot", () => {
+    // w1 is dismissed then restored while w2 is still active — w1 lands after w2, not ahead of it.
+    let state = initialWarningState([w1, w2]);
+    state = dismissWarning(state, "w1");
+    const next = restoreWarning(state, "w1");
+    expect(next.active).toEqual([w2, w1]);
+    expect(next.ignored).toEqual([]);
+  });
+
+  it("is the inverse of dismissWarning back to a structurally-equal state", () => {
+    const start = initialWarningState([w1, w2]);
+    const roundTrip = restoreWarning(dismissWarning(start, "w1"), "w1");
+    // dismiss sends w1 to the end of active; restoring it appends to active again, so order is w2,w1.
+    expect(roundTrip.active).toEqual([w2, w1]);
+    expect(roundTrip.ignored).toEqual([]);
+  });
+
+  it("is a no-op for an id that is not ignored", () => {
+    let state = initialWarningState([w1, w2]);
+    state = dismissWarning(state, "w1");
+    const next = restoreWarning(state, "does-not-exist");
+    expect(next.active).toEqual([w2]);
+    expect(next.ignored).toEqual([w1]);
+  });
+
+  it("never mutates the input state or its arrays", () => {
+    let start = initialWarningState([w1, w2]);
+    start = dismissWarning(start, "w1");
+    const activeBefore = start.active;
+    const ignoredBefore = start.ignored;
+    restoreWarning(start, "w1");
+    expect(start.active).toBe(activeBefore);
+    expect(start.ignored).toBe(ignoredBefore);
+    expect(start.active).toEqual([w2]);
+    expect(start.ignored).toEqual([w1]);
   });
 });

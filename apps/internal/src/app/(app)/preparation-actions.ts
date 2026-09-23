@@ -10,6 +10,7 @@ import {
   removeChecklistItem,
   reorderChecklistItems,
   setChecklistItemChecked,
+  setChecklistItemJenis,
   type AddChecklistItemResult,
   type CreatePreparationCardResult,
   type DeletePreparationCardResult,
@@ -18,7 +19,9 @@ import {
   type RemoveChecklistItemResult,
   type ReorderChecklistItemsResult,
   type SetChecklistItemCheckedResult,
+  type SetChecklistItemJenisResult,
 } from "@sugt/db/queries";
+import type { PreparationJenis } from "@sugt/domain";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -68,11 +71,23 @@ export async function deletePreparationCardAction(
 export async function addChecklistItemAction(
   cardId: string,
   label: string,
+  jenis: PreparationJenis,
 ): Promise<AddChecklistItemResult> {
   const person = await requirePerson();
 
-  const result = await staffSurface(() => addChecklistItem(person, cardId, label));
+  const result = await staffSurface(() => addChecklistItem(person, cardId, label, jenis));
   if (result.outcome === "added") revalidatePath("/");
+  return result;
+}
+
+export async function setChecklistItemJenisAction(
+  itemId: string,
+  jenis: PreparationJenis,
+): Promise<SetChecklistItemJenisResult> {
+  const person = await requirePerson();
+
+  const result = await staffSurface(() => setChecklistItemJenis(person, itemId, jenis));
+  if (result.outcome === "updated") revalidatePath("/");
   return result;
 }
 

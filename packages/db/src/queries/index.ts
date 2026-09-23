@@ -122,6 +122,7 @@ export {
   removeChecklistItem,
   reorderChecklistItems,
   setChecklistItemChecked,
+  setChecklistItemJenis,
   type AddChecklistItemResult,
   type CreatePreparationCardResult,
   type DeletePreparationCardResult,
@@ -132,6 +133,7 @@ export {
   type RemoveChecklistItemResult,
   type ReorderChecklistItemsResult,
   type SetChecklistItemCheckedResult,
+  type SetChecklistItemJenisResult,
 } from "./preparation-cards";
 export {
   arrangeOnlineSession,

@@ -73,15 +73,19 @@ export function DashboardView({
               <CardDescription>Penyerapan anggaran</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <div className="font-heading text-2xl tabular-nums">
+              {/* Stacked on a narrow phone (long rupiah figures collide side-by-side at ~320px),
+                  side-by-side from `sm:` up. `min-w-0` lets a long value shrink rather than force
+                  overflow; the number steps down to `text-lg` on mobile and the right block only
+                  right-aligns once it is a row. Figures stay full and exact — a money surface. */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+                <div className="min-w-0">
+                  <div className="font-heading text-lg tabular-nums sm:text-2xl">
                     Rp {formatIdr(budget.usedIdr)}
                   </div>
                   <div className="text-sm text-muted-foreground">Anggaran terpakai</div>
                 </div>
-                <div className="text-right">
-                  <div className="font-heading text-2xl tabular-nums">
+                <div className="min-w-0 sm:text-right">
+                  <div className="font-heading text-lg tabular-nums sm:text-2xl">
                     Rp {formatIdr(budget.totalIdr)}
                   </div>
                   <div className="text-sm text-muted-foreground">Total anggaran</div>
