@@ -15,6 +15,7 @@ import {
   type TransportMode,
 } from "@sugt/domain";
 import { Button } from "@sugt/ui/components/button";
+import { LinkButton } from "@sugt/ui/components/link-button";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -215,11 +216,13 @@ function TripCard({ trip }: { trip: MyUpcomingPerjadin }) {
             </Button>
           }
         />
-        <Button
+        <LinkButton
           variant="outline"
           size="sm"
-          render={<Link href={`/perjadin/${trip.id}`}>Edit</Link>}
-        />
+          render={<Link href={`/perjadin/${trip.id}`} />}
+        >
+          Edit
+        </LinkButton>
       </div>
     </li>
   );
