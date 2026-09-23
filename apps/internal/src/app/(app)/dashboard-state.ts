@@ -11,8 +11,9 @@ import type { Role } from "@sugt/domain";
  *      (ADR-0004 reversed by ADR-0026, #180). Testing the value, not the render, is what lets the
  *      suite pin which roles see the budget card.
  *   2. **The dismiss state machine** — a warning the operator sets aside moves from `active` to the
- *      end of `ignored`. Modelled as two immutable lists so a reducer over them is a pure
- *      `(state, id) → state`, with the view holding the current state in `useState`.
+ *      end of `ignored`, and `restoreWarning` moves it back the same way. Modelled as two immutable
+ *      lists so each reducer over them is a pure `(state, id) → state`, with the view holding the
+ *      current state in `useState`.
  */
 
 /** A single Dashboard warning: a stable id and the human message shown in the banner. */
@@ -51,5 +52,23 @@ export function dismissWarning(state: WarningState, id: string): WarningState {
   return {
     active: state.active.filter((w) => w.id !== id),
     ignored: [...state.ignored, moved],
+  };
+}
+
+/**
+ * Bring a set-aside warning back. The inverse of `dismissWarning`: returns a NEW state with the
+ * warning whose id matches moved from `ignored` to the END of `active`, preserving the order of the
+ * rest. An id not currently ignored is a no-op — a fresh, structurally-equal state. The input arrays
+ * are never mutated. Restoring appends to `active` rather than restoring the original slot, the same
+ * end-of-list rule dismissal uses, so the two moves stay symmetric and order is predictable (#303).
+ */
+export function restoreWarning(state: WarningState, id: string): WarningState {
+  const moved = state.ignored.find((w) => w.id === id);
+  if (!moved) {
+    return { active: [...state.active], ignored: [...state.ignored] };
+  }
+  return {
+    active: [...state.active, moved],
+    ignored: state.ignored.filter((w) => w.id !== id),
   };
 }
