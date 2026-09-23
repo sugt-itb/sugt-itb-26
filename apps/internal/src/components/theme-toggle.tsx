@@ -28,12 +28,21 @@ function ThemeToggle() {
   }, []);
 
   if (!mounted) {
+    // Safe placeholder pattern: the pre-mount placeholder greys itself out with `aria-disabled`
+    // plus `pointer-events-none opacity-50`, never the base-ui `disabled` prop. base-ui's Button
+    // renders a *focusable-when-disabled* control, and its native `disabled` attribute serializes
+    // differently across the SSR/hydration boundary (server emits `disabled={null}`, the client
+    // computes `disabled={true}`) — a React hydration mismatch on every signed-in page (#302). The
+    // placeholder has no `onClick`, so it is already inert; these classes only preserve the greyed
+    // look while keeping the markup byte-identical on server and client. Use this pattern — not
+    // `disabled` — for any pre-mount base-ui placeholder.
     return (
       <Button
         size="icon-sm"
         variant="ghost"
         aria-label="Tema"
-        disabled
+        aria-disabled
+        className="pointer-events-none opacity-50"
       >
         <Sun />
       </Button>
