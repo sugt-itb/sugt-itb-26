@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
  * **Hydration-safe.** `next-themes` cannot know the stored theme until it has read
  * `localStorage`, which only happens after mount, so the first server/client paint must
  * not depend on it. Until `mounted`, render a stable, theme-agnostic placeholder — the Sun
- * icon, disabled — matching what the server sent; swap to the live control once mounted.
+ * icon, greyed out — matching what the server sent; swap to the live control once mounted.
  * Without this the button's icon and label would differ between server and client and React
  * would warn.
  */
@@ -28,14 +28,14 @@ function ThemeToggle() {
   }, []);
 
   if (!mounted) {
-    // Safe placeholder pattern: the pre-mount placeholder greys itself out with `aria-disabled`
-    // plus `pointer-events-none opacity-50`, never the base-ui `disabled` prop. base-ui's Button
-    // renders a *focusable-when-disabled* control, and its native `disabled` attribute serializes
-    // differently across the SSR/hydration boundary (server emits `disabled={null}`, the client
-    // computes `disabled={true}`) — a React hydration mismatch on every signed-in page (#302). The
-    // placeholder has no `onClick`, so it is already inert; these classes only preserve the greyed
-    // look while keeping the markup byte-identical on server and client. Use this pattern — not
-    // `disabled` — for any pre-mount base-ui placeholder.
+    // Safe placeholder pattern: a pre-mount placeholder greys itself out with `aria-disabled` plus
+    // `pointer-events-none opacity-50`, never the base-ui `disabled` prop. base-ui's Button resolves
+    // its `disabled` state through the button hook rather than as a plain static attribute, and
+    // routing the pre-mount placeholder through it produced a React hydration mismatch on every
+    // signed-in page (#302). `aria-disabled` and these classes are static literals, so the
+    // placeholder's markup is identical on the server and on the client's first paint by
+    // construction. The placeholder has no `onClick` and is already inert; the classes only preserve
+    // the greyed look. Prefer this pattern over `disabled` for any pre-mount base-ui placeholder.
     return (
       <Button
         size="icon-sm"
