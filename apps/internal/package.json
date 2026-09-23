@@ -19,6 +19,7 @@
     "@sugt/story-format": "workspace:*",
     "@sugt/ui": "workspace:*",
     "@supabase/supabase-js": "catalog:",
+    "@vercel/speed-insights": "catalog:",
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
     "lucide-react": "catalog:",

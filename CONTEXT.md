@@ -33,7 +33,7 @@ Direktorat Persiapan Bersama ITB — the organiser appointed to deliver the STEM
 ### Delivery
 
 **School**:
-A participating school receiving teaching under the Programme. Around 42, and the set is fixed.
+A participating school receiving teaching under the Programme. Around 47, and the set is fixed.
 
 **Province**:
 The Indonesian province a School sits in. Nothing is organised by Province — it is not a Cluster and does not group anything — but the number of them the Programme reaches is one of the figures the public site leads with, and it is what says which Time Zone a School keeps.
@@ -82,19 +82,30 @@ A small set of students within the Student Class who produce one Final Project t
 _Avoid_: group (reserved for the travelling party), sub-group, team, squad
 
 **Session**:
-A single teaching occasion at one School — one date, one start time, one mode. Its start time is local to the School, in the School's Time Zone, whichever mode it is and wherever the people teaching it are. Comes into existence when it is arranged, not before. The team says _Sesi_; it translates cleanly. **Both modes are now single-Stream** (see [ADR-0019](./docs/adr/0019-offline-sessions-carry-a-stream-and-a-school-gets-many-per-trip.md) and [ADR-0022](./docs/adr/0022-online-sessions-carry-a-stream-and-name-teachers-as-session-scoped-names.md)): every Session carries one **Stream** — STEM or Research. An **online** Session (a School still has six) is single-Stream like the rest, so its six are split across the two Streams rather than each teaching both; an **offline** Session, likewise single-Stream, may come several to one Perjadin, each on its own date and time, taught by a set of that Perjadin's Teaching Team in parallel.
+A single teaching occasion at one School — one date, one start time, one mode. Its start time is local to the School, in the School's Time Zone for an **offline** Session; an **online** Session is always **WIB** nationally ([#283](https://github.com/mafiefa02/sugt/issues/283)), since a third-party LMS with a WIB Zoom host runs online delivery. Comes into existence when it is arranged, not before. The team says _Sesi_; it translates cleanly. **Only offline Sessions carry a Stream now** ([ADR-0019](./docs/adr/0019-offline-sessions-carry-a-stream-and-a-school-gets-many-per-trip.md), and [ADR-0034](./docs/adr/0034-online-sessions-are-no-longer-single-stream.md) which supersedes ADR-0022's online-Stream rule): an **offline** Session carries one **Stream** — STEM or Research — and may come several to one Perjadin, each on its own date and time, taught by a set of that Perjadin's Teaching Team in parallel. An **online** Session (a School still has six) carries **no Stream and no PIC** ([ADR-0034](./docs/adr/0034-online-sessions-are-no-longer-single-stream.md), [ADR-0035](./docs/adr/0035-online-sessions-track-no-pic-and-file-no-session-record.md)) — the rule is simply **one online Session per School per day** — and produces **no Session Record**. A School receives **two** offline Sessions and six online — **eight** in all ([#195](https://github.com/mafiefa02/sugt/issues/195), down from four offline). The **"Sesi 1/2/…"** a Session shows is not cosmetic and not a stored ordinal: it is the Session's **per-School, per-mode date rank** — order a School's live Sessions of one mode by `(held_on, starts_at)` and the earliest is Sesi 1 — computed on the fly, cancelled Sessions skipped, independent of any calendar window ([ADR-0027](./docs/adr/0027-a-sessions-sesi-is-its-per-school-date-rank.md)).
 _Avoid_: visit, teaching, meeting, class (a Session is an occurrence; a Class is people)
+
+**Pretest**:
+An assessment **administered** to a cohort at a School before the Programme's teaching — tracked per **(School × Stream × participant-type)** as a yes/no about whether it happened, never the scores or how the cohort did ([ADR-0031](./docs/adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md)). It is **delivery, not outcome** ([ADR-0009](./docs/adr/0009-the-tool-tracks-delivery-not-outcomes.md)): the tool records that the Pretest was given, and stores no result. The `Siswa`/`GTK-MS` participant-types it is tracked against are a **column-value set, not glossary terms** — the same footing as the transaction participant types.
+_Avoid_: score, result, mark (a Pretest completion is that it happened, not how it went)
+
+**Posttest**:
+The counterpart to a **Pretest**, administered after the teaching, on the same grain and the same delivery-not-outcome footing. Its completions share the `assessment_completion` table (`kind = 'posttest'`), but **no UI surfaces it this iteration** — the column exists so surfacing it later is a UI-only change, not a migration (ADR-0031).
+
+**Jadwal**:
+The Programme's **activity schedule** — which School has which activity, and on which date, across the term. It is authored and kept by DITSAMA **outside the tool**, and the **Kalender** month view reads it rather than the tool owning it: the Jadwal is that calendar's single source of truth, not a record the tool creates ([ADR-0033](./docs/adr/0033-kalender-schedule-is-a-link-shared-google-sheet.md)).
+_Avoid_: Kalender (that is the on-screen month view; the Jadwal is the schedule it renders)
 
 ### People and travel
 
 **Person**:
-A named human the Programme's records refer to. **Every Person is Staff** — the `Teaching Team` role was retired in T3 ([#153](https://github.com/mafiefa02/sugt/issues/153)), because the professors who teach are free-text names who never sign in (see **Teaching Team**), leaving Staff the only role. A Person is named before they ever sign in, because a Group can be formed around someone who has not.
+A named human the Programme's records refer to. **A Person is Staff or Pimpinan** — the `Teaching Team` role was retired in T3 ([#153](https://github.com/mafiefa02/sugt/issues/153)), because the professors who teach are free-text names who never sign in (see **Teaching Team**), and for a while Staff stood alone; **Pimpinan** is the second signed-in role, read-only, added in [#179](https://github.com/mafiefa02/sugt/issues/179) (see **Pimpinan**). A Person is named before they ever sign in, because a Group can be formed around someone who has not.
 _Avoid_: user (a sign-in identity, which a Person may or may not yet have), member, participant, resource
 
 **Staff**:
-A DITSAMA ITB employee working on the Programme, the Programme's leadership included.
+A DITSAMA ITB employee working on the Programme. Leadership now have a signed-in role of their own — **Pimpinan** ([#179](https://github.com/mafiefa02/sugt/issues/179)) — rather than being folded into Staff, so "Staff" is the working delivery-and-money role, not a catch-all for everyone at DITSAMA.
 The internal UI labels this role by context: **DITSAMA** on surfaces away from a **Perjadin**, and **Pendamping** on a Perjadin's own surfaces (see **Pendamping**). The domain term is still **Staff** (a presentation concern — the stored value stays `Staff`).
-_Avoid_: leadership, admin, organiser (senior Staff are Staff; there is no separate role)
+_Avoid_: admin, organiser (Staff is a working role; leadership are **Pimpinan** now, a separate signed-in role — #179)
 
 **Pendamping**:
 The on-**Perjadin** label for the **Staff** role — the DITSAMA people who **accompany** the Teaching Team on the journey. One role, two context-dependent labels: **Staff** reads **DITSAMA** away from a Perjadin and **Pendamping** on one (its Group list, the acquittal receipts, the "confirmed with the Pendamping" **Preparation Item**). Presentation only — the stored value stays `Staff`, and the **PIC** tag is orthogonal (a PIC is a Pendamping too, but is marked by the more specific fact). See [#141](https://github.com/mafiefa02/sugt/issues/141).
@@ -113,26 +124,54 @@ The **Staff** who travel on one Perjadin — the **PIC** plus up to ten other DI
 _Avoid_: team, squad, class
 
 **Pimpinan**:
-A leader of DITSAMA ITB — one of a fixed set of three named people — who, rarely, joins a Perjadin's **Kelompok Perjalanan** for the offline Sessions to monitor and evaluate. Recorded on the Perjadin (optional, editable, chosen from the fixed set) and named on the **Laporan Perjadin**, but **record-only**: a Pimpinan is not a working **Group** member, files no **Perjadin Evaluation** and adds nothing to the **Preparation Checklist**.
-_Avoid_: leadership (that is the Staff role generally), chairman, director
+DITSAMA ITB's leadership, and — since [#179](https://github.com/mafiefa02/sugt/issues/179) — a **signed-in, read-only Person role** beside **Staff**. A Pimpinan is added open-endedly from **/orang** like any other Person, signs in through the ordinary invite gate, reads every delivery surface — and, since [#180](https://github.com/mafiefa02/sugt/issues/180)/[ADR-0026](./docs/adr/0026-money-is-open-to-read-and-staff-only-to-write.md), **all money** too (the acquittal, its export, the trip money strip, the **Dashboard** budget card) — writes nothing, and lands on the **Dashboard** (`/`) ([ADR-0025](./docs/adr/0025-pimpinan-is-a-second-signed-in-read-only-person-role.md)). The boundary is **read (any signed-in Person) vs write (Staff)**: they are kept out of every working position — **Group** member, **PIC**, **Session Record** filer, **Story** author — and every money **write** by the composite `(id, role)` foreign keys and `requireStaff` that still pin `Staff`, which is what makes the role read-only.
+**Record-only on a trip** is the older, separate sense: a Pimpinan who joins a Perjadin's **Kelompok Perjalanan** to monitor the offline Sessions is _recorded_ on the Perjadin and named on the **Laporan Perjadin**, but is **not a working Group member** and adds nothing to the **Preparation Checklist** ([ADR-0020](./docs/adr/0020-teaching-team-members-on-a-perjadin-are-trip-scoped-names.md)). That trip record is now **chosen from the Pimpinan roster** — real `person` rows of role Pimpinan ([#181](https://github.com/mafiefa02/sugt/issues/181)): the fixed-three `PIMPINAN` constant is gone, a `perjadin_pimpinan` row references a Person via a composite `(person_id, 'Pimpinan')` foreign key, and that FK guarantees only a Pimpinan-Person can be recorded. It stays **record-only on a trip** — still not a working Group member. A Pimpinan **may also file a Perjadin Evaluation** — through an unauthenticated token link with a self-declared Role, `Pimpinan` being one of the three (ADR-0024) — but that is an untrusted self-declared string, unrelated to this Person role.
+_Avoid_: leadership (that is the general sense; the Staff role no longer includes it), chairman, director
 
 **PIC**:
-The Staff member accountable for one piece of work being filed. A Perjadin has one, answerable for its administrative reporting; an online Session has one of its own, since it has no Group. The PIC files the Session Record — the account of the visit — and no Class Records, because they organised the Session rather than taught it.
+The Staff member accountable for one piece of work being filed. A **Perjadin** has one, answerable for its administrative reporting, and an **offline** Session takes its PIC from its Perjadin. An **online** Session has **no PIC** ([ADR-0035](./docs/adr/0035-online-sessions-track-no-pic-and-file-no-session-record.md)): a third-party LMS runs online delivery, so DITSAMA staffs none. The PIC files the offline Session Record — the account of the visit — and no Class Records, because they organised the Session rather than taught it.
 _Avoid_: lead, owner, manager
 
 **Preparation Checklist**:
 A Perjadin's private, hand-ticked list of pre-departure to-dos — an internal-monitoring aid for Staff, shown only on the Perjadin's own screen. It carries no money, no deadline and no record. Every Perjadin has the **same seven fixed Preparation Items** — no per-member derivation any more — and its completion shows on the Perjadin list as a `Persiapan: x/N` count, `N = 7`.
-_Avoid_: preparation status, readiness, onboarding, workflow (it tracks nothing but hand-ticked boxes and blocks nothing)
+**Not the same thing as a Preparation Card** (see **Preparation Cards**), though both read "Persiapan" in the UI: this is a Perjadin's seven _fixed_ boxes tied to one trip; a Preparation Card is a _standalone_ **Dashboard** artefact with a _variable_ checklist and no Perjadin behind it. They share no table and no code.
+_Avoid_: preparation status, readiness, onboarding, workflow (it tracks nothing but hand-ticked boxes and blocks nothing); Preparation Cards (a different concept)
 
 **Preparation Item**:
 One line of a **Preparation Checklist**. Seven are fixed for every Perjadin — SK Perjalanan, the two tickets, lodging, local transport, a single "confirmed with the Pendamping" box, and **"Pengajar sudah lengkap"**. Only the ticked items are stored. Every box is ticked by hand; every box stays ticked until a hand un-ticks it — **except "Pengajar sudah lengkap"**, the one box the tool clears by itself whenever the Teaching Team changes (a name added, removed or renamed), so that each change forces a fresh manual confirmation that the team is complete (see the amendment to [ADR-0018](./docs/adr/0018-the-preparation-checklist-stores-ticks-and-derives-the-list.md)).
 _Avoid_: task, step, todo (it is neither assigned nor sequenced)
 
+**Preparation Cards**:
+The free-standing cards on the **Dashboard** (`/`) **Persiapan** tab — a monitoring aid distinct from a Perjadin's **Preparation Checklist** despite both reading "Persiapan". Each is a standalone card (a title, a date or date-range, a variable **Checklist Item** list) with nothing behind it — no Perjadin, School, Cluster or Session. **Reading is open** to any signed-in Person, like the rest of the Dashboard; **writing is gated by the Editor Grant** (see **Grant**), and an **Administrator** may write it too. Each **Checklist Item** carries a **Jenis** — Teknis, Kurikulum, LAPI, Pimpinan — a category label; the **Pimpinan** Jenis is unrelated to the **Pimpinan** Role.
+_Avoid_: Monitoring Preparation (the retired name), Preparation Checklist (the Perjadin's seven fixed boxes — a different concept), readiness, onboarding
+
+**Preparation Card**:
+One of the **Preparation Cards**: a title, a `starts_on` and an optional `ends_on` (null ⇒ a single date), and an ordered **Checklist Item** list. Standalone — it references no domain row. It carries no Jenis of its own — that lives on each **Checklist Item**. Its completion shows as a percentage — checked ÷ total items, **0 items ⇒ 0%**.
+_Avoid_: Perjadin, Preparation Checklist, task board
+
+**Checklist Item**:
+One line of a **Preparation Card**'s checklist — a label, a **Jenis** (Teknis, Kurikulum, LAPI, Pimpinan — the category, moved here from the Card), a position, and a checked flag that toggles **both ways** (a ticked item can be unticked). A Card holds at most twenty. Not to be confused with a **Preparation Item**, which is one of a Perjadin Preparation Checklist's seven fixed boxes.
+_Avoid_: Preparation Item (the Perjadin one), task, todo
+
+### Access
+
+**Grant**:
+An optional, revocable, **Staff-only** capability a **Person** may hold — a **second, additive access axis** beside the write-once **Role** ([ADR-0028](./docs/adr/0028-grants-are-a-second-additive-access-axis.md)). A Role is exactly one and write-once (a Person is **Staff** or **Pimpinan**); a Grant is none, one or several, and can be taken away. Grants never touch a Person's Role, and being Staff-only they never let a **Pimpinan** — who writes nothing — write anything. Two Grants exist: **Administrator** and **Editor**. Granted and revoked by an **Administrator** from **/orang**.
+_Avoid_: role (a Role is the one write-once axis; a Grant is the second, additive one), permission, scope, claim
+
+**Administrator**:
+The **Grant** that administers Grants — an Administrator assigns and revokes any Grant on any **Staff** Person, including making another Administrator — and that **implies every other Grant**, so an Administrator can do anything a Grant gates. The first Administrator is seeded outside the tool (the founding-Staff seed grants it), because there is otherwise no one who could grant it. Held only by Staff, like every Grant.
+_Avoid_: admin, superuser, owner (it is a Grant a Staff Person holds, not a Role or an account tier)
+
+**Editor**:
+The **Grant** that lets a **Staff** Person **write Preparation Cards**. Without it a Staff Person reads the **Dashboard** (`/`) but does not edit its Preparation Cards; an **Administrator** has it implicitly. It gates writing only — reading the Dashboard is open to any signed-in Person like the rest of delivery.
+_Avoid_: monitor, reviewer, Cerita "editor" (the Story-editing surface, unrelated)
+
 ### Reporting
 
 **Advance**:
-Money for a Perjadin, its amount fixed during trip planning and transferred to the PIC before departure, which the PIC must later account for in full.
-_Avoid_: budget, allowance, float
+Money for a Perjadin, its amount fixed during trip planning and transferred to the PIC before departure. It is a **travel float** for direct on-trip purchases, **not** a pot reconciled in full: only transactions of the draw-down categories (**Konsumsi** and **Lainnya**, the `ADVANCE_DRAWDOWN_CATEGORIES`) consume the remaining float, so **the remaining float is `advance − drawn-down`, not `advance − all spend`** ([ADR-0029](./docs/adr/0029-advance-is-a-travel-float-only-some-categories-draw-it-down.md)). Every other category (Akomodasi, Tiket, Uang Harian, Honorarium, Transport, ATK, …) is still recorded against the trip and shown in the acquittal, but is paid outside the float and leaves the remainder untouched. Separately, the **Dashboard**'s "Anggaran terpakai" still sums **every** category — programme spend and float draw-down are two different numbers by design. The stored code identifier stays `advanceIdr`.
+_Avoid_: budget, allowance (it is a float now — but "float" is the sense, not a rename; the user-facing label becomes "Uang Perjalanan" in a separate ticket)
 
 **Treasurer**:
 The Staff member who releases an Advance and receives whatever is left of it.
@@ -143,7 +182,7 @@ The acquittal of one Perjadin — every transaction that consumed the Advance, e
 _Avoid_: report (unqualified), expense report, reimbursement (nothing is claimed back; the money was transferred upfront)
 
 **Session Record**:
-What the PIC says about one Session as a whole — the visit rather than the teaching. Rates five Aspects: **Facilities**, **Turnout**, **School support**, **Timing** and **Coordination**. Filed by Staff, who organised the Session and taught none of it, so it asks nothing about how a cohort got on.
+What the PIC says about one **offline** Session as a whole — the visit rather than the teaching. Rates five Aspects: **Facilities**, **Turnout**, **School support**, **Timing** and **Coordination**. Filed by Staff, who organised the Session and taught none of it, so it asks nothing about how a cohort got on. **Only offline Sessions produce one** ([ADR-0035](./docs/adr/0035-online-sessions-track-no-pic-and-file-no-session-record.md)): an online Session has no PIC and files none — a third-party LMS runs online delivery.
 _Avoid_: report (unqualified), notes, minutes, evaluation (unqualified — it names none of the four)
 
 **Class Record**:
@@ -155,12 +194,12 @@ One of the named things an evaluation scores. Each of the four evaluations has i
 _Avoid_: category, criterion, dimension, metric, section
 
 **Rating**:
-The score one person gives one Aspect, from 1 to 10. Ratings are the only thing in the system anything counts. An Aspect reaches the concerns list when any single Rating of it is 7 or below — one low score is enough and is never averaged away — and on a Class Record or a Session Record, a Rating that low cannot be filed without saying why.
+The score one person gives one Aspect, from 1 to 10. Ratings are the only thing in the system anything counts. An Aspect reaches the concerns list when any single Rating of it is 7 or below — one low score is enough and is never averaged away — and on a Class Record, a Session Record or a Perjadin Evaluation, a Rating that low cannot be filed without saying why. On a Perjadin Evaluation that "why" is per-Aspect: the explanation goes on that Aspect's own Komentar, not a shared box.
 _Avoid_: grade, mark, health, RAG, status
 
 **Perjadin Evaluation**:
-How the trip went, as against how the teaching went: a Rating for each of **Lodging**, **Transport**, **Meals** and **Punctuality**, plus what went wrong and what to do differently. Only the Group that travelled may file one, and each of them files at most one. Open to anyone signed in — it carries no money.
-_Avoid_: travel evaluation ("travel" is reserved against **Perjadin**), trip report, Perjadin Report (that is the acquittal, and is Staff-only)
+How the trip went, as against how the teaching went: a Rating for each of **Lodging**, **Transport**, **Meals** and **Punctuality**, each carrying an optional comment, required only when that Aspect's own Rating is low (#163, ADR-0023). Filed **without signing in**, through a short-lived token link shared from the trip's page, by a filer who self-declares a Role (**Pengajar**, **Pendamping** or **Pimpinan**) and a Name — the same untrusted-identity pattern as **Participant Feedback** (ADR-0012, ADR-0024). No dedup: anyone with the link may file, as many times as they like. Any signed-in Person may issue the link — it carries no money.
+_Avoid_: travel evaluation ("travel" is reserved against **Perjadin**), trip report, Perjadin Report (that is the acquittal — any signed-in Person may **read** it since #180/ADR-0026, and only **writing** it is Staff-only)
 
 **Participant**:
 Someone taught at a Session — a member of a GTK, MS or Student Class. The Programme's records never name Participants, except where one names themselves in Participant Feedback.
@@ -200,14 +239,14 @@ _Avoid_: showcase (that is the section, not the piece), case study, portfolio it
 - Each **Class** is taught in both **Streams** — six teaching threads per **School**
 - The **Student Class** divides into ten to thirty **Project Teams**; each produces exactly one **Final Project**
 - A **School** therefore ends the Programme with many **Final Projects**, not one
-- A **Session** is held at exactly one **School** and carries one **Stream** — STEM or Research — whichever its mode ([ADR-0019](./docs/adr/0019-offline-sessions-carry-a-stream-and-a-school-gets-many-per-trip.md), [ADR-0022](./docs/adr/0022-online-sessions-carry-a-stream-and-name-teachers-as-session-scoped-names.md))
-- A **School** receives **six online Sessions**, the same for every **School**, now single-**Stream** each rather than teaching both — a **School** may hold one STEM and one Research online **Session** on a date, but not two of the same **Stream**. Its **offline Sessions** are no longer a fixed four — a **Perjadin** may hold several at one **School**, each single-**Stream** (capped at ten per **School** per trip as a safety ceiling, never reached in practice)
+- A **Session** is held at exactly one **School**. An **offline** Session carries one **Stream** — STEM or Research ([ADR-0019](./docs/adr/0019-offline-sessions-carry-a-stream-and-a-school-gets-many-per-trip.md)); an **online** Session carries **no Stream** ([ADR-0034](./docs/adr/0034-online-sessions-are-no-longer-single-stream.md), superseding [ADR-0022](./docs/adr/0022-online-sessions-carry-a-stream-and-name-teachers-as-session-scoped-names.md))
+- A **School** receives **six online Sessions**, the same for every **School** — **one per day** at most, no longer split by **Stream** ([ADR-0034](./docs/adr/0034-online-sessions-are-no-longer-single-stream.md)). It also receives **two offline Sessions** — the two Luring Sesi ([#195](https://github.com/mafiefa02/sugt/issues/195), down from four) — though a **Perjadin** may hold several at one **School** in a single trip, each single-**Stream** (capped at ten per **School** per trip as a safety ceiling, never reached in practice)
 - A **Session** exists only once arranged, and is then either delivered or cancelled
 - A **School**'s progress is delivered **Sessions** against that fixed number; a cancelled **Session** counts for nothing but stays visible as an attempt that failed
 - A **Perjadin** carries exactly one **Group** and has exactly one **PIC**
 - A **Group** exists for one **Perjadin** only — no **Cluster** has a standing team
 - A **Group** contains one **PIC** and up to ten other **Staff**, and nothing else; its minimum is just the **PIC**. **Teaching Team** are trip-scoped names recorded on the **Perjadin**, not **Group** members, and **Pimpinan** who join are recorded but do not travel as working members
-- **Every Person is Staff** — the `Teaching Team` **Person** role was retired in T3 ([#153](https://github.com/mafiefa02/sugt/issues/153)) once both modes named their teachers as plain names, so there is one role now and the old online `session_teacher` table is dropped
+- **A Person is Staff or Pimpinan** — the `Teaching Team` **Person** role was retired in T3 ([#153](https://github.com/mafiefa02/sugt/issues/153)) once both modes named their teachers as plain names (dropping the old online `session_teacher` table), leaving Staff alone; **[#179](https://github.com/mafiefa02/sugt/issues/179)** then added **Pimpinan**, one signed-in read-only leadership role. **Pimpinan** who join a trip are recorded but do not travel as working members
 - A **Session** records who taught it as **names**, filing nothing: an **online Session** carries session-scoped **Pengajar** names entered on it ([ADR-0022](./docs/adr/0022-online-sessions-carry-a-stream-and-name-teachers-as-session-scoped-names.md)); an **offline Session** records the set of the **Perjadin**'s trip-scoped **Teaching Team** names who taught it in parallel
 - Offline **Sessions** happen during a **Perjadin**; online **Sessions** have no **Perjadin** at all
 - A **Perjadin** goes to exactly one **Sub-Cluster**, and every **School** it teaches at belongs to that **Sub-Cluster**
@@ -224,7 +263,7 @@ _Avoid_: showcase (that is the section, not the piece), case study, portfolio it
 - A **Rating** of 7 or below cannot be filed on a **Class Record** or a **Session Record** without saying what went wrong. A **Participant** owes nothing and is held to no such rule
 - Nothing is required and nothing is blocked. The tool names who has not filed so they can be chased; **Participants** cannot be named, because nobody knows who was in the room
 - **Participant Feedback** is never part of a **Session Record**, and neither is derived from the other
-- Every member of a **Group** may file one **Perjadin Evaluation** on their **Perjadin**, and nobody else may
+- A **Perjadin Evaluation** is filed through an unauthenticated token link shared from the **Perjadin**, by a filer who self-declares a Role (**Pengajar**, **Pendamping** or **Pimpinan**) and a Name — no sign-in, no Group-membership gate, and no limit on how many are filed (ADR-0024)
 - One **Perjadin** may cover several **Schools**, so it sits behind many **Session Records**
 - A **Story** is written by **Staff** about exactly one **School**, and is the only Programme narrative a public page ever carries — nothing filed after a **Session** or a trip is ever a source for one
 - A **Story** may name a **Stream**, since a piece is usually about one; its **Cluster** is the **School**'s and is never stated separately
@@ -273,7 +312,9 @@ _Avoid_: showcase (that is the section, not the piece), case study, portfolio it
 - **What replaces Class Records for a Session whose teachers are names, not signed-in People?** Making both modes single-**Stream** with name-based teachers ([ADR-0019](./docs/adr/0019-offline-sessions-carry-a-stream-and-a-school-gets-many-per-trip.md), [ADR-0020](./docs/adr/0020-teaching-team-members-on-a-perjadin-are-trip-scoped-names.md), [ADR-0022](./docs/adr/0022-online-sessions-carry-a-stream-and-name-teachers-as-session-scoped-names.md)) leaves this **deliberately deferred** on both sides. Offline **Sessions** produce no **Class Records** (their teachers cannot sign in to file), and `delivered / 10` no longer describes a School whose offline count is variable. Online is now the same shape: a single-**Stream** online **Session**'s teachers are session-scoped names too, so the old "six Class Records per online Session, two professors one per Stream" no longer holds, and how online Class Records are counted and filed follows the same later decision. The **six online Sessions per School** and online progress (`delivered / TOTAL_SESSIONS_PER_SCHOOL`) are untouched. How name-taught delivery is evaluated and counted is a later decision, not an oversight.
 - When is a **Final Project** due? Still unset.
 - Each **Cluster**'s **Problem** — the specific challenge drawn from its **Topic**. The four **Topics** are set (Mitigasi Bencana, Smart City, Ketahanan Pangan, Waste Management). The **Problems** currently in the seed are **invented placeholders**, plausible for each **Cluster**'s geography but not DITSAMA's. They exist so screens have something real-shaped to render; treat any of them appearing in a design or a document as unconfirmed.
-- No stages are defined between a **School**'s first and last **Session**, and **Final Projects** are not tracked at all. Progress is therefore delivered **Sessions** out of ten, and nothing else — this is the deliberate position, not an oversight.
+- No stages are defined between a **School**'s first and last **Session**, and **Final Projects** are not tracked at all. Progress is therefore delivered **Sessions** out of eight, and nothing else — this is the deliberate position, not an oversight.
 - The ITB documents a **Perjadin Report** produces have no terms here yet. Their real names — Surat Tugas, SPPD, SPJ or otherwise — need confirming against actual paperwork before they enter the glossary or the code. **No completed example exists to confirm them against**: nobody has filed one for this Programme, and no prior trip's set is available to borrow. The first real Perjadin is what produces one, so these terms stay out of the glossary until then — see the amendment to [ADR-0007](./docs/adr/0007-the-tool-generates-the-acquittal.md).
 
-  **What a transaction is spent on is no longer open.** The Programme's approved budget names eleven recurring line items across all twenty-three travel groups, and those are what a transaction is categorised by. They are Indonesian because they are what goes on the paperwork, and they live in `packages/domain` rather than here: a category is a value a column may hold, not a term this glossary defines. The document those categories will eventually be typed onto is still the open question above.
+  **What a transaction is spent on is no longer open.** The Programme's approved budget names eleven recurring line items across all twenty-three travel groups, and those are what a transaction is categorised by. They are Indonesian because they are what goes on the paperwork, and they live in `packages/domain` rather than here: a category is a value a column may hold, not a term this glossary defines. Each transaction also carries a **`participant_type`** — likewise a column value, not a glossary term — recording which cohort the spend served: **Siswa** (the Student Class) or **GTK-MS** (the GTK and MS Classes together). The document those categories will eventually be typed onto is still the open question above.
+
+- **`/monitoring` renders illustrative mock figures, not the domain.** The overview page ships (#178) as a presentational scaffold: every number on it is invented. Its domain gaps are now **settled** ([#195](https://github.com/mafiefa02/sugt/issues/195)): a Session's Sesi is its per-School date **rank** ([ADR-0027](./docs/adr/0027-a-sessions-sesi-is-its-per-school-date-rank.md), no longer cosmetic), the programme budget is the constant `PROGRAMME_BUDGET_IDR` (`= 15,000,000,000`, there is no schema for it), and the two Luring Sesi windows are `LURING_SESI_WINDOWS`. What remains open is only the **wiring**: replacing the mock with real queries — the ranked Session numbering, the budget reconciliation, the timeline/overdue warnings against the windows, and the activity metric — deferred to [#196](https://github.com/mafiefa02/sugt/issues/196). Treat any of its rendered values as unconfirmed until then.

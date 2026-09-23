@@ -1,11 +1,24 @@
 "use client";
 
-import { addPersonAction, revokePersonAction } from "-/app/(app)/orang/actions";
+import {
+  addPersonAction,
+  assignGrantAction,
+  revokeGrantAction,
+  revokePersonAction,
+} from "-/app/(app)/orang/actions";
 import type { RosterEntry } from "@sugt/db/queries";
-import { ROLE_LABELS } from "@sugt/domain";
+import { type Grant, GRANTS, GRANT_LABELS, type Role, ROLES, ROLE_LABELS } from "@sugt/domain";
 import { Badge } from "@sugt/ui/components/badge";
 import { Button } from "@sugt/ui/components/button";
+import { Checkbox } from "@sugt/ui/components/checkbox";
 import { Input } from "@sugt/ui/components/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@sugt/ui/components/select";
 import {
   Table,
   TableBody,
@@ -15,7 +28,7 @@ import {
   TableRow,
 } from "@sugt/ui/components/table";
 import { Lock } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useId, useMemo, useOptimistic, useState, useTransition } from "react";
 
 /**
  * **Orang** — the roster and the invite list, a dense table scanned for a name.
@@ -24,8 +37,20 @@ import { useMemo, useState, useTransition } from "react";
  * courtesy, and `requireStaff` inside each write is the enforcement. Revoked rows sit behind a
  * foot toggle — they exist because correcting a role is revoke-and-re-add, which leaves the old
  * row beside the new one sharing an email.
+ *
+ * The **Akses** column and its Grant toggles render only for an Administrator (`canManageGrants`,
+ * ADR-0028) — the same courtesy, with `requireGrant("Administrator")` inside each assign/revoke as
+ * the enforcement. An Administrator is always Staff, so `canManageGrants` implies `canWrite`.
  */
-function OrangRoster({ people, canWrite }: { people: RosterEntry[]; canWrite: boolean }) {
+function OrangRoster({
+  people,
+  canWrite,
+  canManageGrants,
+}: {
+  people: RosterEntry[];
+  canWrite: boolean;
+  canManageGrants: boolean;
+}) {
   const [showRevoked, setShowRevoked] = useState(false);
 
   const { active, revoked } = useMemo(() => {
@@ -45,6 +70,7 @@ function OrangRoster({ people, canWrite }: { people: RosterEntry[]; canWrite: bo
             <TableHead>Email</TableHead>
             <TableHead>Peran</TableHead>
             <TableHead>Status</TableHead>
+            {canManageGrants && <TableHead>Akses</TableHead>}
             {canWrite && <TableHead className="text-right">Tindakan</TableHead>}
           </TableRow>
         </TableHeader>
@@ -54,6 +80,7 @@ function OrangRoster({ people, canWrite }: { people: RosterEntry[]; canWrite: bo
               key={entry.id}
               entry={entry}
               canWrite={canWrite}
+              canManageGrants={canManageGrants}
             />
           ))}
 
@@ -63,6 +90,7 @@ function OrangRoster({ people, canWrite }: { people: RosterEntry[]; canWrite: bo
                 key={entry.id}
                 entry={entry}
                 canWrite={canWrite}
+                canManageGrants={canManageGrants}
               />
             ))}
         </TableBody>
@@ -90,7 +118,15 @@ function OrangRoster({ people, canWrite }: { people: RosterEntry[]; canWrite: bo
  * exists at all, so every row a Staff member sees keeps the column count of the header. The
  * revoke button inside it shows only on an active row: a revoked one is already off.
  */
-function PersonRow({ entry, canWrite }: { entry: RosterEntry; canWrite: boolean }) {
+function PersonRow({
+  entry,
+  canWrite,
+  canManageGrants,
+}: {
+  entry: RosterEntry;
+  canWrite: boolean;
+  canManageGrants: boolean;
+}) {
   return (
     <TableRow className={entry.active ? undefined : "text-muted-foreground"}>
       <TableCell className="font-medium">{entry.fullName}</TableCell>
@@ -122,12 +158,88 @@ function PersonRow({ entry, canWrite }: { entry: RosterEntry; canWrite: boolean 
       <TableCell>
         <StateBadge entry={entry} />
       </TableCell>
+      {canManageGrants && (
+        <TableCell>
+          {/*
+            Grants are Staff-only, so only an active Staff row offers toggles; a Pimpinan or a
+            revoked row shows a dash. The assign/revoke writes still enforce this server-side —
+            `assignGrant` refuses a non-Staff target — so hiding the toggles is the courtesy and the
+            write is the gate, the same split the roster's other controls follow.
+          */}
+          {entry.active && entry.role === "Staff" ? (
+            <GrantToggles
+              personId={entry.id}
+              grants={entry.grants}
+            />
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
+        </TableCell>
+      )}
       {canWrite && (
         <TableCell className="text-right">
           {entry.active && <RevokeButton personId={entry.id} />}
         </TableCell>
       )}
     </TableRow>
+  );
+}
+
+/**
+ * The per-Grant toggles on one Staff row — a checkbox per `GRANTS` value, checked when the Person
+ * holds it (ADR-0028). Toggling assigns or revokes through the Server Action; the optimistic list
+ * flips the box immediately and the action's `revalidatePath("/orang")` re-reads the roster, so
+ * `useOptimistic` falls back to the true state — the same shape as the Preparation checklist.
+ *
+ * Only an Administrator ever sees this (the column is gated), and `requireGrant("Administrator")`
+ * inside each write is the real enforcement: a non-Administrator who calls the action directly is
+ * refused with a 403. `Administrator` implies `Editor`, so a Person holding Administrator
+ * shows only the Administrator box ticked — the implication is a guard rule, not a stored row.
+ */
+function GrantToggles({ personId, grants }: { personId: string; grants: Grant[] }) {
+  const fields = useId();
+  const [held, setHeld] = useOptimistic(
+    grants,
+    (state, patch: { grant: Grant; granted: boolean }) =>
+      patch.granted ? [...state, patch.grant] : state.filter((grant) => grant !== patch.grant),
+  );
+  const [, startToggle] = useTransition();
+
+  function toggle(grant: Grant, granted: boolean) {
+    startToggle(async () => {
+      // Inside the transition so the flip and the pending state are one update, then the action —
+      // its `revalidatePath` re-reads the real grants and `useOptimistic` falls back to them.
+      setHeld({ grant, granted });
+      await (granted ? assignGrantAction(personId, grant) : revokeGrantAction(personId, grant));
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {GRANTS.map((grant) => {
+        const id = `${fields}-${grant}`;
+        return (
+          <div
+            key={grant}
+            className="flex items-center gap-2 text-sm"
+          >
+            <Checkbox
+              id={id}
+              checked={held.includes(grant)}
+              onCheckedChange={(checked) => {
+                toggle(grant, checked === true);
+              }}
+            />
+            <label
+              htmlFor={id}
+              className="cursor-pointer"
+            >
+              {GRANT_LABELS[grant]}
+            </label>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -176,13 +288,16 @@ function RevokeButton({ personId }: { personId: string }) {
  * by #115) — any Google address may be listed — so the only failures the form surfaces are an
  * incomplete row and a duplicate active email the database's partial index refuses.
  *
- * **Every invite is Staff now** (T3, #153). The form used to offer a role picker (Staff vs Teaching
- * Team), but the `Teaching Team` Person role is retired — professors are free-text names who never
- * sign in — so there is one role and no picker; `addPerson` writes `role: "Staff"`.
+ * **The picker is back, now Staff | Pimpinan** (#179). It was dropped in T3 (#153) when the
+ * `Teaching Team` Person role was retired and Staff stood alone; `Pimpinan` — a signed-in, read-only
+ * role — is the second role a Person may hold, so an invite chooses which. The options iterate
+ * `ROLES` and are labelled through `ROLE_LABELS`, so the picker cannot drift from the role set. The
+ * gating above is unchanged: only Staff manage the roster, and a Pimpinan added here manages nobody.
  */
 function AddPersonForm() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<Role>("Staff");
   const [error, setError] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
 
@@ -192,10 +307,11 @@ function AddPersonForm() {
     if (!canSubmit) return;
 
     startSaving(async () => {
-      const result = await addPersonAction({ fullName, email, role: "Staff" });
+      const result = await addPersonAction({ fullName, email, role });
       if (result.outcome === "added") {
         setFullName("");
         setEmail("");
+        setRole("Staff");
         setError(null);
         return;
       }
@@ -227,8 +343,31 @@ function AddPersonForm() {
           aria-label="Email"
           className="h-8 w-full max-w-64"
         />
-        {/* One role now — every Person added here is {ROLE_LABELS.Staff}, so the picker is gone. */}
-        <span className="text-sm text-muted-foreground">{ROLE_LABELS.Staff}</span>
+        {/* Staff or Pimpinan (#179). The trigger shows the current role's label; options iterate ROLES. */}
+        <Select
+          items={ROLE_LABELS}
+          value={role}
+          onValueChange={(next) => {
+            setRole(next as Role);
+          }}
+        >
+          <SelectTrigger
+            aria-label="Peran"
+            className="h-8 w-full max-w-40"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ROLES.map((r) => (
+              <SelectItem
+                key={r}
+                value={r}
+              >
+                {ROLE_LABELS[r]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           size="sm"
           disabled={saving || !canSubmit}

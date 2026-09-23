@@ -10,19 +10,22 @@ import { describe, expect, it } from "vitest";
  * the map's keys are the stored `ROLES` values, unchanged, so every `role === "Staff"` compare,
  * CHECK constraint and composite FK still speaks the same string it always did.
  *
- * T3 (#153) retired the `Teaching Team` Role: `ROLES` is now exactly `["Staff"]`, so both maps
- * carry a single key. The old `["Teaching Team"]` label assertions are gone with the Role.
+ * T3 (#153) retired the `Teaching Team` Role, leaving Staff alone; #179 then added a second signed-in
+ * role, so `ROLES` is now exactly `["Staff", "Pimpinan"]` and both maps carry those two keys. `Staff`
+ * keeps its DITSAMA/Pendamping labels; the record-only `Pimpinan` reads its own name on both surfaces.
  */
 describe("ROLE_LABELS", () => {
-  it("labels Staff as DITSAMA, the only Role", () => {
+  it("labels Staff as DITSAMA and Pimpinan as Pimpinan, the two Roles", () => {
     expect(ROLE_LABELS.Staff).toBe("DITSAMA");
-    expect(ROLES).toEqual(["Staff"]);
+    expect(ROLE_LABELS.Pimpinan).toBe("Pimpinan");
+    expect(ROLES).toEqual(["Staff", "Pimpinan"]);
   });
 
-  it("keys on the stored role values, so the domain term stays Staff", () => {
+  it("keys on the stored role values, so the domain terms stay Staff and Pimpinan", () => {
     // The stored value is what the keys are: renaming a label must never rename a role.
     expect(Object.keys(ROLE_LABELS).sort()).toEqual([...ROLES].sort());
     expect(ROLES).toContain("Staff");
+    expect(ROLES).toContain("Pimpinan");
   });
 });
 
@@ -33,9 +36,10 @@ describe("ROLE_LABELS", () => {
  * `ROLE_LABELS`, so `[member.role]` render sites resolve and nothing stored changes.
  */
 describe("PERJADIN_ROLE_LABELS", () => {
-  it("labels Staff as Pendamping, the only Role", () => {
+  it("labels Staff as Pendamping and Pimpinan as Pimpinan", () => {
     expect(PERJADIN_ROLE_LABELS.Staff).toBe("Pendamping");
-    expect(ROLES).toEqual(["Staff"]);
+    expect(PERJADIN_ROLE_LABELS.Pimpinan).toBe("Pimpinan");
+    expect(ROLES).toEqual(["Staff", "Pimpinan"]);
   });
 
   it("keys on the stored role values, like ROLE_LABELS", () => {

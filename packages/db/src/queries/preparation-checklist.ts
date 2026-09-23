@@ -1,3 +1,7 @@
+import { sql, type AnyColumn, type SQL } from "drizzle-orm";
+
+import { perjadinPreparationItem } from "../schema/travel";
+
 /**
  * The Preparation Checklist's shape, **derived and never stored**
  * ([#114](https://github.com/mafiefa02/sugt/issues/114)).
@@ -44,6 +48,25 @@ export const PREPARATION_FIXED_ITEMS = [
 
 /** The fixed keys alone, for the directory query's "these are always live" test. */
 export const PREPARATION_FIXED_KEYS = PREPARATION_FIXED_ITEMS.map((item) => item.itemKey);
+
+/**
+ * **The Preparation pill's `x`, as one correlated scalar subquery** — the ticks a Perjadin has whose
+ * key is one of the fixed seven. Both list reads that carry the pill (`perjadinDirectory` and the
+ * personal `myUpcomingPerjadin`) build it from here rather than each inlining the same SQL, the
+ * convention-3 case: shared SQL lives in the helper beneath the modules. Correlate it on the outer
+ * query's Perjadin-id column (`perjadin.id`); it stays a scalar subquery so it never fans a row out.
+ * A `dosen:` tick the old model left behind matches none of the seven, so `x` never exceeds `N` (7).
+ */
+export function preparationDoneSubquery(perjadinIdColumn: AnyColumn): SQL<number> {
+  return sql<number>`(
+    select count(*) from ${perjadinPreparationItem} pi
+    where pi.perjadin_id = ${perjadinIdColumn}
+    and pi.item_key in (${sql.join(
+      PREPARATION_FIXED_KEYS.map((key) => sql`${key}`),
+      sql`, `,
+    )})
+  )`.mapWith(Number);
+}
 
 /** The item key the teacher-mutation queries clear on any Teaching-Team change (amendment to ADR-0018). */
 export const PENGAJAR_LENGKAP_KEY = "pengajar_lengkap";

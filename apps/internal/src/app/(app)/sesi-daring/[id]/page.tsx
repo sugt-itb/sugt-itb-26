@@ -62,10 +62,6 @@ export default async function Page({ params }: PageProps<"/sesi-daring/[id]">) {
         {session.cancelledReason !== null && (
           <p className="mt-2 text-sm text-muted-foreground">{session.cancelledReason}</p>
         )}
-
-        <p className="mt-3 text-sm text-muted-foreground">
-          PIC: <span className="text-foreground">{session.picFullName}</span>
-        </p>
       </header>
 
       <OnlineSessionFields

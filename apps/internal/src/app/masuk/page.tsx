@@ -28,7 +28,12 @@ export default async function SignInPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  if (await getPerson()) redirect("/");
+  // Role-aware landing (#265): a Staff Person's home is the Pendamping; everyone else — the read-only
+  // Pimpinan — lands on the Dashboard at `/`, which is open to them. `/pendamping` itself bounces a
+  // non-Staff caller back to `/`, so the OAuth `callbackURL` can point everyone at `/pendamping` and let
+  // that guard sort them; here we already hold the Person, so we route them directly.
+  const existing = await getPerson();
+  if (existing) redirect(existing.role === "Staff" ? "/pendamping" : "/");
 
   const rejected = "error" in (await searchParams);
 

@@ -52,7 +52,6 @@ async function aSession(
     schoolId: school.id,
     heldOn: "2026-09-10",
     status,
-    onlinePicPersonId: picPersonId,
   });
 }
 

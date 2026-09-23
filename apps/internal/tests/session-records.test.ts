@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   addCluster,
+  addOfflineSession,
+  addPerjadin,
   addPerson,
   addProvince,
   addSchool,
@@ -51,6 +53,7 @@ function nonStaff() {
     fullName: "Bagus Prakoso",
     email: "bagus@itb.ac.id",
     role: "Teaching Team" as unknown as Role,
+    grants: [],
   };
 }
 
@@ -66,14 +69,24 @@ async function oneSchool() {
   });
 }
 
-/** A delivered online Session, which is the cheap one — no Perjadin, just a School and a PIC. */
+/**
+ * A delivered **offline** Session and its Perjadin — Session Records are offline-only now (#284):
+ * an online Session has no PIC and produces none, so the record-filing tests need an offline one,
+ * whose PIC (`picPersonId`, the Perjadin's) is the Staff member who files.
+ */
 async function deliveredSession(picPersonId: string) {
   const school = await oneSchool();
-  return addSession({
+  const perjadin = await addPerjadin({
+    picPersonId,
+    advanceIdr: 5_000_000,
+    startsOn: "2026-09-01",
+    endsOn: "2026-09-30",
+  });
+  return addOfflineSession({
     schoolId: school.id,
     heldOn: "2026-09-10",
+    perjadinId: perjadin.id,
     status: "delivered",
-    onlinePicPersonId: picPersonId,
   });
 }
 
@@ -134,7 +147,6 @@ describe("fileSessionRecord", () => {
       schoolId: school.id,
       heldOn: "2026-09-10",
       status: "arranged",
-      onlinePicPersonId: pic.id,
     });
 
     const result = await fileSessionRecord(pic, {

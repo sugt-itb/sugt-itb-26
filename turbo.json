@@ -16,7 +16,8 @@
         "AGGREGATES_SECRET",
         "REVALIDATE_SECRET",
         "INTERNAL_APP_URL",
-        "PUBLIC_APP_URL"
+        "PUBLIC_APP_URL",
+        "JADWAL_SHEET_CSV_URL"
       ]
     },
     "typecheck": {
@@ -32,7 +33,8 @@
         "AGGREGATES_SECRET",
         "REVALIDATE_SECRET",
         "INTERNAL_APP_URL",
-        "PUBLIC_APP_URL"
+        "PUBLIC_APP_URL",
+        "JADWAL_SHEET_CSV_URL"
       ]
     },
     "dev": {
@@ -49,7 +51,8 @@
         "AGGREGATES_SECRET",
         "REVALIDATE_SECRET",
         "INTERNAL_APP_URL",
-        "PUBLIC_APP_URL"
+        "PUBLIC_APP_URL",
+        "JADWAL_SHEET_CSV_URL"
       ]
     }
   }

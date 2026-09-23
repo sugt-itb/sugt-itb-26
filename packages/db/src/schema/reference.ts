@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { check, foreignKey, pgTable, text, unique, uuid } from "drizzle-orm/pg-core";
 
 /**
- * Reference data: Provinces, the four Clusters, the forty-two Schools.
+ * Reference data: Provinces, the four Clusters, the forty-seven Schools.
  *
  * Seeded once by `seed/reference-data.sql` and never edited in the app —
  * `docs/product.md` is explicit that there are no admin screens for any of it.
@@ -31,7 +31,7 @@ export const province = pgTable(
 );
 
 /**
- * Four of them, at 6 / 17 / 11 / 8 Schools. The sizes are lopsided, so nothing
+ * Four of them, at 7 / 18 / 12 / 10 Schools. The sizes are lopsided, so nothing
  * should assume they are comparable.
  *
  * `topic` and `problem` are columns rather than tables: each Cluster carries
@@ -77,7 +77,7 @@ export const subCluster = pgTable(
  * `subClusterId` is NOT NULL: every School belongs to exactly one Sub-Cluster from the
  * moment the seed runs, so a School with no Sub-Cluster is one no trip can ever be planned
  * for and no screen would say so — the state ADR-0016 argues against. It was nullable while
- * no Sub-Cluster data existed; the seed (`reference-data.sql`) assigns all forty-two Schools
+ * no Sub-Cluster data existed; the seed (`reference-data.sql`) assigns all forty-seven Schools
  * and migration 0009 then tightens the column. `docs/data-model.md`'s Reference-data section
  * is the source for the invariant.
  *

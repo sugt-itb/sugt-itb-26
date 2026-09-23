@@ -2,7 +2,6 @@ import {
   MAX_EXTRA_STAFF_PER_GROUP,
   MAX_OFFLINE_SESSIONS_PER_SCHOOL_PER_PERJADIN,
   MAX_TEACHING_TEAM_PER_PERJADIN,
-  PIMPINAN,
   type Stream,
   type TimeZone,
   type TransportMode,
@@ -15,7 +14,12 @@ import { cluster, province, school, subCluster } from "../schema/reference";
 import { groupMember, perjadin, perjadinPimpinan, perjadinTeacher } from "../schema/travel";
 import type { Person } from "./caller";
 import { duplicatedStaff } from "./group-rules";
-import { activeRosters, type RosterPerson, type SelectedSchool } from "./rosters";
+import {
+  activeRosters,
+  unknownPimpinanIds,
+  type RosterPerson,
+  type SelectedSchool,
+} from "./rosters";
 import { heldOnWithinPerjadin } from "./session-detail";
 import { requireStaff } from "./staff-only";
 
@@ -120,9 +124,10 @@ export type PlanPerjadinInput = {
    */
   teacherNames: string[];
   /**
-   * The **Pimpinan** recorded on the trip — a subset of the fixed `PIMPINAN` set (ADR-0020). Each
-   * is written as a `perjadin_pimpinan` row; record-only, never a `group_member`. Optional, zero or
-   * more; a name outside `PIMPINAN` is refused (`unknown-pimpinan`).
+   * The **Pimpinan** recorded on the trip — the `personId`s of real People of role Pimpinan, chosen
+   * from the Pimpinan roster (#181, ADR-0020). Each is written as a `perjadin_pimpinan` row;
+   * record-only, never a `group_member`. Optional, zero or more; an id that is not an active
+   * Pimpinan is refused (`unknown-pimpinan`).
    */
   pimpinan: string[];
   sessions: PlannedSession[];
@@ -179,7 +184,7 @@ export type PlanPerjadinResult =
    * a safety ceiling, never reached in practice. Names each offending School and its count.
    */
   | { outcome: "too-many-sessions-per-school"; offending: { schoolId: string; count: number }[] }
-  /** A named Pimpinan that is not one of the fixed `PIMPINAN` three. Not reachable through the form. */
+  /** A Pimpinan id that is not an active Person of role Pimpinan. Not reachable through the form. */
   | { outcome: "unknown-pimpinan"; offending: string[] }
   /**
    * A Session's "Diajar oleh" naming a teacher slot that does not exist — a `taughtByTeacherIndexes`
@@ -271,12 +276,12 @@ export async function planPerjadin(
     };
   }
 
-  // A Pimpinan is one of a fixed three (`PIMPINAN`); `perjadin_pimpinan_name_check` refuses any
-  // other at the database too, but the form only ever offers the three, so a stray name is a
-  // hand-edited payload — named here rather than surfaced as a raw constraint violation.
-  const unknownPimpinan = [...new Set(input.pimpinan)].filter(
-    (name) => !(PIMPINAN as readonly string[]).includes(name),
-  );
+  // A Pimpinan is a real Person of role Pimpinan (#181); the composite `perjadin_pimpinan_is_pimpinan`
+  // FK refuses any other at the database too, but the form only offers the roster, so a stray id is a
+  // hand-edited payload — validated here against the active-Pimpinan roster and named rather than
+  // surfaced as a raw constraint violation.
+  const uniquePimpinan = [...new Set(input.pimpinan)];
+  const unknownPimpinan = await unknownPimpinanIds(uniquePimpinan);
   if (unknownPimpinan.length > 0)
     return { outcome: "unknown-pimpinan", offending: unknownPimpinan };
 
@@ -464,13 +469,13 @@ export async function planPerjadin(
       await tx.insert(sessionTeachingTeam).values(teachingLinks);
     }
 
-    // The Pimpinan recorded on the trip — record-only rows, never `group_member` (ADR-0020). Deduped
-    // so `(perjadin_id, name)` cannot collide; skipped when none join.
-    const pimpinanNames = [...new Set(input.pimpinan)];
-    if (pimpinanNames.length > 0) {
+    // The Pimpinan recorded on the trip — record-only rows referencing a real Person, never
+    // `group_member` (ADR-0020, #181). Deduped so `(perjadin_id, person_id)` cannot collide; skipped
+    // when none join. `role` defaults to 'Pimpinan'.
+    if (uniquePimpinan.length > 0) {
       await tx
         .insert(perjadinPimpinan)
-        .values(pimpinanNames.map((name) => ({ perjadinId: id, name })));
+        .values(uniquePimpinan.map((personId) => ({ perjadinId: id, personId })));
     }
 
     return id;
@@ -566,6 +571,11 @@ export type PerjadinPlan = {
    * chosen from a list, so the form needs no roster for them.
    */
   staff: PlannablePerson[];
+  /**
+   * Pimpinan, for the record-only Pimpinan checkbox list (#181). Real People of role Pimpinan chosen
+   * from the roster now, not the retired fixed-three constant; empty until Pimpinan are added.
+   */
+  pimpinan: PlannablePerson[];
 };
 
 /**
@@ -582,10 +592,12 @@ async function plannableSubClusters(): Promise<PlannableSubCluster[]> {
       schoolId: school.id,
       schoolName: school.name,
       kabupatenKota: school.kabupatenKota,
+      timeZone: province.timeZone,
     })
     .from(subCluster)
     .innerJoin(cluster, eq(cluster.id, subCluster.clusterId))
     .innerJoin(school, eq(school.subClusterId, subCluster.id))
+    .innerJoin(province, eq(province.code, school.provinceCode))
     .orderBy(asc(cluster.name), asc(subCluster.name), asc(school.name));
 
   const map = new Map<string, PlannableSubCluster>();
@@ -604,6 +616,7 @@ async function plannableSubClusters(): Promise<PlannableSubCluster[]> {
       id: row.schoolId,
       name: row.schoolName,
       kabupatenKota: row.kabupatenKota,
+      timeZone: row.timeZone,
     });
   }
   return [...map.values()];
@@ -615,13 +628,17 @@ async function plannableSubClusters(): Promise<PlannableSubCluster[]> {
  *
  * **Staff-only, so the read is too** — a Teaching Team member reaching the URL directly would
  * otherwise be shown the whole form and refused only on submit. `Promise.all` keeps the
- * Sub-Cluster read and the roster read concurrent; the roster comes from `./rosters.ts`. Only the
- * `staff` half is kept — the Teaching Team are trip-scoped names now, not a roster (ADR-0020).
+ * Sub-Cluster read and the roster read concurrent; the rosters come from `./rosters.ts`. Both the
+ * `staff` and `pimpinan` halves are kept — Staff for the PIC/extra-Staff pickers, Pimpinan for the
+ * record-only checkbox list (#181). The Teaching Team are trip-scoped names now, not a roster (ADR-0020).
  */
 export async function perjadinPlan(caller: Person): Promise<PerjadinPlan> {
   requireStaff(caller);
 
-  const [subClusters, { staff }] = await Promise.all([plannableSubClusters(), activeRosters()]);
+  const [subClusters, { staff, pimpinan }] = await Promise.all([
+    plannableSubClusters(),
+    activeRosters(),
+  ]);
 
-  return { subClusters, staff };
+  return { subClusters, staff, pimpinan };
 }

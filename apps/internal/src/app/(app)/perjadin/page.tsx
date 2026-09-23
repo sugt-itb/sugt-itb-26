@@ -1,6 +1,8 @@
 import { shortenKabupaten } from "-/lib/format-destination";
 import { requirePerson } from "-/lib/person";
 import { perjadinDirectory } from "@sugt/db/queries";
+import { LinkButton } from "@sugt/ui/components/link-button";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 
 /**
@@ -8,8 +10,9 @@ import Link from "next/link";
  *
  * One `requirePerson()`, one query, no role check: a trip's dates, its destination and how
  * many Schools it reaches are delivery data, and ADR-0004 opens that to everyone signed in.
- * The Advance is not here at all — it is `perjadinAcquittal`'s, behind the Staff-only choke
- * point, so a professor's list is money that was never fetched.
+ * The Advance is not here at all — it is `perjadinAcquittal`'s, which any signed-in Person may
+ * read now (ADR-0004 reversed by ADR-0026, #180); this list simply never fetches money, and
+ * writing money stays Staff-only.
  *
  * The route keeps the `/perjadin` slug [#14](https://github.com/mafiefa02/sugt/issues/14)
  * chose. It mirrors the surface name enumerated in
@@ -23,12 +26,22 @@ export default async function Page() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="border-b border-border px-7 py-5">
-        <h1 className="font-heading text-lg font-medium">Perjadin</h1>
-        <p className="text-sm text-muted-foreground">
-          Setiap perjalanan dinas, yang terbaru di atas. Perjadin direncanakan di Rencanakan
-          Perjadin.
-        </p>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-7 py-5">
+        <div>
+          <h1 className="font-heading text-lg font-medium">Perjadin</h1>
+          <p className="text-sm text-muted-foreground">
+            Setiap perjalanan dinas, yang terbaru di atas. Perjadin direncanakan di Rencanakan
+            Perjadin.
+          </p>
+        </div>
+        {/* Staff-only create action, moved off the sidebar onto its list page (#294). Non-Staff
+            render nothing — no disabled state. */}
+        {person.role === "Staff" && (
+          <LinkButton render={<Link href="/rencanakan-perjadin" />}>
+            <Plus data-icon="inline-start" />
+            Rencanakan Perjadin
+          </LinkButton>
+        )}
       </header>
 
       {trips.length === 0 ? (

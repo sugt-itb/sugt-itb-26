@@ -4,6 +4,8 @@ Inside the internal tool, anyone authenticated can read every Session, every int
 
 There are two roles, Staff and Teaching Team. The Programme's leadership are senior Staff, not a separate role.
 
+> **The money-read half is REVERSED by [ADR-0026](./0026-money-is-open-to-read-and-staff-only-to-write.md) (#180).** Two things this ADR wrote no longer hold. First, leadership _are_ a separate signed-in role now — `Pimpinan`, added by [ADR-0025](./0025-pimpinan-is-a-second-signed-in-read-only-person-role.md) (#179). Second, "Perjadin Reports and their financial detail are visible to Staff only" is retired: money is now open to **any signed-in Person** to read, so a Pimpinan reads the acquittal, its export and the budget. The boundary this ADR drew as delivery-vs-money is redrawn as **read (any signed-in) vs write (Staff)**. Writing money stays Staff-only, exactly as before. Everything below about _writing_, publishing and delivery-arranging is untouched.
+
 ## Why
 
 Groups are assembled per Perjadin and no Cluster has a standing team, so the tool is the only thing carrying knowledge of a School between visits. A professor travelling to a Cluster for the first time has to be able to read what the previous group wrote about those Schools. Restricting Session Records to their authors would remove the continuity mechanism the travel model depends on.

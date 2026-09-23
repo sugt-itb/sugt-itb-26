@@ -2,6 +2,8 @@ import { SessionStatusBadge } from "-/components/session-labels";
 import { requirePerson } from "-/lib/person";
 import { onlineSessionDirectory } from "@sugt/db/queries";
 import { formatSessionStartTimeWithWib } from "@sugt/domain";
+import { LinkButton } from "@sugt/ui/components/link-button";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 
 /**
@@ -23,12 +25,22 @@ export default async function Page() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="border-b border-border px-7 py-5">
-        <h1 className="font-heading text-lg font-medium">Sesi daring</h1>
-        <p className="text-sm text-muted-foreground">
-          Setiap Sesi daring, yang terbaru di atas. Sesi daring dijadwalkan di Jadwalkan Sesi
-          daring.
-        </p>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-7 py-5">
+        <div>
+          <h1 className="font-heading text-lg font-medium">Sesi daring</h1>
+          <p className="text-sm text-muted-foreground">
+            Setiap Sesi daring, yang terbaru di atas. Sesi daring dijadwalkan di Jadwalkan Sesi
+            daring.
+          </p>
+        </div>
+        {/* Staff-only create action, moved off the sidebar onto its list page (#294). Non-Staff
+            render nothing — no disabled state. */}
+        {person.role === "Staff" && (
+          <LinkButton render={<Link href="/jadwalkan-sesi-daring" />}>
+            <Plus data-icon="inline-start" />
+            Jadwalkan Sesi Daring
+          </LinkButton>
+        )}
       </header>
 
       {sessions.length === 0 ? (
@@ -48,11 +60,15 @@ export default async function Page() {
               >
                 {session.schoolName}
               </Link>
+              {/* Peserta as inline muted text beside the School, not a badge (#283). Absent on a
+                  Session arranged before the column existed. */}
+              {session.participantType !== null && (
+                <span className="text-sm text-muted-foreground">{session.participantType}</span>
+              )}
               <span className="text-sm text-muted-foreground tabular-nums">
                 {session.heldOn} ·{" "}
                 {formatSessionStartTimeWithWib(session.startsAt, session.timeZone)}
               </span>
-              <span className="text-xs text-muted-foreground">PIC {session.picFullName}</span>
               <SessionStatusBadge status={session.status} />
               <Link
                 href={`/sesi-daring/${session.id}`}

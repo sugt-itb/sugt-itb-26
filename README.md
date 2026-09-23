@@ -66,7 +66,7 @@ URLs, and they are not interchangeable: `DATABASE_URL` is the transaction pooler
 
 ```bash
 pnpm --filter @sugt/db db:migrate      # apply pending migrations
-pnpm --filter @sugt/db db:seed         # Provinces, 4 Clusters, 42 Schools
+pnpm --filter @sugt/db db:seed         # Provinces, 4 Clusters, 47 Schools
 pnpm --filter @sugt/db db:seed:people  # the founding Staff, once, per environment
 ```
 

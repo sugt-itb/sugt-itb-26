@@ -54,6 +54,7 @@ export default async function Page() {
         <PerjadinPlanForm
           subClusters={plan.subClusters}
           staff={plan.staff}
+          pimpinan={plan.pimpinan}
         />
       )}
     </div>

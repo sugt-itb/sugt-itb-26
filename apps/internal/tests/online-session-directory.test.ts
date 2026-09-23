@@ -66,19 +66,16 @@ describe("onlineSessionDirectory", () => {
       schoolId: a.id,
       heldOn: "2026-09-10",
       startsAt: "09:00",
-      onlinePicPersonId: pic.id,
     });
     await addSession({
       schoolId: b.id,
       heldOn: "2026-09-12",
       startsAt: "08:00",
-      onlinePicPersonId: pic.id,
     });
     await addSession({
       schoolId: a.id,
       heldOn: "2026-09-12",
       startsAt: "13:00",
-      onlinePicPersonId: pic.id,
     });
 
     const rows = await onlineSessionDirectory(pic);
@@ -90,7 +87,7 @@ describe("onlineSessionDirectory", () => {
     ]);
   });
 
-  it("carries the School, its Time Zone, the PIC and the status on each row", async () => {
+  it("carries the School, its Peserta and the status on each row (no PIC, #284)", async () => {
     const pic = await staff();
     const school = await oneSchool();
     await addSession({
@@ -98,16 +95,39 @@ describe("onlineSessionDirectory", () => {
       heldOn: "2026-09-10",
       startsAt: "09:00",
       status: "delivered",
-      onlinePicPersonId: pic.id,
+      participantType: "GTK-MS",
     });
 
     const [row] = await onlineSessionDirectory(pic);
 
     expect(row?.schoolName).toBe("SMAN 1 Bandung");
     expect(row?.schoolSlug).toBe("sman-1-bandung");
-    expect(row?.timeZone).toBe("WIB");
-    expect(row?.picFullName).toBe("Rina Nurhayati");
+    expect(row?.participantType).toBe("GTK-MS");
     expect(row?.status).toBe("delivered");
+    // No PIC on an online row any more (#284).
+    expect(row).not.toHaveProperty("picFullName");
+  });
+
+  /**
+   * Online Sessions are always WIB (#283), not derived from the School's Province — so a School in a
+   * WIT Province still reports WIB. A hardcoded-anywhere `WIB` passes the WIB-Province test above by
+   * accident; this one proves the row does not read `province.time_zone`.
+   */
+  it("reports WIB even for a School in a non-WIB Province", async () => {
+    const pic = await staff();
+    await addProvince("PA", "Papua", "WIT");
+    const papua = await addCluster({ slug: "cluster-papua", name: "Cluster Papua" });
+    const school = await addSchool({
+      slug: "sman-jayapura",
+      name: "SMAN Jayapura",
+      clusterId: papua.id,
+      provinceCode: "PA",
+    });
+    await addSession({ schoolId: school.id, heldOn: "2026-09-10" });
+
+    const [row] = await onlineSessionDirectory(pic);
+
+    expect(row?.timeZone).toBe("WIB");
   });
 
   it("lists every status, including cancelled — this is the calendar, not a count", async () => {
@@ -117,7 +137,6 @@ describe("onlineSessionDirectory", () => {
       schoolId: school.id,
       heldOn: "2026-09-10",
       status: "cancelled",
-      onlinePicPersonId: pic.id,
     });
 
     const rows = await onlineSessionDirectory(pic);
@@ -129,7 +148,7 @@ describe("onlineSessionDirectory", () => {
   it("never lists an offline Session — those belong to a Perjadin", async () => {
     const pic = await staff();
     const school = await oneSchool();
-    await addSession({ schoolId: school.id, heldOn: "2026-09-10", onlinePicPersonId: pic.id });
+    await addSession({ schoolId: school.id, heldOn: "2026-09-10" });
     const trip = await addPerjadin({ advanceIdr: 5_000_000, picPersonId: pic.id });
     await addOfflineSession({ schoolId: school.id, heldOn: "2026-09-02", perjadinId: trip.id });
 

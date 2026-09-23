@@ -31,17 +31,18 @@ function nonStaff() {
     fullName: "Budi Santoso",
     email: "budi@gmail.com",
     role: "Teaching Team" as unknown as Role,
+    grants: [],
   };
 }
 
 /**
- * **Jadwalkan Sesi daring** — arranging one online Session at a time (#70, ADR-0022). The write is
- * the substance: exactly one Session, `mode: 'online'`, its own date and start time, a Staff PIC,
- * one **Stream**, and zero-or-more **session-scoped free-text Pengajar names** written to
- * `session_teacher_name` — never a `session_teacher` Person row. A collision on
- * `session_one_online_per_school_per_day` comes back as a value. The index keys on Stream now, so
- * two online Sessions at one School on one date are allowed when the Streams differ and refused
- * when they match — the case these tests have to pin.
+ * **Jadwalkan Sesi daring** — arranging one online Session at a time (#70). The write is the
+ * substance: exactly one Session, `mode: 'online'`, its own date, start and end time, a Peserta, and
+ * one-or-two **session-scoped free-text Pengajar names** written to `session_teacher_name`. **No PIC
+ * and no Stream (#284):** a third-party LMS runs online delivery. A collision on
+ * `session_one_online_per_school_per_day` comes back as a value; the index keys on `(school_id,
+ * held_on)` now, so it is **one online Session per School per day** whatever the hour — the case
+ * these tests pin.
  */
 
 async function staffCaller(email = "rina@ditsama.itb.ac.id") {
@@ -59,13 +60,12 @@ async function sessionsAt(schoolId: string) {
     .select({
       id: schema.session.id,
       mode: schema.session.mode,
-      stream: schema.session.stream,
       heldOn: schema.session.heldOn,
       startsAt: schema.session.startsAt,
+      endsAt: schema.session.endsAt,
+      participantType: schema.session.participantType,
       status: schema.session.status,
       perjadinId: schema.session.perjadinId,
-      onlinePicPersonId: schema.session.onlinePicPersonId,
-      onlinePicRole: schema.session.onlinePicRole,
     })
     .from(schema.session)
     .where(eq(schema.session.schoolId, schoolId));
@@ -74,7 +74,7 @@ async function sessionsAt(schoolId: string) {
 describe("arrangeOnlineSession", () => {
   beforeEach(resetDatabase);
 
-  it("arranges one online Session with its Stream, date, time and Staff PIC", async () => {
+  it("arranges one online Session with its date, times and Peserta (no PIC, no Stream)", async () => {
     const staff = await staffCaller();
     const school = await oneSchool();
 
@@ -82,23 +82,22 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:30",
-      picPersonId: staff.id,
-      stream: "Research",
-      teacherNames: [],
+      endsAt: "11:00",
+      participantType: "GTK-MS",
+      teacherNames: ["Prof. Bagus"],
     });
 
     expect(result.outcome).toBe("arranged");
     const [row] = await sessionsAt(school.id);
     expect(row).toMatchObject({
       mode: "online",
-      stream: "Research",
       heldOn: "2026-09-01",
+      participantType: "GTK-MS",
       status: "arranged",
       perjadinId: null,
-      onlinePicPersonId: staff.id,
-      onlinePicRole: "Staff",
     });
     expect(row?.startsAt).toMatch(/^09:30/);
+    expect(row?.endsAt).toMatch(/^11:00/);
   });
 
   it("writes session_teacher_name rows for the named Pengajar", async () => {
@@ -109,14 +108,12 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:00",
-      picPersonId: staff.id,
-      stream: "STEM",
+      endsAt: "10:30",
+      participantType: "Siswa",
       teacherNames: ["Prof. Bagus", "Dr. Sari"],
     });
     if (result.outcome !== "arranged") throw new Error("unreachable");
 
-    // Pengajar are session-scoped free-text names now: T3 (#153) dropped `session_teacher`
-    // outright, so there is no Person-based table left even to assert empty.
     const names = await db
       .select({ name: schema.sessionTeacherName.name })
       .from(schema.sessionTeacherName)
@@ -124,62 +121,101 @@ describe("arrangeOnlineSession", () => {
     expect(names.map((row) => row.name).sort()).toEqual(["Dr. Sari", "Prof. Bagus"]);
   });
 
-  it("writes no session_teacher_name rows when no Pengajar is named", async () => {
+  it("refuses when no Pengajar is named (required, #283), writing nothing", async () => {
     const staff = await staffCaller();
     const school = await oneSchool();
 
-    await arrangeOnlineSession(staff, {
+    const result = await arrangeOnlineSession(staff, {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:00",
-      picPersonId: staff.id,
-      stream: "STEM",
+      endsAt: "10:30",
+      participantType: "Siswa",
       teacherNames: [],
     });
 
+    expect(result).toEqual({ outcome: "teachers-required" });
+    expect(await db.select().from(schema.session)).toEqual([]);
     expect(await db.select().from(schema.sessionTeacherName)).toEqual([]);
   });
 
-  it("allows a second online Session on one day when the Stream differs", async () => {
+  it("refuses a missing Peserta and a missing Jam Selesai, writing nothing", async () => {
     const staff = await staffCaller();
     const school = await oneSchool();
-    await addSession({
-      schoolId: school.id,
-      heldOn: "2026-09-01",
-      stream: "STEM",
-      onlinePicPersonId: staff.id,
-    });
 
-    const result = await arrangeOnlineSession(staff, {
-      schoolId: school.id,
-      heldOn: "2026-09-01",
-      startsAt: "13:00",
-      picPersonId: staff.id,
-      stream: "Research",
-      teacherNames: [],
-    });
+    expect(
+      await arrangeOnlineSession(staff, {
+        schoolId: school.id,
+        heldOn: "2026-09-01",
+        startsAt: "09:00",
+        endsAt: "10:30",
+        participantType: "",
+        teacherNames: ["Prof. Bagus"],
+      }),
+    ).toEqual({ outcome: "participant-type-required" });
 
-    expect(result.outcome).toBe("arranged");
-    expect(await sessionsAt(school.id)).toHaveLength(2);
+    expect(
+      await arrangeOnlineSession(staff, {
+        schoolId: school.id,
+        heldOn: "2026-09-01",
+        startsAt: "09:00",
+        endsAt: "",
+        participantType: "Siswa",
+        teacherNames: ["Prof. Bagus"],
+      }),
+    ).toEqual({ outcome: "end-time-required" });
+
+    expect(await db.select().from(schema.session)).toEqual([]);
   });
 
-  it("refuses a second online Session on one day of the same Stream, and writes nothing", async () => {
+  it("refuses Jam Selesai at or before Jam Mulai, writing nothing", async () => {
     const staff = await staffCaller();
     const school = await oneSchool();
-    await addSession({
-      schoolId: school.id,
-      heldOn: "2026-09-01",
-      stream: "STEM",
-      onlinePicPersonId: staff.id,
-    });
 
     const result = await arrangeOnlineSession(staff, {
       schoolId: school.id,
       heldOn: "2026-09-01",
-      startsAt: "13:00",
-      picPersonId: staff.id,
-      stream: "STEM",
-      teacherNames: [],
+      startsAt: "10:00",
+      endsAt: "10:00",
+      participantType: "Siswa",
+      teacherNames: ["Prof. Bagus"],
+    });
+
+    expect(result).toEqual({ outcome: "end-before-start" });
+    expect(await db.select().from(schema.session)).toEqual([]);
+  });
+
+  it("the CHECK rejects an end time at or before the start time", async () => {
+    const school = await oneSchool();
+
+    // Straight at the table, bypassing the query's own guard — the point is that the database, not
+    // just the application, refuses an end that is not after the start (#283).
+    const refusal = await refusedBy(
+      db.insert(schema.session).values({
+        schoolId: school.id,
+        mode: "online",
+        heldOn: "2026-09-01",
+        startsAt: "10:00",
+        endsAt: "09:00",
+        participantType: "Siswa",
+      }),
+    );
+
+    expect(refusal).toBe("session_ends_after_starts_check");
+  });
+
+  it("refuses a second online Session on the same day, whatever the hour (#284: one per day)", async () => {
+    const staff = await staffCaller();
+    const school = await oneSchool();
+    await addSession({ schoolId: school.id, heldOn: "2026-09-01", startsAt: "09:00" });
+
+    const result = await arrangeOnlineSession(staff, {
+      schoolId: school.id,
+      heldOn: "2026-09-01",
+      startsAt: "15:00",
+      endsAt: "16:30",
+      participantType: "Siswa",
+      teacherNames: ["Prof. Bagus"],
     });
 
     expect(result).toEqual({ outcome: "collided", heldOn: "2026-09-01" });
@@ -187,48 +223,18 @@ describe("arrangeOnlineSession", () => {
     expect(await sessionsAt(school.id)).toHaveLength(1);
   });
 
-  it("collides on the day and Stream, not the slot — a different start time is still refused", async () => {
+  it("does not collide with a cancelled Session on that day", async () => {
     const staff = await staffCaller();
     const school = await oneSchool();
-    await addSession({
-      schoolId: school.id,
-      heldOn: "2026-09-01",
-      startsAt: "09:00",
-      stream: "STEM",
-      onlinePicPersonId: staff.id,
-    });
-
-    const result = await arrangeOnlineSession(staff, {
-      schoolId: school.id,
-      heldOn: "2026-09-01",
-      startsAt: "15:00",
-      picPersonId: staff.id,
-      stream: "STEM",
-      teacherNames: [],
-    });
-
-    expect(result.outcome).toBe("collided");
-    expect(await sessionsAt(school.id)).toHaveLength(1);
-  });
-
-  it("does not collide with a cancelled Session of that Stream on that day", async () => {
-    const staff = await staffCaller();
-    const school = await oneSchool();
-    await addSession({
-      schoolId: school.id,
-      heldOn: "2026-09-01",
-      stream: "STEM",
-      status: "cancelled",
-      onlinePicPersonId: staff.id,
-    });
+    await addSession({ schoolId: school.id, heldOn: "2026-09-01", status: "cancelled" });
 
     const result = await arrangeOnlineSession(staff, {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:00",
-      picPersonId: staff.id,
-      stream: "STEM",
-      teacherNames: [],
+      endsAt: "10:30",
+      participantType: "Siswa",
+      teacherNames: ["Prof. Bagus"],
     });
 
     expect(result.outcome).toBe("arranged");
@@ -250,8 +256,8 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:00",
-      picPersonId: staff.id,
-      stream: "STEM",
+      endsAt: "10:30",
+      participantType: "Siswa",
       teacherNames: tooMany,
     });
 
@@ -265,27 +271,6 @@ describe("arrangeOnlineSession", () => {
     expect(await db.select().from(schema.sessionTeacherName)).toEqual([]);
   });
 
-  it("the CHECK rejects an online Session with a null Stream", async () => {
-    const staff = await staffCaller();
-    const school = await oneSchool();
-
-    // Straight at the table, bypassing the query, which never omits the Stream — the point is that
-    // the database, not just the application, refuses a null Stream on either mode now (ADR-0022).
-    const refusal = await refusedBy(
-      db.insert(schema.session).values({
-        schoolId: school.id,
-        mode: "online",
-        stream: null,
-        heldOn: "2026-09-01",
-        startsAt: "09:00",
-        onlinePicPersonId: staff.id,
-        onlinePicRole: "Staff",
-      }),
-    );
-
-    expect(refusal).toBe("session_stream_not_null");
-  });
-
   it("throws NotStaffError for a non-Staff caller", async () => {
     const teacher = nonStaff();
     const school = await oneSchool();
@@ -294,9 +279,9 @@ describe("arrangeOnlineSession", () => {
       schoolId: school.id,
       heldOn: "2026-09-01",
       startsAt: "09:00",
-      picPersonId: teacher.id,
-      stream: "STEM",
-      teacherNames: [],
+      endsAt: "10:30",
+      participantType: "Siswa",
+      teacherNames: ["Prof. Bagus"],
     }).catch((error: unknown) => error);
 
     expect(isNotStaffError(refusal)).toBe(true);
@@ -307,7 +292,7 @@ describe("arrangeOnlineSession", () => {
 describe("arrangeOnlineSessionForm", () => {
   beforeEach(resetDatabase);
 
-  it("returns every School in name order and the Staff roster for the PIC", async () => {
+  it("returns every School in name order, and no Staff roster (#284: no PIC to pick)", async () => {
     const staff = await staffCaller();
     await oneSchool("sman-2", "SMAN 2 Bandung");
     await oneSchool("sman-1", "SMAN 1 Bandung");
@@ -315,9 +300,30 @@ describe("arrangeOnlineSessionForm", () => {
     const form = await arrangeOnlineSessionForm(staff);
 
     expect(form.schools.map((entry) => entry.name)).toEqual(["SMAN 1 Bandung", "SMAN 2 Bandung"]);
-    expect(form.staff.map((entry) => entry.fullName)).toContain("Rina Nurhayati");
-    // No Teaching Team roster any more (ADR-0022): Pengajar are session-scoped free-text names.
+    // No PIC picker (#284) and no Teaching Team roster (ADR-0022): the form carries Schools alone.
+    expect(form).not.toHaveProperty("staff");
     expect(form).not.toHaveProperty("teachingTeam");
+  });
+
+  it("carries each School's Province Time Zone onto the picker options (#165)", async () => {
+    const staff = await staffCaller();
+    // A School in a WIT Province beside a School in JB's default WIB, so a hardcoded zone would fail
+    // one of the two — the assertion proves the value is joined from `province`, not assumed.
+    await addProvince("PA", "Papua", "WIT");
+    const papua = await addCluster({ slug: "cluster-papua", name: "Cluster Papua" });
+    await addSchool({
+      slug: "sman-jayapura",
+      name: "SMAN Jayapura",
+      clusterId: papua.id,
+      provinceCode: "PA",
+    });
+    await oneSchool("sman-1", "SMAN 1 Bandung");
+
+    const form = await arrangeOnlineSessionForm(staff);
+
+    const zoneByName = new Map(form.schools.map((entry) => [entry.name, entry.timeZone]));
+    expect(zoneByName.get("SMAN 1 Bandung")).toBe("WIB");
+    expect(zoneByName.get("SMAN Jayapura")).toBe("WIT");
   });
 
   it("throws NotStaffError for a non-Staff caller", async () => {
@@ -332,14 +338,14 @@ describe("arrangeOnlineSessionForm", () => {
 describe("arrangeOnlineSessionAt", () => {
   beforeEach(resetDatabase);
 
-  it("returns the School named by its slug and the rosters", async () => {
+  it("returns the School named by its slug (no roster, #284)", async () => {
     const staff = await staffCaller();
     const school = await oneSchool("sman-8", "SMAN 8");
 
     const at = await arrangeOnlineSessionAt(staff, "sman-8");
 
-    expect(at?.school).toMatchObject({ id: school.id, name: "SMAN 8" });
-    expect(at?.staff.map((entry) => entry.fullName)).toContain("Rina Nurhayati");
+    expect(at?.school).toMatchObject({ id: school.id, name: "SMAN 8", timeZone: "WIB" });
+    expect(at).not.toHaveProperty("staff");
   });
 
   it("is null for a slug naming no School", async () => {

@@ -41,7 +41,7 @@ export type ScopeCluster = {
 
 /**
  * One School with where it is and which Cluster it belongs to. **No count travels beside this
- * list** — `42 Sekolah · 15 provinsi` is `schools.length` and the number of distinct
+ * list** — `47 Sekolah · 16 provinsi` is `schools.length` and the number of distinct
  * `provinceCode`s, derived by the reader, never a figure sent alongside that could disagree with
  * the list it summarises.
  */
@@ -56,7 +56,7 @@ export type ScopeSchool = {
   clusterSlug: string;
 };
 
-/** The scope payload's data: the four Clusters and all forty-two Schools. */
+/** The scope payload's data: the four Clusters and all forty-seven Schools. */
 export type ScopeData = {
   clusters: ScopeCluster[];
   schools: ScopeSchool[];
@@ -140,7 +140,7 @@ function excerptOf(body: string): string {
 }
 
 /**
- * The scope payload: the four Clusters, and all forty-two Schools with province and Cluster. Two
+ * The scope payload: the four Clusters, and all forty-seven Schools with province and Cluster. Two
  * queries because the two lists are independent — a Cluster fold like Coverage's would only nest
  * one inside the other, and the public Cluster and School pages want them flat.
  */

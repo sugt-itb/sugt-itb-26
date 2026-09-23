@@ -47,7 +47,10 @@ export function GoogleSignInButton() {
         setPending(true);
         await authClient.signIn.social({
           provider: "google",
-          callbackURL: "/",
+          // Role-aware landing (#265): everyone returns to `/pendamping`. A Staff Person's home is the
+          // Pendamping; a non-Staff Pimpinan is bounced from there to the Dashboard at `/` by the
+          // `/pendamping` guard — the role is not known here on the client, so that server guard sorts it.
+          callbackURL: "/pendamping",
           errorCallbackURL: "/masuk",
         });
       }}

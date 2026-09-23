@@ -56,6 +56,7 @@ function nonStaff() {
     fullName: "Budi Santoso",
     email: "budi@gmail.com",
     role: "Teaching Team" as unknown as Role,
+    grants: [],
   };
 }
 
@@ -83,26 +84,27 @@ async function statusOf(sessionId: string) {
 describe("Detail Sesi", () => {
   beforeEach(resetDatabase);
 
-  it("reports the PIC of an online Session from the Session itself", async () => {
+  it("reports no PIC for an online Session (#284)", async () => {
     const pic = await staff();
     const school = await oneSchool();
     const session = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
 
     const detail = await sessionDetail(pic, session.id);
 
-    expect(detail?.picFullName).toBe("Rina Nurhayati");
+    // An online Session tracks no PIC now (#284) — a third-party LMS runs online delivery.
+    expect(detail?.picPersonId).toBeNull();
+    expect(detail?.picFullName).toBeNull();
     expect(detail?.schoolName).toBe("SMAN 1 Bandung");
     expect(detail?.perjadin).toBeNull();
   });
 
   /**
-   * The `coalesce` the criterion names. An offline Session carries no PIC columns of its
-   * own — the composite foreign key is `MATCH SIMPLE` precisely so it may not — so its
-   * PIC has to come from the Perjadin, which makes this a query and not a column.
+   * An offline Session carries no PIC columns of its own — the composite foreign key is
+   * `MATCH SIMPLE` precisely so it may not — so its PIC comes from the Perjadin (#284: the online
+   * `coalesce` is gone, the PIC is simply the Perjadin's), which makes this a query and not a column.
    */
   it("reports the PIC of an offline Session from its Perjadin", async () => {
     const pic = await staff();
@@ -144,7 +146,6 @@ describe("Detail Sesi", () => {
       schoolId: school.id,
       heldOn: "2026-09-10",
       startsAt: "09:00",
-      onlinePicPersonId: pic.id,
     });
 
     const detail = await sessionDetail(pic, session.id);
@@ -157,12 +158,10 @@ describe("Detail Sesi", () => {
     // `sessionDetail` reads delivery data, not money, so it takes any signed-in caller (ADR-0004)
     // — it never calls `requireStaff`. A hand-built non-Staff caller proves the surface is open;
     // no such Person exists in the database since T3 (#153), so the caller is cast, not invited.
-    const pic = await staff();
     const school = await oneSchool();
     const session = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
 
     await expect(sessionDetail(nonStaff(), session.id)).resolves.not.toBeNull();
@@ -176,17 +175,45 @@ describe("Detail Sesi", () => {
   });
 
   /**
-   * `owed` is delivered-only. An arranged Session has not happened, so nothing is owed off it —
-   * the overdue-shaped state ADR-0006 exists to prevent. Since T3 (#153) the only thing ever owed
-   * is the PIC's Session Record, so `owed` on an arranged Session is simply empty.
+   * A delivered offline Session, and the PIC (its Perjadin's) who owes its Session Record — the
+   * fixture the owed tests below share. Session Records are an **offline-only** debt now (#284):
+   * online Sessions have no PIC and owe nothing.
    */
-  it("owes nothing while a Session is arranged", async () => {
+  async function deliveredOfflineSession() {
     const pic = await staff();
     const school = await oneSchool();
-    const session = await addSession({
+    const perjadin = await addPerjadin({
+      picPersonId: pic.id,
+      advanceIdr: 5_000_000,
+      startsOn: "2026-09-01",
+      endsOn: "2026-09-03",
+    });
+    const session = await addOfflineSession({
       schoolId: school.id,
-      heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
+      heldOn: "2026-09-02",
+      perjadinId: perjadin.id,
+    });
+    return { pic, session };
+  }
+
+  /**
+   * `owed` is delivered-only. An arranged Session has not happened, so nothing is owed off it —
+   * the overdue-shaped state ADR-0006 exists to prevent. The only thing ever owed is the offline
+   * PIC's Session Record, so `owed` on an arranged Session is simply empty.
+   */
+  it("owes nothing while an offline Session is arranged", async () => {
+    const pic = await staff();
+    const school = await oneSchool();
+    const perjadin = await addPerjadin({
+      picPersonId: pic.id,
+      advanceIdr: 5_000_000,
+      startsOn: "2026-09-01",
+      endsOn: "2026-09-03",
+    });
+    const session = await addOfflineSession({
+      schoolId: school.id,
+      heldOn: "2026-09-02",
+      perjadinId: perjadin.id,
     });
 
     const detail = await sessionDetail(pic, session.id);
@@ -195,18 +222,12 @@ describe("Detail Sesi", () => {
   });
 
   /**
-   * The one Record still owed off a delivered Session: the PIC's Session Record. Class Records
-   * went with `session_teacher` (T3, #153), so there is no per-teacher, per-Class-kind debt any
-   * more — `owed` is exactly the PIC's Session Record until they file it.
+   * The one Record still owed off a delivered offline Session: the PIC's Session Record. Class
+   * Records went with `session_teacher` (T3, #153), so there is no per-teacher debt any more — `owed`
+   * is exactly the PIC's Session Record until they file it.
    */
-  it("owes the PIC's Session Record once a Session is delivered", async () => {
-    const pic = await staff();
-    const school = await oneSchool();
-    const session = await addSession({
-      schoolId: school.id,
-      heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
-    });
+  it("owes the PIC's Session Record once an offline Session is delivered", async () => {
+    const { pic, session } = await deliveredOfflineSession();
     await markSessionDelivered(pic, session.id);
 
     const detail = await sessionDetail(pic, session.id);
@@ -217,15 +238,21 @@ describe("Detail Sesi", () => {
   });
 
   it("stops owing a Session Record once the PIC files one", async () => {
-    const pic = await staff();
-    const school = await oneSchool();
-    const session = await addSession({
-      schoolId: school.id,
-      heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
-    });
+    const { pic, session } = await deliveredOfflineSession();
     await markSessionDelivered(pic, session.id);
     await addSessionRecord({ sessionId: session.id, filedByPersonId: pic.id });
+
+    const detail = await sessionDetail(pic, session.id);
+
+    expect(detail?.owed).toEqual([]);
+  });
+
+  /** An online Session has no PIC (#284), so it owes no Session Record even once delivered. */
+  it("owes nothing off a delivered online Session (#284)", async () => {
+    const pic = await staff();
+    const school = await oneSchool();
+    const session = await addSession({ schoolId: school.id, heldOn: "2026-09-10" });
+    await markSessionDelivered(pic, session.id);
 
     const detail = await sessionDetail(pic, session.id);
 
@@ -242,7 +269,6 @@ describe("Tandai terlaksana — online", () => {
     const session = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
     return { pic, school, session };
   }
@@ -327,7 +353,6 @@ describe("Batalkan Sesi", () => {
     const session = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
 
     const result = await cancelSession(pic, session.id, "Sekolah meminta penjadwalan ulang");
@@ -347,7 +372,6 @@ describe("Batalkan Sesi", () => {
     const session = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
     await markSessionDelivered(pic, session.id);
 
@@ -367,7 +391,6 @@ describe("Batalkan Sesi", () => {
     const session = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
 
     const result = await cancelSession(pic, session.id, "   ");
@@ -377,12 +400,10 @@ describe("Batalkan Sesi", () => {
   });
 
   it("refuses a non-Staff caller", async () => {
-    const pic = await staff();
     const school = await oneSchool();
     const session = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
 
     await expect(cancelSession(nonStaff(), session.id, "Tidak jadi")).rejects.toSatisfy(
@@ -400,7 +421,6 @@ describe("moving a date", () => {
     const session = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
 
     const result = await moveSessionDate(pic, session.id, "2026-09-17", "09:00");
@@ -417,7 +437,6 @@ describe("moving a date", () => {
       schoolId: school.id,
       heldOn: "2026-09-10",
       startsAt: "09:00",
-      onlinePicPersonId: pic.id,
     });
 
     expect((await moveSessionDate(pic, session.id, "2026-09-17", "13:30")).outcome).toBe("moved");
@@ -439,9 +458,8 @@ describe("moving a date", () => {
     const moving = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
-    await addSession({ schoolId: school.id, heldOn: "2026-09-17", onlinePicPersonId: pic.id });
+    await addSession({ schoolId: school.id, heldOn: "2026-09-17" });
 
     const result = await moveSessionDate(pic, moving.id, "2026-09-17", "09:00");
 
@@ -464,12 +482,10 @@ describe("moving a date", () => {
     const moving = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
     await addSession({
       schoolId: school.id,
       heldOn: "2026-09-17",
-      onlinePicPersonId: pic.id,
       status: "cancelled",
     });
 
@@ -482,7 +498,6 @@ describe("moving a date", () => {
     const session = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
     await markSessionDelivered(pic, session.id);
 
@@ -571,12 +586,10 @@ describe("moving a date", () => {
   });
 
   it("refuses a non-Staff caller", async () => {
-    const pic = await staff();
     const school = await oneSchool();
     const session = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-      onlinePicPersonId: pic.id,
     });
 
     await expect(moveSessionDate(nonStaff(), session.id, "2026-09-17", "09:00")).rejects.toSatisfy(

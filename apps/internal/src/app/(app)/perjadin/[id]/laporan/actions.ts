@@ -6,11 +6,10 @@ import { staffSurface } from "-/lib/staff-surface";
 import {
   attachTransactionEvidence,
   filePerjadinReport,
-  markReceiptsSettled,
   perjadinAcquittal,
   recordTransaction,
+  requireStaff,
   type FilePerjadinReportResult,
-  type MarkReceiptsSettledResult,
   type NewEvidence,
   type NewTransaction,
   type RecordTransactionResult,
@@ -49,9 +48,15 @@ export async function recordTransactionAction(
 /**
  * Mint upload URLs for `count` receipts.
  *
- * **Gated on Staff and on the Perjadin existing**, by a Staff-checked read before any URL is
- * minted: an upload URL is a write credential for the private `receipts` bucket, so it is not
- * handed out against a trip nobody can file for or that is not there.
+ * **Gated on Staff and on the Perjadin existing**, by an explicit `requireStaff` ahead of a read,
+ * both before any URL is minted: an upload URL is a write credential for the private `receipts`
+ * bucket, so it is not handed out against a trip nobody can file for or that is not there.
+ *
+ * The `requireStaff` is load-bearing here in a way it was not before #180. Minting is a money WRITE
+ * and has no guard of its own; it used to lean on `perjadinAcquittal`'s `requireStaff`, but that
+ * read is open to any signed-in Person now (money reads are open — ADR-0026), so opening it would
+ * have handed a Pimpinan an upload credential. The explicit check refuses a non-Staff caller before
+ * a URL is minted.
  */
 export async function mintReceiptUploadsAction(
   perjadinId: string,
@@ -59,7 +64,10 @@ export async function mintReceiptUploadsAction(
 ): Promise<ReceiptUploadTarget[]> {
   const person = await requirePerson();
 
-  const acquittal = await staffSurface(() => perjadinAcquittal(person, perjadinId));
+  const acquittal = await staffSurface(() => {
+    requireStaff(person);
+    return perjadinAcquittal(person, perjadinId);
+  });
   if (!acquittal) throw new Error(`No Perjadin ${perjadinId} to attach receipts to.`);
 
   const wanted = Math.min(Math.max(0, Math.trunc(count)), MAX_RECEIPT_BATCH);
@@ -76,10 +84,11 @@ export async function mintReceiptUploadsAction(
  *
  * **The Staff check runs before Storage is touched, and that order is load-bearing.** The read-back
  * uses the service-role key, which bypasses every policy on a private bucket, so doing it first
- * would tell a Teaching Team caller whether an object exists and how big it is — and, when every
- * read-back failed, would return normally without `requireStaff` having run at all. The guard is
- * therefore a Staff-checked read of the Perjadin, ahead of the loop, exactly as the mint above does
- * it.
+ * would tell a non-Staff caller whether an object exists and how big it is — and, when every
+ * read-back failed, would return normally without any Staff check having run at all. The guard is
+ * therefore an explicit `requireStaff` plus a read of the Perjadin, ahead of `readReceiptFacts`,
+ * exactly as the mint above does it. The `requireStaff` is what closes this now: `perjadinAcquittal`
+ * is an open money read since #180 (ADR-0026), so the read alone no longer refuses a Pimpinan.
  *
  * The key is opaque, so unlike Cerita there is no prefix to check; `receipt-media.ts` explains why
  * that gives nothing up here. What is checked instead is the pair the boundary actually rests on —
@@ -93,7 +102,10 @@ export async function finalizeReceiptsAction(
 ): Promise<FinalizeReceiptsResult> {
   const person = await requirePerson();
 
-  const acquittal = await staffSurface(() => perjadinAcquittal(person, perjadinId));
+  const acquittal = await staffSurface(() => {
+    requireStaff(person);
+    return perjadinAcquittal(person, perjadinId);
+  });
   if (!acquittal) return { outcome: "no-such-perjadin" };
 
   const facts = await Promise.all(
@@ -119,21 +131,6 @@ export async function finalizeReceiptsAction(
 
   revalidatePath(`/perjadin/${perjadinId}/laporan`);
   return { outcome: "attached", attached: result.count, failed };
-}
-
-/** Tick or untick one Group member on the receipts checklist. */
-export async function markReceiptsSettledAction(
-  perjadinId: string,
-  personId: string,
-  settled: boolean,
-): Promise<MarkReceiptsSettledResult> {
-  const person = await requirePerson();
-
-  const result = await staffSurface(() =>
-    markReceiptsSettled(person, perjadinId, personId, settled),
-  );
-  if (result.outcome === "marked") revalidatePath(`/perjadin/${perjadinId}/laporan`);
-  return result;
 }
 
 /**

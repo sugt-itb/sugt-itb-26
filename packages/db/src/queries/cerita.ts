@@ -118,7 +118,23 @@ export async function ceritaIndex(caller: Person): Promise<CeritaEntry[]> {
 /** One Story and its gallery, or `null`. The gallery orders by `uploaded_at`, tie-broken by `id`. */
 export async function storyForEditor(caller: Person, id: string): Promise<StoryForEditor | null> {
   requireStaff(caller);
-  const [row] = await db.select().from(story).where(eq(story.id, id));
+  // Column-explicit like every other read in this package: `StoryForEditor` uses exactly these nine
+  // columns, so a bare `select()` would pull `written_by_*`, `created_at` and `updated_at` only to
+  // discard them below.
+  const [row] = await db
+    .select({
+      id: story.id,
+      slug: story.slug,
+      schoolId: story.schoolId,
+      title: story.title,
+      body: story.body,
+      stream: story.stream,
+      kind: story.kind,
+      coverPhotoId: story.coverPhotoId,
+      publishedAt: story.publishedAt,
+    })
+    .from(story)
+    .where(eq(story.id, id));
   if (!row) return null;
   const photos = await db
     .select({

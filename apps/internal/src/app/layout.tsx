@@ -1,5 +1,6 @@
 import { ThemeProvider } from "-/components/theme-provider";
 import { cn } from "@sugt/ui/lib/utils";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 
 import "@sugt/ui/globals.css";
@@ -9,7 +10,7 @@ const sans = Montserrat({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: {
-    default: "Beranda",
+    default: "Pendamping",
     template: "%s | SUGT Internal",
   },
 };
@@ -33,6 +34,7 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col">
         <ThemeProvider>{children}</ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   );

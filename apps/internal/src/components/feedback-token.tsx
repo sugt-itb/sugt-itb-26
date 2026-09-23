@@ -2,6 +2,7 @@
 
 import { issueFeedbackTokenAction } from "-/app/(app)/sesi/[id]/actions";
 import type { SessionDetail } from "@sugt/db/queries";
+import type { SessionStatus } from "@sugt/domain";
 import { Button } from "@sugt/ui/components/button";
 import {
   Dialog,
@@ -12,7 +13,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@sugt/ui/components/dialog";
-import { useState, useTransition } from "react";
+import { type ReactElement, useState, useTransition } from "react";
+
+/**
+ * Two ways in, one behaviour. The Session detail page hands the whole `SessionDetail` it already
+ * loaded; a card elsewhere (e.g. the Staff dashboard) has only an id and a status and passes those
+ * bare, plus its own labelled `trigger`. The prop is a union so neither caller carries what it does
+ * not have, and both are normalized to `sessionId`/`status` at the top so the body reads the same.
+ * With no `trigger`, the default button renders and the existing `session={session}` mount behaves
+ * exactly as before.
+ */
+type FeedbackTokenDialogProps = (
+  | { session: SessionDetail }
+  | { sessionId: string; status: SessionStatus }
+) & {
+  trigger?: ReactElement;
+};
 
 /**
  * **The Participant Feedback QR.** Anyone signed in presses this at the end of a Session and
@@ -29,7 +45,11 @@ import { useState, useTransition } from "react";
  * opens its own confirmation naming what dies, so a reissue is a second, deliberate act rather
  * than a repeat of the neutral first-issue notice.
  */
-function FeedbackTokenDialog({ session }: { session: SessionDetail }) {
+function FeedbackTokenDialog(props: FeedbackTokenDialogProps) {
+  const sessionId = "session" in props ? props.session.id : props.sessionId;
+  const status = "session" in props ? props.session.status : props.status;
+  const trigger = props.trigger;
+
   const [open, setOpen] = useState(false);
   const [issued, setIssued] = useState<{ url: string; qr: string } | null>(null);
   const [confirmingReissue, setConfirmingReissue] = useState(false);
@@ -39,11 +59,11 @@ function FeedbackTokenDialog({ session }: { session: SessionDetail }) {
 
   // Barred on a cancelled Session, and absent rather than disabled — there is nothing to explain
   // in a dialog nobody should open.
-  if (session.status === "cancelled") return null;
+  if (status === "cancelled") return null;
 
   function issue() {
     startSaving(async () => {
-      const result = await issueFeedbackTokenAction(session.id);
+      const result = await issueFeedbackTokenAction(sessionId);
       if (result.outcome === "issued") {
         setIssued({ url: result.url, qr: result.qr });
         setConfirmingReissue(false);
@@ -77,7 +97,7 @@ function FeedbackTokenDialog({ session }: { session: SessionDetail }) {
         }
       }}
     >
-      <DialogTrigger render={<Button variant="outline">QR umpan balik</Button>} />
+      <DialogTrigger render={trigger ?? <Button variant="outline">QR umpan balik</Button>} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>QR umpan balik</DialogTitle>

@@ -36,6 +36,28 @@ export type Stream = (typeof STREAMS)[number];
 export const CLASS_KINDS = ["GTK", "MS", "Student"] as const;
 export type ClassKind = (typeof CLASS_KINDS)[number];
 
+/**
+ * Which cohort a Pretest/Posttest completion was administered to — one of the two Classes taken as
+ * a pair. `Siswa` is the Student Class; `GTK-MS` is the GTK and MS Classes together. The values
+ * coincide with `TRANSACTION_PARTICIPANT_TYPES` today, but this is a **dedicated** const on purpose
+ * (ticket #246): the money axis and the assessment axis must evolve independently, so a CHECK
+ * coupled to the other would ripple silently. Like the transaction participant types, these are
+ * **values a column may hold, not terms `CONTEXT.md` defines** — mirrored character for character by
+ * `assessment_completion_participant_type_check`; see `packages/db/src/schema/monitoring.ts`.
+ */
+export const PRETEST_PARTICIPANT_TYPES = ["Siswa", "GTK-MS"] as const;
+export type PretestParticipantType = (typeof PRETEST_PARTICIPANT_TYPES)[number];
+
+/**
+ * The two assessments whose administration this tool tracks — whether a Pretest or Posttest was
+ * *administered* to a cohort at a School (yes/no), never scores or outcomes (ADR-0031, reconciling
+ * ADR-0009's "delivery, not outcomes"). Only `pretest` is surfaced in the UI this iteration; the
+ * column and its CHECK carry `posttest` from the start so surfacing it later is a UI-only change,
+ * not a migration. Values a column may hold, mirrored by `assessment_completion_kind_check`.
+ */
+export const ASSESSMENT_KINDS = ["pretest", "posttest"] as const;
+export type AssessmentKind = (typeof ASSESSMENT_KINDS)[number];
+
 /** How a Session is delivered. Offline Sessions happen during a Perjadin; online ones have none. */
 export const SESSION_MODES = ["offline", "online"] as const;
 export type SessionMode = (typeof SESSION_MODES)[number];
@@ -121,6 +143,17 @@ export function formatSessionStartTimeWithWib(time: string, zone: TimeZone): str
 }
 
 /**
+ * The parenthesised Time Zone tag a time-of-day input label carries so a Staffer knows which
+ * zone they are entering — `" (WITA)"`, or `""` when no zone is in scope yet (a Session with
+ * no School picked, a legacy Perjadin before its return zone is chosen). Prepend it to a label:
+ * `` `Jam Mulai${timeZoneSuffix(zone)}` ``. Named once, like `formatIdr`, so the four internal
+ * labels that carry it cannot drift apart on spacing or on the "no zone yet" empty case.
+ */
+export function timeZoneSuffix(zone: TimeZone | "" | null | undefined): string {
+  return zone ? ` (${zone})` : "";
+}
+
+/**
  * Group a Rupiah amount the way every screen shows it: `id-ID` locale, dot separators,
  * `formatIdr(1000000) === "1.000.000"`. Returns the grouped digits only — each call site
  * keeps its own literal `Rp ` prefix, so this is exactly the `n.toLocaleString("id-ID")` the
@@ -132,14 +165,20 @@ export function formatIdr(n: number): string {
 }
 
 /**
- * The one role in the internal tool. **`Teaching Team` was retired in T3** ([#153](https://github.com/mafiefa02/sugt/issues/153)):
- * once online Sessions named their teachers as free-text `session_teacher_name` (ADR-0022) the
- * Person role had no remaining purpose, so every signed-in Person is now Staff. The Programme's
- * leadership are senior Staff, not a separate role — see
+ * The two roles in the internal tool. **`Teaching Team` was retired in T3** ([#153](https://github.com/mafiefa02/sugt/issues/153)) —
+ * once online Sessions named their teachers as free-text `session_teacher_name` (ADR-0022) that
+ * Person role had no purpose — and for a while Staff stood alone. **`Pimpinan` was then added as a
+ * second signed-in role** ([#179](https://github.com/mafiefa02/sugt/issues/179)): a read-only
+ * principal who reads every non-money delivery surface, writes nothing, and lands on the Dashboard (`/`).
+ * It is a Person role and nothing more — the widened CHECK admits it, but every composite `(id, role)`
+ * FK still pins `'Staff'`, so a Pimpinan is never a Group member, a PIC, a Session-Record filer or a
+ * Story author (see `docs/adr/0025-pimpinan-is-a-second-signed-in-read-only-person-role.md` and the
+ * CHECK in `packages/db/src/schema/people.ts`). The Programme's leadership, once folded into senior
+ * Staff, now have this signed-in read-only role of their own — see
  * `docs/adr/0004-delivery-data-is-open-internally-money-is-not.md`. The teaching **team** concept
- * lives on, but as trip-scoped / session-scoped free-text **names**, not People (ADR-0020, ADR-0022).
+ * lives on too, but as trip-scoped / session-scoped free-text **names**, not People (ADR-0020, ADR-0022).
  */
-export const ROLES = ["Staff"] as const;
+export const ROLES = ["Staff", "Pimpinan"] as const;
 export type Role = (typeof ROLES)[number];
 
 /**
@@ -150,24 +189,63 @@ export type Role = (typeof ROLES)[number];
  * across the `*_role` columns, deliberately avoided ([#116](https://github.com/mafiefa02/sugt/issues/116)).
  * Route any rendered role string through this map; never through the raw value.
  *
- * One key now `Role` has narrowed to `"Staff"` alone (#153); the map still satisfies
- * `Record<Role, string>`.
+ * Two keys now (#179): `Staff` reads **DITSAMA**, and the second signed-in role `Pimpinan` reads
+ * **Pimpinan** — its own name, since a Pimpinan is not one of the organisation's DITSAMA people.
+ * The map is `Record<Role, string>`, so adding a role to `ROLES` forces the new key here (a compile
+ * error otherwise), which is exactly what keeps the label maps in step with the role set.
  */
 export const ROLE_LABELS: Record<Role, string> = {
   Staff: "DITSAMA",
+  Pimpinan: "Pimpinan",
 };
 
 /**
  * How each role is labelled **on a Perjadin surface** — the same stored role seen from the trip's
  * vantage point. There the DITSAMA people are the ones who **accompany** the (name-based) teaching
- * team on the journey, so they read as **Pendamping** rather than the organisation's name. One
- * stored role, two context-dependent labels ([#141](https://github.com/mafiefa02/sugt/issues/141)):
- * `ROLE_LABELS` off a Perjadin, this map on one. Presentation only, keyed on the stored `Role` exactly
- * like `ROLE_LABELS`, so `[member.role]` render sites resolve; the stored value stays `"Staff"`. The
- * PIC tag is orthogonal to this — the PIC is a Pendamping too, but is marked by the more specific fact.
+ * team on the journey, so they read as **Pendamping** rather than the organisation's name. So the
+ * `Staff` role carries two context-dependent labels ([#141](https://github.com/mafiefa02/sugt/issues/141)):
+ * **DITSAMA** off a Perjadin via `ROLE_LABELS`, **Pendamping** on one via this map. The second role
+ * `Pimpinan` (#179) reads **Pimpinan** on both surfaces — it is not a Pendamping and does not travel
+ * as a working member, so the trip has no different name for it. Presentation only, keyed on the
+ * stored `Role` exactly like `ROLE_LABELS`, so `[member.role]` render sites resolve; the stored
+ * values stay `"Staff"` and `"Pimpinan"`. The PIC tag is orthogonal to this — the PIC is a Pendamping
+ * too, but is marked by the more specific fact.
  */
 export const PERJADIN_ROLE_LABELS: Record<Role, string> = {
   Staff: "Pendamping",
+  Pimpinan: "Pimpinan",
+};
+
+/**
+ * The Grants a Person may hold — a **second, additive access axis** alongside the write-once
+ * `role`. A Role is exactly one and write-once (ADR-0013); a Grant is optional, revocable,
+ * **Staff-only**, and a Person may hold several. Grants never touch `person.role` or its composite
+ * `(id, role)` foreign keys, and being Staff-only they can never punch through "a Pimpinan writes
+ * nothing" (ADR-0025). See `docs/adr/0028-grants-are-a-second-additive-access-axis.md`.
+ *
+ * Two named Grants:
+ * - **Administrator** — administers Grants (assign/revoke any Grant on any Staff Person, including
+ *   making another Administrator) and **implies every other Grant**, so an Administrator satisfies
+ *   any grant check without holding that grant's own row.
+ * - **Editor** — may write Preparation Cards.
+ *
+ * Unlike `TRANSACTION_CATEGORIES`, these **are** terms the Programme's language defines — `CONTEXT.md`
+ * glosses them under **Access** — so they belong here beside `ROLES`. The list is mirrored by
+ * `person_grant_grant_check` character for character (see `packages/db/src/schema/people.ts`); a
+ * future Grant widens that CHECK the way `0018_widen_person_role_pimpinan.sql` widened the role one.
+ */
+export const GRANTS = ["Administrator", "Editor"] as const;
+export type Grant = (typeof GRANTS)[number];
+
+/**
+ * How each Grant is **labelled in the UI**, keyed on the stored `Grant` exactly like `ROLE_LABELS`.
+ * The map is `Record<Grant, string>`, so adding a Grant to `GRANTS` forces a key here — a compile
+ * error otherwise — which keeps the label map in step with the Grant set. Presentation only; the
+ * stored value stays the English term the CHECK pins.
+ */
+export const GRANT_LABELS: Record<Grant, string> = {
+  Administrator: "Administrator",
+  Editor: "Editor",
 };
 
 /**
@@ -180,17 +258,51 @@ export type StoryKind = (typeof STORY_KINDS)[number];
 
 /**
  * How many Sessions each School receives, by mode. The same for every School and
- * fixed from the start, which is what lets progress read as "3 of 10 delivered"
+ * fixed from the start, which is what lets progress read as "3 of 8 delivered"
  * without any planned Sessions existing
  * (see `docs/adr/0006-sessions-are-created-when-arranged.md`).
+ *
+ * Offline is **2** per School (a programme fact, #195): the two Luring Sesi in
+ * `LURING_SESI_WINDOWS` below. Online stays 6, so a School's total is 8.
  */
 export const SESSIONS_PER_SCHOOL = {
-  offline: 4,
+  offline: 2,
   online: 6,
 } as const satisfies Record<SessionMode, number>;
 
 /** Total Sessions a School receives across both modes. */
 export const TOTAL_SESSIONS_PER_SCHOOL = SESSIONS_PER_SCHOOL.offline + SESSIONS_PER_SCHOOL.online;
+
+/**
+ * How many **Kegiatan terlaksana** units a School is measured against — the denominator of the
+ * `/monitoring` progress KPI (`docs/adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md`, #249).
+ * Its eight Sessions **plus one unit per assessment kind** (pretest + posttest), so **10**. Each
+ * assessment unit is all-or-nothing: a School's pretest unit counts only once all four pretest boxes
+ * are done, likewise posttest. Derived from `TOTAL_SESSIONS_PER_SCHOOL` and `ASSESSMENT_KINDS.length`
+ * so it cannot drift from either. Distinct from `TOTAL_SESSIONS_PER_SCHOOL`, the Session-only total
+ * the other progress readouts (school directory/detail, the public figures) still measure against.
+ */
+export const KEGIATAN_UNITS_PER_SCHOOL = TOTAL_SESSIONS_PER_SCHOOL + ASSESSMENT_KINDS.length;
+
+/**
+ * **The programme's total budget, in whole rupiah** (#195). A single constant — there is no schema
+ * for it — that `/monitoring` reconciles spend against. Whole IDR, like every money column.
+ */
+export const PROGRAMME_BUDGET_IDR = 15_000_000_000;
+
+/**
+ * **The planned period of each Luring (offline) Sesi** (#195). Two windows, one per offline Sesi,
+ * as inclusive `YYYY-MM-DD` date ranges in 2026.
+ *
+ * They drive `/monitoring`'s timeline stepper and its overdue warnings **only** — they do *not*
+ * bucket Sessions into a Sesi. A Session's Sesi is its per-School date **rank**, computed on the fly
+ * (ADR-0027), independent of these calendar windows: a Session delivered outside its window is late,
+ * not re-ranked.
+ */
+export const LURING_SESI_WINDOWS = [
+  { sesi: 1, startsOn: "2026-10-05", endsOn: "2026-10-23" },
+  { sesi: 2, startsOn: "2026-11-02", endsOn: "2026-11-20" },
+] as const;
 
 /**
  * What a Class Record Rates — filed by the Teaching Team member who taught that Class.
@@ -242,6 +354,21 @@ export const PERJADIN_ASPECTS = ["lodging", "transport", "meals", "punctuality"]
 export type PerjadinAspect = (typeof PERJADIN_ASPECTS)[number];
 
 /**
+ * Who a Perjadin Evaluation filer says they are — a **self-declared** role, typed alongside a name
+ * on the unauthenticated `/ep/{token}` form (ADR-0024). It is not validated against the Group or
+ * the Pimpinan roster: the identity is untrusted by design, exactly as `participant_feedback.name`
+ * is (ADR-0012). The three cover everyone the evaluation wants to hear from — the name-based
+ * **Pengajar** (Teaching Team), the signed-in DITSAMA **Pendamping** who travel, and the
+ * record-only **Pimpinan** — none of whom the old signed-in-Group gate could all admit.
+ *
+ * These are **values a column may hold**, so `perjadin_evaluation.filed_by_role` CHECKs this list
+ * character for character (see `packages/db/src/schema/evaluations.ts`), and the form's Role
+ * selector is driven off it — one list behind the schema, the query and the form.
+ */
+export const PERJADIN_EVALUATION_ROLES = ["Pengajar", "Pendamping", "Pimpinan"] as const;
+export type PerjadinEvaluationRole = (typeof PERJADIN_EVALUATION_ROLES)[number];
+
+/**
  * The bounds of a Rating: the score one person gives one Aspect. Ratings are the only
  * thing in the system anything counts.
  */
@@ -269,6 +396,16 @@ export const CONCERN_AT_OR_BELOW = 7;
  * the same moment without storing a Session end time.
  */
 export const FEEDBACK_TOKEN_LIFETIME_HOURS = 24;
+
+/**
+ * How long a Perjadin's Evaluation link stays open — **14 days**, far longer than the Session
+ * feedback token's 24 hours. A Participant Feedback QR is held up in the room and scanned on the
+ * spot, so a day is generous; a Perjadin link is shared by hand to the Pengajar, Pendamping and
+ * Pimpinan after a trip that may have run over a week, and they file when they get to it. Counted
+ * from issue, like `FEEDBACK_TOKEN_LIFETIME_HOURS`, and expressed in hours so both tokens set
+ * their `expires_at` the same way (`now() + make_interval(hours => …)`).
+ */
+export const PERJADIN_FEEDBACK_TOKEN_LIFETIME_HOURS = 24 * 14;
 
 /**
  * A Perjadin Report is due this many days after the Group gets back, so the deadline is
@@ -314,6 +451,62 @@ export const TRANSACTION_CATEGORIES = [
 export type TransactionCategory = (typeof TRANSACTION_CATEGORIES)[number];
 
 /**
+ * The transaction categories that **draw down a Perjadin's travel float** (ADR-0029). Only these
+ * reduce the remaining float (`advanceIdr − drawn-down`); every other category is recorded against
+ * the trip and shown in the acquittal, but is paid outside the float (pre-paid before departure or
+ * handled by other Staff) and does **not** reduce what is left.
+ *
+ * This is the single source of truth for that split. It is deliberately a **narrower** subset of
+ * `TRANSACTION_CATEGORIES` — the two values here are members of that list, character for character —
+ * and it is intended to be extensible: widening the float later is one edit here. It does **not**
+ * change `/monitoring`'s "Anggaran terpakai", which still sums **every** category (that figure is
+ * programme spend, not float draw-down — the two are two different numbers by design).
+ */
+export const ADVANCE_DRAWDOWN_CATEGORIES = [
+  "Konsumsi",
+  "Lainnya",
+] as const satisfies readonly TransactionCategory[];
+export type AdvanceDrawdownCategory = (typeof ADVANCE_DRAWDOWN_CATEGORIES)[number];
+
+/** Whether a category draws down the travel float. Widened to `string` so a DB-read row's `category` compares without a cast. */
+export function isAdvanceDrawdownCategory(category: string): boolean {
+  return (ADVANCE_DRAWDOWN_CATEGORIES as readonly string[]).includes(category);
+}
+
+/**
+ * The **drawn-down total** of a list of transactions — the sum of only those whose category is an
+ * `ADVANCE_DRAWDOWN_CATEGORIES` member. The one place the JS render/query sites compute float
+ * consumption, so the rule lives here beside the constant rather than being re-expressed per site.
+ * The two SQL sums (`my-perjadin`, `dashboard`) can't call this, so they carry a `category in (…)`
+ * built from the same constant; a test pins all three equal.
+ */
+export function sumAdvanceDrawdownIdr(
+  lines: readonly { category: string; amountIdr: number }[],
+): number {
+  return lines.reduce(
+    (total, line) => (isAdvanceDrawdownCategory(line.category) ? total + line.amountIdr : total),
+    0,
+  );
+}
+
+/**
+ * Which cohort a transaction's spend served — an axis orthogonal to `category`. `category` is what
+ * kind of spend it was; `participant_type` is which of the two Classes it was for. `Siswa` is the
+ * Student Class; `GTK-MS` is the GTK and MS Classes taken together. Required on every transaction:
+ * the Laporan splits each acquittal's spend by cohort, so there is no unset state to carry.
+ *
+ * There is deliberately **no "Umum" value**: a shared cost is attributed to whichever type it
+ * predominantly served rather than parked in a third bucket, because a subtotal that leaves spend
+ * unattributed answers the split it exists to make with "some of it".
+ *
+ * Like `TRANSACTION_CATEGORIES`, these are **values a column may hold, not terms `CONTEXT.md`
+ * defines** — Indonesian, a closed set, mirrored by `transaction_participant_type_check` character
+ * for character; see `packages/db/src/schema/travel.ts`.
+ */
+export const TRANSACTION_PARTICIPANT_TYPES = ["Siswa", "GTK-MS"] as const;
+export type TransactionParticipantType = (typeof TRANSACTION_PARTICIPANT_TYPES)[number];
+
+/**
  * How a Group travels to and from a Perjadin — the mode on the Keberangkatan and Kepulangan
  * legs. A closed set of four, in Indonesian because that is what goes on the Surat Tugas, the
  * same reasoning as `TRANSACTION_CATEGORIES` above.
@@ -326,23 +519,22 @@ export const TRANSPORT_MODES = ["Pesawat", "Kereta", "Travel", "Mobil Dalam Kota
 export type TransportMode = (typeof TRANSPORT_MODES)[number];
 
 /**
- * The leaders of DITSAMA ITB — a **fixed set of three named people** — one of whom may, rarely,
- * join a Perjadin's Kelompok Perjalanan to monitor the offline Sessions. They are recorded on the
- * Perjadin (optional, editable, chosen from this set) and named on the Laporan Perjadin, but are
- * **record-only**: a Pimpinan is not a working Group member and files nothing
- * (see the Pimpinan entry in `CONTEXT.md` and [ADR-0020](../../../docs/adr/0020-teaching-team-members-on-a-perjadin-are-trip-scoped-names.md)).
+ * The **Jenis** a Preparation **Checklist Item** carries — the kind of preparation that item tracks,
+ * on the Dashboard (`/`) Persiapan tab. Moved down from the Card to each item (#292). A closed set of
+ * four, mirrored by `preparation_checklist_item_jenis_check` character for character (see
+ * `packages/db/src/schema/monitoring.ts`).
  *
- * Like `TRANSACTION_CATEGORIES` and `TRANSPORT_MODES`, these are **values a column may hold** — the
- * names go in `perjadin_pimpinan.name`, whose CHECK repeats this list character for character; see
- * `packages/db/src/schema/travel.ts`. The exact strings are the paperwork's, so they are shared
- * from here rather than retyped.
+ * **`Pimpinan` here is a category label, not the Person Role.** It names a kind of preparation
+ * (leadership-facing), and has nothing to do with the signed-in read-only `Pimpinan` role in `ROLES`
+ * or with `requireGrant`/Grants — an item's Jenis never gates access. Like `TRANSACTION_CATEGORIES`
+ * and `TRANSPORT_MODES`, these are **values a column may hold, not terms `CONTEXT.md` defines**, so
+ * they live here without a glossary entry; only the Monitoring Preparation *concepts* are glossed.
  */
-export const PIMPINAN = [
-  "Prof. Dr. Fatimah Arofiati Noor, S.Si., M.Si.",
-  "Oktofa Yudha Sudrajad, S.T., M.S.M., Ph.D.",
-  "Dr. Anton Timur Jaelani, S.Si., M.Si.",
-] as const;
-export type Pimpinan = (typeof PIMPINAN)[number];
+export const PREPARATION_JENIS = ["Teknis", "Kurikulum", "LAPI", "Pimpinan"] as const;
+export type PreparationJenis = (typeof PREPARATION_JENIS)[number];
+
+/** The app-enforced ceiling on a Preparation Card's checklist — a safety cap the DB does not hold. */
+export const MAX_PREPARATION_CHECKLIST_ITEMS = 20;
 
 /**
  * The app-enforced caps on the new Perjadin model — ceilings the database deliberately does not
@@ -354,11 +546,13 @@ export type Pimpinan = (typeof PIMPINAN)[number];
  *   maximum, ten is practically unreachable.
  * - `MAX_TEACHING_TEAM_PER_PERJADIN` — trip-scoped teacher names entered on the trip.
  * - `MAX_TEACHING_TEAM_PER_ONLINE_SESSION` — session-scoped online Pengajar names, the online
- *   analogue of the trip-scoped cap above (ADR-0022). A single online Session is taught by a small
- *   handful; ten is a safety ceiling, not a target.
+ *   analogue of the trip-scoped cap above (ADR-0022). An online Session is now required to name at
+ *   least one Pengajar (enforced at the app layer, #283) and capped at **two**: an online Session is
+ *   taught by one or two professors, not a room-full. It is online-only — offline teaching uses
+ *   `MAX_OFFLINE_SESSIONS_PER_SCHOOL_PER_PERJADIN` — so tightening it touches no offline surface.
  * - `MAX_EXTRA_STAFF_PER_GROUP` — DITSAMA Staff on a Group besides the PIC; the PIC plus up to ten.
  */
 export const MAX_OFFLINE_SESSIONS_PER_SCHOOL_PER_PERJADIN = 10;
 export const MAX_TEACHING_TEAM_PER_PERJADIN = 20;
-export const MAX_TEACHING_TEAM_PER_ONLINE_SESSION = 10;
+export const MAX_TEACHING_TEAM_PER_ONLINE_SESSION = 2;
 export const MAX_EXTRA_STAFF_PER_GROUP = 10;

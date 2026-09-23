@@ -9,7 +9,7 @@ This assumes the vocabulary in [`CONTEXT.md`](../CONTEXT.md) and the surfaces in
 
 Postgres and object storage are Supabase; both apps deploy to Vercel.
 
-Every SQL block below was applied to a real Postgres, seeded with the actual forty-two Schools
+Every SQL block below was applied to a real Postgres, seeded with the actual forty-seven Schools
 from `packages/db/seed/reference-data.sql`, and then attacked with the case each constraint is
 meant to reject — 54 checks, all behaving as claimed. Where this document says a rule is
 enforced by the database, that was verified rather than assumed; where it says a rule is not,
@@ -81,8 +81,8 @@ the two is visible by reading them side by side. A new fixed set belongs in both
 neither.
 
 A column CHECKed against a **whole** set is read back as that set's type rather than as
-`string`. A column CHECKed against a **single member** of one — `perjadin.pic_role`,
-`session.online_pic_role` and the two `filed_by_role` columns — now carries that member as a
+`string`. A column CHECKed against a **single member** of one — `perjadin.pic_role`
+and the two `filed_by_role` columns — now carries that member as a
 literal type too: [#52](https://github.com/mafiefa02/sugt/issues/52) settled it, so each reads
 back as `"Staff"` — or `"Teaching Team"` on the now-dead `class_record.filed_by_role` — via
 `$type<"Staff">()` rather than `string`. (`session_teacher.person_role` was one of these until T3
@@ -150,7 +150,7 @@ create table person (
   id          uuid primary key default gen_random_uuid(),
   full_name   text not null,
   email       text not null,
-  role        text not null check (role = 'Staff'),   -- 'Teaching Team' retired in T3, #153
+  role        text not null check (role in ('Staff', 'Pimpinan')),  -- 'Teaching Team' retired (T3, #153); Pimpinan added #179
   active      boolean not null default true,
   created_at  timestamptz not null default now(),
 
@@ -183,17 +183,23 @@ This document previously routed revocation through Better Auth's admin plugin an
 `banned` as `person.active`'s effect; both are gone. See the amendment to
 [ADR-0013](./adr/0013-people-are-added-in-the-tool-and-their-role-is-write-once.md).
 
-**Every Person is Staff** ([#153](https://github.com/mafiefa02/sugt/issues/153)). The `Teaching
-Team` role was retired in T3, so `role` is CHECKed against the single value `'Staff'`: once online
-Sessions named their teachers as `session_teacher_name` (ADR-0022), the role that modelled
-professors as People had no purpose, and `session_teacher` — its last user — was dropped.
+**A Person is Staff or Pimpinan** ([#153](https://github.com/mafiefa02/sugt/issues/153),
+[#179](https://github.com/mafiefa02/sugt/issues/179)). The `Teaching Team` role was retired in T3,
+leaving Staff alone once online Sessions named their teachers as `session_teacher_name` (ADR-0022)
+and `session_teacher` — its last user — was dropped; [#179](https://github.com/mafiefa02/sugt/issues/179)
+then widened `role` to `check (role in ('Staff', 'Pimpinan'))` to admit a second signed-in principal.
+**Only that CHECK widened.** Every composite `(id, role)` foreign key below still pins `role =
+'Staff'`, so the widened role satisfies none of them — a Pimpinan is a login-only, **read-only**
+Person, kept out of Group membership, the PIC seat, a Session Record and a Story authorship by
+exactly those untouched keys ([ADR-0025](./adr/0025-pimpinan-is-a-second-signed-in-read-only-person-role.md)).
 
-**`role` is write-once, and the database already enforces it.** Six composite foreign
+**`role` is write-once, and the database already enforces it.** Five composite foreign
 keys point at `person (id, role)` — from `group_member`, `class_record`, `session_record`,
-`story.written_by_person_id`, `perjadin.pic_person_id` and `session.online_pic_person_id` — and
+`story.written_by_person_id` and `perjadin.pic_person_id` — and
 none declares `on update`, so all default to `NO ACTION`. The moment a Person has been on a trip,
 filed a record or authored a Story, Postgres refuses to change their role. (`session_teacher` was a
-seventh until T3 dropped it.) `class_record`'s FK still pins `'Teaching Team'`, but that table is
+sixth until T3 dropped it, [#153](https://github.com/mafiefa02/sugt/issues/153); `session.online_pic`
+another until #284 dropped the online PIC.) `class_record`'s FK still pins `'Teaching Team'`, but that table is
 dead — no Person can hold that role now, so nothing satisfies it. This is not a policy anyone
 added; it falls out of the composite keys, and it is written here because an unwritten enforced
 constraint reads as a bug the first time it fires.
@@ -298,8 +304,8 @@ create table school (
 );
 ```
 
-There are four Clusters and forty-two Schools. Cluster sizes are lopsided — six, seventeen,
-eleven, eight — which is worth knowing before anyone builds a screen assuming they are
+There are four Clusters and forty-seven Schools. Cluster sizes are lopsided — seven, eighteen,
+twelve, ten — which is worth knowing before anyone builds a screen assuming they are
 comparable.
 
 **Topic and Problem are columns, not tables.** Each Cluster carries exactly one of each and
@@ -327,7 +333,7 @@ on `sub_cluster` exists solely to be the target of that key.
 
 **`province.time_zone` is on the Province, not the School.** Indonesia has three zones —
 WIB, WITA, WIT — and **no Indonesian province straddles a boundary**, so a column on `school`
-would let forty-two rows express something only the Province list can vary by, and would admit
+would let forty-seven rows express something only the Province list can vary by, and would admit
 a state that cannot exist: two Schools in one Province disagreeing about the hour. This is the
 argument for Province being a table at all, applied again with more force — a wrong Province
 misspells a line, a wrong Time Zone puts a Session on screen at the wrong time and nothing
@@ -371,26 +377,23 @@ create table session (
   stream            text check (stream in ('STEM', 'Research')),
   held_on           date not null,
   starts_at         time not null,
+  ends_at           time,
   status            text not null default 'arranged'
                       check (status in ('arranged', 'delivered', 'cancelled')),
   cancelled_reason  text,
-
-  online_pic_person_id  uuid,
-  online_pic_role       text check (online_pic_role = 'Staff'),
+  participant_type  text,
 
   created_at        timestamptz not null default now(),
 
   check ((mode = 'offline') = (perjadin_id is not null)),
-  check (stream is not null),
-  check ((mode = 'online') = (online_pic_person_id is not null)),
-  check ((online_pic_person_id is null) = (online_pic_role is null)),
+  check (mode <> 'offline' or stream is not null),
   check ((status = 'cancelled') = (cancelled_reason is not null)),
-
-  foreign key (online_pic_person_id, online_pic_role) references person (id, role)
+  check (participant_type is null or participant_type in ('Siswa', 'GTK-MS')),
+  check (ends_at is null or ends_at > starts_at)
 );
 
 create unique index session_one_online_per_school_per_day
-  on session (school_id, held_on, stream)
+  on session (school_id, held_on)
   where perjadin_id is null and status <> 'cancelled';
 
 create unique index session_no_duplicate_offline_per_school_per_perjadin
@@ -398,22 +401,24 @@ create unique index session_no_duplicate_offline_per_school_per_perjadin
   where status <> 'cancelled';
 ```
 
-**`stream` carries the STEM/Research division of a Session, whichever its mode**
-([ADR-0019](./adr/0019-offline-sessions-carry-a-stream-and-a-school-gets-many-per-trip.md),
-[ADR-0022](./adr/0022-online-sessions-carry-a-stream-and-name-teachers-as-session-scoped-names.md)).
+**`stream` carries the STEM/Research division of an _offline_ Session**
+([ADR-0019](./adr/0019-offline-sessions-carry-a-stream-and-a-school-gets-many-per-trip.md)).
 The split used to be a property of who taught — the two `session_teacher` rows, one per Stream —
-but a Session now teaches _one_ Stream, so the Stream moved onto the Session itself. It went there
-for the offline half first (ADR-0019); ADR-0022 made the online half single-Stream too. The second
-CHECK is therefore a plain `stream is not null` for **both** modes — it replaced the old
-`(mode = 'offline') = (stream is not null)` equivalence, which let online rows hold a null. Stream
-no longer tells you the mode; `mode`/`perjadin_id` still do. The column type stays nullable and the
-not-null rule is the CHECK, the same shape as the value-set CHECK beside it.
+but an offline Session now teaches _one_ Stream, so the Stream moved onto the Session itself.
+ADR-0022 briefly made online Sessions single-Stream too, but
+[ADR-0034](./adr/0034-online-sessions-are-no-longer-single-stream.md) **superseded that**: online
+delivery is run by a third-party LMS and is no longer split by Stream, so an **online** Session
+leaves `stream` null. The presence CHECK is therefore the implication
+`mode <> 'offline' or stream is not null` (`session_offline_stream_not_null`) — an offline Session
+carries a Stream, an online one need not — replacing ADR-0022's unconditional `stream is not null`.
+`session_stream_check` still pins the value set for the rows that do carry one. `mode`/`perjadin_id`
+tell you the mode; `stream` never did.
 
-**The online index now keys on Stream too** (ADR-0022). Online Sessions are arranged one at a time,
-so "the same School twice on the same day" is a mis-click away — but an online Session is
-single-Stream now, so a School may legitimately hold a STEM _and_ a Research online Session on one
-date. Widening the index to `(school_id, held_on, stream)` draws that line: those two do not
-collide, and only a second Session of the _same_ Stream on that date does. It stays partial on
+**The online index keys on `(school_id, held_on)`**
+([ADR-0034](./adr/0034-online-sessions-are-no-longer-single-stream.md), superseding ADR-0022). Online
+Sessions are arranged one at a time, so "the same School twice on the same day" is a mis-click away;
+the index makes the rule the plain one — **one online Session per School per day**, whatever the hour.
+It dropped `stream` from the key when Stream was dropped from online delivery. It stays partial on
 `perjadin_id is null`, so it touches online Sessions only; offline ones are untouched because their
 `perjadin_id` is not null. Partial the usual way besides: cancelled rows accumulate and must not
 collide with their replacements.
@@ -443,7 +448,7 @@ the Sub-Cluster onto the Session and make both sides composite foreign keys, exa
 `session → school (id, sub_cluster_id)` and defaults to `NO ACTION`, so Postgres would refuse
 to move a School between Sub-Clusters while **any** Session referenced the old pairing —
 delivered and cancelled ones included. A School would be frozen into its Sub-Cluster by its
-first completed trip, and with four offline Sessions each, that is every School early in the
+first completed trip, and with two offline Sessions each, that is every School early in the
 Programme. `on update cascade` does not rescue it: it would rewrite history, making a past
 Perjadin claim it travelled somewhere it did not, and it fails on its own terms anyway because
 the trip's own `sub_cluster_id` does not move with the School, so the cascade would violate the
@@ -460,24 +465,30 @@ the same reason, as "an arranged offline Session falls inside its Perjadin".
 
 The first CHECK is the sharpest rule in the delivery half of the domain, and it is an
 equivalence rather than an implication in both directions: **an offline Session has a
-Perjadin and an online Session has none.** Six of every ten Sessions are invisible to
+Perjadin and an online Session has none.** Six of every eight Sessions are invisible to
 anything trip-shaped, which is why counting Perjadins never tells you how much teaching has
 happened.
 
-**Every Session has a PIC, but they come from different places.** An offline Session's is its
-Perjadin's; an online Session has no Perjadin, so it carries its own — which is what the next
-two CHECKs enforce, in exact mirror of the first. The column is named `online_pic_person_id`
-rather than `pic_person_id` precisely so nobody reads it as "the PIC of this Session" and
-finds it null for every offline row — the PIC of a Session is
-`coalesce(session.online_pic_person_id, perjadin.pic_person_id)`, a query rather than a
-column.
+**Only an offline Session has a PIC now ([ADR-0035](./adr/0035-online-sessions-track-no-pic-and-file-no-session-record.md)).**
+An offline Session's PIC is its **Perjadin's** (`perjadin.pic_person_id`); an **online** Session has
+none — a third-party LMS runs online delivery, so DITSAMA staffs no PIC. The old
+`online_pic_person_id`/`online_pic_role` columns, their CHECKs (`session_online_iff_pic` and the
+PIC-role pair) and the composite foreign key `session_online_pic_is_staff` are **dropped**. "The PIC
+of a Session" is therefore simply `perjadin.pic_person_id` reached through the Session's `perjadin_id`
+— a plain left join (null for an online Session), not the old
+`coalesce(online_pic_person_id, perjadin.pic_person_id)`. `session_offline_iff_perjadin` is now the
+whole of "which Sessions have a PIC".
 
-This matters because the PIC is the one person whose Session Record is required rather than
-optional. Without it, six of every ten Sessions would have nobody who owed anything.
+This is why an **online Session produces no Session Record**: the Session Record is the PIC's account
+of the visit, and online Sessions have no PIC. Only offline Sessions owe one. The `session_record`
+table itself is unchanged — offline Sessions file records exactly as before, filed by the Perjadin's
+Staff PIC.
 
-The composite foreign key uses the default `MATCH SIMPLE`, under which a row with NULLs in
-the referencing columns satisfies the constraint — so offline Sessions, which have neither
-column set, pass without a special case.
+**The load-bearing consequence:** the offline `/sesi/[id]` detail read must resolve an online
+Session's row (with a null PIC) rather than drop it, so the page can redirect the online id to
+`/sesi-daring/[id]`. Before this change its `coalesce(...)` inner join would have gone null for an
+online row and 404'd every online Session; the left join on `perjadin.pic_person_id` is what makes
+dropping the columns safe.
 
 `held_on` is the date the Session is arranged for, and the date it happened once delivered.
 It is a `date`, not a `timestamptz` — Indonesia spans three time zones and a Session is a
@@ -505,6 +516,32 @@ Nothing stores the second number.
 `starts_at` is NOT NULL. It is affordable because no Session exists yet in any live database, and
 it is worth spending that one-off affordance on: a nullable start time acquires a null on the
 first row written and keeps it forever, and every screen then has to render "time unknown".
+
+**`ends_at` and `participant_type` are online-required but nullable at the database (#283).** Both
+were added after online Sessions existed in a populated database, so unlike `starts_at` the one-off
+NOT-NULL affordance is spent — a strict column, or a NOT-NULL-for-online CHECK, would fail the
+migration against rows that carry no value and have no correct backfill. So the columns are nullable
+and carry only value/range CHECKs (`ends_at is null or ends_at > starts_at`; `participant_type is
+null or participant_type in ('Siswa', 'GTK-MS')`), and "required for an online Session" is enforced
+at the application layer — the arrange form's submit guard and `arrangeOnlineSession`/
+`updateOnlineSession`, the same layer the PIC and Stream requirements sit behind on the write path.
+`ends_at` is a wall-clock `time` local to the School exactly like `starts_at`; `participant_type` is
+a column-value set, not a glossary term. #283 **deliberately reuses** the `PRETEST_PARTICIPANT_TYPES`
+values because the online-cohort set coincides with the pretest-cohort set today — a knowing
+exception to the #246 rule that independent axes each get a dedicated const (`transaction` and
+`assessment_completion` each carry their own `participant_type` const so a CHECK coupled to another
+axis cannot ripple silently). The coupling is only at the TypeScript type level; the CHECK is
+independent DDL. If the online-Session cohort ever needs to move apart from the pretest one, it
+should get its own `SESSION_PARTICIPANT_TYPES`. Both columns are online-only in practice — the
+arrange and detail-edit surfaces are online-only — while offline rows leave them null and pass the
+CHECKs untouched.
+
+**An online Session's time is always WIB (#283), and this is a rendering choice, not a column.**
+`starts_at`/`ends_at` are still stored as a bare wall-clock `time`, but for an _online_ Session the
+number is a WIB wall-clock time nationally — the Zoom host is in WIB — so the online surfaces label
+and render it "(WIB)" unconditionally rather than deriving the zone from `province.time_zone` through
+the School the way offline Sessions do. Nothing about the storage changed; the online reads simply
+stopped joining `province` for the zone and treat it as the constant WIB.
 
 **An arranged offline Session's `held_on` lies inside its Perjadin's `starts_on`–`ends_on`.**
 Nothing holds that — not this schema, and until now not any document either. It is scoped to
@@ -589,6 +626,52 @@ whole point of the name-based model ([ADR-0020](./adr/0020-teaching-team-members
 **Offline Class Records fall out of scope** as a consequence: their filers would be the teachers,
 and a name is not a Person who can sign in and file. See the open question in `CONTEXT.md`.
 
+### Pretest/Posttest completion
+
+Whether a **Pretest** — and later a **Posttest** — was **administered** to a cohort at a School,
+tracked as a bare tuple whose _presence_ means "done"
+([ADR-0031](./adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md)). This is
+**delivery, not outcome** ([ADR-0009](./adr/0009-the-tool-tracks-delivery-not-outcomes.md)): the row
+records that the assessment happened, never a score.
+
+```sql
+create table assessment_completion (
+  id                uuid primary key default gen_random_uuid(),
+  school_id         uuid not null references school (id) on delete cascade,
+  stream            text not null,
+  participant_type  text not null,
+  kind              text not null,
+
+  constraint assessment_completion_box_key
+    unique (school_id, stream, participant_type, kind),
+  constraint assessment_completion_stream_check
+    check (stream in ('STEM', 'Research')),
+  constraint assessment_completion_participant_type_check
+    check (participant_type in ('Siswa', 'GTK-MS')),
+  constraint assessment_completion_kind_check
+    check (kind in ('pretest', 'posttest'))
+);
+```
+
+The grain is **(School × Stream × participant-type × kind)**: one row per box on the **Dashboard** (`/`)
+Pretest tracker. Ticking a box inserts the row, un-ticking deletes it — there is **no `done` column
+and no `recorded_at`/`recorded_by`**, because a completion needs no audit trail and "done" has one
+representation. The unique constraint gives one row per box; the three CHECKs mirror the domain
+consts `STREAMS`, `PRETEST_PARTICIPANT_TYPES` and `ASSESSMENT_KINDS` character for character, the
+same discipline as every other set-valued column (see _the glossary is not the schema_). `posttest`
+is a legal `kind` from the start though no UI surfaces it this iteration, so surfacing it is a
+UI-only change rather than a migration.
+
+`participant_type`'s `Siswa`/`GTK-MS` values coincide with `transaction.participant_type` today but
+sit on a **dedicated** const on purpose — the money axis and the assessment axis evolve
+independently.
+
+**The /47 denominator is never stored.** Any progress reading ("X / 47") derives its denominator
+from `schools.length` at read time, matching every existing "X / 47" pattern (`aggregates.ts`,
+`dashboard-derive.ts`) — a stored copy would be a second source of truth that could drift. Reads are
+open to any signed-in Person; the one write (tick/un-tick) opens with `requireGrant(caller,
+"Editor")` (ADR-0028).
+
 ---
 
 ## The four evaluations
@@ -601,7 +684,7 @@ rubric, because each asks a question only that person can answer.
 | `class_record`         | Teaching Team | Class, per professor  | Comprehension, Participation, Readiness, Materials, Delivery, Facilities, Timing |
 | `session_record`       | PIC / Staff   | Session               | Facilities, Turnout, School support, Timing, Coordination                        |
 | `participant_feedback` | Participants  | Class, per respondent | Materials, Instructor, Relevance                                                 |
-| `perjadin_evaluation`  | Group         | Perjadin, per member  | Lodging, Transport, Meals, Punctuality                                           |
+| `perjadin_evaluation`  | Token link    | Perjadin (no dedup)   | Lodging, Transport, Meals, Punctuality                                           |
 
 They share a scale (1–10), a threshold (`CONCERN_AT_OR_BELOW`, 7), and one rule — **a Rating at
 or below the threshold cannot be filed without saying what went wrong** — so all four feed one
@@ -839,31 +922,47 @@ chased in the room, not by the tool.
 
 ## Perjadin Evaluation
 
-How the trip went, as distinct from how the teaching went. Internal, and **only the Group that
-travelled may file one**.
+How the trip went, as distinct from how the teaching went. Filed **without signing in**, through a
+short-lived token link shared from the trip's page, by a filer who **self-declares** a Role and a
+Name (ADR-0024).
 
 ```sql
+create table perjadin_feedback_token (
+  perjadin_id           uuid primary key references perjadin (id) on delete cascade,
+  token                 text not null unique,
+  issued_at             timestamptz not null default now(),
+  expires_at            timestamptz not null default now() + interval '14 days',
+  issued_by_person_id   uuid not null references person (id),
+
+  check (expires_at > issued_at)
+);
+
 create table perjadin_evaluation (
-  id                  uuid primary key default gen_random_uuid(),
-  perjadin_id         uuid not null references perjadin (id) on delete cascade,
-  filed_by_person_id  uuid not null references person (id),
+  id             uuid primary key default gen_random_uuid(),
+  perjadin_id    uuid not null references perjadin (id) on delete cascade,
+  filed_by_role  text not null check (filed_by_role in ('Pengajar', 'Pendamping', 'Pimpinan')),
+  filed_by_name  text not null,
 
   lodging      smallint          check (lodging     between 1 and 10),   -- nullable; see below
   transport    smallint not null check (transport   between 1 and 10),
   meals        smallint not null check (meals       between 1 and 10),
   punctuality  smallint not null check (punctuality between 1 and 10),
 
-  problems     text,
-  suggestions  text,
+  lodging_comment      text,
+  transport_comment    text,
+  meals_comment        text,
+  punctuality_comment  text,
 
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
 
-  unique (perjadin_id, filed_by_person_id),
-
+  -- Per-Aspect elaboration (ADR-0023): each Aspect is not-low or carries its OWN comment, and all
+  -- four must hold. `lodging` is guarded by `is null` first, so a skipped hotel owes no comment.
   check (
-    least(lodging, transport, meals, punctuality) > 7
-    or btrim(coalesce(problems, '')) <> ''
+    (lodging is null or lodging > 7 or btrim(coalesce(lodging_comment, '')) <> '')
+    and (transport   > 7 or btrim(coalesce(transport_comment, ''))   <> '')
+    and (meals       > 7 or btrim(coalesce(meals_comment, ''))       <> '')
+    and (punctuality > 7 or btrim(coalesce(punctuality_comment, '')) <> '')
   )
 );
 
@@ -872,9 +971,30 @@ create index perjadin_evaluation_concerns_idx
   where least(lodging, transport, meals, punctuality) <= 7;
 ```
 
-Same shape as a Session Record, on purpose: one row per person, five or four Ratings beside the
-prose, the same 1–10 scale, the same elaboration rule at the same threshold. Two evaluation
-forms that behave differently would be two things to learn.
+**`perjadin_feedback_token` mirrors `session_feedback_token`.** One token per Perjadin, keyed on
+`perjadin_id`, so issuing a new one replaces it and every link already shared resolves to nothing.
+`expires_at` defaults **14 days** out — far longer than the Session token's 24 hours, because the
+link is shared by hand after the trip and filed when the recipient gets to it, not scanned in the
+room. Any signed-in Person may issue it; a Perjadin is a real trip once it exists, so there is no
+cancelled state to bar (as the Session token has).
+
+**`filed_by_role` and `filed_by_name` are self-declared and untrusted.** There is no
+`filed_by_person_id` and no foreign key: the filer may be a name-based Pengajar or a record-only
+Pimpinan, neither of whom has a `person` row to point at, so identity is a Role from a fixed three
+(CHECKed character for character, `PERJADIN_EVALUATION_ROLES`) plus a free-text name referenced by
+nothing — exactly as `participant_feedback.name` is. The one-per-filer `unique` is gone with the
+sign-in: with no account behind a submission there is nothing to dedup on, and duplicates are
+allowed, the accepted cost of the token pattern ([ADR-0012](./adr/0012-participants-write-through-a-short-lived-session-token.md), [ADR-0024](./adr/0024-perjadin-evaluation-is-filed-through-an-unauthenticated-token-link.md)).
+
+Close to a Session Record's shape — four Ratings, the same 1–10 scale and threshold — but the
+prose is no longer a shared `problems`/`suggestions` pair. Each Aspect now
+carries its **own** optional comment, and the elaboration rule is retargeted per-Aspect: a low
+Aspect owes _its own_ comment, not one shared box (#163, [ADR-0023](adr/0023-perjadin-evaluation-has-a-comment-per-aspect.md)).
+A comment about the hotel can no longer excuse a low transport score, and the concerns list shows
+each low Aspect the prose written about that Aspect. The trip-wide "Saran / what to do differently"
+box is retired outright — advice with no per-Aspect home now lives inside the relevant Komentar, or
+nowhere. This mirrors the #102 reversal on `participant_feedback`, plus the per-Aspect CHECK that
+Participant Feedback (which owes no prose) never needed.
 
 **`lodging` is the one nullable Rating in the system, because a day-trip has no hotel.** Not
 every Perjadin involves a night away — the programme budget carries at least one group visiting
@@ -900,25 +1020,24 @@ that was prompt, and one is the vendor's fault while the other is the plan's.
 
 There is no `covered` field. Nothing was taught on a journey.
 
-### Why there is no foreign key to the Group
+### Why there is no filer foreign key
 
-"Only the Group may file" is exactly the shape that a composite foreign key to
-`group_member (perjadin_id, person_id)` would enforce, matching the pattern used for the PIC and
-for who taught. **It cannot be used here**, and the reason is a decision made earlier in this
-document: a Group is [replaced wholesale](#the-group), by deleting every member row and
-reinserting the new set.
+There is no `filed_by_person_id` and no key into the Group at all. That is a reversal (ADR-0024):
+the Evaluation used to be a signed-in write gated on Group membership, and this section used to
+explain why the gate lived in the application rather than in a composite foreign key to
+`group_member (perjadin_id, person_id)` — a Group is [replaced wholesale](#the-group), so under
+`no action` the delete failed once anyone had filed, and under `cascade` it destroyed every
+evaluation on the trip. Both were tested and both were wrong.
 
-Tested against Postgres, both available behaviours are wrong:
-
-| On delete             | What happens when a Group is corrected                                                                               |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Default (`no action`) | The delete fails outright. Once anyone has filed, the Group can never be edited again.                               |
-| `cascade`             | The delete succeeds and destroys **every** evaluation on the trip — including those filed by members who never left. |
-
-So `filed_by_person_id` references `person` alone, and membership is checked where the
-evaluation is written. This joins the honest list in
-[what the database does not hold](#what-the-database-does-not-hold) — it is the second rule that
-wholesale Group replacement costs, and it is worth knowing that is what it costs.
+That reasoning is now moot, because the filer is not a `person` any more. The people best placed
+to judge a trip include the name-based **Pengajar** and the record-only **Pimpinan**, neither of
+whom signs in — so the signed-in gate excluded exactly the voices the form wanted. Identity is now
+**self-declared and untrusted** (ADR-0024): `filed_by_role` is one of three CHECKed values and
+`filed_by_name` is free text, the same model as `participant_feedback.name`. There is nothing to
+key to the Group, so the wholesale-replacement problem above simply does not arise, and the
+Group-membership rule leaves the honest list in
+[what the database does not hold](#what-the-database-does-not-hold) — it is no longer enforced
+anywhere, because it is no longer a rule.
 
 ### The concerns list in full
 
@@ -967,13 +1086,14 @@ select 'Participant', sch.name || ' · ' || f.class_kind, r.aspect, r.rating,
 union all
 
 select 'Perjadin Evaluation', pj.destination, r.aspect, r.rating,
-       p.full_name, e.problems, e.created_at
+       e.filed_by_name, r.said, e.created_at
   from perjadin_evaluation e
   join perjadin pj on pj.id = e.perjadin_id
-  join person p on p.id = e.filed_by_person_id
-  cross join lateral (values ('lodging', e.lodging), ('transport',   e.transport),
-                             ('meals',   e.meals),   ('punctuality', e.punctuality))
-                     as r(aspect, rating)
+  cross join lateral (values ('lodging',     e.lodging,     e.lodging_comment),
+                             ('transport',   e.transport,   e.transport_comment),
+                             ('meals',       e.meals,       e.meals_comment),
+                             ('punctuality', e.punctuality, e.punctuality_comment))
+                     as r(aspect, rating, said)
  where r.rating <= 7
 
  order by when_ desc;
@@ -1004,10 +1124,12 @@ predicates, which is why moving it is a migration.
 
 A Perjadin Evaluation carries **no money**, so it follows
 [ADR-0004](./adr/0004-delivery-data-is-open-internally-money-is-not.md)'s open-delivery rule and
-not the Perjadin Report's Staff-only rule. Anyone signed in can read one; only that trip's Group
-can write one. This is worth stating because the table hangs off a Perjadin and a reader who
-knows the Report is Staff-only will assume this is too. Teaching Team members file these — they
-are the ones who slept in the hotel.
+the same open-to-read rule the Perjadin Report itself now follows (its money-read gate was opened by
+[ADR-0026](./adr/0026-money-is-open-to-read-and-staff-only-to-write.md), #180). Anyone signed in can
+read one; only that trip's Group can write one. This is worth stating because the table hangs off a
+Perjadin, and the difference is not who reads — both are open — but who **writes**: an Evaluation is
+written by the travellers, the Report's money by Staff. Teaching Team members file these — they are
+the ones who slept in the hotel.
 
 ---
 
@@ -1133,7 +1255,6 @@ create table group_member (
   person_id            uuid not null,
   role                 text not null check (role = 'Staff'),   -- 'Teaching Team' retired, #153
   stream               text check (stream in ('STEM', 'Research')),
-  receipts_settled_at  timestamptz,
 
   primary key (perjadin_id, person_id),
   foreign key (person_id, role) references person (id, role),
@@ -1162,10 +1283,6 @@ and transactions are untouched — only the membership is destroyed and rebuilt.
 That is what makes the last Group rule cheap. See
 [what the database does not hold](#what-the-database-does-not-hold).
 
-`receipts_settled_at` is the PIC's checklist from `product.md`. It has to be an explicit mark
-rather than something derived, because a member with no transactions is genuinely ambiguous
-between _spent nothing_ and _has not handed anything over yet_.
-
 ### The Teaching Team and Pimpinan on a Perjadin
 
 ```sql
@@ -1177,12 +1294,12 @@ create table perjadin_teacher (
 
 create table perjadin_pimpinan (
   perjadin_id  uuid not null references perjadin (id) on delete cascade,
-  name         text not null check (name in (
-                 'Prof. Dr. Fatimah Arofiati Noor, S.Si., M.Si.',
-                 'Oktofa Yudha Sudrajad, S.T., M.S.M., Ph.D.',
-                 'Dr. Anton Timur Jaelani, S.Si., M.Si.')),
+  person_id    uuid not null,
+  role         text not null default 'Pimpinan' check (role = 'Pimpinan'),
 
-  primary key (perjadin_id, name)
+  primary key (perjadin_id, person_id),
+  constraint perjadin_pimpinan_is_pimpinan
+    foreign key (person_id, role) references person (id, role)
 );
 ```
 
@@ -1197,13 +1314,17 @@ are added, renamed and removed one at a time (T3), and each row has an `id` so
 Stream and no Person FK** — a name is not a Person and a Stream lives on the Session now. `on delete
 cascade`: the names are the trip's and outlive nothing.
 
-**`perjadin_pimpinan` records a Pimpinan on a Perjadin — record-only.** A leader of DITSAMA ITB (one
-of the fixed three) who rarely joins the Kelompok Perjalanan to monitor the offline Sessions is
-noted here and named on the Laporan Perjadin, but is **not a working Group member**: they file no
-Perjadin Evaluation and add nothing to the Preparation Checklist, which is exactly why they are not
-a `group_member` row. `name` CHECKs the three `PIMPINAN` values from `@sugt/domain` character for
-character, the same discipline as `transaction.category`; the primary key `(perjadin_id, name)`
-makes a Pimpinan recordable at most once per trip. Writing and rendering them is T3/T7
+**`perjadin_pimpinan` records a Pimpinan on a Perjadin — record-only.** A leader of DITSAMA ITB who
+rarely joins the Kelompok Perjalanan to monitor the offline Sessions is noted here and named on the
+Laporan Perjadin, but is **not a working Group member**: they file no Perjadin Evaluation and add
+nothing to the Preparation Checklist, which is exactly why they are not a `group_member` row. A row
+references a **real `person` of role Pimpinan** ([#181](https://github.com/mafiefa02/sugt/issues/181)):
+the Pimpinan roster is the single source of truth, so the old fixed-three `name` column with its CHECK
+and the `PIMPINAN` constant in `@sugt/domain` are gone. `role` is pinned to `'Pimpinan'` and the
+composite `(person_id, role)` foreign key into `person (id, role)` guarantees a non-Pimpinan can never
+be recorded — the same PIC-is-Staff discipline as `perjadin_pic_is_staff` and `group_member`'s role
+FK. The primary key `(perjadin_id, person_id)` makes a Pimpinan recordable at most once per trip.
+Writing and rendering them is T3/T7
 ([#138](https://github.com/mafiefa02/sugt/issues/138), [#142](https://github.com/mafiefa02/sugt/issues/142)).
 
 ### The Preparation Checklist
@@ -1268,7 +1389,7 @@ create table transaction (
                           'Transport Bandara/Stasiun', 'Transport Lokal Dalam Provinsi',
                           'Konsumsi', 'Modul', 'ATK',
                           'Alat dan Bahan Research Project', 'Seminar kit', 'Lainnya')),
-  incurred_by_person_id uuid references person (id),
+  participant_type      text not null check (participant_type in ('Siswa', 'GTK-MS')),
   created_by_person_id  uuid not null references person (id),
   created_at            timestamptz not null default now()
 );
@@ -1285,15 +1406,18 @@ create table transaction_evidence (
 ```
 
 **The Advance is one pot and the acquittal reconciles the pot** — a transaction consumes the
-Advance rather than a person's share of it. That is the claim, and `incurred_by_person_id` below
-does not weaken it: naming who a per-diem was paid to says nothing about how the pot reconciles.
-This paragraph read _"A transaction is not attributed to a person"_ until that column shipped;
-the sentence is gone rather than corrected in place, because the pot is what it was always about.
-Worth knowing:
-[ADR-0004](./adr/0004-delivery-data-is-open-internally-money-is-not.md) justifies hiding money
-from Teaching Team by citing "per-diem amounts and personal travel claims" — the rule still
-holds, its stated reason is just thinner than when it was written. Adding
-`incurred_by_person_id` later is a nullable column, not a migration of meaning.
+Advance rather than a person's share of it. Worth knowing:
+[ADR-0004](./adr/0004-delivery-data-is-open-internally-money-is-not.md) justified hiding money
+from Teaching Team by citing "per-diem amounts and personal travel claims" — but that money-read
+gate is reversed by [ADR-0026](./adr/0026-money-is-open-to-read-and-staff-only-to-write.md) (#180):
+money is now open to any signed-in Person to **read**, so a Pimpinan reads these lines; only
+_writing_ them stays Staff-only.
+
+**`incurred_by_person_id` is gone (#182).** The column shipped in migration `0006` as a nullable
+"who a per-diem was paid to" and never earned its keep: naming that person said nothing about how
+the pot reconciles, and the Laporan needed a different cut of the spend than it offered. It is
+dropped, replaced by the required `participant_type` below. (ADR-0004 still names the column as a
+point-in-time record; that is history and is left as written.)
 
 **`category` is a closed set read off DITSAMA's own approved budget**, not invented for a
 template nobody has read. The eleven named values are the line items the programme RAB repeats
@@ -1311,13 +1435,18 @@ beyond these columns, and it is still replaced rather than corrected when a comp
 arrives. `Uang Harian` stays one category; the Narasumber/Asisten split in the RAB is a rate
 difference, not a different kind of spend.
 
-**`incurred_by_person_id` is nullable, and its absence is not a gap.** This document previously
-said a transaction is not attributed to a person at all, and offered the column as "a nullable
-column, not a migration of meaning" if evidence ever appeared. It has: the RAB budgets
-`Uang Harian` as `2 orang × N hari`, at different rates for Narasumber and Asisten. Per-diems
-and honoraria carry a person; a taxi and a box of ATK do not. **The Advance is still one pot
+**`participant_type` is required, and it is an axis orthogonal to `category` (#182).** `category`
+is _what kind of spend_ a line was; `participant_type` is _which cohort_ it served — `Siswa` (the
+Student Class) or `GTK-MS` (the GTK and MS Classes together). The Laporan splits every acquittal's
+Terpakai total into a Siswa and a GTK-MS subtotal, so the column is `NOT NULL`: there is no unset
+state to carry and no third `Umum` value — a shared cost is attributed to whichever type it
+predominantly served. It is character-for-character `TRANSACTION_PARTICIPANT_TYPES` in
+`packages/domain/src/index.ts`, CHECKed the same way `category` is. **The Advance is still one pot
 and the acquittal still reconciles the pot**, so
-[ADR-0004](./adr/0004-delivery-data-is-open-internally-money-is-not.md) is untouched.
+[ADR-0004](./adr/0004-delivery-data-is-open-internally-money-is-not.md)'s reconciliation model is
+untouched — though its money-_read_ gate is amended by
+[ADR-0026](./adr/0026-money-is-open-to-read-and-staff-only-to-write.md) (money read opened to any
+signed-in Person; writing money stays Staff-only).
 
 Note what did **not** enter the table: no cost-centre, no account code, no payee, no
 `Ref Standar Biaya` — the RAB carries the last of these on most lines (`PMK 32/2025 No.28.1`
@@ -1712,27 +1841,30 @@ cancelled rows accumulate without bound. Blocking a legitimate eleventh Session 
 number nobody is disputing is the kind of invented friction
 [ADR-0007](./adr/0007-the-tool-generates-the-acquittal.md) warns has an escape route.
 
-**Access control.** ADR-0004's rule — delivery open to everyone signed in, money Staff-only —
-is application code, not RLS. Better Auth means there is no `auth.uid()` in Postgres, so
-policies would need `SET LOCAL` on every transaction plus a non-superuser role with `FORCE
-ROW LEVEL SECURITY`: a great deal of machinery for one two-role rule. Every money-reading
-query therefore takes the authenticated Person and refuses a non-Staff caller, at a single
-choke point in `@sugt/db`. See
+**Access control.** The rule — delivery and money open to everyone signed in to **read**, money
+and delivery-arranging Staff-only to **write** — is application code, not RLS.
+[ADR-0004](./adr/0004-delivery-data-is-open-internally-money-is-not.md) drew the line at
+delivery-vs-money; [ADR-0026](./adr/0026-money-is-open-to-read-and-staff-only-to-write.md) (#180)
+redrew it as read-vs-write, so money reads are open now (a Pimpinan reads all money) and it is money
+_writes_ that the guard closes. Better Auth means there is no `auth.uid()` in Postgres, so policies
+would need `SET LOCAL` on every transaction plus a non-superuser role with `FORCE ROW LEVEL
+SECURITY`: a great deal of machinery for one role rule. Every money-_writing_ query therefore takes
+the authenticated Person and refuses a non-Staff caller, at a single choke point in `@sugt/db`. See
 [ADR-0011](./adr/0011-supabase-and-better-auth.md).
 
 Note what this is _not_: the public/internal boundary is still structural, held by the
-dependency graph. It is only the Staff/Teaching Team line that is a runtime check.
+dependency graph. It is only the Staff/non-Staff write line that is a runtime check.
 
 **Who a caller is, is a type.** This document used to leave open whether the Staff-only choke
 point needed a sibling for "no Person at all, but a valid secret". It does, and the sibling is
 a type rather than a second guard. Three kinds of caller now reach `@sugt/db`, and they are
 three named types rather than one with optional fields:
 
-| Caller             | Is                                                      | May read                      | May write                   |
-| ------------------ | ------------------------------------------------------- | ----------------------------- | --------------------------- |
-| `Person`           | somebody signed in whose `person` row is still `active` | delivery; money only if Staff | their own records           |
-| `ServiceCaller`    | `@sugt/public`, holding `AGGREGATES_SECRET`             | the three aggregate payloads  | nothing                     |
-| `ParticipantToken` | a live Session feedback token                           | nothing                       | `participant_feedback` only |
+| Caller             | Is                                                      | May read                     | May write                              |
+| ------------------ | ------------------------------------------------------- | ---------------------------- | -------------------------------------- |
+| `Person`           | somebody signed in whose `person` row is still `active` | delivery and money           | their own records; money only if Staff |
+| `ServiceCaller`    | `@sugt/public`, holding `AGGREGATES_SECRET`             | the three aggregate payloads | nothing                                |
+| `ParticipantToken` | a live Session feedback token                           | nothing                      | `participant_feedback` only            |
 
 Every query takes one, and the money queries accept only `Person`. A single type carrying
 optional fields would turn "is this a Staff caller" into a runtime shape check — which is
@@ -1755,11 +1887,12 @@ cannot sign in and file, so no Record can be filed and none is expected. The `cl
 stands unused; how name-taught teaching is evaluated is a later decision (the `CONTEXT.md` open
 question). See [who still owes what](#who-still-owes-what).
 
-**That only the Group filed a Perjadin Evaluation.** `filed_by_person_id` references `person`,
-not `group_member`, so the database will accept an evaluation from someone who was not on the
-trip. This is the second rule wholesale Group replacement costs — the composite foreign key that
-would enforce it either freezes the Group forever or destroys every evaluation when one is
-corrected. See [why there is no foreign key to the Group](#why-there-is-no-foreign-key-to-the-group).
+**Who filed a Perjadin Evaluation.** There is no `filed_by_person_id` at all: the Evaluation is
+filed through an unauthenticated token link now, and the filer self-declares a Role and a Name that
+reference nothing (ADR-0024). The database cannot say whether a submission came from someone who was
+on the trip — the identity is untrusted by design, as `participant_feedback.name` is. The old "only
+the Group may file" rule is not enforced anywhere because it is no longer a rule. See
+[why there is no filer foreign key](#why-there-is-no-filer-foreign-key).
 
 **That the PIC filed theirs.** "The PIC's Record is required" is the one completeness rule in
 the delivery half, and it is unenforceable in the database — the PIC is itself a `coalesce`

@@ -10,18 +10,52 @@ import {
   setStoryCoverAction,
   withdrawStoryAction,
 } from "-/app/(app)/cerita/actions";
-import { StoryEditor } from "-/components/cerita/story-editor";
 import type { RevalidationReport } from "-/lib/revalidate-public";
 import type { PublishResult } from "@sugt/db/queries";
 import { STORY_KINDS, type StoryKind, type Stream } from "@sugt/domain";
 import { Button } from "@sugt/ui/components/button";
 import { Input } from "@sugt/ui/components/input";
 import { LinkButton } from "@sugt/ui/components/link-button";
+import { Skeleton } from "@sugt/ui/components/skeleton";
 import { cn } from "@sugt/ui/lib/utils";
 import { Check, ImageOff, Info, Loader2, Plus, Star, Trash2, Upload, X } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type Dispatch, type SetStateAction, useRef, useState, useTransition } from "react";
+
+/**
+ * **The Milkdown body editor, loaded on demand.** It is the route's single heaviest client
+ * dependency — the ProseMirror/Milkdown stack — and inherently client-only (`useEffect`/`useRef`/
+ * `useInstance`, so SSR gives it nothing). `next/dynamic` with `ssr: false` splits it out of
+ * `/cerita/[id]`'s first-load JS, so the surrounding page chrome (title, PublishBar, cover,
+ * Dokumentasi) paints while it fetches; a Skeleton holds its space so its arrival shifts nothing
+ * ([#268](https://github.com/sugt-itb/sugt-itb-26/issues/268)). This is the app's one `next/dynamic`
+ * — the editor is the only dependency heavy enough to earn the extra request. The `key` at the call
+ * site still remounts it per Story, so `initialBody` re-seeds exactly as before.
+ */
+const StoryEditor = dynamic(
+  () => import("-/components/cerita/story-editor").then((mod) => mod.StoryEditor),
+  { ssr: false, loading: () => <StoryEditorSkeleton /> },
+);
+
+/**
+ * The editor's placeholder, in the same bordered surface `StoryEditor` renders, so swapping the real
+ * editor in on hydration is a content change inside a box of the same size — no layout jump. The top
+ * bar stands in for the sticky toolbar; the `min-h-96` body matches the `contenteditable`'s floor.
+ */
+function StoryEditorSkeleton() {
+  return (
+    <div className="rounded-lg border border-border bg-background px-4 py-3">
+      <Skeleton className="-mx-4 -mt-3 mb-2 h-11 rounded-t-lg rounded-b-none" />
+      <div className="min-h-96 space-y-3 py-1">
+        <Skeleton className="h-4 w-3/4 rounded-md" />
+        <Skeleton className="h-4 w-full rounded-md" />
+        <Skeleton className="h-4 w-5/6 rounded-md" />
+      </div>
+    </div>
+  );
+}
 
 /**
  * A publish attempt that did not publish — the outcomes `publishStory` returns other than success,
@@ -694,8 +728,15 @@ function PhotoRow({
   );
 }
 
-/** A published timestamp, short and local. Server time is fine here — this is an editor, not a public page. */
+/**
+ * A published timestamp, short and local, as `YYYY-MM-DD HH:MM` (24h) — the ISO date form every
+ * other date reads in across the internal app (#166), not the `id-ID` `31 Agu 2026, 09.00` this
+ * once produced. Local wall-clock components: server time is fine here — this is an editor, not a
+ * public page.
+ */
 function formatWhen(when: Date | null): string {
   if (!when) return "";
-  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(when);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const date = `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}`;
+  return `${date} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
 }

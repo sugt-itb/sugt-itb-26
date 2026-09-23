@@ -21,6 +21,7 @@ catalog:
   "@types/qrcode": ^1.5.5
   "@types/react": ^19
   "@types/react-dom": ^19
+  "@vercel/speed-insights": ^2.0.0
   babel-plugin-react-compiler: 1.0.0
   # Pinned to the version docs/research/better-auth-capabilities.md was read against.
   # That file is a snapshot of the 1.6.27 bundles, not durable documentation: on a

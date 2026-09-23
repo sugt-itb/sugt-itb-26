@@ -42,6 +42,9 @@ describe("resolving who is asking", () => {
       fullName: "Yang Masuk",
       email: "rina@ditsama.itb.ac.id",
       role: "Staff",
+      // Grants are threaded onto the caller at resolution, the same as `role` (ADR-0028); a
+      // freshly signed-in Staff Person holds none.
+      grants: [],
     });
   });
 

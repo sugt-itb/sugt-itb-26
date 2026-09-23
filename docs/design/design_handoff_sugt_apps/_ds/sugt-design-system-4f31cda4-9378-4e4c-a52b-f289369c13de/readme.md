@@ -35,7 +35,7 @@ Indonesian**. Some Indonesian terms have no English equivalent and are kept verb
 
 **Tone: counts, not claims.** The system reports what happened and lets a human judge it.
 - The internal tool shows **"3 of 10 delivered"** — never "behind", "overdue", or "finished". Nothing is ever gated on a deadline; nothing is coloured as a health verdict except the explicit *how it went* pick.
-- The public site **leads with scope** ("42 Sekolah, tersebar di 9 provinsi"), and shows delivery figures only *as they accrue* — never "0 of 42 reached".
+- The public site **leads with scope** ("47 Sekolah, tersebar di 16 provinsi"), and shows delivery figures only *as they accrue* — never "0 of 47 reached".
 
 **Casing.** Domain nouns are **Capitalised** in prose (a School, a Session, the Group).
 UI labels and headings use sentence case. The wordmark **SUGT** is all-caps.
@@ -48,7 +48,7 @@ Describes the Programme, doesn't sell it.
 
 **Examples**
 - Public: *"Membangun kapasitas riset di sekolah-sekolah unggul Indonesia."*
-- Public scope: *"42 Sekolah · 2 Stream · 3 Kelas / sekolah · 10 Sesi / sekolah."*
+- Public scope: *"47 Sekolah · 2 Stream · 3 Kelas / sekolah · 10 Sesi / sekolah."*
 - Internal count: *"3 dari 10 sesi terlaksana."*
 - Session Record pick: *on track · some concerns · struggling.*
 

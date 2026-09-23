@@ -5,6 +5,7 @@ import type { PerjadinTravelLeg } from "@sugt/db/queries";
 import {
   formatSessionStartTime,
   TIME_ZONES,
+  timeZoneSuffix,
   TRANSPORT_MODES,
   type TimeZone,
   type TransportMode,
@@ -242,7 +243,7 @@ function EditLogistics({
                 />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor={`${fields}-dep-time`}>Jam</Label>
+                <Label htmlFor={`${fields}-dep-time`}>Jam (WIB)</Label>
                 <Input
                   id={`${fields}-dep-time`}
                   type="time"
@@ -282,7 +283,8 @@ function EditLogistics({
                 {dateRefusal !== null && <p className="text-sm text-destructive">{dateRefusal}</p>}
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor={`${fields}-ret-time`}>Jam</Label>
+                {/* Return leg lands in the destination's zone; omit the suffix on a legacy trip before a zone is picked. */}
+                <Label htmlFor={`${fields}-ret-time`}>Jam{timeZoneSuffix(form.returnZone)}</Label>
                 <Input
                   id={`${fields}-ret-time`}
                   type="time"

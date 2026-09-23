@@ -3,7 +3,7 @@ import { requirePerson } from "-/lib/person";
 import { schoolDirectory } from "@sugt/db/queries";
 
 /**
- * **Direktori Sekolah** — all forty-two Schools, and the way into one School's Sessions.
+ * **Direktori Sekolah** — all forty-seven Schools, and the way into one School's Sessions.
  *
  * One `requirePerson()`, one query, one payload — and no role check, because delivery
  * data is open to everyone signed in (ADR-0004). The filtering runs in the browser over
