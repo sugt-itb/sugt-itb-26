@@ -319,7 +319,7 @@ function PreparationCardView({ card, canEdit }: { card: PreparationCard; canEdit
                   </label>
                   <Badge
                     variant="secondary"
-                    className="ml-auto shrink-0"
+                    className="shrink-0"
                   >
                     {item.jenis}
                   </Badge>
@@ -522,6 +522,7 @@ function CreateCardForm({ onDone }: { onDone: () => void }) {
   });
   const [items, setItems] = useState<DraftItem[]>([]);
   const [draft, setDraft] = useState("");
+  const [draftJenis, setDraftJenis] = useState<PreparationJenis>(DEFAULT_JENIS);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const draftId = useId();
@@ -531,8 +532,11 @@ function CreateCardForm({ onDone }: { onDone: () => void }) {
   function addDraft() {
     const label = draft.trim();
     if (label === "" || atCap) return;
-    setItems((previous) => [...previous, { label, jenis: DEFAULT_JENIS }]);
+    // The chosen Jenis rides in with the label — the create dialog now picks it before adding, the
+    // same as the edit form's add control — then resets to the default for the next row (#299).
+    setItems((previous) => [...previous, { label, jenis: draftJenis }]);
     setDraft("");
+    setDraftJenis(DEFAULT_JENIS);
   }
 
   function submit() {
@@ -577,6 +581,12 @@ function CreateCardForm({ onDone }: { onDone: () => void }) {
                 addDraft();
               }
             }}
+          />
+          <JenisSelect
+            value={draftJenis}
+            ariaLabel="Jenis checklist baru"
+            disabled={atCap}
+            onValueChange={setDraftJenis}
           />
           <Button
             type="button"
