@@ -1,7 +1,10 @@
 import { fetchJadwal } from "-/lib/jadwal-sheet";
 import { requirePerson } from "-/lib/person";
+import type { Metadata } from "next";
 
 import { KalenderCalendar } from "./kalender-calendar";
+
+export const metadata: Metadata = { title: "Kalender" };
 
 /**
  * **Kalender** — a dedicated, full-width month view of the Programme's activity schedule: which

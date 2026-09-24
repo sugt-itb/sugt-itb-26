@@ -1,6 +1,9 @@
 import { SchoolDirectoryTable } from "-/components/school-directory-table";
 import { requirePerson } from "-/lib/person";
 import { schoolDirectory } from "@sugt/db/queries";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Direktori Sekolah" };
 
 /**
  * **Direktori Sekolah** — all forty-seven Schools, and the way into one School's Sessions.

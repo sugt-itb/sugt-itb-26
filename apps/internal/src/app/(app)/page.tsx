@@ -5,6 +5,7 @@ import {
   monitoringData,
   preparationCards,
 } from "@sugt/db/queries";
+import type { Metadata } from "next";
 
 import { deriveDashboard } from "./dashboard-derive";
 import { showBudget } from "./dashboard-state";
@@ -13,6 +14,8 @@ import { DashboardView } from "./dashboard-view";
 import { DashboardWarnings } from "./dashboard-warnings";
 import { PersiapanTab } from "./persiapan-tab";
 import { preparationWarnings } from "./preparation-derive";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 /**
  * **Dashboard** (`/`) — a one-screen overview of how far Session delivery has got and how much of the

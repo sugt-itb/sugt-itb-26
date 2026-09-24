@@ -6,10 +6,27 @@ import { signedReceiptUrl } from "-/lib/receipt-media";
 import { perjadinAcquittal, type AcquittalTransaction } from "@sugt/db/queries";
 import { formatIdr } from "@sugt/domain";
 import { LinkButton } from "@sugt/ui/components/link-button";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import type { ViewableTransaction } from "./action-types";
+
+/**
+ * The browser-tab title: `Laporan — <destination>`, reusing the same shortened destination the page
+ * links back with; a not-found id falls back to the section label (#309). Reads `perjadinAcquittal`
+ * again — a minimal title query, as the ticket asks, not shared state.
+ */
+export async function generateMetadata({
+  params,
+}: PageProps<"/perjadin/[id]/laporan">): Promise<Metadata> {
+  const person = await requirePerson();
+  const { id } = await params;
+  const acquittal = await perjadinAcquittal(person, id);
+  return {
+    title: acquittal ? `Laporan — ${shortenKabupaten(acquittal.destination)}` : "Laporan Perjadin",
+  };
+}
 
 /**
  * **The Perjadin Report** — the acquittal of one trip, and the screen ADR-0007 says the whole

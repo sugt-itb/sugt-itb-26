@@ -5,7 +5,22 @@ import { staffSurface } from "-/lib/staff-surface";
 import { arrangeOnlineSessionAt, schoolDetail } from "@sugt/db/queries";
 import { TOTAL_SESSIONS_PER_SCHOOL } from "@sugt/domain";
 import { Progress } from "@sugt/ui/components/progress";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+
+/**
+ * The browser-tab title: the School's name, falling back to the section label for a slug that names
+ * no School (#309). Reads the same open query the page does — a minimal title query, as the ticket
+ * asks, rather than shared state.
+ */
+export async function generateMetadata({
+  params,
+}: PageProps<"/sekolah/[slug]">): Promise<Metadata> {
+  const person = await requirePerson();
+  const { slug } = await params;
+  const school = await schoolDetail(person, slug);
+  return { title: school ? school.name : "Direktori Sekolah" };
+}
 
 /**
  * **Detail Sekolah** — one School's Sessions, and how much teaching has happened.

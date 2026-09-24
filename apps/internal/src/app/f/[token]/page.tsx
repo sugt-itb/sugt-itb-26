@@ -1,7 +1,10 @@
 import { resolveFeedbackToken } from "-/lib/feedback-token";
+import type { Metadata } from "next";
 
 import { FeedbackForm } from "./feedback-form";
 import { GoneNotice } from "./gone-notice";
+
+export const metadata: Metadata = { title: "Umpan Balik Peserta" };
 
 /**
  * **`/f/{token}` — the Participant Feedback form.** The one page in either app served without a

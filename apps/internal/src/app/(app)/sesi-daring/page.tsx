@@ -4,7 +4,10 @@ import { onlineSessionDirectory } from "@sugt/db/queries";
 import { formatSessionStartTimeWithWib } from "@sugt/domain";
 import { LinkButton } from "@sugt/ui/components/link-button";
 import { Plus } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = { title: "Sesi Daring" };
 
 /**
  * **Sesi daring** — every online Session, newest first.

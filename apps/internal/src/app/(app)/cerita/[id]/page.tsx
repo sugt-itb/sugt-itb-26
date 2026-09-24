@@ -3,7 +3,20 @@ import { requirePerson } from "-/lib/person";
 import { staffSurface } from "-/lib/staff-surface";
 import { publicUrlFor } from "-/lib/story-photo-url";
 import { schoolDirectory, storyForEditor } from "@sugt/db/queries";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+
+/**
+ * The browser-tab title: the Story's own title, or "Draf Cerita" for a draft not yet named. Runs the
+ * same Staff-gated read the page does; a not-found id falls back to the section label (#309). The
+ * repeated read is deliberate — the ticket asks for a minimal title query, not shared state.
+ */
+export async function generateMetadata({ params }: PageProps<"/cerita/[id]">): Promise<Metadata> {
+  const person = await requirePerson();
+  const { id } = await params;
+  const story = await staffSurface(() => storyForEditor(person, id));
+  return { title: story ? story.title || "Draf Cerita" : "Cerita" };
+}
 
 /**
  * **The Cerita editor** — one Story, its badges, its cover, and its gallery.

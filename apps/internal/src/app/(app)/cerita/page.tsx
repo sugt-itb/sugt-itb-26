@@ -5,7 +5,10 @@ import { type CeritaEntry, ceritaIndex } from "@sugt/db/queries";
 import { Badge } from "@sugt/ui/components/badge";
 import { LinkButton } from "@sugt/ui/components/link-button";
 import { ImageOff, Plus } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = { title: "Cerita" };
 
 /**
  * **Cerita** — the index of every Story, draft and published, and the way into the editor.
