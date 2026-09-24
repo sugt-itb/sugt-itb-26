@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@sugt/ui/components/table";
 
-import type { PivotTable } from "./dashboard-derive";
+import type { PivotTable, ProgressSummary } from "./dashboard-derive";
 
 /**
  * The Dashboard view — the presentational half of the screen, now fed **real** figures. Every
@@ -46,7 +46,7 @@ export function DashboardView({
   showBudget: boolean;
   activitiesPercent: number;
   budget: { usedIdr: number; totalIdr: number; percent: number };
-  summary: { pretest: number; daring: number; luring: number; posttest: number };
+  summary: ProgressSummary;
   luring: PivotTable;
   daring: PivotTable;
   pretestTable: PivotTable;

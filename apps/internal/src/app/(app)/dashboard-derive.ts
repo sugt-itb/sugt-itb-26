@@ -175,8 +175,9 @@ export function completedAssessmentUnits(completions: AssessmentCompletion[]): n
 
 /**
  * A summary percentage for one delivery mode (#313): every `delivered` Session of that mode over the
- * mode's capacity — `schoolCount × perSchool` (2 offline, 6 online). Box-level, not
- * all-or-nothing: it counts Sessions, matching `deliveryMatrix`. Guards a 0-School denominator at 0%.
+ * mode's capacity — `schoolCount × perSchool` (2 offline, 6 online). Session-level, not
+ * all-or-nothing per School — the same `status === "delivered"` count `deliveryMatrix` sums, just
+ * rolled up rather than split by Sesi and Cluster. Guards a 0-School denominator at 0%.
  */
 export function deliveryProgress(
   sessions: MonitoringSession[],
