@@ -1,17 +1,18 @@
 import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
 import {
+  type AssessmentKind,
   KEGIATAN_UNITS_PER_SCHOOL,
   LURING_SESI_WINDOWS,
   PRETEST_PARTICIPANT_TYPES,
   PROGRAMME_BUDGET_IDR,
   SESSIONS_PER_SCHOOL,
   STREAMS,
-  type PretestParticipantType,
   type SessionMode,
   type Stream,
 } from "@sugt/domain";
 
 import type { Warning } from "./dashboard-state";
+import { completionKey, completionKeySet, PRETEST_COLUMNS } from "./pretest/pretest-derive";
 
 /**
  * **The pure core of the Dashboard (`/`)**, with no React, no DOM and no database — the seam the suite
@@ -25,8 +26,8 @@ import type { Warning } from "./dashboard-state";
  * cancelled Session was already dropped upstream so the one after it takes the rank. Computing that
  * in TypeScript is what lets the suite assert "a School whose earlier Session was cancelled has its
  * later Session rank 1" without a database. The calendar windows in `LURING_SESI_WINDOWS` drive the
- * timeline and the overdue warnings but **do not** bucket Sessions into a Sesi: a Session delivered
- * outside its window is late, not re-ranked.
+ * overdue warnings but **do not** bucket Sessions into a Sesi: a Session delivered outside its
+ * window is late, not re-ranked.
  */
 
 /** A Cluster column — id keys the fold, name is the header the view prints. */
@@ -37,34 +38,37 @@ type School = MonitoringData["schools"][number];
 /** One matrix row: a Sesi label and one `"X/Y"` cell per Cluster, in the Clusters' order. */
 export type MatrixRow = { session: string; cells: string[] };
 
-/** One step in the delivery timeline: its Sesi label, its date window, and whether it is done. */
-export type TimelineStep = { label: string; window: string; status: "completed" | "pending" };
+/** One pivoted row: a Cluster's name and one `"X/Y"` cell per column, in the columns' order. */
+export type PivotRow = { label: string; cells: string[] };
+
+/**
+ * A pivoted table the Pelaksanaan tab renders — Klaster rows down, some other dimension across
+ * (#313). `columns` are the header labels left→right; each `rows` entry is one Cluster, its `cells`
+ * lining up under `columns` by index. Used for the two delivery tables (columns = Sesi) and the two
+ * assessment tables (columns = Stream ∙ Peserta).
+ */
+export type PivotTable = { columns: string[]; rows: PivotRow[] };
+
+/**
+ * The four Pelaksanaan summary percentages (#313), each a whole-number percent rendered `{n}%`.
+ * Luring/Daring are delivered Sessions over the per-mode capacity; pretest/posttest are ticked boxes
+ * over `schools × 4` (`STREAMS × PRETEST_PARTICIPANT_TYPES`). Posttest reads an honest 0 until
+ * posttest rows exist. All four are guarded at a 0-School denominator.
+ */
+export type ProgressSummary = { pretest: number; daring: number; luring: number; posttest: number };
 
 /** A Luring Sesi's calendar window — the shape `LURING_SESI_WINDOWS` holds, accepted read-only. */
 type SesiWindow = { sesi: number; startsOn: string; endsOn: string };
-
-/**
- * One Pretest meter: how many Schools have that `(stream, participant-type)` Pretest box ticked, out
- * of all Schools. `total` is `schools.length` (the always-47 denominator, never stored), and
- * `percent` is `done/total` as a whole number, guarded at 0 Schools.
- */
-export type PretestMeter = {
-  stream: Stream;
-  participantType: PretestParticipantType;
-  done: number;
-  total: number;
-  percent: number;
-};
 
 /** Everything the Dashboard view renders, assembled from the raw data by `deriveDashboard`. */
 export type DerivedDashboard = {
   activitiesPercent: number;
   budget: { usedIdr: number; totalIdr: number; percent: number };
-  clusters: Cluster[];
-  luring: MatrixRow[];
-  daring: MatrixRow[];
-  timeline: TimelineStep[];
-  pretest: PretestMeter[];
+  summary: ProgressSummary;
+  luring: PivotTable;
+  daring: PivotTable;
+  pretestTable: PivotTable;
+  postestTable: PivotTable;
   warnings: Warning[];
 };
 
@@ -170,16 +174,98 @@ export function completedAssessmentUnits(completions: AssessmentCompletion[]): n
 }
 
 /**
- * One timeline step per Luring window. A window is `"completed"` once today is strictly past its
- * `endsOn` — the calendar has moved on — and `"pending"` until then. `today` is a `YYYY-MM-DD`
- * string, compared lexically against `endsOn` in the same shape.
+ * A summary percentage for one delivery mode (#313): every `delivered` Session of that mode over the
+ * mode's capacity — `schoolCount × perSchool` (2 offline, 6 online). Session-level, not
+ * all-or-nothing per School — the same `status === "delivered"` count `deliveryMatrix` sums, just
+ * rolled up rather than split by Sesi and Cluster. Guards a 0-School denominator at 0%.
  */
-export function timelineSteps(windows: readonly SesiWindow[], today: string): TimelineStep[] {
-  return windows.map((w) => ({
-    label: `Luring Sesi ${w.sesi}`,
-    window: `${w.startsOn} - ${w.endsOn}`,
-    status: today > w.endsOn ? "completed" : "pending",
-  }));
+export function deliveryProgress(
+  sessions: MonitoringSession[],
+  mode: SessionMode,
+  schoolCount: number,
+  perSchool: number,
+): number {
+  const denominator = schoolCount * perSchool;
+  if (denominator === 0) return 0;
+  const delivered = sessions.filter((s) => s.mode === mode && s.status === "delivered").length;
+  return Math.round((delivered / denominator) * 100);
+}
+
+/**
+ * A summary percentage for one assessment kind (#313): every ticked box of that kind over
+ * `schoolCount × BOXES_PER_ASSESSMENT_UNIT` (the four `STREAMS × PRETEST_PARTICIPANT_TYPES` boxes a
+ * School can tick). Box-level, matching the per-box meters this replaces — a School three-quarters
+ * done still contributes its three boxes. Posttest stays 0% until posttest rows exist, by
+ * construction. Guards a 0-School denominator at 0%.
+ */
+export function assessmentProgress(
+  completions: AssessmentCompletion[],
+  kind: AssessmentKind,
+  schoolCount: number,
+): number {
+  const denominator = schoolCount * BOXES_PER_ASSESSMENT_UNIT;
+  if (denominator === 0) return 0;
+  const ticked = completions.filter((c) => c.kind === kind).length;
+  return Math.round((ticked / denominator) * 100);
+}
+
+/**
+ * Pivot a Sesi-indexed delivery matrix into the Klaster-row shape the tab renders (#313): columns
+ * become the Sesi labels, and each Cluster gets one row whose `i`th cell is its cell from Sesi `i+1`.
+ * `deliveryMatrix` builds each row's cells in the Clusters' order, so cluster `ci` reads
+ * `row.cells[ci]` across the rows — a transpose, no re-count.
+ */
+export function pivotByCluster(clusters: Cluster[], sesiRows: MatrixRow[]): PivotTable {
+  return {
+    columns: sesiRows.map((row) => row.session),
+    rows: clusters.map((cluster, ci) => ({
+      label: cluster.name,
+      cells: sesiRows.map((row) => row.cells[ci]),
+    })),
+  };
+}
+
+/** The stream's on-screen label — English in code (`Stream`), Indonesian on screen: `Research` → "Riset". */
+const STREAM_DISPLAY = { STEM: "STEM", Research: "Riset" } as const satisfies Record<
+  Stream,
+  string
+>;
+
+/**
+ * One assessment table (#313): Klaster rows down, the four `STREAMS × PRETEST_PARTICIPANT_TYPES`
+ * boxes across, each cell `"{schools in the Cluster with that box ticked} / {schools in the Cluster}"`.
+ * Reuses `/pretest`'s column order and completion-key helpers so the readout cannot drift from the
+ * grid or the CHECK constraints. `kind` selects pretest or posttest; a posttest table reads all
+ * `0/Y` until posttest rows exist. Column headers use the "∙" separator and the Indonesian stream
+ * label.
+ */
+export function assessmentTable(
+  clusters: Cluster[],
+  schools: School[],
+  completions: AssessmentCompletion[],
+  kind: AssessmentKind,
+): PivotTable {
+  const ticked = completionKeySet(completions.filter((c) => c.kind === kind));
+  const schoolsByCluster = new Map<string, School[]>();
+  for (const sc of schools) {
+    const list = schoolsByCluster.get(sc.clusterId);
+    if (list) list.push(sc);
+    else schoolsByCluster.set(sc.clusterId, [sc]);
+  }
+  return {
+    columns: PRETEST_COLUMNS.map((col) => `${STREAM_DISPLAY[col.stream]} ∙ ${col.participantType}`),
+    rows: clusters.map((cluster) => {
+      const clusterSchools = schoolsByCluster.get(cluster.id) ?? [];
+      const cells = PRETEST_COLUMNS.map((col) => {
+        let x = 0;
+        for (const sc of clusterSchools) {
+          if (ticked.has(completionKey(sc.id, col.stream, col.participantType))) x++;
+        }
+        return `${x}/${clusterSchools.length}`;
+      });
+      return { label: cluster.name, cells };
+    }),
+  };
 }
 
 /** How many Schools a Luring row still owes: the sum over its cells of `(Y - X)`. */
@@ -218,60 +304,33 @@ export function overdueWarnings(
 }
 
 /**
- * The four Pretest meters (#248), in the fixed order STEM·Siswa, STEM·GTK-MS, Research·Siswa,
- * Research·GTK-MS — `STREAMS × PRETEST_PARTICIPANT_TYPES`, so the readout cannot drift from the
- * vocabulary the CHECK constraints mirror. Each meter's `done` is the number of **distinct** Schools
- * that hold that `(stream, participantType, kind=pretest)` completion; `posttest` rows are ignored.
- * `total` is the always-47 denominator (`schoolCount`), and `percent` is guarded at 0 Schools.
- */
-export function pretestProgress(
-  completions: AssessmentCompletion[],
-  schoolCount: number,
-): PretestMeter[] {
-  return STREAMS.flatMap((stream) =>
-    PRETEST_PARTICIPANT_TYPES.map((participantType) => {
-      const schools = new Set<string>();
-      for (const c of completions) {
-        if (c.kind === "pretest" && c.stream === stream && c.participantType === participantType) {
-          schools.add(c.schoolId);
-        }
-      }
-      const done = schools.size;
-      return {
-        stream,
-        participantType,
-        done,
-        total: schoolCount,
-        percent: schoolCount === 0 ? 0 : Math.round((done / schoolCount) * 100),
-      };
-    }),
-  );
-}
-
-/**
- * Assemble the whole view from the raw data, today's date and the Pretest completion rows. The
- * delivered total is every `delivered` Session across both modes (the data already excludes
+ * Assemble the whole view from the raw data, today's date and the assessment completion rows (#313).
+ * The delivered total is every `delivered` Session across both modes (the data already excludes
  * cancelled), and the budget percent is spend against `PROGRAMME_BUDGET_IDR` to one decimal — the
- * same tiny fraction the scaffold showed as `0.2`. Luring is `SESSIONS_PER_SCHOOL.offline` rows,
- * Daring is `.online`; the four Pretest meters read against the same always-47 School denominator.
+ * same tiny fraction the scaffold showed as `0.2`. The two delivery tables are the ranked matrices
+ * pivoted to Klaster rows; the two assessment tables count ticked boxes per Cluster; the four
+ * summary percentages read against the same always-47 School denominator, posttest honestly 0 until
+ * posttest rows exist. The overdue warnings still fold the Sesi-indexed Luring matrix, before it is
+ * pivoted for the view.
  */
 export function deriveDashboard(
   data: MonitoringData,
   today: string,
   completions: AssessmentCompletion[],
 ): DerivedDashboard {
+  const schoolCount = data.schools.length;
   const deliveredTotal = data.sessions.filter((s) => s.status === "delivered").length;
   // Kegiatan terlaksana now folds the all-or-nothing pretest/posttest units into the numerator, over
   // the ×10 denominator (ADR-0031/#249); posttest stays 0 until posttest rows exist.
   const completedUnits = deliveredTotal + completedAssessmentUnits(completions);
-  const luring = deliveryMatrix(
+  const luringRows = deliveryMatrix(
     data.clusters,
     data.schools,
     data.sessions,
     "offline",
     SESSIONS_PER_SCHOOL.offline,
   );
-  const daring = deliveryMatrix(
+  const daringRows = deliveryMatrix(
     data.clusters,
     data.schools,
     data.sessions,
@@ -281,13 +340,18 @@ export function deriveDashboard(
   const usedIdr = data.budgetUsedIdr;
   const totalIdr = PROGRAMME_BUDGET_IDR;
   return {
-    activitiesPercent: activitiesPercent(completedUnits, data.schools.length),
+    activitiesPercent: activitiesPercent(completedUnits, schoolCount),
     budget: { usedIdr, totalIdr, percent: Math.round((usedIdr / totalIdr) * 1000) / 10 },
-    clusters: data.clusters,
-    luring,
-    daring,
-    timeline: timelineSteps(LURING_SESI_WINDOWS, today),
-    pretest: pretestProgress(completions, data.schools.length),
-    warnings: overdueWarnings(luring, LURING_SESI_WINDOWS, today),
+    summary: {
+      pretest: assessmentProgress(completions, "pretest", schoolCount),
+      daring: deliveryProgress(data.sessions, "online", schoolCount, SESSIONS_PER_SCHOOL.online),
+      luring: deliveryProgress(data.sessions, "offline", schoolCount, SESSIONS_PER_SCHOOL.offline),
+      posttest: assessmentProgress(completions, "posttest", schoolCount),
+    },
+    luring: pivotByCluster(data.clusters, luringRows),
+    daring: pivotByCluster(data.clusters, daringRows),
+    pretestTable: assessmentTable(data.clusters, data.schools, completions, "pretest"),
+    postestTable: assessmentTable(data.clusters, data.schools, completions, "posttest"),
+    warnings: overdueWarnings(luringRows, LURING_SESI_WINDOWS, today),
   };
 }

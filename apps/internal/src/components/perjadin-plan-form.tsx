@@ -1,6 +1,6 @@
 "use client";
 
-import { planPerjadinAction } from "-/app/(app)/rencanakan-perjadin/actions";
+import { planPerjadinAction } from "-/app/(app)/perjadin/baru/actions";
 import { MultiSelectCombobox } from "-/components/multi-select-combobox";
 import { PersonSelect } from "-/components/person-select";
 import type {

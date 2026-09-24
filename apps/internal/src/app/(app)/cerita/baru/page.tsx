@@ -1,7 +1,10 @@
 import { CeritaBaruForm } from "-/components/cerita/cerita-baru-form";
 import { requirePerson } from "-/lib/person";
 import { schoolDirectory } from "@sugt/db/queries";
+import type { Metadata } from "next";
 import { forbidden } from "next/navigation";
+
+export const metadata: Metadata = { title: "Cerita baru" };
 
 /**
  * **Start a Story.** Pick a School and a title; creation and the redirect into the editor happen in

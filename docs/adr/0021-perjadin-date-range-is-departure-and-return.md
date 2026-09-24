@@ -2,7 +2,7 @@
 
 A Perjadin's stored range **is** its travel legs: `starts_on = date(departure_at)` and
 `ends_on = date(return_at)`. The range is no longer a pair of hand-typed fields. It is derived from
-the departure and return dates at every write — planning (`/rencanakan-perjadin`) and the logistics
+the departure and return dates at every write — planning (`/perjadin/baru`) and the logistics
 edit (`/perjadin/[id]`) alike — and the "Mulai"/"Selesai" date inputs are gone from both surfaces.
 
 This is scoped to the **stored range's source**, not its storage. `starts_on`/`ends_on` stay as

@@ -1,6 +1,9 @@
 import { KelompokSekolahEditor } from "-/components/kelompok-sekolah-editor";
 import { requirePerson } from "-/lib/person";
 import { subClusterBoard } from "@sugt/db/queries";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Kelompok Sekolah" };
 
 /**
  * **Kelompok Sekolah** — the Sub-Cluster editing screen, the tool's only admin surface over

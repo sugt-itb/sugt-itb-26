@@ -149,6 +149,31 @@ describe("assigning and revoking Grants", () => {
     await expect(personGrants(admin, target.id)).resolves.toEqual(["Editor"]);
   });
 
+  it("assigns and revokes Dashboard Viewer on a Staff Person, and refuses it to a non-Staff target", async () => {
+    const admin = await anAdministrator();
+    const target = await aStaffTarget();
+
+    await expect(assignGrant(admin, target.id, "Dashboard Viewer")).resolves.toEqual({
+      outcome: "assigned",
+    });
+    await expect(personGrants(admin, target.id)).resolves.toEqual(["Dashboard Viewer"]);
+
+    await expect(revokeGrant(admin, target.id, "Dashboard Viewer")).resolves.toEqual({
+      outcome: "revoked",
+    });
+    await expect(personGrants(admin, target.id)).resolves.toEqual([]);
+
+    const pimpinan = await addPerson({
+      fullName: "Ibu",
+      email: "ibu-pimpinan@ditsama.itb.ac.id",
+      role: "Pimpinan",
+    });
+    await expect(assignGrant(admin, pimpinan.id, "Dashboard Viewer")).resolves.toEqual({
+      outcome: "not-staff-target",
+    });
+    await expect(personGrants(admin, pimpinan.id)).resolves.toEqual([]);
+  });
+
   it("refuses the write to a Staff Person who is not an Administrator", async () => {
     // A Editor is Staff and holds a Grant, but administering Grants is Administrator-only.
     const editor = await resolved("Staff", "editor@ditsama.itb.ac.id", ["Editor"]);

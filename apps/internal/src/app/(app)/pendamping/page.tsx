@@ -2,7 +2,10 @@ import { DashboardStaff } from "-/components/dashboard-staff";
 import { requirePerson } from "-/lib/person";
 import { staffSurface } from "-/lib/staff-surface";
 import { myUpcomingPerjadin, staffDashboard } from "@sugt/db/queries";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = { title: "Pendamping" };
 
 /**
  * **Pendamping** — the landing screen (#40), renamed from Beranda at `/pendamping` (#294; the future

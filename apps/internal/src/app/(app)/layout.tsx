@@ -2,7 +2,7 @@ import { AppShell } from "-/components/app-shell";
 import { SignOutButton } from "-/components/sign-out-button";
 import { ThemeToggle } from "-/components/theme-toggle";
 import { getPerson } from "-/lib/person";
-import { hasGrant } from "@sugt/db/queries";
+import { canViewDashboard, hasGrant } from "@sugt/db/queries";
 import { redirect } from "next/navigation";
 
 /**
@@ -43,6 +43,7 @@ export default async function SignedInLayout({
       role={person.role}
       personName={person.fullName}
       canEditMonitoring={hasGrant(person, "Editor")}
+      canViewDashboard={canViewDashboard(person)}
       footerAction={
         /* Sign-out sits in the shell's footer — the one `SidebarBody` the desktop sidebar and
            the mobile drawer both render (#122), so it is reachable in both. The theme toggle is

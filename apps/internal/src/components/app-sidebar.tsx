@@ -45,6 +45,12 @@ import { usePathname } from "next/navigation";
  * Editor (an Administrator implies it). `/pretest` carries it — its page `forbidden()`s a
  * non-holder, so linking a screen that would refuse them is the same "worse than no link" rule the
  * Staff-only entries follow. The shell resolves the Grant once and passes the boolean down.
+ *
+ * `dashboardView` is a third such dimension (#322): the `/` link is shown only when the viewer may
+ * read the Dashboard — a `Pimpinan` by Role, a `Staff` holding `Editor` or `Dashboard Viewer`. Its
+ * page redirects a grant-less Staff to `/pendamping`, so — same rule again — the link is hidden for
+ * exactly the callers it would bounce. The shell computes `canViewDashboard` once (the one predicate
+ * the page guard shares) and passes the boolean down.
  */
 type NavItem = {
   href: Route;
@@ -53,13 +59,15 @@ type NavItem = {
   staffOnly: boolean;
   /** Shown only to an Editor / Administrator. Absent means "no Grant gate". */
   editorOnly?: boolean;
+  /** Shown only to a Person who may read the Dashboard (`canViewDashboard`). Absent means "no gate". */
+  dashboardView?: boolean;
 };
 
 const NAV: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: Gauge, staffOnly: false },
-  { href: "/pendamping", label: "Pendamping", icon: LayoutDashboard, staffOnly: true },
+  { href: "/", label: "Dashboard", icon: Gauge, staffOnly: false, dashboardView: true },
   { href: "/kalender", label: "Kalender", icon: CalendarDays, staffOnly: false },
   { href: "/pretest", label: "Pretest", icon: ClipboardCheck, staffOnly: false, editorOnly: true },
+  { href: "/pendamping", label: "Pendamping", icon: LayoutDashboard, staffOnly: true },
   { href: "/sekolah", label: "Direktori Sekolah", icon: School, staffOnly: false },
   { href: "/kelompok-sekolah", label: "Kelompok Sekolah", icon: Boxes, staffOnly: false },
   { href: "/feedback", label: "Feedback", icon: MessageSquare, staffOnly: false },
@@ -78,10 +86,21 @@ function isActive(pathname: string, href: string) {
  * The sidebar's links. A client component because the current section is read from the
  * URL; the shell around it stays on the server.
  */
-function AppSidebarNav({ role, canEditMonitoring }: { role: Role; canEditMonitoring: boolean }) {
+function AppSidebarNav({
+  role,
+  canEditMonitoring,
+  canViewDashboard,
+}: {
+  role: Role;
+  canEditMonitoring: boolean;
+  canViewDashboard: boolean;
+}) {
   const pathname = usePathname();
   const visible = NAV.filter(
-    (item) => (!item.staffOnly || role === "Staff") && (!item.editorOnly || canEditMonitoring),
+    (item) =>
+      (!item.staffOnly || role === "Staff") &&
+      (!item.editorOnly || canEditMonitoring) &&
+      (!item.dashboardView || canViewDashboard),
   );
 
   return (

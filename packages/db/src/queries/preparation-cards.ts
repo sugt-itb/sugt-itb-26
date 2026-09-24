@@ -13,8 +13,10 @@ import { requireGrant } from "./staff-only";
  * (ADR-0018), which is a Perjadin's seven fixed boxes — see `docs` / `CONTEXT.md` for the collision
  * note.
  *
- * **Reading is open** to any signed-in Person, like the rest of the Dashboard — a Pimpinan reads the
- * tab. **Every write opens with `requireGrant(caller, "Editor")`**: writing a Preparation
+ * **The read query applies no guard** — it is the reads behind the Persiapan tab, and whoever reaches
+ * the Dashboard reads them. Reaching the Dashboard itself now needs a grant (#322, ADR-0037): a
+ * Pimpinan by role, a Staff Person by `Editor` or `Dashboard Viewer`, so a grant-less Staff never
+ * gets this far. **Every write opens with `requireGrant(caller, "Editor")`**: writing a Preparation
  * Card is the one thing that Grant gates, and an Administrator implies it. A non-holder is
  * refused with `NotGrantedError`, which `staffSurface` turns into a 403 (the UI hides the controls
  * as a courtesy; the guard is the enforcement, since a layout does not run before a Server Action).

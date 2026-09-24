@@ -9,6 +9,9 @@ import {
   perjadinFeedbackAverages,
   perjadinFeedbackPage,
 } from "@sugt/db/queries";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Feedback" };
 
 /**
  * **Feedback** — what Participants said about the Sessions they sat in, and what filers said about

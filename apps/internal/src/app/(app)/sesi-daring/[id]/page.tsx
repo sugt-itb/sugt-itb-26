@@ -1,17 +1,34 @@
 import { OnlineSessionFields } from "-/components/online-session-fields";
-import { OnlineSessionTeachers } from "-/components/online-session-teachers";
 import { OnlineSessionWrites } from "-/components/online-session-writes";
 import { MODE_LABELS, SessionStatusBadge } from "-/components/session-labels";
 import { requirePerson } from "-/lib/person";
 import { onlineSessionDetail } from "@sugt/db/queries";
 import { formatSessionStartTimeWithWib } from "@sugt/domain";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 /**
- * **Detail Sesi daring** — one online Session, and every field the arrange form set, editable (#152,
- * ADR-0022). The online counterpart of `/perjadin/[id]`: the header, then the Session's fields, its
- * Pengajar, and — for Staff — Tandai terlaksana (status-only now) and Batalkan Sesi.
+ * The browser-tab title: the School's name and the mode label, reusing the same heading fields the
+ * page shows. A not-found — or an offline id, which the page redirects to /sesi/[id] — falls back to
+ * the section label (#309). Reads `onlineSessionDetail` again, a minimal title query per the ticket.
+ */
+export async function generateMetadata({
+  params,
+}: PageProps<"/sesi-daring/[id]">): Promise<Metadata> {
+  const person = await requirePerson();
+  const { id } = await params;
+  const lookup = await onlineSessionDetail(person, id);
+  if (lookup.outcome !== "online") return { title: "Sesi Daring" };
+  return { title: `${lookup.session.schoolName} — ${MODE_LABELS.online}` };
+}
+
+/**
+ * **Detail Sesi daring** — one online Session, and every field the record form set, editable (#152,
+ * #318). The online counterpart of `/perjadin/[id]`: the header, then the Session's fields (School,
+ * date, times and the two cohort-named Pengajar) with an Edit dialog, and — for Staff — a hard Delete.
+ * A born-`delivered` Session shows **Edit + Delete**; a legacy `arranged` one also shows Tandai
+ * terlaksana and Batalkan Sesi.
  *
  * **Online-only.** An offline Session's detail surface is `/sesi/[id]`, so an offline id is
  * redirected there rather than rendered here, and an id naming nothing is a **404** — an ordinary
@@ -66,12 +83,6 @@ export default async function Page({ params }: PageProps<"/sesi-daring/[id]">) {
 
       <OnlineSessionFields
         session={session}
-        canEdit={canEdit}
-      />
-
-      <OnlineSessionTeachers
-        sessionId={session.id}
-        teachers={session.teachers}
         canEdit={canEdit}
       />
 
