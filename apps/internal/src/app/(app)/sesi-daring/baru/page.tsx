@@ -2,6 +2,9 @@ import { ArrangeOnlineSessionForm } from "-/components/arrange-online-session-fo
 import { requirePerson } from "-/lib/person";
 import { staffSurface } from "-/lib/staff-surface";
 import { arrangeOnlineSessionForm } from "@sugt/db/queries";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Jadwalkan Sesi Daring" };
 
 /**
  * **Jadwalkan Sesi daring** — arranging one online Session, for one School (#70).

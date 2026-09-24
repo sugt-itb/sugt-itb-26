@@ -10,8 +10,12 @@ const sans = Montserrat({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: {
-    default: "Pendamping",
-    template: "%s | SUGT Internal",
+    // The app-wide default is the tool's own name, not any one page's. "Pendamping" used to sit here
+    // and leaked onto every untitled tab (#309) — and it is a *specific* page's name besides. Each
+    // route now supplies its own `title`, which this template wraps; only the Pendamping page itself
+    // reads "Pendamping".
+    default: "SUGT ITB Internal",
+    template: "%s | SUGT ITB Internal",
   },
 };
 

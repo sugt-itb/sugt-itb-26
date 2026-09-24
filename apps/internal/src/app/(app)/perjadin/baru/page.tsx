@@ -3,7 +3,10 @@ import { requirePerson } from "-/lib/person";
 import { staffSurface } from "-/lib/staff-surface";
 import { perjadinPlan } from "@sugt/db/queries";
 import { LinkButton } from "@sugt/ui/components/link-button";
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = { title: "Rencanakan Perjadin" };
 
 /**
  * **Rencanakan Perjadin** — the trip, its Group and one Session per kept School, planned in one

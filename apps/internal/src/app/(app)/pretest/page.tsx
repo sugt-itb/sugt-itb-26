@@ -1,8 +1,11 @@
 import { requirePerson } from "-/lib/person";
 import { hasGrant, pretestEditorData } from "@sugt/db/queries";
+import type { Metadata } from "next";
 import { forbidden } from "next/navigation";
 
 import { PretestEditor } from "./pretest-editor";
+
+export const metadata: Metadata = { title: "Pretest" };
 
 /**
  * **Pretest** — where a grant-holder records which Schools have had their Pretest administered, per

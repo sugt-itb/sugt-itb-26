@@ -1,6 +1,9 @@
 import { OrangRoster } from "-/components/orang-roster";
 import { requirePerson } from "-/lib/person";
 import { hasGrant, roster } from "@sugt/db/queries";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Orang" };
 
 /**
  * **Orang** — the roster, which is also the invite list (`person` is the invite list).

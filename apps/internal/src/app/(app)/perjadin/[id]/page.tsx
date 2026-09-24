@@ -12,8 +12,21 @@ import { requirePerson } from "-/lib/person";
 import { perjadinAcquittal, perjadinDetail } from "@sugt/db/queries";
 import { formatIdr } from "@sugt/domain";
 import { LinkButton } from "@sugt/ui/components/link-button";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+/**
+ * The browser-tab title: `Perjadin — <destination>`, reusing the same shortened destination the H1
+ * shows; a not-found id falls back to the section label (#309). Reads `perjadinDetail` again rather
+ * than share state — a minimal title query, as the ticket asks.
+ */
+export async function generateMetadata({ params }: PageProps<"/perjadin/[id]">): Promise<Metadata> {
+  const person = await requirePerson();
+  const { id } = await params;
+  const trip = await perjadinDetail(person, id);
+  return { title: trip ? `Perjadin — ${shortenKabupaten(trip.destination)}` : "Perjadin" };
+}
 
 /**
  * **One Perjadin** — the trip, its Group, the Schools on it, and when the Report is due.
