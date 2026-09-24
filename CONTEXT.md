@@ -156,7 +156,7 @@ _Avoid_: Preparation Item (the Perjadin one), task, todo
 ### Access
 
 **Grant**:
-An optional, revocable, **Staff-only** capability a **Person** may hold — a **second, additive access axis** beside the write-once **Role** ([ADR-0028](./docs/adr/0028-grants-are-a-second-additive-access-axis.md)). A Role is exactly one and write-once (a Person is **Staff** or **Pimpinan**); a Grant is none, one or several, and can be taken away. Grants never touch a Person's Role, and being Staff-only they never let a **Pimpinan** — who writes nothing — write anything. Two Grants exist: **Administrator** and **Editor**. Granted and revoked by an **Administrator** from **/orang**.
+An optional, revocable, **Staff-only** capability a **Person** may hold — a **second, additive access axis** beside the write-once **Role** ([ADR-0028](./docs/adr/0028-grants-are-a-second-additive-access-axis.md)). A Role is exactly one and write-once (a Person is **Staff** or **Pimpinan**); a Grant is none, one or several, and can be taken away. Grants never touch a Person's Role, and being Staff-only they never let a **Pimpinan** — who writes nothing — write anything. Three Grants exist: **Administrator**, **Editor** and **Dashboard Viewer**. Granted and revoked by an **Administrator** from **/orang**.
 _Avoid_: role (a Role is the one write-once axis; a Grant is the second, additive one), permission, scope, claim
 
 **Administrator**:
@@ -165,6 +165,9 @@ _Avoid_: admin, superuser, owner (it is a Grant a Staff Person holds, not a Role
 
 **Editor**:
 The **Grant** that lets a **Staff** Person **write Preparation Cards**. Without it a Staff Person reads the **Dashboard** (`/`) but does not edit its Preparation Cards; an **Administrator** has it implicitly. It gates writing only — reading the Dashboard is open to any signed-in Person like the rest of delivery.
+
+**Dashboard Viewer**:
+The **Grant** that lets a **Staff** Person **read the Dashboard** (`/`), and nothing more — the read-only Dashboard capability for a Staff Person who is neither **Administrator** nor **Editor**. Like every Grant it is **Staff-only** and an **Administrator** holds it implicitly; a **Pimpinan** never holds it, their Dashboard access coming from their Role, not this Grant.
 _Avoid_: monitor, reviewer, Cerita "editor" (the Story-editing surface, unrelated)
 
 ### Reporting
