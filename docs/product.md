@@ -106,6 +106,13 @@ contains a Staff member by construction, so no trip's material is unreachable.
 Every School with its delivered count, grouped by Cluster. Answers "where are we
 overall" at a glance.
 
+**Reading it needs a grant.** The Dashboard (`/`) is the overview surface for leadership and
+for the Staff who steer the Programme: a **Pimpinan** reaches it by role, and a **Staff** Person
+by holding the **Editor** or **Dashboard Viewer** grant (an **Administrator** implies both). A
+grant-less Staff Person is sent to their own landing screen, `/pendamping`, instead — the mirror
+of the redirect a Pimpinan gets from `/pendamping`. See
+[ADR-0037](./adr/0037-dashboard-read-is-gated-by-a-grant.md).
+
 It shows counts, and nothing else. No health indicator, no flagging, no colour. Nothing
 is ever "overdue" either — no Session ever asserted a due date — so a School behind on
 pace shows a low delivered count and noticing that is a human reading the number. See
@@ -163,42 +170,42 @@ from the School's Province, since no Indonesian province straddles a boundary. S
 from Bandung show the WIB equivalent alongside it. This holds for online Sessions too: the
 stored time is the School's, so it means one thing whichever mode a Session is.
 
-A Session comes into existence **when it is arranged** — when a Perjadin is planned or an
-online meeting scheduled — never before. The full eight are not laid out in advance with
-target dates, because those dates would be invented and a schedule nobody maintains
-displays confident wrong information. Progress reads "3 of 8 delivered" without any
+A Session comes into existence **when it is written**, never before. The full eight are not laid
+out in advance with target dates, because those dates would be invented and a schedule nobody
+maintains displays confident wrong information. Progress reads "3 of 8 delivered" without any
 planned rows existing.
 
-An arranged Session is then delivered or **cancelled**. A cancelled Session persists,
-flagged with a reason. It counts for nothing, but a School that was planned for and
-missed looks different from one nobody has reached yet — which is the actionable
-difference.
+**An offline Session is arranged, then delivered or cancelled.** It is written when a Perjadin is
+planned. A cancelled Session persists, flagged with a reason. It counts for nothing, but a School
+that was planned for and missed looks different from one nobody has reached yet — which is the
+actionable difference.
 
-**Every Session has a PIC.** An offline Session's is its Perjadin's. An online Session has
-no Perjadin, so scheduling one means naming a Staff member as its PIC — otherwise six of
-every eight Sessions would have nobody to file the Session Record.
+**An online Session is recorded after it happened.** A third-party LMS runs online delivery, so the
+tool does not schedule one and confirm it later — it **logs a Session that already took place**,
+written straight to _delivered_ (ADR-0036). The form is titled "Catat Sesi daring" and its button
+reads "Tandai Terlaksana"; the date cannot be in the future.
 
-**Online Sessions are arranged one School at a time.** Each is held at a moment of its own —
-its own date, its own start time, its own PIC — so there is nothing for a batch to share.
-They were once scheduled across a multi-selection from the coverage view, with one date and
-one PIC stamped across the rows and each editable afterwards; the shared fields were doing
-no work that per-School arranging does not do more plainly, and a screen that can write
-seventeen rows at once fails seventeen rows at once.
+**Only an offline Session has a PIC** — its Perjadin's. An online Session has none: a third-party
+LMS runs delivery, so DITSAMA staffs no PIC and an online Session files no Session Record
+(ADR-0035). It carries no Stream either (ADR-0034), and no single-cohort "Peserta" — both cohorts
+are always taught.
 
-The screen stands on its own with a School picker, and the same action appears on a School's
-own page, which is where you already are when you are thinking about one School. Six of every
-eight Sessions are online, so this is not a secondary path.
+**Online Sessions are recorded one School at a time.** Each happened at a moment of its own — its
+own date, its own start and end time — so there is nothing for a batch to share. The screen stands
+on its own with a **searchable School combobox** (type a name or a Kabupaten/Kota), and the same
+action appears on a School's own page, which is where you already are when you are thinking about one
+School. Six of every eight Sessions are online, so this is not a secondary path.
 
-**Marking a Session delivered is also how it records who taught.** The form asks for the
-Teaching Team member on each Stream — pre-filled from the Group on an offline Session, empty on
-an online one — and will not submit with a Stream unnamed. This is deliberately one act rather
-than two: the list of who still owes a Class Record is computed from who taught, so a Session
-marked delivered with nobody recorded owes nothing, and the chase list is silently empty. That
-is the worst failure available to a tool whose only enforcement is naming who has not filed.
+**It names two Pengajar, one per cohort.** One professor taught the Siswa cohort and one taught
+GTK-MS, so the form asks for exactly those two names, both required — not a variable list (ADR-0036).
+There is no separate "mark delivered" step and no who-taught prompt: the Session is recorded
+delivered with its two Pengajar in one act.
 
-**Cancelling happens on the Session, and only while it is arranged.** The reason is required in
-the same dialog, because it is required by the database — a Session that was delivered and then
-went wrong is a correction, not a cancellation.
+**Correcting an online Session is an edit; removing one is a delete.** Its fields — School, date,
+times and the two Pengajar — are editable from its detail page, and a Session recorded in error is
+**hard-deleted** behind a confirm dialog rather than cancelled. (Cancellation, with a required
+reason, remains for offline Sessions, and only while one is still arranged — a Session that was
+delivered and then went wrong is a correction, not a cancellation.)
 
 ### Perjadin
 

@@ -1,11 +1,13 @@
 import {
   activitiesPercent,
+  assessmentProgress,
+  assessmentTable,
   completedAssessmentUnits,
   deliveryMatrix,
+  deliveryProgress,
   deriveDashboard,
   overdueWarnings,
-  pretestProgress,
-  timelineSteps,
+  pivotByCluster,
   type MatrixRow,
 } from "-/app/(app)/dashboard-derive";
 import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
@@ -16,7 +18,7 @@ import { describe, expect, it } from "vitest";
  *
  * Like `dashboard-state.test.ts` (the warning reducer) and `theme-cycle.test.ts`, this file touches
  * neither Postgres nor a browser: it hands `dashboard-derive.ts` hand-built rows and a fixed date
- * and asserts on the matrix, percentages, timeline and warnings it returns. Ranking a School's
+ * and asserts on the matrices, summary percentages, pivots and warnings it returns. Ranking a School's
  * Sessions into Sesi lives in TypeScript precisely so it can be pinned here — the cancelled-skip
  * rule and "X never exceeds Y" are assertions, not a query nobody can drive.
  */
@@ -97,22 +99,105 @@ describe("activitiesPercent", () => {
   });
 });
 
-describe("timelineSteps", () => {
-  const windows = [
-    { sesi: 1, startsOn: "2026-10-05", endsOn: "2026-10-23" },
-    { sesi: 2, startsOn: "2026-11-02", endsOn: "2026-11-20" },
+describe("deliveryProgress", () => {
+  const sessions: MonitoringSession[] = [
+    sess({ schoolId: "s1", mode: "offline", status: "delivered" }),
+    sess({ schoolId: "s2", mode: "offline", status: "delivered" }),
+    sess({ schoolId: "s3", mode: "offline", status: "arranged" }), // not delivered → not counted
+    sess({ schoolId: "s1", mode: "online", status: "delivered" }),
+    sess({ schoolId: "s2", mode: "online", status: "cancelled" }), // cancelled → not counted
   ];
 
-  it("marks a window completed only once today is strictly past its endsOn", () => {
-    const steps = timelineSteps(windows, "2026-10-24");
-    expect(steps).toEqual([
-      { label: "Luring Sesi 1", window: "2026-10-05 - 2026-10-23", status: "completed" },
-      { label: "Luring Sesi 2", window: "2026-11-02 - 2026-11-20", status: "pending" },
+  it("counts delivered Sessions of the mode over schoolCount × perSchool", () => {
+    // 2 delivered offline of 3 schools × 2 = 6 → 33.33 rounds to 33.
+    expect(deliveryProgress(sessions, "offline", 3, 2)).toBe(33);
+    // 1 delivered online of 3 schools × 6 = 18 → 5.56 rounds to 6.
+    expect(deliveryProgress(sessions, "online", 3, 6)).toBe(6);
+  });
+
+  it("guards a zero school count at 0%", () => {
+    expect(deliveryProgress(sessions, "offline", 0, 2)).toBe(0);
+  });
+});
+
+describe("assessmentProgress", () => {
+  const box = (
+    schoolId: string,
+    stream: "STEM" | "Research",
+    participantType: "Siswa" | "GTK-MS",
+    kind: "pretest" | "posttest",
+  ): AssessmentCompletion => ({ schoolId, stream, participantType, kind });
+
+  it("counts ticked boxes of the kind over schoolCount × 4, box-level not all-or-nothing", () => {
+    const completions = [
+      box("s1", "STEM", "Siswa", "pretest"),
+      box("s1", "STEM", "GTK-MS", "pretest"), // s1 partial (2 of 4) still contributes both boxes
+      box("s2", "Research", "Siswa", "pretest"),
+    ];
+    // 3 pretest boxes of 3 schools × 4 = 12 → 25%.
+    expect(assessmentProgress(completions, "pretest", 3)).toBe(25);
+    // No posttest rows → an honest 0%.
+    expect(assessmentProgress(completions, "posttest", 3)).toBe(0);
+  });
+
+  it("guards a zero school count at 0%", () => {
+    expect(assessmentProgress([box("s1", "STEM", "Siswa", "pretest")], "pretest", 0)).toBe(0);
+  });
+});
+
+describe("pivotByCluster", () => {
+  it("transposes Sesi rows into Klaster rows, cells lined up under each Sesi column", () => {
+    const sesiRows: MatrixRow[] = [
+      { session: "Sesi 1", cells: ["2/2", "0/1"] },
+      { session: "Sesi 2", cells: ["1/2", "1/1"] },
+    ];
+    expect(pivotByCluster(CLUSTERS, sesiRows)).toEqual({
+      columns: ["Sesi 1", "Sesi 2"],
+      rows: [
+        { label: "Klaster A", cells: ["2/2", "1/2"] },
+        { label: "Klaster B", cells: ["0/1", "1/1"] },
+      ],
+    });
+  });
+});
+
+describe("assessmentTable", () => {
+  const box = (
+    schoolId: string,
+    stream: "STEM" | "Research",
+    participantType: "Siswa" | "GTK-MS",
+    kind: "pretest" | "posttest",
+  ): AssessmentCompletion => ({ schoolId, stream, participantType, kind });
+
+  it("counts, per Cluster, schools with each box ticked over the Cluster's school count", () => {
+    // Cluster A holds s1, s2; Cluster B holds s3.
+    const completions = [
+      box("s1", "STEM", "Siswa", "pretest"),
+      box("s2", "STEM", "Siswa", "pretest"),
+      box("s3", "Research", "GTK-MS", "pretest"),
+    ];
+    const table = assessmentTable(CLUSTERS, SCHOOLS, completions, "pretest");
+    // Columns are the four STEM/Research × Siswa/GTK-MS boxes, "Research" shown as "Riset".
+    expect(table.columns).toEqual([
+      "STEM ∙ Siswa",
+      "STEM ∙ GTK-MS",
+      "Riset ∙ Siswa",
+      "Riset ∙ GTK-MS",
+    ]);
+    // Klaster A: both schools ticked STEM·Siswa (2/2), nothing else. Klaster B: s3 ticked Riset·GTK-MS (1/1).
+    expect(table.rows).toEqual([
+      { label: "Klaster A", cells: ["2/2", "0/2", "0/2", "0/2"] },
+      { label: "Klaster B", cells: ["0/1", "0/1", "0/1", "1/1"] },
     ]);
   });
 
-  it("is still pending on the endsOn day itself", () => {
-    expect(timelineSteps(windows, "2026-10-23")[0]?.status).toBe("pending");
+  it("reads all 0/Y for posttest until posttest rows exist", () => {
+    const completions = [box("s1", "STEM", "Siswa", "pretest")];
+    const table = assessmentTable(CLUSTERS, SCHOOLS, completions, "posttest");
+    expect(table.rows).toEqual([
+      { label: "Klaster A", cells: ["0/2", "0/2", "0/2", "0/2"] },
+      { label: "Klaster B", cells: ["0/1", "0/1", "0/1", "0/1"] },
+    ]);
   });
 });
 
@@ -169,22 +254,24 @@ describe("deriveDashboard", () => {
 
     const derived = deriveDashboard(data, "2026-09-01", []);
 
-    // Two offline Sesi rows, six online — the per-mode Session counts.
-    expect(derived.luring).toHaveLength(2);
-    expect(derived.daring).toHaveLength(6);
+    // Delivery tables are pivoted to Klaster rows now: one row per Cluster, Sesi as columns.
+    expect(derived.luring.rows).toHaveLength(CLUSTERS.length);
+    expect(derived.luring.columns).toEqual(["Sesi 1", "Sesi 2"]);
+    expect(derived.daring.columns).toHaveLength(6);
+    expect(derived.daring.rows).toHaveLength(CLUSTERS.length);
     // 2 delivered units (no assessment units) of 3 Schools × 10 = 30 possible → 6.67 rounds to 7%.
     expect(derived.activitiesPercent).toBe(7);
-    // The columns pass through in order; total is the programme budget; the tiny fraction is 0.2.
-    expect(derived.clusters).toEqual(CLUSTERS);
+    // The budget total is the programme budget; the tiny fraction is 0.2.
     expect(derived.budget.totalIdr).toBe(15_000_000_000);
     expect(derived.budget.usedIdr).toBe(29_560_000);
     expect(derived.budget.percent).toBe(0.2);
-    // No completions handed in → four Pretest meters, all zero out of the 3 Schools.
-    expect(derived.pretest).toEqual([
-      { stream: "STEM", participantType: "Siswa", done: 0, total: 3, percent: 0 },
-      { stream: "STEM", participantType: "GTK-MS", done: 0, total: 3, percent: 0 },
-      { stream: "Research", participantType: "Siswa", done: 0, total: 3, percent: 0 },
-      { stream: "Research", participantType: "GTK-MS", done: 0, total: 3, percent: 0 },
+    // Summary percentages: no completions → 0% pretest and posttest; 1 delivered online of 18 → 6%,
+    // 1 delivered offline of 6 → 17%.
+    expect(derived.summary).toEqual({ pretest: 0, daring: 6, luring: 17, posttest: 0 });
+    // No completions → both assessment tables read all 0/Y, one row per Cluster.
+    expect(derived.postestTable.rows).toEqual([
+      { label: "Klaster A", cells: ["0/2", "0/2", "0/2", "0/2"] },
+      { label: "Klaster B", cells: ["0/1", "0/1", "0/1", "0/1"] },
     ]);
   });
 
@@ -244,63 +331,5 @@ describe("completedAssessmentUnits", () => {
       box("s3", "STEM", "Siswa", "pretest"), // partial → contributes 0
     ];
     expect(completedAssessmentUnits(completions)).toBe(3);
-  });
-});
-
-describe("pretestProgress", () => {
-  const pretest = (
-    schoolId: string,
-    stream: "STEM" | "Research",
-    participantType: "Siswa" | "GTK-MS",
-  ): AssessmentCompletion => ({ schoolId, stream, participantType, kind: "pretest" });
-
-  it("returns the four meters in the fixed STEM/Research × Siswa/GTK-MS order", () => {
-    expect(pretestProgress([], 42).map((m) => `${m.stream}·${m.participantType}`)).toEqual([
-      "STEM·Siswa",
-      "STEM·GTK-MS",
-      "Research·Siswa",
-      "Research·GTK-MS",
-    ]);
-  });
-
-  it("counts distinct schools per box and computes the rounded percent out of the school count", () => {
-    const completions = [
-      pretest("s1", "STEM", "Siswa"),
-      pretest("s2", "STEM", "Siswa"),
-      pretest("s3", "Research", "GTK-MS"),
-    ];
-    const meters = pretestProgress(completions, 42);
-    const byBox = (stream: "STEM" | "Research", pt: "Siswa" | "GTK-MS") =>
-      meters.find((m) => m.stream === stream && m.participantType === pt)!;
-
-    // 2 of 42 → 5% (rounded from 4.76).
-    expect(byBox("STEM", "Siswa")).toEqual({
-      stream: "STEM",
-      participantType: "Siswa",
-      done: 2,
-      total: 42,
-      percent: 5,
-    });
-    // 1 of 42 → 2%.
-    expect(byBox("Research", "GTK-MS")).toMatchObject({ done: 1, percent: 2 });
-    // An untouched box is zero.
-    expect(byBox("STEM", "GTK-MS")).toMatchObject({ done: 0, percent: 0 });
-  });
-
-  it("ignores posttest rows — only pretest counts", () => {
-    const completions: AssessmentCompletion[] = [
-      { schoolId: "s1", stream: "STEM", participantType: "Siswa", kind: "posttest" },
-    ];
-    expect(pretestProgress(completions, 42).find((m) => m.stream === "STEM")!.done).toBe(0);
-  });
-
-  it("guards a zero school count at 0% rather than dividing by zero", () => {
-    const completions = [pretest("s1", "STEM", "Siswa")];
-    expect(pretestProgress(completions, 0)).toEqual([
-      { stream: "STEM", participantType: "Siswa", done: 1, total: 0, percent: 0 },
-      { stream: "STEM", participantType: "GTK-MS", done: 0, total: 0, percent: 0 },
-      { stream: "Research", participantType: "Siswa", done: 0, total: 0, percent: 0 },
-      { stream: "Research", participantType: "GTK-MS", done: 0, total: 0, percent: 0 },
-    ]);
   });
 });

@@ -5,7 +5,22 @@ import { staffSurface } from "-/lib/staff-surface";
 import { arrangeOnlineSessionAt, schoolDetail } from "@sugt/db/queries";
 import { TOTAL_SESSIONS_PER_SCHOOL } from "@sugt/domain";
 import { Progress } from "@sugt/ui/components/progress";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+
+/**
+ * The browser-tab title: the School's name, falling back to the section label for a slug that names
+ * no School (#309). Reads the same open query the page does — a minimal title query, as the ticket
+ * asks, rather than shared state.
+ */
+export async function generateMetadata({
+  params,
+}: PageProps<"/sekolah/[slug]">): Promise<Metadata> {
+  const person = await requirePerson();
+  const { slug } = await params;
+  const school = await schoolDetail(person, slug);
+  return { title: school ? school.name : "Direktori Sekolah" };
+}
 
 /**
  * **Detail Sekolah** — one School's Sessions, and how much teaching has happened.
@@ -13,7 +28,7 @@ import { notFound } from "next/navigation";
  * One `requirePerson()`, one open query, and no role check on the read: this is delivery data
  * and ADR-0004 opens it to everyone signed in.
  *
- * **The arrange-a-Session affordance is the second entry point for Jadwalkan Sesi daring (#70)**
+ * **The record-a-Session affordance is the second entry point for Catat Sesi daring (#70, #318)**
  * — you are already thinking about one School here. It is Staff-only, so its read runs only for a
  * Staff caller and renders only when it returns; `requireStaff` in the write is the enforcement,
  * since a layout does not run before a Server Action.
@@ -62,7 +77,7 @@ export default async function Page({ params }: PageProps<"/sekolah/[slug]">) {
 
       {arrange !== null && (
         <section className="border-t border-border">
-          <h2 className="px-7 pt-5 font-heading text-sm font-medium">Jadwalkan Sesi daring</h2>
+          <h2 className="px-7 pt-5 font-heading text-sm font-medium">Catat Sesi daring</h2>
           <ArrangeOnlineSessionForm school={arrange.school} />
         </section>
       )}

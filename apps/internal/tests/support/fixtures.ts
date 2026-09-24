@@ -7,7 +7,6 @@ import type {
   ParticipantFeedbackAspect,
   PerjadinAspect,
   PerjadinEvaluationRole,
-  PretestParticipantType,
   SessionStatus,
   Stream,
   Role,
@@ -162,8 +161,10 @@ export type SessionFixture = {
    * `session_ends_after_starts_check` whatever `startsAt` a test picks; overridable.
    */
   endsAt?: string;
-  /** Which cohort the Session teaches (#283). Defaults to `Siswa`, overridable. */
-  participantType?: PretestParticipantType;
+  /** The Siswa cohort's Pengajar name (#318). Defaults to a placeholder; both are required for online. */
+  pengajarSiswaName?: string;
+  /** The GTK-MS cohort's Pengajar name (#318). Defaults to a placeholder; both are required for online. */
+  pengajarGtkMsName?: string;
   status?: SessionStatus;
 };
 
@@ -194,7 +195,8 @@ export async function addSession(fixture: SessionFixture) {
       heldOn: fixture.heldOn,
       startsAt,
       endsAt: fixture.endsAt ?? oneHourAfter(startsAt),
-      participantType: fixture.participantType ?? "Siswa",
+      pengajarSiswaName: fixture.pengajarSiswaName ?? "Pengajar Siswa",
+      pengajarGtkMsName: fixture.pengajarGtkMsName ?? "Pengajar GTK-MS",
       status,
       cancelledReason: status === "cancelled" ? "Sekolah meminta penjadwalan ulang" : null,
     })
@@ -643,14 +645,12 @@ export async function addTransactionEvidence(fixture: EvidenceFixture) {
  * references and no fixture writes needs no entry; one a fixture writes does. The other three
  * evaluation tables are named below because fixtures write them directly.
  *
- * `session_teacher_name` is a table here that **no fixture writes and the tests populate
- * anyway** — `arrangeOnlineSession` and the online-detail per-item writes do, and the
- * online-detail tests assert on it, so it is named even though `cascade` from
- * `public."session"` reaches it too. (Its predecessor `session_teacher` was dropped whole in
- * T3 (#153) — the online-session Teaching Team it carried is gone — so it leaves this list with
- * the table.) `perjadin_evaluation` sits beside it for the same reason: no fixture writes one,
- * but the Perjadin Evaluation write-path tests file them directly, and `cascade` from
- * `public."perjadin"` reaches it, so naming it is for the same reason and not for a fixture.
+ * `session_teacher_name` was **dropped in #318** and leaves this list with the table: an online
+ * Session's two Pengajar are cohort-named columns on `session` itself now, not side-table rows, so
+ * there is nothing to truncate. (Its predecessor `session_teacher` had already been dropped whole in
+ * T3 (#153).) `perjadin_evaluation` is named even though no fixture writes one: the Perjadin
+ * Evaluation write-path tests file them directly, and `cascade` from `public."perjadin"` reaches it,
+ * so naming it is for that reason and not for a fixture.
  * `perjadin_feedback_token` is named for the fixture reason `session_feedback_token` is:
  * `addPerjadinFeedbackToken` writes it (ADR-0024), even though `cascade` from `public."perjadin"`
  * already reaches it.
@@ -673,7 +673,6 @@ export async function resetDatabase() {
       public."sub_cluster",
       public."school",
       public."session",
-      public."session_teacher_name",
       public."class_record",
       public."session_record",
       public."participant_feedback",

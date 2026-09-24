@@ -2,6 +2,7 @@
 
 import {
   cancelOnlineSessionAction,
+  deleteOnlineSessionAction,
   markOnlineSessionDeliveredAction,
 } from "-/app/(app)/sesi-daring/[id]/actions";
 import type { OnlineSessionDetail } from "@sugt/db/queries";
@@ -18,13 +19,15 @@ import {
 } from "@sugt/ui/components/dialog";
 import { Label } from "@sugt/ui/components/label";
 import { Textarea } from "@sugt/ui/components/textarea";
+import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
 /**
- * The status writes an online Session offers Staff — Tandai terlaksana and Batalkan Sesi — mirroring
- * the offline detail's controls (`session-writes.tsx`). Both are offered only while `arranged`; a
- * cancelled Session offers nothing, and a delivered one is terminal. The Session's fields and its
- * Pengajar are edited in their own sections above, so this carries only the two status acts.
+ * The writes an online Session offers Staff — a hard **Delete** always, plus the legacy status acts
+ * Tandai terlaksana and Batalkan Sesi while `arranged`. An online Session is born `delivered` now
+ * (#318), so a born-`delivered` Session shows **Edit** (in the fields section above) **+ Delete**; a
+ * Session arranged before #318 also shows the two status acts. Delete replaced cancellation as the
+ * correction for a mis-recorded delivered Session.
  *
  * Each rule is also held by the write function, which is why each dialog has a branch for a refusal
  * it believes it cannot provoke — a page opened before somebody else acted on the same Session is
@@ -40,18 +43,70 @@ function OnlineSessionWrites({ session }: { session: OnlineSessionDetail }) {
         </>
       )}
 
-      {session.status === "cancelled" && (
-        <p className="text-sm text-muted-foreground">
-          Sesi yang dibatalkan tidak bisa diubah lagi.
-        </p>
-      )}
+      <Delete session={session} />
     </div>
   );
 }
 
 /**
- * **Tandai terlaksana** — status only (#152). No who-taught prompt: the Pengajar are session-scoped
- * names edited in their own section, and no `session_teacher` row is written. The confirmation exists
+ * **Hapus Sesi** — a hard delete behind a confirm dialog (#318). The correction for a Session
+ * recorded in error, which for a born-`delivered` Session replaced cancellation. On success the row is
+ * gone, so the page redirects to `/sesi-daring`; a `no-such-session` refusal means somebody else
+ * already deleted it, which the same redirect resolves.
+ */
+function Delete({ session }: { session: OnlineSessionDetail }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [saving, startSaving] = useTransition();
+
+  function submit() {
+    startSaving(async () => {
+      await deleteOnlineSessionAction(session.id);
+      // Whether it deleted or was already gone, the Session no longer belongs on this page.
+      router.push("/sesi-daring");
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={setOpen}
+    >
+      <DialogTrigger render={<Button variant="destructive">Hapus Sesi</Button>} />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Hapus Sesi daring</DialogTitle>
+          <DialogDescription>
+            Sesi daring ini akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.
+          </DialogDescription>
+        </DialogHeader>
+
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            Batal
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={saving}
+            onClick={submit}
+          >
+            {saving ? "Menghapus…" : "Hapus Sesi"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * **Tandai terlaksana** — status only (#152), and **legacy for online now** (#318): an online Session
+ * is born `delivered`, so this reaches only a Session arranged before #318. No who-taught prompt — the
+ * two Pengajar are columns on the Session, edited in the fields section above. The confirmation exists
  * only so a delivered Session is a deliberate act; the sole refusal it can meet is a Session someone
  * else already moved.
  */

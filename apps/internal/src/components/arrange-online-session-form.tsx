@@ -1,48 +1,45 @@
 "use client";
 
-import { arrangeOnlineSessionAction } from "-/app/(app)/jadwalkan-sesi-daring/actions";
+import { arrangeOnlineSessionAction } from "-/app/(app)/sesi-daring/baru/actions";
+import { SchoolCombobox } from "-/components/single-select-combobox";
 import type { SchoolOption } from "@sugt/db/queries";
-import {
-  MAX_TEACHING_TEAM_PER_ONLINE_SESSION,
-  PRETEST_PARTICIPANT_TYPES,
-  type PretestParticipantType,
-} from "@sugt/domain";
 import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
 import { Input } from "@sugt/ui/components/input";
 import { Label } from "@sugt/ui/components/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@sugt/ui/components/select";
-import { XIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
 /**
- * Arrange **one** online Session (#70). Two entry points share this component: the
- * standalone screen leads with a School picker (`schools`), and Detail Sekolah pins the School it
- * is on (`school`). Exactly one of the two is passed.
+ * **Catat Sesi daring** — record **one** online Session that has already happened (#70, #318). Two
+ * entry points share this component: the standalone screen leads with a **searchable School
+ * combobox** (`schools`), and Detail Sekolah pins the School it is on (`school`). Exactly one of the
+ * two is passed.
  *
- * It names its Pengajar as **session-scoped free-text names** — typed in one at a time and shown as
- * removable chips, the same pattern the plan form uses for a Perjadin's trip-scoped Teaching Team
- * (ADR-0020). The fields are Peserta (Siswa / GTK-MS), Tanggal, Jam Mulai and Jam Selesai (both
- * **WIB**, strictly ordered), and Pengajar (required, one or two). **No Aliran and no PIC (#284):**
- * a third-party LMS runs online delivery, so an online Session tracks neither Stream nor a PIC.
+ * A third-party LMS runs online delivery, so the internal app only **logs** a Session — the write
+ * records it **already delivered** (#318, ADR-0036), collapsing the old arrange→deliver step. Its two
+ * Pengajar are **cohort-named**: one Siswa professor and one GTK-MS professor, one free-text name each,
+ * both required — not a chip list. **No Aliran, no PIC and no Peserta selector (#318, #284):** both
+ * cohorts are always taught, and delivery tracks neither Stream nor a PIC. The fields are Sekolah,
+ * Tanggal (WIB, no future dates), Jam Mulai and Jam Selesai (both WIB, strictly ordered), and the two
+ * Pengajar.
  *
  * A client component because every field is editable and none of that state is worth a URL. The
  * Schools arrive from the server as props; nothing here fetches. The Server Action is called with a
- * typed value rather than through a `<form action>`, because the payload is nested — a list of
- * teacher names — and `FormData` would mean flattening it out and parsing it back with the type
- * checker helping at neither end.
+ * typed value rather than through a `<form action>`, because `FormData` would mean flattening the
+ * fields out and parsing them back with the type checker helping at neither end.
+ *
+ * On success it **leaves the form**: the standalone screen redirects to `/sesi-daring` where the new
+ * row appears, and the Detail Sekolah embed refreshes in place so the Session joins the School's own
+ * list — no stay-on-page "record another" state (#318).
  */
 function ArrangeOnlineSessionForm(
   props:
     | /** Detail Sekolah pins the School. */ { school: SchoolOption; schools?: never }
-    | /** The standalone screen offers a picker. */ { school?: never; schools: SchoolOption[] },
+    | /** The standalone screen offers a searchable picker. */ {
+        school?: never;
+        schools: SchoolOption[];
+      },
 ) {
   const { school, schools } = props;
   const router = useRouter();
@@ -50,62 +47,36 @@ function ArrangeOnlineSessionForm(
   const [heldOn, setHeldOn] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
-  // Which cohort the Session teaches (#283). Required, `""` until chosen; the submit guard proves it
-  // is set before the cast.
-  const [participantType, setParticipantType] = useState<PretestParticipantType | "">("");
-  // The Pengajar as session-scoped names (ADR-0022): a list of plain strings, added one at a time
-  // from `teacherDraft` and shown as removable chips. Required now (#283): one or two.
-  const [teacherNames, setTeacherNames] = useState<string[]>([]);
-  const [teacherDraft, setTeacherDraft] = useState("");
-  const [collidedOn, setCollidedOn] = useState<string | null>(null);
-  const [arranged, setArranged] = useState(false);
+  // The two cohort-named Pengajar (#318), one free-text name each, both required.
+  const [pengajarSiswaName, setPengajarSiswaName] = useState("");
+  const [pengajarGtkMsName, setPengajarGtkMsName] = useState("");
+  const [refusal, setRefusal] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
 
   const schoolFieldId = useId();
   const dateId = useId();
   const timeId = useId();
   const endTimeId = useId();
-  const participantId = useId();
-  const teacherDraftId = useId();
+  const pengajarSiswaId = useId();
+  const pengajarGtkMsId = useId();
+
+  // Today in WIB (`YYYY-MM-DD`) — the zone an online Session's date is a day in. Caps the date input
+  // and mirrors the query's future-date guard, which is measured in the same zone.
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
 
   // Jam Selesai must be strictly after Jam Mulai — the app-layer half of the
-  // `session_ends_after_starts_check` CHECK. Both are `HH:MM`, so the string compare is chronological;
-  // only meaningful once both are set.
+  // `session_ends_after_starts_check` CHECK. Both `HH:MM`, so the string compare is chronological.
   const endBeforeStart = startsAt !== "" && endsAt !== "" && endsAt <= startsAt;
 
-  // `held_on`/`starts_at` are NOT NULL by CHECK; #283 adds a required Peserta, a required Jam Selesai
-  // after Jam Mulai, and at least one Pengajar — so the screen refuses a submit that could only be
-  // rejected. There is no PIC or Aliran to require now (#284).
   const incomplete =
     schoolId === "" ||
     heldOn === "" ||
+    heldOn > today ||
     startsAt === "" ||
     endsAt === "" ||
     endBeforeStart ||
-    participantType === "" ||
-    teacherNames.length < 1;
-
-  function reset() {
-    setHeldOn("");
-    setStartsAt("");
-    setEndsAt("");
-    setParticipantType("");
-    setTeacherNames([]);
-    setTeacherDraft("");
-    setArranged(false);
-    setCollidedOn(null);
-  }
-
-  function addTeacher() {
-    const name = teacherDraft.trim();
-    if (name === "" || teacherNames.length >= MAX_TEACHING_TEAM_PER_ONLINE_SESSION) return;
-    setTeacherNames((previous) => [...previous, name]);
-    setTeacherDraft("");
-  }
-
-  function removeTeacher(index: number) {
-    setTeacherNames((previous) => previous.filter((_, i) => i !== index));
-  }
+    pengajarSiswaName.trim() === "" ||
+    pengajarGtkMsName.trim() === "";
 
   function submit() {
     startSaving(async () => {
@@ -114,50 +85,35 @@ function ArrangeOnlineSessionForm(
         heldOn,
         startsAt,
         endsAt,
-        // The guard proves Peserta is chosen; the query also treats `""` as a refusal.
-        participantType,
-        teacherNames: teacherNames.map((name) => name.trim()).filter((name) => name !== ""),
+        pengajarSiswaName,
+        pengajarGtkMsName,
       });
 
-      if (result.outcome === "arranged") {
-        setArranged(true);
-        setCollidedOn(null);
-        // Detail Sekolah reads its Sessions on the server; refresh so the new one appears.
-        router.refresh();
+      if (result.outcome === "recorded") {
+        // The standalone screen has no list of its own; land on the one that lists every Session.
+        // The embed stays on the School page — a refresh brings the new Session into its list (#318).
+        if (school === undefined) router.push("/sesi-daring");
+        else router.refresh();
         return;
       }
-      // `too-many-teachers` is unreachable from here — the chip input caps at the same number the
-      // query does — so a collision is the only refusal the form can surface, beside the date.
-      if (result.outcome === "collided") setCollidedOn(result.heldOn);
+      setRefusal(
+        result.outcome === "collided"
+          ? "Sekolah ini sudah punya Sesi daring pada tanggal tersebut. Ubah tanggalnya, lalu simpan lagi."
+          : result.outcome === "future-date"
+            ? "Tanggal tidak boleh di masa depan — Sesi daring dicatat setelah terlaksana."
+            : result.outcome === "end-before-start"
+              ? "Jam selesai harus setelah jam mulai."
+              : "Sesi belum tersimpan. Periksa isian, lalu simpan lagi.",
+      );
     });
-  }
-
-  if (arranged) {
-    return (
-      <div className="flex flex-col items-start gap-3.5 px-7 py-5">
-        <Alert>
-          <AlertTitle>Sesi daring dijadwalkan.</AlertTitle>
-          <AlertDescription>Sesi baru muncul di daftar Sesi Sekolah ini.</AlertDescription>
-        </Alert>
-        <Button
-          variant="outline"
-          onClick={reset}
-        >
-          Jadwalkan lagi
-        </Button>
-      </div>
-    );
   }
 
   return (
     <div className="flex flex-col gap-4 px-7 py-5">
-      {collidedOn !== null && (
+      {refusal !== null && (
         <Alert variant="destructive">
-          <AlertTitle>Sesi belum dijadwalkan.</AlertTitle>
-          <AlertDescription>
-            Sekolah ini sudah punya Sesi daring pada {collidedOn}. Ubah tanggalnya, lalu simpan
-            lagi.
-          </AlertDescription>
+          <AlertTitle>Sesi belum tersimpan.</AlertTitle>
+          <AlertDescription>{refusal}</AlertDescription>
         </Alert>
       )}
 
@@ -167,31 +123,15 @@ function ArrangeOnlineSessionForm(
             id={schoolFieldId}
             label="Sekolah"
           >
-            <Select
-              items={Object.fromEntries((schools ?? []).map((entry) => [entry.id, entry.name]))}
+            <SchoolCombobox
+              id={schoolFieldId}
+              schools={schools ?? []}
               value={schoolId === "" ? null : schoolId}
-              onValueChange={(value) => {
-                setSchoolId((value as string | null) ?? "");
-                setCollidedOn(null);
+              onValueChange={(next) => {
+                setSchoolId(next ?? "");
+                setRefusal(null);
               }}
-            >
-              <SelectTrigger
-                id={schoolFieldId}
-                aria-label="Sekolah"
-              >
-                <SelectValue placeholder="Pilih Sekolah" />
-              </SelectTrigger>
-              <SelectContent>
-                {(schools ?? []).map((entry) => (
-                  <SelectItem
-                    key={entry.id}
-                    value={entry.id}
-                  >
-                    {entry.name} — {entry.kabupatenKota}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </Field>
         ) : (
           <div className="grid gap-1.5">
@@ -199,37 +139,6 @@ function ArrangeOnlineSessionForm(
             <p className="text-sm font-medium">{school.name}</p>
           </div>
         )}
-
-        <Field
-          id={participantId}
-          label="Peserta"
-        >
-          <Select
-            items={Object.fromEntries(PRETEST_PARTICIPANT_TYPES.map((entry) => [entry, entry]))}
-            value={participantType === "" ? null : participantType}
-            onValueChange={(value) => {
-              setParticipantType((value as PretestParticipantType | null) ?? "");
-              setCollidedOn(null);
-            }}
-          >
-            <SelectTrigger
-              id={participantId}
-              aria-label="Peserta"
-            >
-              <SelectValue placeholder="Pilih Peserta" />
-            </SelectTrigger>
-            <SelectContent>
-              {PRETEST_PARTICIPANT_TYPES.map((entry) => (
-                <SelectItem
-                  key={entry}
-                  value={entry}
-                >
-                  {entry}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
 
         <Field
           id={dateId}
@@ -240,18 +149,20 @@ function ArrangeOnlineSessionForm(
             type="date"
             className="w-44"
             value={heldOn}
+            max={today}
             onChange={(event) => {
               setHeldOn(event.target.value);
-              setCollidedOn(null);
+              setRefusal(null);
             }}
           />
         </Field>
 
+        {/* Jam Mulai and Jam Selesai side by side (#318). Online Sessions are always WIB (#283), so
+            the zone is fixed, not School-derived. */}
         <Field
           id={timeId}
           label="Jam Mulai (WIB)"
         >
-          {/* Online Sessions are always WIB (#283), so the zone is fixed, not School-derived. */}
           <Input
             id={timeId}
             type="time"
@@ -280,69 +191,35 @@ function ArrangeOnlineSessionForm(
             <p className="text-xs text-destructive">Jam selesai harus setelah jam mulai.</p>
           )}
         </Field>
-      </div>
 
-      <div>
-        <Label htmlFor={teacherDraftId}>Pengajar</Label>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Nama Pengajar untuk Sesi ini. Tambahkan satu per satu; minimal satu, hingga{" "}
-          {MAX_TEACHING_TEAM_PER_ONLINE_SESSION} nama.
-        </p>
-
-        <div className="mt-3 flex max-w-md gap-2">
+        {/* The two cohort-named Pengajar side by side (#318), one name each, both required. */}
+        <Field
+          id={pengajarSiswaId}
+          label="Pengajar Siswa"
+        >
           <Input
-            id={teacherDraftId}
-            aria-label="Nama pengajar"
-            placeholder="Nama pengajar"
-            value={teacherDraft}
-            disabled={teacherNames.length >= MAX_TEACHING_TEAM_PER_ONLINE_SESSION}
+            id={pengajarSiswaId}
+            placeholder="Nama pengajar Siswa"
+            value={pengajarSiswaName}
             onChange={(event) => {
-              setTeacherDraft(event.target.value);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                addTeacher();
-              }
+              setPengajarSiswaName(event.target.value);
             }}
           />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={
-              teacherDraft.trim() === "" ||
-              teacherNames.length >= MAX_TEACHING_TEAM_PER_ONLINE_SESSION
-            }
-            onClick={addTeacher}
-          >
-            Tambah pengajar
-          </Button>
-        </div>
+        </Field>
 
-        {teacherNames.length > 0 && (
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {teacherNames.map((name, index) => (
-              <li
-                // The list is reordered only by removal, so the index is a stable enough key for a
-                // chip that carries no editable state of its own.
-                key={`teacher-${index}`}
-                className="flex items-center gap-1 rounded-2xl bg-input px-2.5 py-1 text-xs font-medium dark:bg-input/60"
-              >
-                {name}
-                <button
-                  type="button"
-                  aria-label={`Hapus ${name}`}
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    removeTeacher(index);
-                  }}
-                >
-                  <XIcon className="size-3.5" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <Field
+          id={pengajarGtkMsId}
+          label="Pengajar GTK-MS"
+        >
+          <Input
+            id={pengajarGtkMsId}
+            placeholder="Nama pengajar GTK-MS"
+            value={pengajarGtkMsName}
+            onChange={(event) => {
+              setPengajarGtkMsName(event.target.value);
+            }}
+          />
+        </Field>
       </div>
 
       <div className="flex justify-end">
@@ -350,7 +227,7 @@ function ArrangeOnlineSessionForm(
           disabled={incomplete || saving}
           onClick={submit}
         >
-          {saving ? "Menyimpan…" : "Jadwalkan"}
+          {saving ? "Menyimpan…" : "Tandai Terlaksana"}
         </Button>
       </div>
     </div>

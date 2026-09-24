@@ -1,8 +1,11 @@
 import { shortenKabupaten } from "-/lib/format-destination";
 import { resolvePerjadinFeedbackToken } from "-/lib/perjadin-feedback-token";
+import type { Metadata } from "next";
 
 import { EpForm } from "./ep-form";
 import { GoneNotice } from "./gone-notice";
+
+export const metadata: Metadata = { title: "Evaluasi Perjadin" };
 
 /**
  * **`/ep/{token}` — the Perjadin Evaluation form.** The second page in either app served without a

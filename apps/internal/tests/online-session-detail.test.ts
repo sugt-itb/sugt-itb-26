@@ -1,14 +1,11 @@
 import { db, schema } from "@sugt/db";
 import {
-  addOnlineSessionTeacher,
+  deleteOnlineSession,
   isNotStaffError,
   markSessionDelivered,
   onlineSessionDetail,
-  removeOnlineSessionTeacher,
-  renameOnlineSessionTeacher,
   updateOnlineSession,
 } from "@sugt/db/queries";
-import { MAX_TEACHING_TEAM_PER_ONLINE_SESSION } from "@sugt/domain";
 import type { Role } from "@sugt/domain";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -25,14 +22,14 @@ import {
 } from "./support/fixtures";
 
 /**
- * **Detail Sesi daring** (#152, ADR-0022) — the online-only detail surface's read and its writes:
- * editing the Session's School, PIC, date, time and Stream, and its `session_teacher_name` Pengajar
- * per item. Every block drives the query function against a real Postgres, because every rule here is
- * about *state* — the widened unique index, the arranged-only field edit, the per-name cap — that a
- * test through the form would pass against a function checking none of them.
+ * **Detail Sesi daring** (#152, #318) — the online-only detail surface's read and its writes: editing
+ * the Session's School, date, times and two cohort-named Pengajar, and hard-deleting it. Every block
+ * drives the query function against a real Postgres, because every rule here is about *state* — the
+ * unique index, the born-`delivered` field edit, the cancelled-is-settled guard, the hard delete —
+ * that a test through the form would pass against a function checking none of them.
  */
 
-/** A Staff Person, PIC of the online Sessions below. */
+/** A Staff Person. */
 async function staff(email = "rina@ditsama.itb.ac.id", fullName = "Rina Nurhayati") {
   return addPerson({ fullName, email, role: "Staff" });
 }
@@ -41,8 +38,8 @@ async function staff(email = "rina@ditsama.itb.ac.id", fullName = "Rina Nurhayat
  * A non-Staff caller, hand-built rather than invited. T3 (#153) retired the Teaching Team Role, so
  * no such Person can exist in the database any more. `onlineSessionDetail` is open and ignores its
  * caller, so this proves the read admits a non-Staff caller; the writes are Staff-only and
- * `requireStaff` throws on the role alone, before it touches the row, so this proves they refuse
- * one. The cast through `unknown` is the only way to name a role the type no longer admits.
+ * `requireStaff` throws on the role alone, before it touches the row. The cast through `unknown` is
+ * the only way to name a role the type no longer admits.
  */
 function nonStaff() {
   return {
@@ -53,6 +50,9 @@ function nonStaff() {
     grants: [],
   };
 }
+
+/** A date no run will ever reach, for the future-date guard. */
+const FUTURE = "2999-01-01";
 
 /** Two Schools in one Province, so an edit can move a Session between them. */
 async function twoSchools() {
@@ -83,7 +83,8 @@ async function sessionRow(sessionId: string) {
       heldOn: schema.session.heldOn,
       startsAt: schema.session.startsAt,
       endsAt: schema.session.endsAt,
-      participantType: schema.session.participantType,
+      pengajarSiswaName: schema.session.pengajarSiswaName,
+      pengajarGtkMsName: schema.session.pengajarGtkMsName,
       status: schema.session.status,
     })
     .from(schema.session)
@@ -91,54 +92,54 @@ async function sessionRow(sessionId: string) {
   return row;
 }
 
-/** The `session_teacher_name` names a Session actually holds, in id order. */
-async function teacherNamesOf(sessionId: string) {
-  return db
-    .select({ id: schema.sessionTeacherName.id, name: schema.sessionTeacherName.name })
-    .from(schema.sessionTeacherName)
-    .where(eq(schema.sessionTeacherName.sessionId, sessionId));
+/** One valid edit payload, overridable field by field. */
+function editInput(schoolId: string, overrides: Record<string, unknown> = {}) {
+  return {
+    schoolId,
+    heldOn: "2026-01-17",
+    startsAt: "13:30",
+    endsAt: "15:00",
+    pengajarSiswaName: "Ani Wijaya",
+    pengajarGtkMsName: "Budi Hartono",
+    ...overrides,
+  };
 }
 
 describe("Detail Sesi daring — read", () => {
   beforeEach(resetDatabase);
 
-  it("returns one online Session with its fields and its Pengajar names in order", async () => {
-    const pic = await staff();
+  it("returns one online Session with its fields and its two Pengajar", async () => {
+    const caller = await staff();
     const { first } = await twoSchools();
     const session = await addSession({
       schoolId: first.id,
-      heldOn: "2026-09-10",
+      heldOn: "2026-01-10",
       startsAt: "09:00",
       endsAt: "10:30",
-      participantType: "GTK-MS",
+      pengajarSiswaName: "Ani Wijaya",
+      pengajarGtkMsName: "Bagus Prakoso",
     });
-    await db.insert(schema.sessionTeacherName).values([
-      { sessionId: session.id, name: "Bagus Prakoso" },
-      { sessionId: session.id, name: "Ani Wijaya" },
-    ]);
 
-    const lookup = await onlineSessionDetail(pic, session.id);
+    const lookup = await onlineSessionDetail(caller, session.id);
 
     expect(lookup.outcome).toBe("online");
     if (lookup.outcome !== "online") throw new Error("unreachable");
     expect(lookup.session).toMatchObject({
       schoolId: first.id,
       schoolName: "SMAN 1 Bandung",
-      heldOn: "2026-09-10",
+      heldOn: "2026-01-10",
       startsAt: "09:00:00",
       endsAt: "10:30:00",
-      participantType: "GTK-MS",
+      pengajarSiswaName: "Ani Wijaya",
+      pengajarGtkMsName: "Bagus Prakoso",
       // Online Sessions are always WIB (#283), regardless of the School's Province.
       timeZone: "WIB",
     });
-    // No PIC or Stream on an online Session any more (#284).
+    // No PIC, Stream, Peserta or teacher list on an online Session any more (#284, #318).
     expect(lookup.session).not.toHaveProperty("picFullName");
     expect(lookup.session).not.toHaveProperty("stream");
-    // Name order, so Ani before Bagus regardless of insertion order.
-    expect(lookup.session.teachers.map((teacher) => teacher.name)).toEqual([
-      "Ani Wijaya",
-      "Bagus Prakoso",
-    ]);
+    expect(lookup.session).not.toHaveProperty("participantType");
+    expect(lookup.session).not.toHaveProperty("teachers");
     // The School picker rides on the payload; there is no Staff roster (no PIC to pick, #284).
     expect(lookup.session.schools.map((school) => school.id)).toContain(first.id);
     expect(lookup.session).not.toHaveProperty("staff");
@@ -146,10 +147,7 @@ describe("Detail Sesi daring — read", () => {
 
   it("is open to a non-Staff caller, because a Session carries no money", async () => {
     const { first } = await twoSchools();
-    const session = await addSession({
-      schoolId: first.id,
-      heldOn: "2026-09-10",
-    });
+    const session = await addSession({ schoolId: first.id, heldOn: "2026-01-10" });
 
     expect((await onlineSessionDetail(nonStaff(), session.id)).outcome).toBe("online");
   });
@@ -161,12 +159,12 @@ describe("Detail Sesi daring — read", () => {
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
       advanceIdr: 5_000_000,
-      startsOn: "2026-09-01",
-      endsOn: "2026-09-03",
+      startsOn: "2026-01-01",
+      endsOn: "2026-01-03",
     });
     const session = await addOfflineSession({
       schoolId: first.id,
-      heldOn: "2026-09-02",
+      heldOn: "2026-01-02",
       perjadinId: perjadin.id,
     });
 
@@ -186,33 +184,46 @@ describe("Detail Sesi daring — read", () => {
 describe("Detail Sesi daring — editing the fields", () => {
   beforeEach(resetDatabase);
 
-  it("persists a change to School, date, times and Peserta", async () => {
+  it("persists a change to School, date, times and both Pengajar", async () => {
     const pic = await staff();
     const { first, second } = await twoSchools();
     const session = await addSession({
       schoolId: first.id,
-      heldOn: "2026-09-10",
+      heldOn: "2026-01-10",
       startsAt: "09:00",
-      participantType: "Siswa",
     });
 
-    const result = await updateOnlineSession(pic, session.id, {
-      schoolId: second.id,
-      heldOn: "2026-09-17",
-      startsAt: "13:30",
-      endsAt: "15:00",
-      participantType: "GTK-MS",
-    });
+    const result = await updateOnlineSession(pic, session.id, editInput(second.id));
 
     expect(result).toEqual({ outcome: "updated" });
     expect(await sessionRow(session.id)).toEqual({
       schoolId: second.id,
-      heldOn: "2026-09-17",
+      heldOn: "2026-01-17",
       startsAt: "13:30:00",
       endsAt: "15:00:00",
-      participantType: "GTK-MS",
+      pengajarSiswaName: "Ani Wijaya",
+      pengajarGtkMsName: "Budi Hartono",
       status: "arranged",
     });
+  });
+
+  /** A born-`delivered` Session is the normal case now (#318); its fields stay correctable via Edit. */
+  it("edits a delivered Session — the correction path", async () => {
+    const pic = await staff();
+    const { first } = await twoSchools();
+    const session = await addSession({ schoolId: first.id, heldOn: "2026-01-10" });
+    await markSessionDelivered(pic, session.id);
+
+    const result = await updateOnlineSession(
+      pic,
+      session.id,
+      editInput(first.id, { heldOn: "2026-01-10", pengajarSiswaName: "Nama Baru" }),
+    );
+
+    expect(result).toEqual({ outcome: "updated" });
+    const row = await sessionRow(session.id);
+    expect(row?.status).toBe("delivered");
+    expect(row?.pengajarSiswaName).toBe("Nama Baru");
   });
 
   /**
@@ -223,25 +234,23 @@ describe("Detail Sesi daring — editing the fields", () => {
   it("is refused by session_one_online_per_school_per_day when the School holds a Session that day", async () => {
     const pic = await staff();
     const { first } = await twoSchools();
-    const standing = await addSession({ schoolId: first.id, heldOn: "2026-09-17" });
-    const moving = await addSession({ schoolId: first.id, heldOn: "2026-09-10" });
+    const standing = await addSession({ schoolId: first.id, heldOn: "2026-01-17" });
+    const moving = await addSession({ schoolId: first.id, heldOn: "2026-01-10" });
 
-    const result = await updateOnlineSession(pic, moving.id, {
-      schoolId: first.id,
-      heldOn: "2026-09-17",
-      startsAt: "09:00",
-      endsAt: "10:30",
-      participantType: "Siswa",
-    });
+    const result = await updateOnlineSession(
+      pic,
+      moving.id,
+      editInput(first.id, { heldOn: "2026-01-17" }),
+    );
 
     expect(result).toEqual({
       outcome: "collided",
       constraint: "session_one_online_per_school_per_day",
     });
     // Unmoved: a refused edit writes nothing.
-    expect((await sessionRow(moving.id))?.heldOn).toBe("2026-09-10");
+    expect((await sessionRow(moving.id))?.heldOn).toBe("2026-01-10");
     // The standing Session is untouched too.
-    expect((await sessionRow(standing.id))?.heldOn).toBe("2026-09-17");
+    expect((await sessionRow(standing.id))?.heldOn).toBe("2026-01-17");
   });
 
   /** The row being edited is excluded, so re-saving a Session onto its own slot is not a self-collision. */
@@ -250,176 +259,131 @@ describe("Detail Sesi daring — editing the fields", () => {
     const { first } = await twoSchools();
     const session = await addSession({
       schoolId: first.id,
-      heldOn: "2026-09-10",
+      heldOn: "2026-01-10",
       startsAt: "09:00",
     });
 
-    const result = await updateOnlineSession(pic, session.id, {
-      schoolId: first.id,
-      heldOn: "2026-09-10",
-      startsAt: "10:30",
-      endsAt: "12:00",
-      participantType: "Siswa",
-    });
+    const result = await updateOnlineSession(
+      pic,
+      session.id,
+      editInput(first.id, { heldOn: "2026-01-10", startsAt: "10:30", endsAt: "12:00" }),
+    );
 
     expect(result).toEqual({ outcome: "updated" });
     expect((await sessionRow(session.id))?.startsAt).toBe("10:30:00");
   });
 
-  it("refuses an end time at or before the start, and a missing Peserta or Jam Selesai (#283)", async () => {
+  it("refuses an end at/before the start, a missing Jam Selesai, a blank Pengajar, and a future date (#318)", async () => {
     const pic = await staff();
     const { first } = await twoSchools();
     const session = await addSession({
       schoolId: first.id,
-      heldOn: "2026-09-10",
+      heldOn: "2026-01-10",
       startsAt: "09:00",
     });
 
-    const base = {
-      schoolId: first.id,
-      heldOn: "2026-09-10",
-      startsAt: "09:00",
-    };
-
     expect(
-      await updateOnlineSession(pic, session.id, {
-        ...base,
-        endsAt: "09:00",
-        participantType: "Siswa",
-      }),
+      await updateOnlineSession(
+        pic,
+        session.id,
+        editInput(first.id, { startsAt: "09:00", endsAt: "09:00" }),
+      ),
     ).toEqual({ outcome: "end-before-start" });
+    expect(await updateOnlineSession(pic, session.id, editInput(first.id, { endsAt: "" }))).toEqual(
+      { outcome: "end-time-required" },
+    );
     expect(
-      await updateOnlineSession(pic, session.id, { ...base, endsAt: "", participantType: "Siswa" }),
-    ).toEqual({ outcome: "end-time-required" });
+      await updateOnlineSession(pic, session.id, editInput(first.id, { pengajarGtkMsName: "  " })),
+    ).toEqual({ outcome: "pengajar-required" });
     expect(
-      await updateOnlineSession(pic, session.id, { ...base, endsAt: "10:30", participantType: "" }),
-    ).toEqual({ outcome: "participant-type-required" });
+      await updateOnlineSession(pic, session.id, editInput(first.id, { heldOn: FUTURE })),
+    ).toMatchObject({ outcome: "future-date" });
 
-    // None of the refused edits wrote — the Session keeps its original time.
+    // None of the refused edits wrote — the Session keeps its original time and school.
     expect((await sessionRow(session.id))?.startsAt).toBe("09:00:00");
+    expect((await sessionRow(session.id))?.heldOn).toBe("2026-01-10");
   });
 
-  it("refuses to edit a delivered Session, whose fields are settled", async () => {
+  it("refuses to edit a cancelled Session, whose fields are settled", async () => {
     const pic = await staff();
     const { first, second } = await twoSchools();
-    const session = await addSession({ schoolId: first.id, heldOn: "2026-09-10" });
-    await markSessionDelivered(pic, session.id);
-
-    const result = await updateOnlineSession(pic, session.id, {
-      schoolId: second.id,
-      heldOn: "2026-09-17",
-      startsAt: "09:00",
-      endsAt: "10:30",
-      participantType: "Siswa",
+    const session = await addSession({
+      schoolId: first.id,
+      heldOn: "2026-01-10",
+      status: "cancelled",
     });
 
-    expect(result).toEqual({ outcome: "not-arranged", status: "delivered" });
+    const result = await updateOnlineSession(pic, session.id, editInput(second.id));
+
+    expect(result).toEqual({ outcome: "cancelled" });
     expect((await sessionRow(session.id))?.schoolId).toBe(first.id);
   });
 
   it("refuses a non-Staff caller", async () => {
     const { first } = await twoSchools();
-    const session = await addSession({
-      schoolId: first.id,
-      heldOn: "2026-09-10",
-    });
+    const session = await addSession({ schoolId: first.id, heldOn: "2026-01-10" });
 
     await expect(
-      updateOnlineSession(nonStaff(), session.id, {
-        schoolId: first.id,
-        heldOn: "2026-09-10",
-        startsAt: "09:00",
-        endsAt: "10:30",
-        participantType: "Siswa",
-      }),
+      updateOnlineSession(nonStaff(), session.id, editInput(first.id, { heldOn: "2026-01-10" })),
     ).rejects.toSatisfy(isNotStaffError);
   });
 });
 
-describe("Detail Sesi daring — Pengajar per item", () => {
+describe("Detail Sesi daring — hard delete", () => {
   beforeEach(resetDatabase);
 
-  async function arrangedSession() {
+  it("removes the Session row", async () => {
     const pic = await staff();
     const { first } = await twoSchools();
-    const session = await addSession({
-      schoolId: first.id,
-      heldOn: "2026-09-10",
-    });
-    return { pic, session };
-  }
+    const session = await addSession({ schoolId: first.id, heldOn: "2026-01-10" });
 
-  it("adds, renames and removes one name at a time", async () => {
-    const { pic, session } = await arrangedSession();
-
-    const added = await addOnlineSessionTeacher(pic, session.id, "  Bagus Prakoso  ");
-    expect(added.outcome).toBe("added");
-    if (added.outcome !== "added") throw new Error("unreachable");
-    // Trimmed on the way in.
-    expect(await teacherNamesOf(session.id)).toEqual([
-      { id: added.teacherId, name: "Bagus Prakoso" },
-    ]);
-
-    expect(await renameOnlineSessionTeacher(pic, added.teacherId, "Bagus P.")).toEqual({
-      outcome: "renamed",
-    });
-    expect((await teacherNamesOf(session.id))[0]?.name).toBe("Bagus P.");
-
-    expect(await removeOnlineSessionTeacher(pic, added.teacherId)).toEqual({ outcome: "removed" });
-    expect(await teacherNamesOf(session.id)).toEqual([]);
+    expect(await deleteOnlineSession(pic, session.id)).toEqual({ outcome: "deleted" });
+    expect(await sessionRow(session.id)).toBeUndefined();
   });
 
-  it("refuses a blank name, writing no row", async () => {
-    const { pic, session } = await arrangedSession();
-
-    expect(await addOnlineSessionTeacher(pic, session.id, "   ")).toEqual({
-      outcome: "name-required",
-    });
-    expect(await teacherNamesOf(session.id)).toEqual([]);
-  });
-
-  /** The cap is app-enforced (ADR-0022): the database holds no rule, so the query refuses the one past
-   *  `MAX_TEACHING_TEAM_PER_ONLINE_SESSION` — the third now the cap is two (#283). */
-  it("refuses the name past the cap", async () => {
-    const { pic, session } = await arrangedSession();
-    for (let index = 0; index < MAX_TEACHING_TEAM_PER_ONLINE_SESSION; index++) {
-      const result = await addOnlineSessionTeacher(pic, session.id, `Pengajar ${index}`);
-      expect(result.outcome).toBe("added");
-    }
-
-    const result = await addOnlineSessionTeacher(pic, session.id, "Satu lagi");
-
-    expect(result).toEqual({
-      outcome: "too-many-teachers",
-      count: MAX_TEACHING_TEAM_PER_ONLINE_SESSION,
-      limit: MAX_TEACHING_TEAM_PER_ONLINE_SESSION,
-    });
-    expect(await teacherNamesOf(session.id)).toHaveLength(MAX_TEACHING_TEAM_PER_ONLINE_SESSION);
-  });
-
-  /** Pengajar are edited anytime (#152) — the correction path that replaced post-delivery fixes. */
-  it("adds a name to a delivered Session", async () => {
-    const { pic, session } = await arrangedSession();
+  it("deletes a delivered Session too — the correction for one recorded in error", async () => {
+    const pic = await staff();
+    const { first } = await twoSchools();
+    const session = await addSession({ schoolId: first.id, heldOn: "2026-01-10" });
     await markSessionDelivered(pic, session.id);
 
-    expect((await addOnlineSessionTeacher(pic, session.id, "Bagus")).outcome).toBe("added");
+    expect(await deleteOnlineSession(pic, session.id)).toEqual({ outcome: "deleted" });
+    expect(await sessionRow(session.id)).toBeUndefined();
   });
 
-  it("reports no-such-teacher when renaming or removing a name that is gone", async () => {
-    const { pic } = await arrangedSession();
-    const ghost = "00000000-0000-0000-0000-000000000000";
+  it("reports no-such-session for an id already gone", async () => {
+    const pic = await staff();
+    await twoSchools();
 
-    expect(await renameOnlineSessionTeacher(pic, ghost, "Baru")).toEqual({
-      outcome: "no-such-teacher",
+    expect(await deleteOnlineSession(pic, "00000000-0000-0000-0000-000000000000")).toEqual({
+      outcome: "no-such-session",
     });
-    expect(await removeOnlineSessionTeacher(pic, ghost)).toEqual({ outcome: "no-such-teacher" });
+  });
+
+  /** An offline Session blocks deleting its Perjadin and is not deleted here — the match is online-only. */
+  it("does not delete an offline Session", async () => {
+    const pic = await staff();
+    const { first } = await twoSchools();
+    const perjadin = await addPerjadin({
+      picPersonId: pic.id,
+      advanceIdr: 5_000_000,
+      startsOn: "2026-01-01",
+      endsOn: "2026-01-03",
+    });
+    const offline = await addOfflineSession({
+      schoolId: first.id,
+      heldOn: "2026-01-02",
+      perjadinId: perjadin.id,
+    });
+
+    expect(await deleteOnlineSession(pic, offline.id)).toEqual({ outcome: "no-such-session" });
+    expect(await sessionRow(offline.id)).toBeDefined();
   });
 
   it("refuses a non-Staff caller", async () => {
-    const { session } = await arrangedSession();
+    const { first } = await twoSchools();
+    const session = await addSession({ schoolId: first.id, heldOn: "2026-01-10" });
 
-    await expect(addOnlineSessionTeacher(nonStaff(), session.id, "Nama")).rejects.toSatisfy(
-      isNotStaffError,
-    );
+    await expect(deleteOnlineSession(nonStaff(), session.id)).rejects.toSatisfy(isNotStaffError);
   });
 });

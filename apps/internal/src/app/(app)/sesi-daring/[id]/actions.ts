@@ -3,24 +3,20 @@
 import { requirePerson } from "-/lib/person";
 import { staffSurface } from "-/lib/staff-surface";
 import {
-  addOnlineSessionTeacher,
   cancelSession,
+  deleteOnlineSession,
   markSessionDelivered,
-  removeOnlineSessionTeacher,
-  renameOnlineSessionTeacher,
   updateOnlineSession,
-  type AddOnlineSessionTeacherResult,
   type CancelSessionResult,
+  type DeleteOnlineSessionResult,
   type MarkDeliveredResult,
   type OnlineSessionInput,
-  type RemoveOnlineSessionTeacherResult,
-  type RenameOnlineSessionTeacherResult,
   type UpdateOnlineSessionResult,
 } from "@sugt/db/queries";
 import { revalidatePath } from "next/cache";
 
 /**
- * **Detail Sesi daring's writes**, each beside the route that offers it (#152) — the online
+ * **Detail Sesi daring's writes**, each beside the route that offers it (#152, #318) — the online
  * counterpart of `/perjadin/[id]/actions.ts`. Each is the same three lines: resolve the Person, hand
  * it to `@sugt/db`, return what came back.
  *
@@ -30,9 +26,13 @@ import { revalidatePath } from "next/cache";
  * **403** server-side rather than a crash; every other refusal comes back as a value the client
  * renders. `revalidatePath` clears the client router cache for the page just written — called only on
  * the outcome that wrote something, since a refused write left the page correct.
+ *
+ * The Pengajar add/rename/remove trio is gone (#318): an online Session's two Pengajar are edited in
+ * the Session's own field dialog now (`updateOnlineSession`), and a mis-recorded Session is hard-
+ * deleted rather than corrected name by name.
  */
 
-/** Edit the Session's scalar fields — School, Peserta, date, start and end time (#284: no PIC, no Aliran) — in one write. */
+/** Edit the Session's fields — School, date, start and end time, and both cohort-named Pengajar (#318) — in one write. */
 export async function updateOnlineSessionAction(
   sessionId: string,
   input: OnlineSessionInput,
@@ -44,49 +44,25 @@ export async function updateOnlineSessionAction(
   return result;
 }
 
-/** Add one session-scoped Pengajar name. */
-export async function addOnlineSessionTeacherAction(
-  sessionId: string,
-  name: string,
-): Promise<AddOnlineSessionTeacherResult> {
-  const person = await requirePerson();
-
-  const result = await staffSurface(() => addOnlineSessionTeacher(person, sessionId, name));
-  if (result.outcome === "added") revalidatePath(`/sesi-daring/${sessionId}`);
-  return result;
-}
-
 /**
- * Rename one Pengajar name. `sessionId` is passed for revalidation only — the query takes the name's
- * id and needs no Session to find it.
+ * **Hapus Sesi** — hard-delete an online Session (#318). On success the row is gone, so the detail
+ * route it revalidates would 404 — the client redirects to `/sesi-daring`, which this also revalidates
+ * so the deleted row drops out of the list.
  */
-export async function renameOnlineSessionTeacherAction(
+export async function deleteOnlineSessionAction(
   sessionId: string,
-  teacherId: string,
-  name: string,
-): Promise<RenameOnlineSessionTeacherResult> {
+): Promise<DeleteOnlineSessionResult> {
   const person = await requirePerson();
 
-  const result = await staffSurface(() => renameOnlineSessionTeacher(person, teacherId, name));
-  if (result.outcome === "renamed") revalidatePath(`/sesi-daring/${sessionId}`);
-  return result;
-}
-
-/** Remove one Pengajar name. */
-export async function removeOnlineSessionTeacherAction(
-  sessionId: string,
-  teacherId: string,
-): Promise<RemoveOnlineSessionTeacherResult> {
-  const person = await requirePerson();
-
-  const result = await staffSurface(() => removeOnlineSessionTeacher(person, teacherId));
-  if (result.outcome === "removed") revalidatePath(`/sesi-daring/${sessionId}`);
+  const result = await staffSurface(() => deleteOnlineSession(person, sessionId));
+  if (result.outcome === "deleted") revalidatePath("/sesi-daring");
   return result;
 }
 
 /**
- * **Tandai terlaksana** — status only now (#152), so no teachers travel. The shared write with the
- * offline surface; this action revalidates its own route, as convention keeps honest.
+ * **Tandai terlaksana** — status only (#152). Legacy for online now (#318): an online Session is born
+ * `delivered`, so this reaches only a Session arranged before #318. The shared write with the offline
+ * surface; this action revalidates its own route, as convention keeps honest.
  */
 export async function markOnlineSessionDeliveredAction(
   sessionId: string,
@@ -98,7 +74,7 @@ export async function markOnlineSessionDeliveredAction(
   return result;
 }
 
-/** **Batalkan Sesi** — the shared cancel write; the reason travels in the same call, by CHECK. */
+/** **Batalkan Sesi** — the shared cancel write; the reason travels in the same call, by CHECK. Legacy for online (#318). */
 export async function cancelOnlineSessionAction(
   sessionId: string,
   reason: string,

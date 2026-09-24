@@ -5,8 +5,22 @@ import { SessionWrites } from "-/components/session-writes";
 import { requirePerson } from "-/lib/person";
 import { sessionDetail } from "@sugt/db/queries";
 import { formatSessionStartTimeWithWib } from "@sugt/domain";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+
+/**
+ * The browser-tab title: the School's name and the mode label, reusing the same heading fields the
+ * page shows. A not-found — or an online id, which the page redirects to /sesi-daring/[id] — falls
+ * back to the section label (#309). Reads `sessionDetail` again, a minimal title query per the ticket.
+ */
+export async function generateMetadata({ params }: PageProps<"/sesi/[id]">): Promise<Metadata> {
+  const person = await requirePerson();
+  const { id } = await params;
+  const session = await sessionDetail(person, id);
+  if (!session || session.mode === "online") return { title: "Sesi" };
+  return { title: `${session.schoolName} — ${MODE_LABELS[session.mode]}` };
+}
 
 /**
  * **Detail Sesi** — one Session: what has been filed against it, who still owes what, and

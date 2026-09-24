@@ -1,4 +1,4 @@
-import type { PretestParticipantType, SessionStatus, TimeZone } from "@sugt/domain";
+import type { SessionStatus, TimeZone } from "@sugt/domain";
 import { desc, eq } from "drizzle-orm";
 
 import { db } from "../client";
@@ -32,8 +32,6 @@ export type DirectoryOnlineSession = {
    * through the same `formatSessionStartTimeWithWib` helper, which simply shows `"HH:MM WIB"`.
    */
   timeZone: TimeZone;
-  /** Which cohort the Session teaches (#283); `null` on a Session arranged before the column existed. */
-  participantType: PretestParticipantType | null;
   status: SessionStatus;
 };
 
@@ -61,7 +59,6 @@ export async function onlineSessionDirectory(_caller: Person): Promise<Directory
       schoolSlug: school.slug,
       heldOn: session.heldOn,
       startsAt: session.startsAt,
-      participantType: session.participantType,
       status: session.status,
     })
     .from(session)

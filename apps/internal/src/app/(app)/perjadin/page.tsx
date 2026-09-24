@@ -3,7 +3,10 @@ import { requirePerson } from "-/lib/person";
 import { perjadinDirectory } from "@sugt/db/queries";
 import { LinkButton } from "@sugt/ui/components/link-button";
 import { Plus } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = { title: "Perjadin" };
 
 /**
  * **Perjadin** — every trip, newest first.
@@ -37,7 +40,7 @@ export default async function Page() {
         {/* Staff-only create action, moved off the sidebar onto its list page (#294). Non-Staff
             render nothing — no disabled state. */}
         {person.role === "Staff" && (
-          <LinkButton render={<Link href="/rencanakan-perjadin" />}>
+          <LinkButton render={<Link href="/perjadin/baru" />}>
             <Plus data-icon="inline-start" />
             Rencanakan Perjadin
           </LinkButton>
