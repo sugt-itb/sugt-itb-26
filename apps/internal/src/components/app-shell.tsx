@@ -27,6 +27,7 @@ function AppShell({
   role,
   personName,
   canEditMonitoring,
+  canViewDashboard,
   footerAction,
   children,
 }: {
@@ -34,6 +35,8 @@ function AppShell({
   personName: string;
   /** Whether the viewer holds the Editor Grant — gates the `/pretest` nav link. */
   canEditMonitoring: boolean;
+  /** Whether the viewer may read the Dashboard (`/`) — gates its nav link (#322). */
+  canViewDashboard: boolean;
   /** Sits beside the avatar block. Sign-out, once there is a session to end. */
   footerAction?: React.ReactNode;
   children: React.ReactNode;
@@ -43,6 +46,7 @@ function AppShell({
       role={role}
       personName={personName}
       canEditMonitoring={canEditMonitoring}
+      canViewDashboard={canViewDashboard}
       footerAction={footerAction}
     />
   );
@@ -79,11 +83,13 @@ function SidebarBody({
   role,
   personName,
   canEditMonitoring,
+  canViewDashboard,
   footerAction,
 }: {
   role: Role;
   personName: string;
   canEditMonitoring: boolean;
+  canViewDashboard: boolean;
   footerAction?: React.ReactNode;
 }) {
   return (
@@ -95,6 +101,7 @@ function SidebarBody({
       <AppSidebarNav
         role={role}
         canEditMonitoring={canEditMonitoring}
+        canViewDashboard={canViewDashboard}
       />
 
       <div className="mt-auto flex items-center gap-2.5 border-t border-sidebar-border p-4">

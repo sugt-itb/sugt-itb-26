@@ -292,6 +292,7 @@ export {
 } from "./session-records";
 export { assignGrant, personGrants, revokeGrant, type SetGrantResult } from "./grants";
 export {
+  canViewDashboard,
   hasGrant,
   isNotGrantedError,
   isNotStaffError,
