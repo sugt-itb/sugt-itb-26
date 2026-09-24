@@ -26,7 +26,7 @@ of them taught each parallel Session.
 ## Consequences
 
 - **A Group's minimum at planning is just the PIC.** Teaching team may be left empty on
-  `/rencanakan-perjadin` and filled in later on `/perjadin/[id]`; the old "at least one Teaching Team
+  `/perjadin/baru` and filled in later on `/perjadin/[id]`; the old "at least one Teaching Team
   member per Stream" Group rule is gone, and with it `group_member.stream` for teachers. A Perjadin
   _should_ end with a teaching team, but nothing blocks it — completeness is tracked by the hand-ticked
   "Pengajar sudah lengkap" box ([ADR-0018](./0018-the-preparation-checklist-stores-ticks-and-derives-the-list.md)).

@@ -14,7 +14,7 @@ import { arrangeOnlineSessionForm } from "@sugt/db/queries";
  * server-side. Without it on the read, a Teaching Team member who reached this URL directly would
  * be shown the whole form and refused only on submit.
  *
- * The route is named after the surface, the way `/rencanakan-perjadin` is.
+ * The route is named after the surface, the way `/perjadin/baru` is.
  */
 export default async function Page() {
   const person = await requirePerson();

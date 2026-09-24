@@ -17,7 +17,7 @@ import Link from "next/link";
  * `staffSurface` on the read, a Teaching Team member reaching this URL directly would be shown
  * the whole form and refused only on submit.
  *
- * The route is named after the surface, beside `/jadwalkan-sesi-daring`. The trip that results
+ * The route is named after the surface, beside `/sesi-daring/baru`. The trip that results
  * is read at `/perjadin`, which is a different thing at a different name — one is the act, the
  * other is the record.
  */

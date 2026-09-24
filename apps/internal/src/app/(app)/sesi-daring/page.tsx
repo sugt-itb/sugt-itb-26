@@ -13,7 +13,7 @@ import Link from "next/link";
  * but an online Session has no Perjadin, so this is the one screen that lists them together. One
  * `requirePerson()`, one query, no role check — a Session's School, date, start time, PIC and
  * status are delivery data, open to everyone signed in (ADR-0004). Arranging one stays Staff-only,
- * on `/jadwalkan-sesi-daring`, so this page carries no create or edit affordance.
+ * on `/sesi-daring/baru`, so this page carries no create or edit affordance.
  *
  * The start time is rendered with its School's Time Zone the same way every other surface shows it
  * ([#72](https://github.com/mafiefa02/sugt/issues/72)); the zone comes from the School's Province,
@@ -36,7 +36,7 @@ export default async function Page() {
         {/* Staff-only create action, moved off the sidebar onto its list page (#294). Non-Staff
             render nothing — no disabled state. */}
         {person.role === "Staff" && (
-          <LinkButton render={<Link href="/jadwalkan-sesi-daring" />}>
+          <LinkButton render={<Link href="/sesi-daring/baru" />}>
             <Plus data-icon="inline-start" />
             Jadwalkan Sesi Daring
           </LinkButton>
