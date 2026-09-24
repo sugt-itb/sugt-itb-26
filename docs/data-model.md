@@ -214,6 +214,16 @@ Staff file a Session Record" be declarative constraints instead of triggers. Do 
 table: a row here is an invitation, and `active = false` is a revocation that preserves every
 historical reference to that person.
 
+**Grants live in `person_grant`, a second access axis** ([ADR-0028](./adr/0028-grants-are-a-second-additive-access-axis.md)):
+a row is a capability a Staff Person holds, its `grant` column CHECKed against the closed set
+`in ('Administrator', 'Editor', 'Dashboard Viewer')` — widened to admit `'Dashboard Viewer'` by
+migration `0031` ([#321](https://github.com/sugt-itb/sugt-itb-26/issues/321)), the drop-and-re-add
+CHECK pattern `0018`/`0025` use, and character-for-character `GRANTS` in `@sugt/domain`. The
+`Dashboard Viewer` grant is what [#322](https://github.com/sugt-itb/sugt-itb-26/issues/322)/[ADR-0037](./adr/0037-dashboard-read-is-gated-by-a-grant.md)
+check to gate the Dashboard read. The rest of `person_grant` (its columns, its `unique (person_id, grant)`,
+its Staff-only rule) is otherwise undocumented here — a pre-existing gap from ADR-0028, out of scope to
+close in full now.
+
 ### Linking a sign-in to a Person
 
 `better_auth.user` carries one extra column:

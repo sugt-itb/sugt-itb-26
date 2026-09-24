@@ -178,3 +178,26 @@ export function hasGrant(person: Person, grant: Grant): boolean {
 export function requireGrant(person: Person, grant: Grant): void {
   if (!hasGrant(person, grant)) throw new NotGrantedError(person, grant);
 }
+
+/**
+ * **May this Person read the Dashboard (`/`)?** The one predicate behind both the page guard and the
+ * sidebar's Dashboard link — never duplicated, so the link is shown exactly when the page is
+ * reachable (#322).
+ *
+ * Two ways in, and they are different in kind:
+ * - **A `Pimpinan` reads it by Role**, not by a Grant. Grants stay Staff-only (ADR-0028) — a
+ *   Pimpinan holds none — so their access is the role branch, and the Dashboard is their home
+ *   (ADR-0025).
+ * - **A `Staff` reads it by holding a Grant**: `Editor` or `Dashboard Viewer`. `hasGrant` already
+ *   folds in that an `Administrator` implies every Grant, so those two calls cover all of
+ *   `{Administrator, Editor, Dashboard Viewer}`.
+ *
+ * A grant-less Staff Person falls through to `false` and is redirected to `/pendamping` — the mirror
+ * of the `/pendamping → /` redirect a Pimpinan gets. This is the documented exception to "reading is
+ * open to any signed-in Person" (ADR-0026): the Dashboard read now needs a grant (see the ADR
+ * this ticket adds).
+ */
+export function canViewDashboard(person: Person): boolean {
+  if (person.role === "Pimpinan") return true;
+  return hasGrant(person, "Editor") || hasGrant(person, "Dashboard Viewer");
+}

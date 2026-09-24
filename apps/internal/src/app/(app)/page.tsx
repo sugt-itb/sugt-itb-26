@@ -1,11 +1,13 @@
 import { requirePerson } from "-/lib/person";
 import {
   assessmentCompletions,
+  canViewDashboard,
   hasGrant,
   monitoringData,
   preparationCards,
 } from "@sugt/db/queries";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { deriveDashboard } from "./dashboard-derive";
 import { showBudget } from "./dashboard-state";
@@ -23,8 +25,12 @@ export const metadata: Metadata = { title: "Dashboard" };
  * mock module is gone. `monitoringData` fetches the raw rows in one round trip and
  * `deriveDashboard` (the pure, tested seam in `./dashboard-derive.ts`) folds them — ranking each
  * School's Sessions into Sesi, building the two matrices, the timeline and the overdue warnings —
- * against the programme constants in `@sugt/domain`. It is the landing surface, **open to every
- * signed-in Person** — Staff and the read-only Pimpinan alike — so it carries no role guard (#265).
+ * against the programme constants in `@sugt/domain`. It is the landing surface for a Pimpinan and
+ * for a **granted** Staff, but **reading it now needs a grant** (#322): a `Pimpinan` reads it by
+ * Role, a `Staff` by holding `Editor` or `Dashboard Viewer` (an `Administrator` implies both). This
+ * reverses the earlier "open to every signed-in Person" rule (#265) — a grant-less Staff Person is
+ * redirected to `/pendamping`, the mirror of the `/pendamping → /` Pimpinan redirect. The predicate
+ * is `canViewDashboard`, shared with the sidebar so a link is shown exactly when the page renders.
  *
  * The server's decisions are the money gate and today's date. `showBudget(person.role)` returns
  * `true` for both signed-in roles — Staff and the read-only Pimpinan — because money is open to any
@@ -35,6 +41,11 @@ export const metadata: Metadata = { title: "Dashboard" };
  */
 export default async function Page() {
   const person = await requirePerson();
+  // Reading the Dashboard needs a grant now (#322). A grant-less Staff Person is redirected to their
+  // own landing screen — the mirror of `pendamping/page.tsx`'s `/pendamping → /` for a Pimpinan.
+  // `canViewDashboard` is the one predicate the sidebar filters on too, so the link and the page
+  // agree. The redirect throws, so nothing below runs for a grant-less Staff.
+  if (!canViewDashboard(person)) redirect("/pendamping");
   // These three reads depend only on `person`, not on one another, so they run under a single
   // `Promise.all` — one round of latency, not a three-deep request waterfall. `pendamping/page.tsx`
   // batches the same way; this brings the landing surface back in line with the codebase's

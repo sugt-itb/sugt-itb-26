@@ -106,6 +106,13 @@ contains a Staff member by construction, so no trip's material is unreachable.
 Every School with its delivered count, grouped by Cluster. Answers "where are we
 overall" at a glance.
 
+**Reading it needs a grant.** The Dashboard (`/`) is the overview surface for leadership and
+for the Staff who steer the Programme: a **Pimpinan** reaches it by role, and a **Staff** Person
+by holding the **Editor** or **Dashboard Viewer** grant (an **Administrator** implies both). A
+grant-less Staff Person is sent to their own landing screen, `/pendamping`, instead — the mirror
+of the redirect a Pimpinan gets from `/pendamping`. See
+[ADR-0037](./adr/0037-dashboard-read-is-gated-by-a-grant.md).
+
 It shows counts, and nothing else. No health indicator, no flagging, no colour. Nothing
 is ever "overdue" either — no Session ever asserted a due date — so a School behind on
 pace shows a low delivered count and noticing that is a human reading the number. See

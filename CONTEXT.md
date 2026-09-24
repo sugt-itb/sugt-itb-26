@@ -142,7 +142,7 @@ One line of a **Preparation Checklist**. Seven are fixed for every Perjadin — 
 _Avoid_: task, step, todo (it is neither assigned nor sequenced)
 
 **Preparation Cards**:
-The free-standing cards on the **Dashboard** (`/`) **Persiapan** tab — a monitoring aid distinct from a Perjadin's **Preparation Checklist** despite both reading "Persiapan". Each is a standalone card (a title, a date or date-range, a variable **Checklist Item** list) with nothing behind it — no Perjadin, School, Cluster or Session. **Reading is open** to any signed-in Person, like the rest of the Dashboard; **writing is gated by the Editor Grant** (see **Grant**), and an **Administrator** may write it too. Each **Checklist Item** carries a **Jenis** — Teknis, Kurikulum, LAPI, Pimpinan — a category label; the **Pimpinan** Jenis is unrelated to the **Pimpinan** Role.
+The free-standing cards on the **Dashboard** (`/`) **Persiapan** tab — a monitoring aid distinct from a Perjadin's **Preparation Checklist** despite both reading "Persiapan". Each is a standalone card (a title, a date or date-range, a variable **Checklist Item** list) with nothing behind it — no Perjadin, School, Cluster or Session. **Reading is gated with the rest of the Dashboard** (`/`): only a **Pimpinan** (by Role) or a Staff Person holding **Editor** or **Dashboard Viewer** reaches it at all (#322, [ADR-0037](./docs/adr/0037-dashboard-read-is-gated-by-a-grant.md)); **writing is gated by the Editor Grant** (see **Grant**), and an **Administrator** may write it too. Each **Checklist Item** carries a **Jenis** — Teknis, Kurikulum, LAPI, Pimpinan — a category label; the **Pimpinan** Jenis is unrelated to the **Pimpinan** Role.
 _Avoid_: Monitoring Preparation (the retired name), Preparation Checklist (the Perjadin's seven fixed boxes — a different concept), readiness, onboarding
 
 **Preparation Card**:
@@ -164,10 +164,10 @@ The **Grant** that administers Grants — an Administrator assigns and revokes a
 _Avoid_: admin, superuser, owner (it is a Grant a Staff Person holds, not a Role or an account tier)
 
 **Editor**:
-The **Grant** that lets a **Staff** Person **write Preparation Cards**. Without it a Staff Person reads the **Dashboard** (`/`) but does not edit its Preparation Cards; an **Administrator** has it implicitly. It gates writing only — reading the Dashboard is open to any signed-in Person like the rest of delivery.
+The **Grant** that lets a **Staff** Person **write Preparation Cards** — and, like **Dashboard Viewer**, one of the two grants that lets a Staff Person **read the Dashboard** (`/`) at all (#322). An **Administrator** has it implicitly. Holding it, a Staff Person both reads the Dashboard and edits its Preparation Cards; a grant-less Staff Person reads neither — the Dashboard read is no longer open to every signed-in Person (see **Dashboard Viewer** and [ADR-0037](./docs/adr/0037-dashboard-read-is-gated-by-a-grant.md)).
 
 **Dashboard Viewer**:
-The **Grant** that lets a **Staff** Person **read the Dashboard** (`/`), and nothing more — the read-only Dashboard capability for a Staff Person who is neither **Administrator** nor **Editor**. Like every Grant it is **Staff-only** and an **Administrator** holds it implicitly; a **Pimpinan** never holds it, their Dashboard access coming from their Role, not this Grant.
+The **Grant** that lets a **Staff** Person **read the Dashboard** (`/`), and nothing more — the read-only Dashboard capability for a Staff Person who is neither **Administrator** nor **Editor**. Reading the Dashboard **needs a grant** (#322, [ADR-0037](./docs/adr/0037-dashboard-read-is-gated-by-a-grant.md)): this Grant or **Editor** admits a Staff Person; a grant-less Staff Person is **redirected to `/pendamping`** rather than reading it (the mirror of the `/pendamping → /` redirect a Pimpinan gets). Like every Grant it is **Staff-only** and an **Administrator** holds it implicitly; a **Pimpinan** never holds it, their Dashboard access coming from their Role, not this Grant.
 _Avoid_: monitor, reviewer, Cerita "editor" (the Story-editing surface, unrelated)
 
 ### Reporting
