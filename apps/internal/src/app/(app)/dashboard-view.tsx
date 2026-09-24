@@ -17,10 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@sugt/ui/components/table";
-import { cn } from "@sugt/ui/lib/utils";
-import { Check } from "lucide-react";
 
-import type { MatrixRow, PretestMeter, TimelineStep } from "./dashboard-derive";
+import type { PivotTable } from "./dashboard-derive";
 
 /**
  * The Dashboard view — the presentational half of the screen, now fed **real** figures. Every
@@ -28,28 +26,31 @@ import type { MatrixRow, PretestMeter, TimelineStep } from "./dashboard-derive";
  * `monitoringData` reads, and handed down as props; this component only lays them out — it holds no
  * client state of its own now.
  *
- * `showBudget` gates the money card (money reads are open, ADR-0026), decided on the server. The
- * Peringatan section that once lived here has moved to `DashboardWarnings`, rendered above the tabs
- * so it shows on both (#235); this view is warnings-free now.
+ * The tab reads, top to bottom (#313): the two KPI cards (Kegiatan terlaksana + the budget), a row
+ * of four progress summary cards, the two pivoted delivery tables, then the two assessment tables —
+ * every one a Klaster-row `"X/Y"` pivot. `showBudget` gates the money card (money reads are open,
+ * ADR-0026), decided on the server. The Peringatan section that once lived here has moved to
+ * `DashboardWarnings`, rendered above the tabs so it shows on both (#235); this view is
+ * warnings-free now.
  */
 export function DashboardView({
   showBudget,
   activitiesPercent,
   budget,
-  clusters,
+  summary,
   luring,
   daring,
-  timeline,
-  pretest,
+  pretestTable,
+  postestTable,
 }: {
   showBudget: boolean;
   activitiesPercent: number;
   budget: { usedIdr: number; totalIdr: number; percent: number };
-  clusters: { id: string; name: string }[];
-  luring: MatrixRow[];
-  daring: MatrixRow[];
-  timeline: TimelineStep[];
-  pretest: PretestMeter[];
+  summary: { pretest: number; daring: number; luring: number; posttest: number };
+  luring: PivotTable;
+  daring: PivotTable;
+  pretestTable: PivotTable;
+  postestTable: PivotTable;
 }) {
   return (
     <div className="flex flex-col gap-6 px-7 py-6">
@@ -97,142 +98,73 @@ export function DashboardView({
         )}
       </div>
 
-      {/* Pretest progress — four read-only meters, grouped STEM / Research (#248). */}
-      <PretestCard meters={pretest} />
+      {/* Four progress summary cards, left→right (#313): two-up on a phone, four across on `md`. */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <SummaryCard
+          label="Progress Pretest"
+          percent={summary.pretest}
+        />
+        <SummaryCard
+          label="Progress Daring"
+          percent={summary.daring}
+        />
+        <SummaryCard
+          label="Progress Luring"
+          percent={summary.luring}
+        />
+        <SummaryCard
+          label="Progress Posttest"
+          percent={summary.posttest}
+        />
+      </div>
 
-      {/* Timeline / stepper — horizontal, derived from each step's status. */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Lini masa pelaksanaan</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Timeline steps={timeline} />
-        </CardContent>
-      </Card>
-
-      {/* The two delivery matrices — stacked on mobile, side by side on `md`. The calendar that
-          once spanned the right column has moved to `/kalender` (#257). */}
+      {/* The two delivery tables — Klaster rows, Sesi columns — stacked on mobile, side by side on
+          `md`. The calendar that once spanned the right column has moved to `/kalender` (#257). */}
       <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start">
         <MatrixCard
           title="Luring Terlaksana"
-          clusters={clusters}
-          rows={luring}
+          table={luring}
         />
         <MatrixCard
           title="Daring Terlaksana"
-          clusters={clusters}
-          rows={daring}
+          table={daring}
+        />
+      </div>
+
+      {/* The two assessment tables — Klaster rows, Stream ∙ Peserta columns (#313). Postest reads
+          all `0/Y` until posttest data-entry lands; the surface is honest by construction. */}
+      <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start">
+        <MatrixCard
+          title="Pretest Terlaksana"
+          table={pretestTable}
+        />
+        <MatrixCard
+          title="Postest Terlaksana"
+          table={postestTable}
         />
       </div>
     </div>
   );
 }
 
-/**
- * The read-only Pretest tracker (#248): the four meters grouped into two labelled columns, STEM and
- * Research, each with a Siswa and a GTK-MS row. Every row reads `done / total` (the always-47
- * denominator), its percent, and a `Progress` bar — the same visual language as "Kegiatan
- * terlaksana". The streams are taken from the meters in the order the derive emits them (STEM then
- * Research), so this holds no vocabulary of its own. Editing lives on `/pretest`.
- */
-function PretestCard({ meters }: { meters: PretestMeter[] }) {
-  const streams = [...new Set(meters.map((m) => m.stream))];
-  const total = meters[0]?.total ?? 0;
+/** One progress summary card: a label and a single whole-number percentage (#313). */
+function SummaryCard({ label, percent }: { label: string; percent: number }) {
   return (
     <Card>
       <CardHeader>
-        <CardDescription>Progress Pretest</CardDescription>
-        <CardTitle className="text-base">
-          Sekolah yang telah menyelesaikan Pretest, dari {total} sekolah
-        </CardTitle>
+        <CardDescription>{label}</CardDescription>
+        <CardTitle className="font-heading text-3xl tabular-nums">{percent}%</CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {streams.map((stream) => (
-          <div
-            key={stream}
-            className="flex flex-col gap-3"
-          >
-            <div className="text-sm font-medium">{stream}</div>
-            {meters
-              .filter((m) => m.stream === stream)
-              .map((m) => (
-                <div
-                  key={m.participantType}
-                  className="flex flex-col gap-1.5"
-                >
-                  <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <span className="text-muted-foreground">{m.participantType}</span>
-                    <span className="tabular-nums">
-                      {m.done} / {m.total} · {m.percent}%
-                    </span>
-                  </div>
-                  <Progress value={m.percent} />
-                </div>
-              ))}
-          </div>
-        ))}
-      </CardContent>
     </Card>
   );
 }
 
-/** A horizontal stepper: a filled, checked circle for completed steps, a muted ring for pending. */
-function Timeline({ steps }: { steps: TimelineStep[] }) {
-  return (
-    <ol className="flex items-start">
-      {steps.map((step, i) => {
-        const completed = step.status === "completed";
-        return (
-          <li
-            key={step.label}
-            className="flex flex-1 flex-col items-center text-center"
-          >
-            <div className="flex w-full items-center">
-              <div className="flex-1" />
-              <div
-                className={cn(
-                  "flex size-8 shrink-0 items-center justify-center rounded-full",
-                  completed
-                    ? "bg-primary text-primary-foreground"
-                    : "border-2 border-muted-foreground/40 text-muted-foreground",
-                )}
-              >
-                {completed ? (
-                  <Check className="size-4" />
-                ) : (
-                  <span className="text-sm">{i + 1}</span>
-                )}
-              </div>
-              <div
-                className={cn(
-                  "h-0.5 flex-1",
-                  i < steps.length - 1 ? "bg-primary" : "bg-transparent",
-                )}
-              />
-            </div>
-            <div className="mt-2 text-sm font-medium text-foreground">{step.label}</div>
-            <div className="text-xs text-muted-foreground tabular-nums">{step.window}</div>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
 /**
- * One delivery matrix: a Klaster column per Cluster across, Sesi rows down, `"delivered/total"` per
- * cell. The column headers are the `clusters` prop's names in order, so a cell's `i`th value lines
- * up under the `i`th Cluster — the same order `deliveryMatrix` builds the cells in.
+ * One pivoted table: Klaster rows down, `table.columns` across, `"X/Y"` per cell (#313). A cell's
+ * `i`th value lines up under the `i`th column — the same order the derive builds each row's cells
+ * in, whether the columns are Sesi (delivery) or Stream ∙ Peserta (assessment).
  */
-function MatrixCard({
-  title,
-  clusters,
-  rows,
-}: {
-  title: string;
-  clusters: { id: string; name: string }[];
-  rows: MatrixRow[];
-}) {
+function MatrixCard({ title, table }: { title: string; table: PivotTable }) {
   return (
     <Card>
       <CardHeader>
@@ -244,18 +176,18 @@ function MatrixCard({
             <TableHeader>
               <TableRow>
                 <TableHead>Klaster</TableHead>
-                {clusters.map((c) => (
-                  <TableHead key={c.id}>{c.name}</TableHead>
+                {table.columns.map((column) => (
+                  <TableHead key={column}>{column}</TableHead>
                 ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.session}>
-                  <TableCell className="font-medium">{row.session}</TableCell>
+              {table.rows.map((row) => (
+                <TableRow key={row.label}>
+                  <TableCell className="font-medium">{row.label}</TableCell>
                   {row.cells.map((cell, i) => (
                     <TableCell
-                      key={clusters[i]?.id ?? i}
+                      key={table.columns[i] ?? i}
                       className="tabular-nums"
                     >
                       {cell}

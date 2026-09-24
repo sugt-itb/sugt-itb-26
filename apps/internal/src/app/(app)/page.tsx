@@ -71,11 +71,11 @@ export default async function Page() {
             showBudget={showBudget(person.role)}
             activitiesPercent={derived.activitiesPercent}
             budget={derived.budget}
-            clusters={derived.clusters}
+            summary={derived.summary}
             luring={derived.luring}
             daring={derived.daring}
-            timeline={derived.timeline}
-            pretest={derived.pretest}
+            pretestTable={derived.pretestTable}
+            postestTable={derived.postestTable}
           />
         }
         persiapan={
