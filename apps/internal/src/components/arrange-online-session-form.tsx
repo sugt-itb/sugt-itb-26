@@ -1,6 +1,6 @@
 "use client";
 
-import { arrangeOnlineSessionAction } from "-/app/(app)/jadwalkan-sesi-daring/actions";
+import { arrangeOnlineSessionAction } from "-/app/(app)/sesi-daring/baru/actions";
 import type { SchoolOption } from "@sugt/db/queries";
 import {
   MAX_TEACHING_TEAM_PER_ONLINE_SESSION,

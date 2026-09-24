@@ -17,9 +17,9 @@ import Link from "next/link";
  * `staffSurface` on the read, a Teaching Team member reaching this URL directly would be shown
  * the whole form and refused only on submit.
  *
- * The route is named after the surface, beside `/jadwalkan-sesi-daring`. The trip that results
- * is read at `/perjadin`, which is a different thing at a different name — one is the act, the
- * other is the record.
+ * The route sits under its list route as `/perjadin/baru`, beside `/sesi-daring/baru` and
+ * matching the `/cerita/baru` house pattern (#308). The trip that results is read at `/perjadin` —
+ * the same prefix, but a different thing: one is the act, the other the record.
  */
 export default async function Page() {
   const person = await requirePerson();

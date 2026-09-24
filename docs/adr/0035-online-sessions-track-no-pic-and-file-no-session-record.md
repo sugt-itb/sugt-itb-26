@@ -17,7 +17,7 @@ expected online, the PIC has nothing left to be.
 
 This is the companion of [ADR-0034](./0034-online-sessions-are-no-longer-single-stream.md) (online
 Sessions are no longer single-Stream); together they are the **subtractive** half of the
-`/jadwalkan-sesi-daring` rework (#284), following the additive #283.
+`/sesi-daring/baru` rework (#284), following the additive #283.
 
 ## The decision
 
