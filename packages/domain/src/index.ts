@@ -166,8 +166,9 @@ export function formatIdr(n: number): string {
 
 /**
  * The two roles in the internal tool. **`Teaching Team` was retired in T3** ([#153](https://github.com/mafiefa02/sugt/issues/153)) —
- * once online Sessions named their teachers as free-text `session_teacher_name` (ADR-0022) that
- * Person role had no purpose — and for a while Staff stood alone. **`Pimpinan` was then added as a
+ * once online Sessions named their teachers as free-text names (ADR-0022; since #318 the two
+ * `pengajar_*` columns) that Person role had no purpose — and for a while Staff stood alone.
+ * **`Pimpinan` was then added as a
  * second signed-in role** ([#179](https://github.com/mafiefa02/sugt/issues/179)): a read-only
  * principal who reads every non-money delivery surface, writes nothing, and lands on the Dashboard (`/`).
  * It is a Person role and nothing more — the widened CHECK admits it, but every composite `(id, role)`

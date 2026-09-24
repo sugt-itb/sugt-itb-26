@@ -104,8 +104,9 @@ function Delete({ session }: { session: OnlineSessionDetail }) {
 }
 
 /**
- * **Tandai terlaksana** — status only (#152). No who-taught prompt: the Pengajar are session-scoped
- * names edited in their own section, and no `session_teacher` row is written. The confirmation exists
+ * **Tandai terlaksana** — status only (#152), and **legacy for online now** (#318): an online Session
+ * is born `delivered`, so this reaches only a Session arranged before #318. No who-taught prompt — the
+ * two Pengajar are columns on the Session, edited in the fields section above. The confirmation exists
  * only so a delivered Session is a deliberate act; the sole refusal it can meet is a Session someone
  * else already moved.
  */
