@@ -274,13 +274,14 @@ async function lockedSession(
  * **Tandai terlaksana** — mark a Session delivered. **Status only, for both modes**
  * (ADR-0019, ADR-0020, ADR-0022, #140, #152, #153).
  *
- * It writes nothing but `session.status = 'delivered'`, and it names nobody. Both modes name
- * their Stream on the Session and their teachers as **free-text names**: an offline Session's are
- * trip-scoped `session_teaching_team` names edited on the Perjadin, and an online Session's are
- * `session_teacher_name` names edited on `/sesi-daring/[id]` (ADR-0022). Neither is a `person`, and
- * `session_teacher` — the Person-based table that once held the online half — is gone (T3, #153), so
- * there is no who-taught prompt on either side. Class Records and the offline progress metric stay
- * deferred (the `CONTEXT.md` open question), so nothing is owed off the back of this.
+ * It writes nothing but `session.status = 'delivered'`, and it names nobody. Both modes name their
+ * teachers as **free-text names**: an offline Session's are trip-scoped `session_teaching_team` names
+ * edited on the Perjadin, and an online Session's are the two cohort-named Pengajar columns on the
+ * `session` row itself (#318, superseding ADR-0022's `session_teacher_name` list). Neither is a
+ * `person`, so there is no who-taught prompt on either side. **This path is legacy for online now**
+ * (#318): an online Session is born `delivered` by `arrangeOnlineSession`, so only an offline Session
+ * — or an online Session arranged before #318 — reaches this. Class Records and the offline progress
+ * metric stay deferred (the `CONTEXT.md` open question), so nothing is owed off the back of this.
  *
  * The transaction and the `for update` lock are still here, by convention 5: the status check means
  * nothing without the lock — two Staff pressing the button at once both read `arranged` otherwise,

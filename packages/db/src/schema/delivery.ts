@@ -1,4 +1,4 @@
-import type { PretestParticipantType, SessionMode, SessionStatus, Stream } from "@sugt/domain";
+import type { SessionMode, SessionStatus, Stream } from "@sugt/domain";
 import { sql } from "drizzle-orm";
 import {
   check,
@@ -84,18 +84,16 @@ export const session = pgTable(
     endsAt: time("ends_at"),
     status: text("status").$type<SessionStatus>().notNull().default("arranged"),
     cancelledReason: text("cancelled_reason"),
-    // Which cohort an online Session teaches (#283) — `'Siswa'` or `'GTK-MS'`, a column-value set,
-    // not a glossary term. Ticket #283 **deliberately reuses** `PRETEST_PARTICIPANT_TYPES`: the
-    // online-cohort set coincides with the pretest-cohort set today. This is a knowing exception to
-    // the #246 rule that independent axes each get their OWN dedicated const so a CHECK coupled to
-    // another cannot ripple silently — `transaction` and `assessment_completion` each carry their own
-    // `participant_type` const precisely for that reason. The coupling here is only at the TS type
-    // level (the CHECK DDL below is an independent string), so if the online-Session cohort set is
-    // ever meant to move apart from the pretest set, give it a `SESSION_PARTICIPANT_TYPES` of its own
-    // rather than keep borrowing this one. **Nullable with a value-domain CHECK only**, for the same
-    // migration-safety reason as `ends_at`: existing rows have no value and a strict CHECK would fail
-    // against populated data. "Required for online" is an app-layer rule, not a DB one.
-    participantType: text("participant_type").$type<PretestParticipantType>(),
+    // An online Session's two Pengajar, one per cohort — the Siswa professor and the GTK-MS professor,
+    // one name each (#318, superseding ADR-0022's variable-length `session_teacher_name` list). Online
+    // teaching is one or two named professors, not a room-full, and the two cohorts are fixed, so a
+    // pair of columns says it straight where a side table said it loosely. **Nullable in the column
+    // type** — an offline Session carries neither — with `session_online_pengajar_not_null` (below)
+    // making both required for an online row. There is no online data to migrate (the ticket wipes
+    // it), so that CHECK is clean rather than an `is null or …` backstop. Free-text names, never
+    // `person` rows, exactly as the offline trip-scoped names are (ADR-0020).
+    pengajarSiswaName: text("pengajar_siswa_name"),
+    pengajarGtkMsName: text("pengajar_gtk_ms_name"),
 
     // **No PIC columns any more (#284).** An online Session used to carry its own
     // `online_pic_person_id`/`online_pic_role` because it had no Perjadin to take one from — but a
@@ -130,12 +128,14 @@ export const session = pgTable(
       "session_cancelled_iff_reason",
       sql`(${t.status} = 'cancelled') = (${t.cancelledReason} is not null)`,
     ),
-    // Value-domain and range CHECKs for the two #283 columns, both written `is null or …` so they
-    // are backstops the migration applies cleanly against populated data — a legacy row with a null
-    // in either passes, and the app layer is what makes both required on an online Session.
+    // Both Pengajar are required on an online row and left null on an offline one (#318). Written as an
+    // implication — an online Session names both its professors — the clean direction, since the ticket
+    // wipes the online data so nothing violates it and no offline row would carry either. `ends_at`
+    // keeps its `is null or …` range backstop: an offline row leaves it null, so the CHECK must admit a
+    // null.
     check(
-      "session_participant_type_check",
-      sql`${t.participantType} is null or ${t.participantType} in ('Siswa', 'GTK-MS')`,
+      "session_online_pengajar_not_null",
+      sql`${t.mode} <> 'online' or (${t.pengajarSiswaName} is not null and ${t.pengajarGtkMsName} is not null)`,
     ),
     check(
       "session_ends_after_starts_check",
@@ -188,38 +188,17 @@ export const session = pgTable(
 );
 
 /**
- * **`session_teacher` was dropped in T3** ([#153](https://github.com/mafiefa02/sugt/issues/153)).
- * It recorded who taught which Stream as one-per-Stream `person` rows, but offline teaching went
- * name-based first (ADR-0019, ADR-0020) and ADR-0022 did the same online, so by T3 nothing wrote
- * or read it and the `Teaching Team` Person role it depended on had no purpose. Both modes now name
- * their teachers as free-text: offline through `session_teaching_team` (below), online through
- * `session_teacher_name` (below). See `docs/data-model.md`'s Delivery section.
+ * **`session_teacher` was dropped in T3** ([#153](https://github.com/mafiefa02/sugt/issues/153)), and
+ * **`session_teacher_name` in turn was dropped in #318.** `session_teacher` recorded who taught which
+ * Stream as one-per-Stream `person` rows; offline teaching went name-based first (ADR-0019, ADR-0020)
+ * and ADR-0022 did the same online, replacing `session_teacher` on the online side with
+ * `session_teacher_name` — a variable-length list of session-scoped free-text names. #318 (ADR-0036)
+ * then collapsed that list to **two cohort-named columns on `session` itself** —
+ * `pengajar_siswa_name` and `pengajar_gtk_ms_name`, one each — because an online Session is taught by
+ * exactly one Siswa and one GTK-MS professor, so the side table's row-per-name shape held nothing the
+ * columns do not. Offline teaching still goes through `session_teaching_team` (below). See
+ * `docs/data-model.md`'s Delivery section.
  */
-
-/**
- * An online Session's teachers, as **session-scoped free-text names** (ADR-0022). The online
- * mirror of ADR-0020's trip-scoped Teaching Team: a name typed at arrangement, never a `person`
- * row, carrying no Stream (the Session already carries its own) and no sign-in.
- *
- * This is the online analogue of the offline `perjadin_teacher` + `session_teaching_team` pair,
- * **collapsed to one table** because an online Session has no Perjadin to scope its names to —
- * offline names belong to the trip and are linked to the Sessions that used them, whereas an
- * online name belongs to the one Session and nothing else, so the two-table split has nothing to
- * express here. Cascade on delete: a name is meaningless once its Session is gone.
- *
- * This replaced `session_teacher` on the online side (ADR-0022), and that Person-based table is
- * now dropped (T3, #153) along with the `Teaching Team` Person role it depended on.
- */
-export const sessionTeacherName = pgTable("session_teacher_name", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  // The drizzle-default FK name `session_teacher_name_session_id_session_id_fk` is 42 characters,
-  // well under Postgres's 63-char identifier limit, so the inline `.references` is safe here where
-  // `session_teaching_team` had to name its FKs by hand.
-  sessionId: uuid("session_id")
-    .notNull()
-    .references(() => session.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-});
 
 /**
  * "Diajar oleh" — which of a Perjadin's trip-scoped teacher names taught one offline
@@ -228,8 +207,9 @@ export const sessionTeacherName = pgTable("session_teacher_name", {
  * rooms, so this is a plain many-to-many with no Stream and no Person.
  *
  * Both sides cascade on delete — a link is meaningless once either the Session or the
- * teacher name is gone. It is the offline analogue of `session_teacher_name`; nothing here
- * touches a `person` row, which is the whole point of the name-based model.
+ * teacher name is gone. It is the offline analogue of an online Session's Pengajar, which since #318
+ * are the two cohort-named columns above rather than a side table; nothing here touches a `person`
+ * row, which is the whole point of the name-based model.
  */
 export const sessionTeachingTeam = pgTable(
   "session_teaching_team",

@@ -185,8 +185,9 @@ This document previously routed revocation through Better Auth's admin plugin an
 
 **A Person is Staff or Pimpinan** ([#153](https://github.com/mafiefa02/sugt/issues/153),
 [#179](https://github.com/mafiefa02/sugt/issues/179)). The `Teaching Team` role was retired in T3,
-leaving Staff alone once online Sessions named their teachers as `session_teacher_name` (ADR-0022)
-and `session_teacher` — its last user — was dropped; [#179](https://github.com/mafiefa02/sugt/issues/179)
+leaving Staff alone once online Sessions named their teachers as free-text names (ADR-0022; since #318
+the two `pengajar_*` columns) and `session_teacher` — its last user — was dropped;
+[#179](https://github.com/mafiefa02/sugt/issues/179)
 then widened `role` to `check (role in ('Staff', 'Pimpinan'))` to admit a second signed-in principal.
 **Only that CHECK widened.** Every composite `(id, role)` foreign key below still pins `role =
 'Staff'`, so the widened role satisfies none of them — a Pimpinan is a login-only, **read-only**
@@ -381,14 +382,16 @@ create table session (
   status            text not null default 'arranged'
                       check (status in ('arranged', 'delivered', 'cancelled')),
   cancelled_reason  text,
-  participant_type  text,
+  pengajar_siswa_name   text,
+  pengajar_gtk_ms_name  text,
 
   created_at        timestamptz not null default now(),
 
   check ((mode = 'offline') = (perjadin_id is not null)),
   check (mode <> 'offline' or stream is not null),
   check ((status = 'cancelled') = (cancelled_reason is not null)),
-  check (participant_type is null or participant_type in ('Siswa', 'GTK-MS')),
+  check (mode <> 'online'
+         or (pengajar_siswa_name is not null and pengajar_gtk_ms_name is not null)),
   check (ends_at is null or ends_at > starts_at)
 );
 
@@ -517,24 +520,33 @@ Nothing stores the second number.
 it is worth spending that one-off affordance on: a nullable start time acquires a null on the
 first row written and keeps it forever, and every screen then has to render "time unknown".
 
-**`ends_at` and `participant_type` are online-required but nullable at the database (#283).** Both
-were added after online Sessions existed in a populated database, so unlike `starts_at` the one-off
-NOT-NULL affordance is spent — a strict column, or a NOT-NULL-for-online CHECK, would fail the
-migration against rows that carry no value and have no correct backfill. So the columns are nullable
-and carry only value/range CHECKs (`ends_at is null or ends_at > starts_at`; `participant_type is
-null or participant_type in ('Siswa', 'GTK-MS')`), and "required for an online Session" is enforced
-at the application layer — the arrange form's submit guard and `arrangeOnlineSession`/
-`updateOnlineSession`, the same layer the PIC and Stream requirements sit behind on the write path.
-`ends_at` is a wall-clock `time` local to the School exactly like `starts_at`; `participant_type` is
-a column-value set, not a glossary term. #283 **deliberately reuses** the `PRETEST_PARTICIPANT_TYPES`
-values because the online-cohort set coincides with the pretest-cohort set today — a knowing
-exception to the #246 rule that independent axes each get a dedicated const (`transaction` and
-`assessment_completion` each carry their own `participant_type` const so a CHECK coupled to another
-axis cannot ripple silently). The coupling is only at the TypeScript type level; the CHECK is
-independent DDL. If the online-Session cohort ever needs to move apart from the pretest one, it
-should get its own `SESSION_PARTICIPANT_TYPES`. Both columns are online-only in practice — the
-arrange and detail-edit surfaces are online-only — while offline rows leave them null and pass the
-CHECKs untouched.
+**`ends_at` is nullable and online-required at the application layer (#283).** It was added after
+online Sessions existed in a populated database, so unlike `starts_at` the one-off NOT-NULL
+affordance is spent — a strict column would fail the migration against rows with no value and no
+backfill. So it is nullable with only a range CHECK (`ends_at is null or ends_at > starts_at`), and
+"required for an online Session" is enforced on the write path (`arrangeOnlineSession` /
+`updateOnlineSession` and the form guard). It is a wall-clock `time` local to the School exactly like
+`starts_at`. Offline rows leave it null and pass the CHECK.
+
+**The two `pengajar_*` columns are online-required, enforced both ways (#318).** An online Session
+carries `pengajar_siswa_name` and `pengajar_gtk_ms_name` — one Pengajar for the Siswa cohort and one
+for GTK-MS, one free-text name each ([ADR-0036](./adr/0036-online-sessions-carry-two-cohort-named-pengajar-and-are-recorded-delivered.md),
+superseding ADR-0022's `session_teacher_name` list). They are nullable in the column type so an
+_offline_ row leaves them null, but — unlike `ends_at` — the presence rule is a **NOT-NULL-for-online
+CHECK**, `mode <> 'online' or (pengajar_siswa_name is not null and pengajar_gtk_ms_name is not null)`,
+because #318 wiped the (empty) online data, so the clean implication holds with nothing to migrate
+against. The old `participant_type` column and its `session_participant_type_check` are **dropped**:
+an online Session no longer carries a single-cohort "Peserta" — both cohorts are always taught, one
+Pengajar each. (`transaction` and `assessment_completion` keep their own `participant_type`; only the
+Session's is gone.)
+
+**An online Session is recorded `delivered` in one step (#318).** A third-party LMS runs online
+delivery, so `arrangeOnlineSession` logs a Session that already happened — `status: 'delivered'`, with
+`held_on` refused if it is in the future — rather than arranging one and marking it later. The
+arrange→deliver two-step survives only for offline Sessions and any online Session arranged before
+#318 (of which there are none). This is a superseding gloss on
+[ADR-0006](./adr/0006-sessions-are-created-when-arranged.md) for the online half — a Session still
+_exists only once written_, it is simply written already delivered.
 
 **An online Session's time is always WIB (#283), and this is a rendering choice, not a column.**
 `starts_at`/`ends_at` are still stored as a bare wall-clock `time`, but for an _online_ Session the
@@ -559,15 +571,15 @@ A Session exists only once arranged
 no target dates and nothing is ever overdue. Progress is `count(*) where status = 'delivered'`
 against `TOTAL_SESSIONS_PER_SCHOOL`, a constant that already lives in `@sugt/domain`.
 
-**Marking a Session delivered is status only, for both modes** (#140, #152, #153). It writes nothing
-but `session.status = 'delivered'` and names nobody. An **online** Session's "Tandai terlaksana"
-historically named a Teaching-Team Person per Stream and wrote `session_teacher` in the same act;
-ADR-0022 made online Sessions single-Stream with their teachers named as session-scoped
-`session_teacher_name`, and #152 retired the Person-per-Stream step from delivery — the online mirror
-of #140's offline change. Online Pengajar are now edited anytime, one name at a time, on
-`/sesi-daring/[id]` (add/rename/remove against `session_teacher_name`), which is also the correction
-path that replaced the old post-delivery "Perbaiki pengajar" flow. An **offline** Session's
-mark-delivered was already status only (#140): it carries its Stream, its teachers are trip-scoped
+**Marking a Session delivered is status only, for both modes** (#140, #152, #153) — and for online it
+is now **legacy** (#318). An online Session is born `delivered` (above), so it never passes through
+"Tandai terlaksana"; that path survives for offline Sessions and any pre-#318 online row. When it does
+run it writes nothing but `session.status = 'delivered'` and names nobody. Online Pengajar are the two
+cohort-named columns on the Session, edited through the Session's own field dialog on
+`/sesi-daring/[id]`, and a mis-recorded online Session is **hard-deleted** (`deleteOnlineSession`)
+rather than corrected name by name or cancelled — the correction path that replaced the old
+post-delivery "Perbaiki pengajar" flow and, for born-`delivered` rows, cancellation. An **offline**
+Session's mark-delivered was already status only (#140): it carries its Stream, its teachers are trip-scoped
 `session_teaching_team` names edited on the Perjadin, and it writes no per-Stream Person (ADR-0019,
 ADR-0020). Consequences left **deferred** and not modelled here — see the open question in
 `CONTEXT.md`: **Class Records** for a name-taught Session (their filer would be a name, not a Person
@@ -585,26 +597,17 @@ having taught a Stream. But offline teaching went name-based first
 [ADR-0020](./adr/0020-teaching-team-members-on-a-perjadin-are-trip-scoped-names.md)) and ADR-0022 did
 the same online, so by T3 nothing wrote or read the table and the `Teaching Team` Person role it
 depended on had no purpose — so the table and the role were both dropped. Both modes now record who
-taught as **free-text names**: online through `session_teacher_name`, offline through
-`session_teaching_team` (below).
+taught as **free-text names**: online through the two `pengajar_*` columns on `session` itself,
+offline through `session_teaching_team` (below).
 
-An online Session records who taught it as session-scoped free-text names:
-
-```sql
-create table session_teacher_name (
-  id          uuid primary key default gen_random_uuid(),
-  session_id  uuid not null references session (id) on delete cascade,
-  name        text not null
-);
-```
-
-The online analogue of the offline `perjadin_teacher` + `session_teaching_team` pair, **collapsed
-to one table** because an online Session has no Perjadin to scope names to: an offline name belongs
-to the trip and is linked to the Sessions that used it, whereas an online name belongs to the one
-Session and nothing else. No Stream (the Session carries its own now) and no Person, which is the
-whole point of the name-based model. Cascade on delete: a name means nothing once its Session is
-gone. The count is an app cap (`MAX_TEACHING_TEAM_PER_ONLINE_SESSION`), not a DB rule — the same
-disposition as the offline caps.
+**`session_teacher_name` was in turn dropped in #318.** ADR-0022's online model was a variable-length
+side table of session-scoped names; [ADR-0036](./adr/0036-online-sessions-carry-two-cohort-named-pengajar-and-are-recorded-delivered.md)
+replaced it with **two cohort-named columns on the `session` row** — `pengajar_siswa_name` and
+`pengajar_gtk_ms_name`, one Pengajar for the Siswa cohort and one for GTK-MS, one free-text name each,
+both required for an online row (the NOT-NULL-for-online CHECK above). An online Session is taught by
+exactly one professor per cohort, so the row-per-name shape held nothing the columns do not, and the
+app-layer `MAX_TEACHING_TEAM_PER_ONLINE_SESSION` cap that bounded the list is **gone** — the number is
+fixed by the schema now. No Stream and no Person, the whole point of the name-based model.
 
 Offline Sessions record who taught through a name-based link instead:
 
@@ -620,8 +623,8 @@ create table session_teaching_team (
 "Diajar oleh" — the _set_ of a Perjadin's trip-scoped teacher names who staffed one offline
 Session's parallel rooms. A plain many-to-many with no Stream (the Session already carries it) and
 no Person. Both sides cascade: a link means nothing once either the Session or the teacher name is
-gone. It is the offline analogue of `session_teacher_name`, and touches no `person` row, which is the
-whole point of the name-based model ([ADR-0020](./adr/0020-teaching-team-members-on-a-perjadin-are-trip-scoped-names.md)).
+gone. It is the offline analogue of an online Session's two `pengajar_*` columns, and touches no
+`person` row, which is the whole point of the name-based model ([ADR-0020](./adr/0020-teaching-team-members-on-a-perjadin-are-trip-scoped-names.md)).
 
 **Offline Class Records fall out of scope** as a consequence: their filers would be the teachers,
 and a name is not a Person who can sign in and file. See the open question in `CONTEXT.md`.

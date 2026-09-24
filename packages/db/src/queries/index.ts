@@ -25,11 +25,10 @@
  *    multi-statement: Rencanakan Perjadin writes `perjadin`, `group_member` and N
  *    `session` rows; a Group is replaced wholesale. The boundary belongs in the function
  *    here, never in the Server Action calling it — a Server Action that opens one has put
- *    the boundary somewhere a second caller cannot reuse. **`arrangeOnlineSession` in
- *    `./arrange-online-session.ts`** exercises it: a Session and its `session_teacher_name`
- *    rows commit together, and a collision returns a value without writing either. (It
- *    replaced a batch write, `#70`, once online Sessions were arranged one at a time —
- *    a one-row batch was dead weight every reader had to understand.)
+ *    the boundary somewhere a second caller cannot reuse. (**`arrangeOnlineSession` no longer
+ *    needs one** — #318 collapsed its Session-plus-`session_teacher_name` pair to a single
+ *    insert of a `delivered` row with two cohort-named Pengajar columns, so a bare insert
+ *    with `on conflict do nothing` is the whole write now.)
  *
  * Validation belongs beside the write, in this package, for the rules
  * `docs/data-model.md` describes as *enforced twice by design* — chief among them
@@ -200,18 +199,13 @@ export {
 export type { PreparationItem } from "./preparation-checklist";
 export { onlineSessionDirectory, type DirectoryOnlineSession } from "./online-session-directory";
 export {
-  addOnlineSessionTeacher,
+  deleteOnlineSession,
   onlineSessionDetail,
-  removeOnlineSessionTeacher,
-  renameOnlineSessionTeacher,
   updateOnlineSession,
-  type AddOnlineSessionTeacherResult,
+  type DeleteOnlineSessionResult,
   type OnlineSessionDetail,
   type OnlineSessionInput,
   type OnlineSessionLookup,
-  type OnlineSessionTeacher,
-  type RemoveOnlineSessionTeacherResult,
-  type RenameOnlineSessionTeacherResult,
   type UpdateOnlineSessionResult,
 } from "./online-session-detail";
 export {

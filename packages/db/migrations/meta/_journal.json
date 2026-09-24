@@ -211,6 +211,13 @@
       "when": 1790094933599,
       "tag": "0029_persiapan_item_jenis",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1790258235936,
+      "tag": "0030_soft_sinister_six",
+      "breakpoints": true
     }
   ]
 }
