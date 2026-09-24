@@ -57,9 +57,9 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: Gauge, staffOnly: false },
-  { href: "/pendamping", label: "Pendamping", icon: LayoutDashboard, staffOnly: true },
   { href: "/kalender", label: "Kalender", icon: CalendarDays, staffOnly: false },
   { href: "/pretest", label: "Pretest", icon: ClipboardCheck, staffOnly: false, editorOnly: true },
+  { href: "/pendamping", label: "Pendamping", icon: LayoutDashboard, staffOnly: true },
   { href: "/sekolah", label: "Direktori Sekolah", icon: School, staffOnly: false },
   { href: "/kelompok-sekolah", label: "Kelompok Sekolah", icon: Boxes, staffOnly: false },
   { href: "/feedback", label: "Feedback", icon: MessageSquare, staffOnly: false },
