@@ -1,5 +1,4 @@
 import { OnlineSessionFields } from "-/components/online-session-fields";
-import { OnlineSessionTeachers } from "-/components/online-session-teachers";
 import { OnlineSessionWrites } from "-/components/online-session-writes";
 import { MODE_LABELS, SessionStatusBadge } from "-/components/session-labels";
 import { requirePerson } from "-/lib/person";
@@ -25,9 +24,11 @@ export async function generateMetadata({
 }
 
 /**
- * **Detail Sesi daring** — one online Session, and every field the arrange form set, editable (#152,
- * ADR-0022). The online counterpart of `/perjadin/[id]`: the header, then the Session's fields, its
- * Pengajar, and — for Staff — Tandai terlaksana (status-only now) and Batalkan Sesi.
+ * **Detail Sesi daring** — one online Session, and every field the record form set, editable (#152,
+ * #318). The online counterpart of `/perjadin/[id]`: the header, then the Session's fields (School,
+ * date, times and the two cohort-named Pengajar) with an Edit dialog, and — for Staff — a hard Delete.
+ * A born-`delivered` Session shows **Edit + Delete**; a legacy `arranged` one also shows Tandai
+ * terlaksana and Batalkan Sesi.
  *
  * **Online-only.** An offline Session's detail surface is `/sesi/[id]`, so an offline id is
  * redirected there rather than rendered here, and an id naming nothing is a **404** — an ordinary
@@ -82,12 +83,6 @@ export default async function Page({ params }: PageProps<"/sesi-daring/[id]">) {
 
       <OnlineSessionFields
         session={session}
-        canEdit={canEdit}
-      />
-
-      <OnlineSessionTeachers
-        sessionId={session.id}
-        teachers={session.teachers}
         canEdit={canEdit}
       />
 

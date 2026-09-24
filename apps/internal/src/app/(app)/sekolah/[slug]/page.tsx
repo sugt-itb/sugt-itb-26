@@ -28,7 +28,7 @@ export async function generateMetadata({
  * One `requirePerson()`, one open query, and no role check on the read: this is delivery data
  * and ADR-0004 opens it to everyone signed in.
  *
- * **The arrange-a-Session affordance is the second entry point for Jadwalkan Sesi daring (#70)**
+ * **The record-a-Session affordance is the second entry point for Catat Sesi daring (#70, #318)**
  * — you are already thinking about one School here. It is Staff-only, so its read runs only for a
  * Staff caller and renders only when it returns; `requireStaff` in the write is the enforcement,
  * since a layout does not run before a Server Action.
@@ -77,7 +77,7 @@ export default async function Page({ params }: PageProps<"/sekolah/[slug]">) {
 
       {arrange !== null && (
         <section className="border-t border-border">
-          <h2 className="px-7 pt-5 font-heading text-sm font-medium">Jadwalkan Sesi daring</h2>
+          <h2 className="px-7 pt-5 font-heading text-sm font-medium">Catat Sesi daring</h2>
           <ArrangeOnlineSessionForm school={arrange.school} />
         </section>
       )}

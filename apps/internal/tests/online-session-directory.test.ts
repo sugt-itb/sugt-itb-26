@@ -87,7 +87,7 @@ describe("onlineSessionDirectory", () => {
     ]);
   });
 
-  it("carries the School, its Peserta and the status on each row (no PIC, #284)", async () => {
+  it("carries the School and the status on each row (no PIC, no Peserta; #284, #318)", async () => {
     const pic = await staff();
     const school = await oneSchool();
     await addSession({
@@ -95,17 +95,16 @@ describe("onlineSessionDirectory", () => {
       heldOn: "2026-09-10",
       startsAt: "09:00",
       status: "delivered",
-      participantType: "GTK-MS",
     });
 
     const [row] = await onlineSessionDirectory(pic);
 
     expect(row?.schoolName).toBe("SMAN 1 Bandung");
     expect(row?.schoolSlug).toBe("sman-1-bandung");
-    expect(row?.participantType).toBe("GTK-MS");
     expect(row?.status).toBe("delivered");
-    // No PIC on an online row any more (#284).
+    // No PIC on an online row any more (#284), and no Peserta (#318).
     expect(row).not.toHaveProperty("picFullName");
+    expect(row).not.toHaveProperty("participantType");
   });
 
   /**

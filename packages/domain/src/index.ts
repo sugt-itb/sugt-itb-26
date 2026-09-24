@@ -545,14 +545,13 @@ export const MAX_PREPARATION_CHECKLIST_ITEMS = 20;
  * - `MAX_OFFLINE_SESSIONS_PER_SCHOOL_PER_PERJADIN` — a safety ceiling; six or seven is the real
  *   maximum, ten is practically unreachable.
  * - `MAX_TEACHING_TEAM_PER_PERJADIN` — trip-scoped teacher names entered on the trip.
- * - `MAX_TEACHING_TEAM_PER_ONLINE_SESSION` — session-scoped online Pengajar names, the online
- *   analogue of the trip-scoped cap above (ADR-0022). An online Session is now required to name at
- *   least one Pengajar (enforced at the app layer, #283) and capped at **two**: an online Session is
- *   taught by one or two professors, not a room-full. It is online-only — offline teaching uses
- *   `MAX_OFFLINE_SESSIONS_PER_SCHOOL_PER_PERJADIN` — so tightening it touches no offline surface.
  * - `MAX_EXTRA_STAFF_PER_GROUP` — DITSAMA Staff on a Group besides the PIC; the PIC plus up to ten.
+ *
+ * `MAX_TEACHING_TEAM_PER_ONLINE_SESSION` is **gone** (#318, ADR-0036): an online Session no longer
+ * holds a variable-length Pengajar list to cap — it carries exactly two cohort-named Pengajar as
+ * `pengajar_siswa_name` and `pengajar_gtk_ms_name`, one each, both required, so the number is fixed
+ * by the schema rather than by an app-layer ceiling.
  */
 export const MAX_OFFLINE_SESSIONS_PER_SCHOOL_PER_PERJADIN = 10;
 export const MAX_TEACHING_TEAM_PER_PERJADIN = 20;
-export const MAX_TEACHING_TEAM_PER_ONLINE_SESSION = 2;
 export const MAX_EXTRA_STAFF_PER_GROUP = 10;
