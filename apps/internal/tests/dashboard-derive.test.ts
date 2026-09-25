@@ -177,12 +177,17 @@ describe("assessmentTable", () => {
       box("s3", "Research", "GTK-MS", "pretest"),
     ];
     const table = assessmentTable(CLUSTERS, SCHOOLS, completions, "pretest");
-    // Columns are the four STEM/Research × Siswa/GTK-MS boxes, "Research" shown as "Riset".
+    // Columns are the four STEM/Research × Siswa/GTK-MS boxes as `stream|participantType` keys, in
+    // render order; the header groups them by Stream ("Research" shown as "Riset") over Peserta (#329).
     expect(table.columns).toEqual([
-      "STEM ∙ Siswa",
-      "STEM ∙ GTK-MS",
-      "Riset ∙ Siswa",
-      "Riset ∙ GTK-MS",
+      "STEM|Siswa",
+      "STEM|GTK-MS",
+      "Research|Siswa",
+      "Research|GTK-MS",
+    ]);
+    expect(table.groups).toEqual([
+      { label: "STEM", subColumns: ["Siswa", "GTK-MS"] },
+      { label: "Riset", subColumns: ["Siswa", "GTK-MS"] },
     ]);
     // Klaster A: both schools ticked STEM·Siswa (2/2), nothing else. Klaster B: s3 ticked Riset·GTK-MS (1/1).
     expect(table.rows).toEqual([
