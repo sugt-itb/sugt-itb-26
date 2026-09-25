@@ -222,7 +222,8 @@ function MoveDate({ session }: { session: SessionDetail }) {
   const [heldOn, setHeldOn] = useState(session.heldOn);
   // The time moves with the date, in the same act (#72). Seeded from the current value so
   // moving only the date leaves the hour where the School expects it.
-  const [startsAt, setStartsAt] = useState(session.startsAt);
+  // `session.startsAt` is `HH:MM:SS`; TimeField's contract (and every sibling seed) is `HH:MM`.
+  const [startsAt, setStartsAt] = useState(session.startsAt.slice(0, 5));
   const [refusal, setRefusal] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const dateId = useId();
