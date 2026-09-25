@@ -54,26 +54,28 @@ export function DashboardView({
 }) {
   return (
     <div className="flex flex-col gap-6 px-7 py-6">
-      {/* KPI cards. */}
+      {/* KPI cards. Both are equal-height flex columns (the grid stretches them), each with a
+          label-only header; the value text pins to the top of the content and the progress bar to the
+          bottom (`justify-between`). So the two cards' value rows line up and their bars line up, even
+          though the budget card's value block is taller than the activities card's single percentage
+          (#329) — earlier the activities `%` sat in a two-row header and the two cards' bars diverged. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
-            <CardDescription>Kegiatan terlaksana</CardDescription>
-            <CardTitle className="font-heading text-3xl tabular-nums">
-              {activitiesPercent}%
-            </CardTitle>
+            <CardDescription>Kegiatan Terlaksana</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-1 flex-col justify-between gap-4">
+            <div className="font-heading text-3xl tabular-nums">{activitiesPercent}%</div>
             <Progress value={activitiesPercent} />
           </CardContent>
         </Card>
 
         {showBudget && (
-          <Card>
+          <Card className="flex flex-col">
             <CardHeader>
-              <CardDescription>Penyerapan anggaran</CardDescription>
+              <CardDescription>Penyerapan Anggaran</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
+            <CardContent className="flex flex-1 flex-col justify-between gap-4">
               {/* Stacked on a narrow phone (long rupiah figures collide side-by-side at ~320px),
                   side-by-side from `sm:` up. `min-w-0` lets a long value shrink rather than force
                   overflow; the number steps down to `text-lg` on mobile and the right block only
@@ -162,7 +164,9 @@ function SummaryCard({ label, percent }: { label: string; percent: number }) {
 /**
  * One pivoted table: Klaster rows down, `table.columns` across, `"X/Y"` per cell (#313). A cell's
  * `i`th value lines up under the `i`th column — the same order the derive builds each row's cells
- * in, whether the columns are Sesi (delivery) or Stream ∙ Peserta (assessment).
+ * in, whether the columns are Sesi labels (delivery) or `stream|participantType` keys (assessment).
+ * When `table.groups` is set (the assessment tables, #329) the header is two rows — each Stream group
+ * spanning its Peserta sub-columns; otherwise it is the single flat row the delivery tables use.
  */
 function MatrixCard({ title, table }: { title: string; table: PivotTable }) {
   return (
@@ -174,12 +178,36 @@ function MatrixCard({ title, table }: { title: string; table: PivotTable }) {
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Klaster</TableHead>
-                {table.columns.map((column) => (
-                  <TableHead key={column}>{column}</TableHead>
-                ))}
-              </TableRow>
+              {table.groups ? (
+                <>
+                  <TableRow>
+                    <TableHead rowSpan={2}>Klaster</TableHead>
+                    {table.groups.map((group) => (
+                      <TableHead
+                        key={group.label}
+                        colSpan={group.subColumns.length}
+                        className="text-center"
+                      >
+                        {group.label}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    {table.groups.flatMap((group) =>
+                      group.subColumns.map((sub) => (
+                        <TableHead key={`${group.label}-${sub}`}>{sub}</TableHead>
+                      )),
+                    )}
+                  </TableRow>
+                </>
+              ) : (
+                <TableRow>
+                  <TableHead>Klaster</TableHead>
+                  {table.columns.map((column) => (
+                    <TableHead key={column}>{column}</TableHead>
+                  ))}
+                </TableRow>
+              )}
             </TableHeader>
             <TableBody>
               {table.rows.map((row) => (
