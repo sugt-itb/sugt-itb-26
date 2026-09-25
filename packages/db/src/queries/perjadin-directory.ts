@@ -3,7 +3,8 @@ import { desc, eq, sql } from "drizzle-orm";
 import { db } from "../client";
 import { session } from "../schema/delivery";
 import { person } from "../schema/people";
-import { perjadin } from "../schema/travel";
+import { school } from "../schema/reference";
+import { groupMember, perjadin, perjadinTeacher } from "../schema/travel";
 import type { Person } from "./caller";
 import { PREPARATION_FIXED_KEYS, preparationDoneSubquery } from "./preparation-checklist";
 
@@ -36,7 +37,56 @@ export type DirectoryPerjadin = {
    */
   preparationDone: number;
   preparationTotal: number;
+  /**
+   * The three name axes the `/perjadin` search matches on beyond `destination` and `picFullName`
+   * (#334) — the trip-scoped Teaching-Team names, the Group (Kelompok Perjalanan) member names, and
+   * the names of the Schools it visits. All three are one-to-many, so each is returned as an array
+   * and populated by a correlated aggregate subquery rather than a join (see `pengajarNames` below).
+   * Search-only: nothing on the list renders them, so a trip with none carries an empty array.
+   */
+  pengajarNames: string[];
+  groupMemberNames: string[];
+  schoolNames: string[];
 };
+
+/**
+ * The three name arrays the `/perjadin` search reads (#334), each a **correlated aggregate
+ * subquery** — the shape `preparationDoneSubquery` uses, kept off the outer `session` left join so it
+ * stays a scalar and never fans the row out. A plain join would multiply the row and break the
+ * existing `count(distinct session.school_id)` and the `groupBy`; these open their own scans instead.
+ * `coalesce(…, '{}'::text[])` makes a trip with none an empty array rather than `null`, mirroring
+ * `roster.ts`'s `grantsHeld`. Ordered by name so the arrays are stable read to read; `schoolNames`
+ * is `distinct` because a School is taught over several Sessions on one trip. Correlated on
+ * `perjadin.id`, which is in the outer `groupBy`, so each is valid in the grouped select.
+ */
+const pengajarNames = sql<string[]>`coalesce(
+  (
+    select array_agg(pt.name order by pt.name)
+    from ${perjadinTeacher} pt
+    where pt.perjadin_id = ${perjadin.id}
+  ),
+  '{}'::text[]
+)`;
+
+const groupMemberNames = sql<string[]>`coalesce(
+  (
+    select array_agg(gp.full_name order by gp.full_name)
+    from ${groupMember} gm
+    join ${person} gp on gp.id = gm.person_id
+    where gm.perjadin_id = ${perjadin.id}
+  ),
+  '{}'::text[]
+)`;
+
+const schoolNames = sql<string[]>`coalesce(
+  (
+    select array_agg(distinct sch.name order by sch.name)
+    from ${session} s
+    join ${school} sch on sch.id = s.school_id
+    where s.perjadin_id = ${perjadin.id}
+  ),
+  '{}'::text[]
+)`;
 
 /**
  * Every Perjadin, newest trip first.
@@ -65,6 +115,9 @@ export async function perjadinDirectory(_caller: Person): Promise<DirectoryPerja
       // the same pill from the same helper, so the fragment has one home (convention 3).
       preparationTotal: sql<number>`${PREPARATION_FIXED_KEYS.length}`.mapWith(Number),
       preparationDone: preparationDoneSubquery(perjadin.id),
+      pengajarNames,
+      groupMemberNames,
+      schoolNames,
     })
     .from(perjadin)
     .innerJoin(person, eq(person.id, perjadin.picPersonId))

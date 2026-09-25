@@ -12,7 +12,12 @@ import {
 } from "@sugt/domain";
 
 import type { Warning } from "./dashboard-state";
-import { completionKey, completionKeySet, PRETEST_COLUMNS } from "./pretest/pretest-derive";
+import {
+  columnKey,
+  completionKey,
+  completionKeySet,
+  PRETEST_COLUMNS,
+} from "./pretest/pretest-derive";
 
 /**
  * **The pure core of the Dashboard (`/`)**, with no React, no DOM and no database — the seam the suite
@@ -42,12 +47,21 @@ export type MatrixRow = { session: string; cells: string[] };
 export type PivotRow = { label: string; cells: string[] };
 
 /**
- * A pivoted table the Pelaksanaan tab renders — Klaster rows down, some other dimension across
- * (#313). `columns` are the header labels left→right; each `rows` entry is one Cluster, its `cells`
- * lining up under `columns` by index. Used for the two delivery tables (columns = Sesi) and the two
- * assessment tables (columns = Stream ∙ Peserta).
+ * A top-level column group for a two-row grouped header (#329): a label (`STEM`, `Riset`) spanning
+ * its `subColumns` (`Siswa`, `GTK-MS`). The groups' `subColumns`, flattened left→right, line up with
+ * `PivotTable.columns` and so with each row's cells.
  */
-export type PivotTable = { columns: string[]; rows: PivotRow[] };
+export type ColumnGroup = { label: string; subColumns: string[] };
+
+/**
+ * A pivoted table the Pelaksanaan tab renders — Klaster rows down, some other dimension across
+ * (#313). `columns` are the per-column keys left→right; each `rows` entry is one Cluster, its `cells`
+ * lining up under `columns` by index. The two delivery tables (columns = Sesi) leave `groups` unset
+ * and render a flat single-row header. The two assessment tables set `groups` (Stream over Peserta,
+ * #329) to render a two-row grouped header; their `columns` are the flattened `stream|participantType`
+ * keys behind that header.
+ */
+export type PivotTable = { columns: string[]; groups?: ColumnGroup[]; rows: PivotRow[] };
 
 /**
  * The four Pelaksanaan summary percentages (#313), each a whole-number percent rendered `{n}%`.
@@ -236,8 +250,9 @@ const STREAM_DISPLAY = { STEM: "STEM", Research: "Riset" } as const satisfies Re
  * boxes across, each cell `"{schools in the Cluster with that box ticked} / {schools in the Cluster}"`.
  * Reuses `/pretest`'s column order and completion-key helpers so the readout cannot drift from the
  * grid or the CHECK constraints. `kind` selects pretest or posttest; a posttest table reads all
- * `0/Y` until posttest rows exist. Column headers use the "∙" separator and the Indonesian stream
- * label.
+ * `0/Y` until posttest rows exist. The header is a two-row group (#329): each Stream (`STEM`, `Riset`
+ * via `STREAM_DISPLAY`) spans its two Peserta sub-columns (`Siswa`, `GTK-MS`); `columns` are the
+ * flattened `stream|participantType` keys behind it, in `PRETEST_COLUMNS` order.
  */
 export function assessmentTable(
   clusters: Cluster[],
@@ -253,7 +268,11 @@ export function assessmentTable(
     else schoolsByCluster.set(sc.clusterId, [sc]);
   }
   return {
-    columns: PRETEST_COLUMNS.map((col) => `${STREAM_DISPLAY[col.stream]} ∙ ${col.participantType}`),
+    columns: PRETEST_COLUMNS.map(columnKey),
+    groups: STREAMS.map((stream) => ({
+      label: STREAM_DISPLAY[stream],
+      subColumns: [...PRETEST_PARTICIPANT_TYPES],
+    })),
     rows: clusters.map((cluster) => {
       const clusterSchools = schoolsByCluster.get(cluster.id) ?? [];
       const cells = PRETEST_COLUMNS.map((col) => {

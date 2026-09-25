@@ -18,6 +18,7 @@ import {
 } from "-/components/laporan-perjadin/acquittal-transactions-sort";
 import {
   formatIdr,
+  formatRupiah,
   TRANSACTION_CATEGORIES,
   TRANSACTION_PARTICIPANT_TYPES,
   type TransactionCategory,
@@ -186,7 +187,7 @@ function TransactionCard({ perjadinId, line }: { perjadinId: string; line: Viewa
           <span className="text-muted-foreground">{line.category}</span>
           <Badge variant="secondary">{line.participantType}</Badge>
           <div className="ml-auto flex items-center gap-4">
-            <span className="tabular-nums">Rp {formatIdr(line.amountIdr)}</span>
+            <span className="tabular-nums">{formatRupiah(line.amountIdr)}</span>
             <Receipts
               perjadinId={perjadinId}
               line={line}
@@ -564,7 +565,7 @@ function RecordTransaction({
               id={`${fields}-amount`}
               type="text"
               inputMode="numeric"
-              value={amount === "" ? "" : `Rp ${formatIdr(Number(amount))}`}
+              value={amount === "" ? "" : formatIdr(Number(amount))}
               onChange={(event) => {
                 const digits = event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
                 setAmount(digits);

@@ -21,6 +21,7 @@ import {
 import { Input } from "@sugt/ui/components/input";
 import { Label } from "@sugt/ui/components/label";
 import { Textarea } from "@sugt/ui/components/textarea";
+import { TimeField } from "@sugt/ui/components/time-field";
 import { useId, useState, useTransition } from "react";
 
 /**
@@ -221,7 +222,8 @@ function MoveDate({ session }: { session: SessionDetail }) {
   const [heldOn, setHeldOn] = useState(session.heldOn);
   // The time moves with the date, in the same act (#72). Seeded from the current value so
   // moving only the date leaves the hour where the School expects it.
-  const [startsAt, setStartsAt] = useState(session.startsAt);
+  // `session.startsAt` is `HH:MM:SS`; TimeField's contract (and every sibling seed) is `HH:MM`.
+  const [startsAt, setStartsAt] = useState(session.startsAt.slice(0, 5));
   const [refusal, setRefusal] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const dateId = useId();
@@ -281,13 +283,12 @@ function MoveDate({ session }: { session: SessionDetail }) {
           <div className="grid gap-1.5">
             <Label htmlFor={timeId}>Jam Mulai{timeZoneSuffix(session.timeZone)}</Label>
             {/* Wall-clock time local to the School, in the School's Time Zone. */}
-            <Input
+            <TimeField
               id={timeId}
-              type="time"
               className="w-32"
               value={startsAt}
-              onChange={(event) => {
-                setStartsAt(event.target.value);
+              onValueChange={(value) => {
+                setStartsAt(value);
                 setRefusal(null);
               }}
             />
