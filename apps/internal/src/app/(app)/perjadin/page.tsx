@@ -1,4 +1,4 @@
-import { shortenKabupaten } from "-/lib/format-destination";
+import { PerjadinDirectoryList } from "-/components/perjadin-directory-list";
 import { requirePerson } from "-/lib/person";
 import { perjadinDirectory } from "@sugt/db/queries";
 import { LinkButton } from "@sugt/ui/components/link-button";
@@ -16,6 +16,9 @@ export const metadata: Metadata = { title: "Perjadin" };
  * The Advance is not here at all — it is `perjadinAcquittal`'s, which any signed-in Person may
  * read now (ADR-0004 reversed by ADR-0026, #180); this list simply never fetches money, and
  * writing money stays Staff-only.
+ *
+ * The list rendering lives in the `"use client"` `PerjadinDirectoryList`, which filters the payload
+ * in the browser (#334) — the page stays a Server Component that fetches the full list once.
  *
  * The route keeps the `/perjadin` slug [#14](https://github.com/mafiefa02/sugt/issues/14)
  * chose. It mirrors the surface name enumerated in
@@ -52,52 +55,8 @@ export default async function Page() {
           Belum ada Perjadin. Buka Rencanakan Perjadin untuk merencanakan yang pertama.
         </p>
       ) : (
-        <ul className="border-t border-border">
-          {trips.map((trip) => (
-            <li
-              key={trip.id}
-              className="flex flex-wrap items-center gap-x-3.5 gap-y-1 border-b border-border px-7 py-3"
-            >
-              <Link
-                href={`/perjadin/${trip.id}`}
-                className="text-sm font-medium hover:underline"
-              >
-                {shortenKabupaten(trip.destination)}
-              </Link>
-              <span className="text-sm text-muted-foreground tabular-nums">
-                {trip.startsOn} – {trip.endsOn}
-              </span>
-              <span className="text-xs text-muted-foreground">PIC {trip.picFullName}</span>
-              <PreparationPill
-                done={trip.preparationDone}
-                total={trip.preparationTotal}
-              />
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {trip.schoolCount} Sekolah
-              </span>
-            </li>
-          ))}
-        </ul>
+        <PerjadinDirectoryList trips={trips} />
       )}
     </div>
-  );
-}
-
-/**
- * **The `Persiapan: x/N` pill**, coloured by progress ([#114](https://github.com/mafiefa02/sugt/issues/114)):
- * neutral before anything is ticked, amber part-way, green when every item is done. `N` is at least
- * the six fixed items, so it is never zero and "complete" is `done === total`.
- */
-function PreparationPill({ done, total }: { done: number; total: number }) {
-  const tone =
-    done === total
-      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-      : done > 0
-        ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
-        : "bg-muted text-muted-foreground";
-  return (
-    <span className={`ml-auto rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${tone}`}>
-      Persiapan: {done}/{total}
-    </span>
   );
 }
