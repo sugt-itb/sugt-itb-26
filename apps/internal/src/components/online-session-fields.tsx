@@ -17,6 +17,7 @@ import {
 } from "@sugt/ui/components/dialog";
 import { Input } from "@sugt/ui/components/input";
 import { Label } from "@sugt/ui/components/label";
+import { TimeField } from "@sugt/ui/components/time-field";
 import { useId, useState, useTransition } from "react";
 
 /**
@@ -208,24 +209,22 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
             <div className="grid gap-1.5">
               <Label htmlFor={`${idPrefix}-time`}>Jam Mulai (WIB)</Label>
               {/* Online Sessions are always WIB (#283), so the zone is fixed, not School-derived. */}
-              <Input
+              <TimeField
                 id={`${idPrefix}-time`}
-                type="time"
                 value={startsAt}
-                onChange={(event) => {
-                  setStartsAt(event.target.value);
+                onValueChange={(value) => {
+                  setStartsAt(value);
                   setRefusal(null);
                 }}
               />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor={`${idPrefix}-end-time`}>Jam Selesai (WIB)</Label>
-              <Input
+              <TimeField
                 id={`${idPrefix}-end-time`}
-                type="time"
                 value={endsAt}
-                onChange={(event) => {
-                  setEndsAt(event.target.value);
+                onValueChange={(value) => {
+                  setEndsAt(value);
                   setRefusal(null);
                 }}
               />

@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@sugt/ui/components/select";
+import { TimeField } from "@sugt/ui/components/time-field";
 import { XIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -556,13 +557,12 @@ function PerjadinPlanForm({
                           id={`${idPrefix}-time-${school.id}-${index}`}
                           label={`Jam Mulai${timeZoneSuffix(school.timeZone)}`}
                         >
-                          <Input
+                          <TimeField
                             id={`${idPrefix}-time-${school.id}-${index}`}
-                            type="time"
                             className="w-32"
                             value={draft.time}
-                            onChange={(event) => {
-                              patchSession(school.id, index, { time: event.target.value });
+                            onValueChange={(value) => {
+                              patchSession(school.id, index, { time: value });
                             }}
                           />
                         </Field>
@@ -814,12 +814,11 @@ function TravelLeg({
           id={`${idPrefix}-time`}
           label="Jam"
         >
-          <Input
+          <TimeField
             id={`${idPrefix}-time`}
-            type="time"
             value={time}
-            onChange={(event) => {
-              onChange({ time: event.target.value });
+            onValueChange={(value) => {
+              onChange({ time: value });
             }}
           />
         </Field>
