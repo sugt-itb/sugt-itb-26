@@ -915,6 +915,41 @@ describe("the Perjadin list and detail", () => {
     expect(trip?.schoolCount).toBe(1);
   });
 
+  /**
+   * The three search axes the list carries but never renders (#334): the trip-scoped Teaching-Team
+   * names, the Group (Kelompok Perjalanan) member names, and the Schools the trip visits. Each is a
+   * correlated aggregate, so it returns every match without fanning the row out — `schoolCount` still
+   * reads 2 beside a two-entry `schoolNames`, and the names come back sorted and School-distinct.
+   */
+  it("returns pengajar, Group-member and School names for the search to match on", async () => {
+    const { pic, input } = await validPlan();
+    const planned = await planPerjadin(pic, {
+      ...input,
+      teacherNames: ["Dr. Bella", "Dr. Andi"],
+    });
+    if (planned.outcome !== "planned") throw new Error("fixture failed to plan");
+
+    const [trip] = await perjadinDirectory(nonStaff());
+
+    expect(trip?.pengajarNames).toEqual(["Dr. Andi", "Dr. Bella"]);
+    // The Group is the PIC alone (ADR-0020), so their name is the one Group-member name.
+    expect(trip?.groupMemberNames).toEqual(["Rina Nurhayati"]);
+    // Both Schools of the two Sessions, distinct and sorted; `schoolCount` agrees, proving no fan-out.
+    expect(trip?.schoolNames).toEqual(["SMAN 1 Bandung", "SMAN 2 Bandung"]);
+    expect(trip?.schoolCount).toBe(2);
+  });
+
+  /** A trip with an empty Teaching Team carries an empty array, never `null` — the `coalesce`. */
+  it("returns an empty pengajar array for a trip with no Teaching Team", async () => {
+    const { pic, input } = await validPlan();
+    const planned = await planPerjadin(pic, input);
+    if (planned.outcome !== "planned") throw new Error("fixture failed to plan");
+
+    const [trip] = await perjadinDirectory(nonStaff());
+
+    expect(trip?.pengajarNames).toEqual([]);
+  });
+
   it("is null for an id naming no Perjadin, which is what a stale link is", async () => {
     const pic = await staff();
 
