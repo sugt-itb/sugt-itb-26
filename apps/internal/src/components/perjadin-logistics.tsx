@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@sugt/ui/components/select";
+import { TimeField } from "@sugt/ui/components/time-field";
 import { useId, useState, useTransition } from "react";
 
 /** The `YYYY-MM-DD` half of a wall-clock `departure_at` / `return_at` string. */
@@ -244,12 +245,11 @@ function EditLogistics({
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor={`${fields}-dep-time`}>Jam (WIB)</Label>
-                <Input
+                <TimeField
                   id={`${fields}-dep-time`}
-                  type="time"
                   value={form.departureTime}
-                  onChange={(event) => {
-                    set({ departureTime: event.target.value });
+                  onValueChange={(value) => {
+                    set({ departureTime: value });
                   }}
                 />
               </div>
@@ -285,12 +285,11 @@ function EditLogistics({
               <div className="grid gap-1.5">
                 {/* Return leg lands in the destination's zone; omit the suffix on a legacy trip before a zone is picked. */}
                 <Label htmlFor={`${fields}-ret-time`}>Jam{timeZoneSuffix(form.returnZone)}</Label>
-                <Input
+                <TimeField
                   id={`${fields}-ret-time`}
-                  type="time"
                   value={form.returnTime}
-                  onChange={(event) => {
-                    set({ returnTime: event.target.value });
+                  onValueChange={(value) => {
+                    set({ returnTime: value });
                   }}
                 />
               </div>

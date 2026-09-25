@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@sugt/ui/components/select";
+import { TimeField } from "@sugt/ui/components/time-field";
 import Link from "next/link";
 import { useId, useState, useTransition } from "react";
 
@@ -287,12 +288,11 @@ function SessionDialog({
             <div className="grid gap-1.5">
               {/* Zone follows the picked School (#165): shown once one is chosen in add mode, seeded from the Session's School in edit mode, omitted when none is in scope. */}
               <Label htmlFor={`${idPrefix}-time`}>Jam Mulai{timeZoneSuffix(timeZone)}</Label>
-              <Input
+              <TimeField
                 id={`${idPrefix}-time`}
-                type="time"
                 value={time}
-                onChange={(event) => {
-                  setTime(event.target.value);
+                onValueChange={(value) => {
+                  setTime(value);
                   setRefusal(null);
                 }}
               />

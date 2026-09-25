@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
 import { Input } from "@sugt/ui/components/input";
 import { Label } from "@sugt/ui/components/label";
+import { TimeField } from "@sugt/ui/components/time-field";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
@@ -163,13 +164,12 @@ function ArrangeOnlineSessionForm(
           id={timeId}
           label="Jam Mulai (WIB)"
         >
-          <Input
+          <TimeField
             id={timeId}
-            type="time"
             className="w-32"
             value={startsAt}
-            onChange={(event) => {
-              setStartsAt(event.target.value);
+            onValueChange={(value) => {
+              setStartsAt(value);
             }}
           />
         </Field>
@@ -178,13 +178,12 @@ function ArrangeOnlineSessionForm(
           id={endTimeId}
           label="Jam Selesai (WIB)"
         >
-          <Input
+          <TimeField
             id={endTimeId}
-            type="time"
             className="w-32"
             value={endsAt}
-            onChange={(event) => {
-              setEndsAt(event.target.value);
+            onValueChange={(value) => {
+              setEndsAt(value);
             }}
           />
           {endBeforeStart && (
