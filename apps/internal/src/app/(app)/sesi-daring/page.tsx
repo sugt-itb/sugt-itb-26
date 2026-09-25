@@ -1,7 +1,6 @@
-import { SessionStatusBadge } from "-/components/session-labels";
+import { OnlineSessionDirectoryList } from "-/components/online-session-directory-list";
 import { requirePerson } from "-/lib/person";
 import { onlineSessionDirectory } from "@sugt/db/queries";
-import { formatSessionStartTimeWithWib } from "@sugt/domain";
 import { LinkButton } from "@sugt/ui/components/link-button";
 import { Plus } from "lucide-react";
 import type { Metadata } from "next";
@@ -51,32 +50,7 @@ export default async function Page() {
           Belum ada Sesi daring. Jadwalkan yang pertama di Jadwalkan Sesi daring.
         </p>
       ) : (
-        <ul className="border-t border-border">
-          {sessions.map((session) => (
-            <li
-              key={session.id}
-              className="flex flex-wrap items-center gap-x-3.5 gap-y-1 border-b border-border px-7 py-3"
-            >
-              <Link
-                href={`/sekolah/${session.schoolSlug}`}
-                className="text-sm font-medium hover:underline"
-              >
-                {session.schoolName}
-              </Link>
-              <span className="text-sm text-muted-foreground tabular-nums">
-                {session.heldOn} ·{" "}
-                {formatSessionStartTimeWithWib(session.startsAt, session.timeZone)}
-              </span>
-              <SessionStatusBadge status={session.status} />
-              <Link
-                href={`/sesi-daring/${session.id}`}
-                className="ml-auto text-xs text-muted-foreground hover:underline"
-              >
-                Lihat sesi
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <OnlineSessionDirectoryList sessions={sessions} />
       )}
     </div>
   );
