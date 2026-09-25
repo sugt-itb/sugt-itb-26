@@ -9,7 +9,7 @@ import { PerjadinPreparationDialog } from "-/components/perjadin-preparation";
 import { shortenKabupaten } from "-/lib/format-destination";
 import type { MyPerjadinSchool, MyUpcomingPerjadin } from "@sugt/db/queries";
 import {
-  formatIdr,
+  formatRupiah,
   formatSessionStartTimeWithWib,
   type TimeZone,
   type TransportMode,
@@ -158,7 +158,7 @@ function TripCard({ trip }: { trip: MyUpcomingPerjadin }) {
       <div className="mt-2.5 grid gap-1 text-sm">
         <span className="text-muted-foreground">
           Uang Perjalanan:{" "}
-          <span className="text-foreground tabular-nums">Rp {formatIdr(trip.advanceIdr)}</span>
+          <span className="text-foreground tabular-nums">{formatRupiah(trip.advanceIdr)}</span>
         </span>
         {/* The same travel-float remainder the acquittal derives (`advanceIdr - drawnDownIdr`, only
             ADVANCE_DRAWDOWN_CATEGORIES draw down — ADR-0029), pinned equal by a query test so the two
@@ -166,7 +166,7 @@ function TripCard({ trip }: { trip: MyUpcomingPerjadin }) {
         <span className="text-muted-foreground">
           Tersisa:{" "}
           <span className="text-foreground tabular-nums">
-            Rp {formatIdr(trip.advanceIdr - trip.drawnDownIdr)}
+            {formatRupiah(trip.advanceIdr - trip.drawnDownIdr)}
           </span>
         </span>
       </div>

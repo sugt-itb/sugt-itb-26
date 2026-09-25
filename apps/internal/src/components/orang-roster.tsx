@@ -52,62 +52,110 @@ function OrangRoster({
   canManageGrants: boolean;
 }) {
   const [showRevoked, setShowRevoked] = useState(false);
+  const [query, setQuery] = useState("");
 
+  // Filtering runs in the browser over the payload the page already fetched — the roster is a
+  // bounded set and its rows carry every field the search reads, so a filtered query would buy a
+  // round trip per keystroke for nothing (the shape `SchoolDirectoryTable` uses). Name and email
+  // both match, because a roster two Staff scan at once is searched either way. Both the active and
+  // the revoked lists narrow, so a revoked row is still findable behind its toggle.
   const { active, revoked } = useMemo(() => {
-    const activeRows = people.filter((entry) => entry.active);
-    const revokedRows = people.filter((entry) => !entry.active);
+    const needle = query.trim().toLowerCase();
+    const matches = (entry: RosterEntry) =>
+      needle === "" ||
+      entry.fullName.toLowerCase().includes(needle) ||
+      entry.email.toLowerCase().includes(needle);
+    const activeRows = people.filter((entry) => entry.active && matches(entry));
+    const revokedRows = people.filter((entry) => !entry.active && matches(entry));
     return { active: activeRows, revoked: revokedRows };
-  }, [people]);
+  }, [people, query]);
+
+  // The active roster is what shows by default; revoked rows sit behind the toggle below, whose
+  // label carries their own matched count. So the headline counts the active set against the active
+  // total — counting `active + revoked` would promise matches the default view doesn't show (a query
+  // that hits only a revoked row would read "3 dari …" above an empty table).
+  const activeTotal = useMemo(
+    () => people.reduce((count, entry) => (entry.active ? count + 1 : count), 0),
+    [people],
+  );
+  // Nothing matched in either list — the one case that hides the table entirely, so a revoked-only
+  // match still leaves the toggle reachable.
+  const shownCount = active.length + revoked.length;
 
   return (
     <div className="flex min-h-full flex-col p-7">
       {canWrite && <AddPersonForm />}
 
-      <Table className="border border-border">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nama</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Peran</TableHead>
-            <TableHead>Status</TableHead>
-            {canManageGrants && <TableHead>Akses</TableHead>}
-            {canWrite && <TableHead className="text-right">Tindakan</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {active.map((entry) => (
-            <PersonRow
-              key={entry.id}
-              entry={entry}
-              canWrite={canWrite}
-              canManageGrants={canManageGrants}
-            />
-          ))}
-
-          {showRevoked &&
-            revoked.map((entry) => (
-              <PersonRow
-                key={entry.id}
-                entry={entry}
-                canWrite={canWrite}
-                canManageGrants={canManageGrants}
-              />
-            ))}
-        </TableBody>
-      </Table>
-
-      {revoked.length > 0 && (
-        <button
-          type="button"
-          className="mt-3 self-start text-sm text-muted-foreground hover:text-foreground hover:underline"
-          onClick={() => {
-            setShowRevoked((previous) => !previous);
+      {/* The roster search, distinct from the add-person form above — this one filters the table,
+          it does not create anyone. */}
+      <div className="mb-4">
+        <Input
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
           }}
-        >
-          {showRevoked
-            ? "Sembunyikan yang dinonaktifkan"
-            : `Tampilkan yang dinonaktifkan (${revoked.length})`}
-        </button>
+          placeholder="Cari nama atau email"
+          aria-label="Cari orang"
+          className="h-8 w-full max-w-72"
+        />
+        <p className="mt-2.5 text-xs text-muted-foreground">
+          Menampilkan {active.length} dari {activeTotal} orang aktif
+        </p>
+      </div>
+
+      {shownCount === 0 ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">
+          Tidak ada orang yang cocok dengan pencarian ini.
+        </p>
+      ) : (
+        <>
+          <Table className="border border-border">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nama</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Peran</TableHead>
+                <TableHead>Status</TableHead>
+                {canManageGrants && <TableHead>Akses</TableHead>}
+                {canWrite && <TableHead className="text-right">Tindakan</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {active.map((entry) => (
+                <PersonRow
+                  key={entry.id}
+                  entry={entry}
+                  canWrite={canWrite}
+                  canManageGrants={canManageGrants}
+                />
+              ))}
+
+              {showRevoked &&
+                revoked.map((entry) => (
+                  <PersonRow
+                    key={entry.id}
+                    entry={entry}
+                    canWrite={canWrite}
+                    canManageGrants={canManageGrants}
+                  />
+                ))}
+            </TableBody>
+          </Table>
+
+          {revoked.length > 0 && (
+            <button
+              type="button"
+              className="mt-3 self-start text-sm text-muted-foreground hover:text-foreground hover:underline"
+              onClick={() => {
+                setShowRevoked((previous) => !previous);
+              }}
+            >
+              {showRevoked
+                ? "Sembunyikan yang dinonaktifkan"
+                : `Tampilkan yang dinonaktifkan (${revoked.length})`}
+            </button>
+          )}
+        </>
       )}
     </div>
   );

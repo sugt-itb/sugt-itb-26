@@ -4,7 +4,7 @@ import { shortenKabupaten } from "-/lib/format-destination";
 import { requirePerson } from "-/lib/person";
 import { signedReceiptUrl } from "-/lib/receipt-media";
 import { perjadinAcquittal, type AcquittalTransaction } from "@sugt/db/queries";
-import { formatIdr } from "@sugt/domain";
+import { formatRupiah } from "@sugt/domain";
 import { LinkButton } from "@sugt/ui/components/link-button";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -195,7 +195,7 @@ function Figure({ label, amountIdr }: { label: string; amountIdr: number }) {
   return (
     <div>
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="tabular-nums">Rp {formatIdr(amountIdr)}</dd>
+      <dd className="tabular-nums">{formatRupiah(amountIdr)}</dd>
     </div>
   );
 }
