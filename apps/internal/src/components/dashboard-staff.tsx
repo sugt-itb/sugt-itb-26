@@ -1,7 +1,7 @@
 import { MyPerjadinSection } from "-/components/my-perjadin-section";
 import { shortenKabupaten } from "-/lib/format-destination";
 import type { MyUpcomingPerjadin, StaffDashboard } from "@sugt/db/queries";
-import { formatIdr } from "@sugt/domain";
+import { formatRupiah } from "@sugt/domain";
 import Link from "next/link";
 
 /**
@@ -84,7 +84,7 @@ function DashboardStaff({
           <span className="text-xs text-muted-foreground">Hanya DITSAMA</span>
         </div>
         <p className="mt-1 font-heading text-2xl font-semibold tabular-nums">
-          Rp {formatIdr(dashboard.advanceOutstandingIdr)}
+          {formatRupiah(dashboard.advanceOutstandingIdr)}
         </p>
       </section>
 
@@ -121,7 +121,7 @@ function DashboardStaff({
                   </span>
                   <span className="text-muted-foreground">
                     <span className="text-foreground tabular-nums">
-                      Rp {formatIdr(report.remainderIdr)}
+                      {formatRupiah(report.remainderIdr)}
                     </span>{" "}
                     Sisa untuk dikembalikan
                   </span>

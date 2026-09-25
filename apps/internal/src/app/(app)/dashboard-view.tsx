@@ -1,6 +1,6 @@
 "use client";
 
-import { formatIdr } from "@sugt/domain";
+import { formatRupiah } from "@sugt/domain";
 import {
   Card,
   CardContent,
@@ -81,13 +81,13 @@ export function DashboardView({
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
                 <div className="min-w-0">
                   <div className="font-heading text-lg tabular-nums sm:text-2xl">
-                    Rp {formatIdr(budget.usedIdr)}
+                    {formatRupiah(budget.usedIdr)}
                   </div>
                   <div className="text-sm text-muted-foreground">Anggaran terpakai</div>
                 </div>
                 <div className="min-w-0 sm:text-right">
                   <div className="font-heading text-lg tabular-nums sm:text-2xl">
-                    Rp {formatIdr(budget.totalIdr)}
+                    {formatRupiah(budget.totalIdr)}
                   </div>
                   <div className="text-sm text-muted-foreground">Total anggaran</div>
                 </div>
