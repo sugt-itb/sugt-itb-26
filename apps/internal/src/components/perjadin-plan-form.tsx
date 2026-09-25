@@ -320,7 +320,7 @@ function PerjadinPlanForm({
             id={advanceId}
             type="text"
             inputMode="numeric"
-            value={trip.advanceIdr === "" ? "" : `Rp ${formatIdr(Number(trip.advanceIdr))}`}
+            value={trip.advanceIdr === "" ? "" : formatIdr(Number(trip.advanceIdr))}
             onChange={(event) => {
               const digits = event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
               setTrip((previous) => ({ ...previous, advanceIdr: digits }));

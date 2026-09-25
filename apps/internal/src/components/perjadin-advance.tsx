@@ -105,7 +105,7 @@ function EditAdvance({
             id={fieldId}
             type="text"
             inputMode="numeric"
-            value={empty ? "" : `Rp ${formatIdr(Number(amount))}`}
+            value={empty ? "" : formatIdr(Number(amount))}
             onChange={(event) => {
               setAmount(event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""));
               setRefusal(null);
