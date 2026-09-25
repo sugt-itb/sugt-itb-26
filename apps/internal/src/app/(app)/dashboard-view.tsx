@@ -164,9 +164,9 @@ function SummaryCard({ label, percent }: { label: string; percent: number }) {
 /**
  * One pivoted table: Klaster rows down, `table.columns` across, `"X/Y"` per cell (#313). A cell's
  * `i`th value lines up under the `i`th column — the same order the derive builds each row's cells
- * in, whether the columns are Sesi (delivery) or Stream ∙ Peserta (assessment). When `table.groups`
- * is set (the assessment tables, #329) the header is two rows — each Stream group spanning its
- * Peserta sub-columns; otherwise it is the single flat row the delivery tables use.
+ * in, whether the columns are Sesi labels (delivery) or `stream|participantType` keys (assessment).
+ * When `table.groups` is set (the assessment tables, #329) the header is two rows — each Stream group
+ * spanning its Peserta sub-columns; otherwise it is the single flat row the delivery tables use.
  */
 function MatrixCard({ title, table }: { title: string; table: PivotTable }) {
   return (
