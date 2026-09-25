@@ -218,7 +218,7 @@ function MatrixCard({ title, table }: { title: string; table: PivotTable }) {
                       key={table.columns[i] ?? i}
                       className="tabular-nums"
                     >
-                      {cell}
+                      <FractionCell value={cell} />
                     </TableCell>
                   ))}
                 </TableRow>
@@ -228,5 +228,23 @@ function MatrixCard({ title, table }: { title: string; table: PivotTable }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * One `"n/m"` fraction cell, with the `/` and the denominator dimmed so the numerator — the value
+ * that matters — reads first (#335). The subtle half takes `text-muted-foreground`, the app's
+ * established still-AA-legible muted token, so the denominator stays readable in both themes. This is
+ * a purely presentational split: the cell string is still built whole in `dashboard-derive.ts`, and
+ * a cell that is not an `n/m` fraction (the guard) renders unchanged.
+ */
+function FractionCell({ value }: { value: string }) {
+  const match = /^(\d+)\/(\d+)$/.exec(value);
+  if (match === null) return value;
+  return (
+    <>
+      {match[1]}
+      <span className="text-muted-foreground">/{match[2]}</span>
+    </>
   );
 }
