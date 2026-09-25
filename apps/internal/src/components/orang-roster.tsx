@@ -70,6 +70,16 @@ function OrangRoster({
     return { active: activeRows, revoked: revokedRows };
   }, [people, query]);
 
+  // The active roster is what shows by default; revoked rows sit behind the toggle below, whose
+  // label carries their own matched count. So the headline counts the active set against the active
+  // total — counting `active + revoked` would promise matches the default view doesn't show (a query
+  // that hits only a revoked row would read "3 dari …" above an empty table).
+  const activeTotal = useMemo(
+    () => people.reduce((count, entry) => (entry.active ? count + 1 : count), 0),
+    [people],
+  );
+  // Nothing matched in either list — the one case that hides the table entirely, so a revoked-only
+  // match still leaves the toggle reachable.
   const shownCount = active.length + revoked.length;
 
   return (
@@ -89,7 +99,7 @@ function OrangRoster({
           className="h-8 w-full max-w-72"
         />
         <p className="mt-2.5 text-xs text-muted-foreground">
-          Menampilkan {shownCount} dari {people.length} orang
+          Menampilkan {active.length} dari {activeTotal} orang aktif
         </p>
       </div>
 
