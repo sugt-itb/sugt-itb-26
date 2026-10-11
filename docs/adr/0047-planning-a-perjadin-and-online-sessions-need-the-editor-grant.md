@@ -63,3 +63,9 @@ Pimpinan write.
   with offline Sessions and are not gated here: who writes an **existing** Perjadin and its Sessions is
   the companion decision, ADR-0048 ([#439](https://github.com/sugt-itb/sugt-itb-26/issues/439)), not
   this one.
+
+## Amendment (2026-10-12): two Grants, not one
+
+The Editor Grant split ([ADR-0052](./0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md), #469). **Planning a Perjadin** needs **Perjadin Editor**; **recording,
+editing and deleting an online Session**, Tandai terlaksana and Batalkan Sesi on one, and `/pretest`
+need **Daring Editor**. Neither reads the Dashboard. An Administrator still does all of it.

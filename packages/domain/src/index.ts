@@ -294,23 +294,45 @@ export const PERJADIN_ROLE_LABELS: Record<Role, string> = {
  * `(id, role)` foreign keys, and being Staff-only they can never punch through "a Pimpinan writes
  * nothing" (ADR-0025). See `docs/adr/0028-grants-are-a-second-additive-access-axis.md`.
  *
- * Three named Grants:
+ * Six named Grants (ADR-0052, #469):
  * - **Administrator** — administers Grants (assign/revoke any Grant on any Staff Person, including
  *   making another Administrator) and **implies every other Grant**, so an Administrator satisfies
  *   any grant check without holding that grant's own row.
- * - **Editor** — may write Preparation Cards.
- * - **Dashboard Viewer** — may read the Dashboard, and nothing more; the read-only Dashboard
- *   capability for a Staff Person who is neither Administrator nor Editor. Administrator implies it
- *   like every Grant. A Pimpinan never holds it — Grants are Staff-only (ADR-0028); a Pimpinan's
- *   Dashboard access comes from their role, not this Grant.
+ * - **Keuangan** — gates nothing yet; reserved for a future `/keuangan`.
+ * - **Perjadin Editor** — plans a Perjadin and writes every Perjadin, not only those whose Group the
+ *   Person is in (ADR-0047, ADR-0048).
+ * - **Daring Editor** — `/pretest` and the online Sessions: recording, editing, deleting, Tandai
+ *   terlaksana and Batalkan Sesi on one.
+ * - **Dashboard Editor** — writes the Persiapan Program tab's Preparation Cards, and **implies
+ *   Dashboard Viewer** (`GRANT_IMPLIED_BY`).
+ * - **Dashboard Viewer** — may read the Dashboard, and nothing more. A Pimpinan never holds it —
+ *   Grants are Staff-only (ADR-0028); a Pimpinan's Dashboard access comes from their role.
+ *
+ * **No other Grant implies another**: Perjadin Editor, Daring Editor and Keuangan do not read the
+ * Dashboard.
  *
  * Unlike `TRANSACTION_CATEGORIES`, these **are** terms the Programme's language defines — `CONTEXT.md`
  * glosses them under **Access** — so they belong here beside `ROLES`. The list is mirrored by
  * `person_grant_grant_check` character for character (see `packages/db/src/schema/people.ts`); a
  * future Grant widens that CHECK the way `0018_widen_person_role_pimpinan.sql` widened the role one.
  */
-export const GRANTS = ["Administrator", "Editor", "Dashboard Viewer"] as const;
+export const GRANTS = [
+  "Administrator",
+  "Keuangan",
+  "Perjadin Editor",
+  "Daring Editor",
+  "Dashboard Editor",
+  "Dashboard Viewer",
+] as const;
 export type Grant = (typeof GRANTS)[number];
+
+/**
+ * **Which other Grants satisfy a Grant check** (ADR-0052), besides Administrator, which satisfies
+ * every one. Only one Grant is implied by another: Dashboard Editor reads the Dashboard it writes.
+ */
+export const GRANT_IMPLIED_BY: Partial<Record<Grant, readonly Grant[]>> = {
+  "Dashboard Viewer": ["Dashboard Editor"],
+};
 
 /**
  * How each Grant is **labelled in the UI**, keyed on the stored `Grant` exactly like `ROLE_LABELS`.
@@ -320,7 +342,10 @@ export type Grant = (typeof GRANTS)[number];
  */
 export const GRANT_LABELS: Record<Grant, string> = {
   Administrator: "Administrator",
-  Editor: "Editor",
+  Keuangan: "Keuangan",
+  "Perjadin Editor": "Perjadin Editor",
+  "Daring Editor": "Daring Editor",
+  "Dashboard Editor": "Dashboard Editor",
   "Dashboard Viewer": "Dashboard Viewer",
 };
 

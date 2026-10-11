@@ -22,8 +22,8 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   staffOnly: boolean;
-  /** Shown only to an Editor / Administrator. Absent means "no Grant gate". */
-  editorOnly?: boolean;
+  /** Shown only to a Daring Editor / Administrator. Absent means "no Grant gate". */
+  daringEditorOnly?: boolean;
   /** Shown only to a Person who may read the Dashboard (`canViewDashboard`). Absent means "no gate". */
   dashboardView?: boolean;
   /** Shown only to an Administrator. Absent means "no gate". */
@@ -61,13 +61,14 @@ export type VisibleNavItem = NavItem & { badge: boolean };
  * Omitting a link is not access control. The gate is a Staff-only choke point in the
  * data layer, which is issue #25 rather than this shell.
  *
- * `editorOnly` is a second, narrower dimension beside `staffOnly` (ADR-0028): a link shown only to an
- * Editor (an Administrator implies it). `/pretest` carries it — its page `forbidden()`s a
+ * `daringEditorOnly` is a second, narrower dimension beside `staffOnly` (ADR-0028): a link shown only to a
+ * Daring Editor (an Administrator implies it). `/pretest` carries it — its page `forbidden()`s a
  * non-holder, so linking a screen that would refuse them is the same "worse than no link" rule the
  * Staff-only entries follow. The shell resolves the Grant once and passes the boolean down.
  *
  * `dashboardView` is a third such dimension (#322): the `/` link is shown only when the viewer may
- * read the Dashboard — a `Pimpinan` by Role, a `Staff` holding `Editor` or `Dashboard Viewer`. Its
+ * read the Dashboard — a `Pimpinan` by Role, a `Staff` holding `Dashboard Viewer`
+ * (or `Dashboard Editor` or `Administrator`, which imply it). Its
  * page redirects a grant-less Staff to `/pendamping`, so — same rule again — the link is hidden for
  * exactly the callers it would bounce. The shell computes `canViewDashboard` once (the one predicate
  * the page guard shares) and passes the boolean down.
@@ -83,7 +84,13 @@ export type VisibleNavItem = NavItem & { badge: boolean };
 const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: Gauge, staffOnly: false, dashboardView: true },
   { href: "/kalender", label: "Kalender", icon: CalendarDays, staffOnly: false },
-  { href: "/pretest", label: "Pretest", icon: ClipboardCheck, staffOnly: false, editorOnly: true },
+  {
+    href: "/pretest",
+    label: "Pretest",
+    icon: ClipboardCheck,
+    staffOnly: false,
+    daringEditorOnly: true,
+  },
   { href: "/pendamping", label: "Pendamping", icon: LayoutDashboard, staffOnly: true },
   { href: "/perjadin", label: "Perjadin", icon: Plane, staffOnly: false },
   { href: "/sesi-daring", label: "Sesi Daring", icon: ListVideo, staffOnly: false },
@@ -110,13 +117,13 @@ const NAV: NavItem[] = [
  */
 export function sidebarItems({
   role,
-  canEditMonitoring,
+  canEditDaring,
   canViewDashboard,
   canAdminister,
   driveNeedsAttention,
 }: {
   role: Role;
-  canEditMonitoring: boolean;
+  canEditDaring: boolean;
   canViewDashboard: boolean;
   canAdminister: boolean;
   /** Receipts cannot be uploaded until an Administrator fixes the Drive connection. */
@@ -125,7 +132,7 @@ export function sidebarItems({
   const visible = NAV.filter(
     (item) =>
       (!item.staffOnly || role === "Staff") &&
-      (!item.editorOnly || canEditMonitoring) &&
+      (!item.daringEditorOnly || canEditDaring) &&
       (!item.dashboardView || canViewDashboard) &&
       (!item.administratorOnly || canAdminister),
   ).map((item) => ({ ...item, badge: Boolean(item.driveBadge) && driveNeedsAttention }));

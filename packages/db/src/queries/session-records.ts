@@ -125,7 +125,7 @@ export type FileSessionRecordResult =
  *
  * Opens with the Staff-only choke point, which throws `NotStaffError` on a Teaching Team
  * caller, then `requireSessionWriter`, which throws `NotOnPerjadinError` on a Staff member off
- * the Session's trip without the Editor Grant (ADR-0048). Those are the opposite case to the
+ * the Session's trip without the Perjadin Editor Grant (ADR-0048). Those are the opposite case to the
  * refusals below: only Staff file one, and the composite foreign key
  * `session_record_filed_by_staff` holds the Staff half behind the throw. A refusal here is instead a state a correct screen can reach — the Session was
  * cancelled, or this member already filed while the page was open.

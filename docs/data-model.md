@@ -216,9 +216,14 @@ historical reference to that person.
 
 **Grants live in `person_grant`, a second access axis** ([ADR-0028](./adr/0028-grants-are-a-second-additive-access-axis.md)):
 a row is a capability a Staff Person holds, its `grant` column CHECKed against the closed set
-`in ('Administrator', 'Editor', 'Dashboard Viewer')` — widened to admit `'Dashboard Viewer'` by
-migration `0031` ([#321](https://github.com/sugt-itb/sugt-itb-26/issues/321)), the drop-and-re-add
-CHECK pattern `0018`/`0025` use, and character-for-character `GRANTS` in `@sugt/domain`. The
+`in ('Administrator', 'Keuangan', 'Perjadin Editor', 'Daring Editor', 'Dashboard Editor', 'Dashboard Viewer')`,
+character-for-character `GRANTS` in `@sugt/domain`. Migration `0051`
+([#469](https://github.com/sugt-itb/sugt-itb-26/issues/469),
+[ADR-0052](./adr/0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md)) split `'Editor'`
+into the three Editors, giving every Editor all three, and added `'Keuangan'`, by the drop-and-re-add
+CHECK pattern `0018`/`0025`/`0031` use with the rows moved between the drop and the add. No Grant
+implies another except `Administrator` (all of them) and `Dashboard Editor` (`Dashboard Viewer`), a
+rule `hasGrant` holds, not the database. The
 `Dashboard Viewer` grant is what [#322](https://github.com/sugt-itb/sugt-itb-26/issues/322)/[ADR-0037](./adr/0037-dashboard-read-is-gated-by-a-grant.md)
 check to gate the Dashboard read. The rest of `person_grant` (its columns, its `unique (person_id, grant)`,
 its Staff-only rule) is otherwise undocumented here — a pre-existing gap from ADR-0028, out of scope to
@@ -711,7 +716,7 @@ independently.
 from `schools.length` at read time, matching every existing "X / 47" pattern (`aggregates.ts`,
 `dashboard-derive.ts`) — a stored copy would be a second source of truth that could drift. Reads are
 open to any signed-in Person; the one write (tick/un-tick) opens with `requireGrant(caller,
-"Editor")` (ADR-0028).
+"Daring Editor")` (ADR-0028, ADR-0052).
 
 ---
 
@@ -2402,7 +2407,7 @@ the authenticated Person and refuses a non-Staff caller, at a single choke point
 
 **Who writes a Perjadin** is the same kind of rule, at the same choke point. A Perjadin and its
 offline Sessions are written only by **its Group** — a `group_member` row for the caller, the PIC
-included — or by a Staff Person holding **Editor** (an Administrator implies it)
+included — or by a Staff Person holding **Perjadin Editor** (an Administrator implies it)
 ([ADR-0048](./adr/0048-a-perjadin-is-written-by-its-group.md), #439). Every write on a trip runs
 `requirePerjadinWriter` (or `requireSessionWriter`, for a write naming an offline Session) after its
 `requireStaff`, on the write's own transaction where it has one, and a non-member without the Grant

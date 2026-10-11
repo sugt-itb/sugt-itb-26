@@ -314,10 +314,13 @@ describe("the Dashboard's tabs", () => {
     expect(html).not.toContain("Persiapan Luring 8–13 Mar 2027");
   });
 
-  it("opens on Persiapan Luring for a URL naming a week, read-only even for an Editor", async () => {
+  it("opens on Persiapan Luring for a URL naming a week, read-only even for a Dashboard Editor", async () => {
     const staff = await addPerson({ fullName: "Ed", email: "ed@itb.ac.id", role: "Staff" });
-    await addGrant(staff.id, "Editor");
-    vi.mocked(requirePerson).mockResolvedValue({ ...staff, grants: ["Editor"] } as Person);
+    await addGrant(staff.id, "Dashboard Editor");
+    vi.mocked(requirePerson).mockResolvedValue({
+      ...staff,
+      grants: ["Dashboard Editor"],
+    } as Person);
     const cluster = (await addCluster({ slug: "c", name: "Cluster" })).id;
     const sub = (await addSubCluster({ slug: "k", name: "Kelompok 7", clusterId: cluster })).id;
     await addPerjadin({

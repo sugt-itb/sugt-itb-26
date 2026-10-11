@@ -65,3 +65,11 @@ holding any of the three grants passes the predicate and renders `/` with no red
   a link that works is never hidden.
 - A Staff Person's Dashboard access is now an Administrator's decision (grant `Dashboard Viewer` or
   `Editor`), revocable like any Grant, rather than a property of merely being signed in.
+
+## Amendment (2026-10-12): who reads the Dashboard
+
+The Dashboard is read by the Pimpinan Role, Dashboard Viewer, **Dashboard Editor** (which implies
+Dashboard Viewer) or Administrator ([ADR-0052](./0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md), #469). Editor is retired, and the Grants that took over its
+other jobs — Perjadin Editor and Daring Editor — do **not** read `/`, nor does Keuangan: a Staff
+member holding only those is redirected to `/pendamping` and sees Pendamping first, as a grant-less
+one does. `canViewDashboard` is now one check, `hasGrant(person, "Dashboard Viewer")`.

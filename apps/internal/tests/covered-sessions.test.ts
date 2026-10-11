@@ -14,7 +14,7 @@ import {
   addSchool,
   addSession,
   addSubCluster,
-  asEditor,
+  withGrant,
   resetDatabase,
 } from "./support/fixtures";
 
@@ -33,8 +33,9 @@ import {
  */
 async function scene() {
   // An Editor: the plan form's read needs the Grant (ADR-0047).
-  const pic = await asEditor(
+  const pic = await withGrant(
     await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" }),
+    "Perjadin Editor",
   );
   await addProvince("KT", "Kalimantan Timur", "WITA");
   const cluster = await addCluster({ slug: "kaltim", name: "Cluster Kaltim" });

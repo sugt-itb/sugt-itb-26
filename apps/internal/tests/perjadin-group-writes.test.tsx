@@ -168,7 +168,7 @@ async function people() {
     andi: await staffWith([], "Andi Wijaya"),
     fajar: await staffWith([], "Fajar Pratama"),
     dewi: await staffWith(["Dashboard Viewer"], "Dewi Lestari"),
-    budi: await staffWith(["Editor"], "Budi Santoso"),
+    budi: await staffWith(["Perjadin Editor"], "Budi Santoso"),
     sari: await staffWith(["Administrator"], "Sari Utami"),
     hadi: (await addPerson({
       fullName: "Pak Hadi",

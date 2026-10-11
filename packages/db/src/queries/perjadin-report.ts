@@ -19,7 +19,7 @@ import { requirePerjadinWriter, requireStaff } from "./staff-only";
  * **Perjadin Report** — the acquittal of one Perjadin. Reading it is now open to any signed-in
  * Person (ADR-0026 reversed ADR-0004's money-read half, #180); only **writing** it — recording or
  * deleting a transaction, attaching or deleting a receipt, filing — is the trip's Group's,
- * an Editor's or an Administrator's (ADR-0048), each write query below opening with its own
+ * a Perjadin Editor's or an Administrator's (ADR-0048), each write query below opening with its own
  * `requireStaff` and running `requirePerjadinWriter`.
  *
  * There is no `perjadin_report` table: a Perjadin yields exactly one Report, always, so the

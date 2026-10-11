@@ -18,7 +18,7 @@ import { requireGrant } from "./staff-only";
  * split `preparationCards` keeps.
  *
  * **Reading is open** to any signed-in Person, like the rest of `/monitoring`. **The write opens
- * with `requireGrant(caller, "Editor")`** (an Administrator implies it, ADR-0028): a
+ * with `requireGrant(caller, "Daring Editor")`** (an Administrator implies it, ADR-0028): a
  * layout does not run before a Server Action, so this line is the enforcement, not the hidden UI
  * control.
  */
@@ -59,7 +59,7 @@ export type SetAssessmentCompletionInput = AssessmentCompletion & { done: boolea
 export type SetAssessmentCompletionResult = { outcome: "ticked" } | { outcome: "unticked" };
 
 /**
- * Tick or un-tick one box — **Editor-guarded**. Ticking inserts the tuple (a repeat tick
+ * Tick or un-tick one box — **Daring Editor-guarded**. Ticking inserts the tuple (a repeat tick
  * is a no-op by the unique constraint, so the box cannot go to two rows); un-ticking deletes it (a
  * repeat un-tick removes nothing). Either way the write drives the box to the requested state and
  * reports which state that is, so a stale screen re-ticking or re-unticking is idempotent rather
@@ -69,7 +69,7 @@ export async function setAssessmentCompletion(
   caller: Person,
   input: SetAssessmentCompletionInput,
 ): Promise<SetAssessmentCompletionResult> {
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Daring Editor");
 
   const { schoolId, stream, participantType, kind, done } = input;
 

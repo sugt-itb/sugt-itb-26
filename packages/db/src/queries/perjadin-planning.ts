@@ -32,7 +32,7 @@ import { requireGrant, requireStaff } from "./staff-only";
  * together.
  *
  * Staff-only, by the surface list: arranging delivery is one of `./staff-only.ts`'s two reasons. **And
- * it needs the Editor Grant** (ADR-0047): planning a trip is a deliberate choice of who plans, not
+ * it needs the Perjadin Editor Grant** (ADR-0047): planning a trip is a deliberate choice of who plans, not
  * every Staff member's.
  *
  * **Planning starts from a Sub-Cluster**, not from a Coverage selection
@@ -256,9 +256,9 @@ export async function planPerjadin(
   input: PlanPerjadinInput,
 ): Promise<PlanPerjadinResult> {
   requireStaff(caller);
-  // Planning a Perjadin needs the Editor Grant (ADR-0047).
+  // Planning a Perjadin needs the Perjadin Editor Grant (ADR-0047).
   // `requireStaff` stays first, so a Pimpinan is refused as non-Staff.
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Perjadin Editor");
 
   // The range is two typed dates (ADR-0041). Same-day is allowed. `perjadin_dates_check` holds
   // `ends_on >= starts_on` too; this is repeated here so the form can point at Tanggal selesai
@@ -599,7 +599,7 @@ async function plannableSubClusters(): Promise<SubClusterOfSchools[]> {
  * The form's payload: the Sub-Clusters to plan around, and the Staff roster its PIC and extra-Staff
  * pickers name.
  *
- * **Editor-only, so the read is too** (ADR-0047) — a caller without the Grant reaching the URL
+ * **Perjadin Editor-only, so the read is too** (ADR-0047) — a caller without the Grant reaching the URL
  * directly would otherwise be shown the whole form and refused only on submit. `Promise.all` keeps the
  * Sub-Cluster read and the roster read concurrent; the rosters come from `./rosters.ts`. What each
  * School already has on other trips (#409) is a second round trip after them, since it is keyed on
@@ -609,9 +609,9 @@ async function plannableSubClusters(): Promise<SubClusterOfSchools[]> {
  */
 export async function perjadinPlan(caller: Person): Promise<PerjadinPlan> {
   requireStaff(caller);
-  // Planning a Perjadin needs the Editor Grant (ADR-0047).
+  // Planning a Perjadin needs the Perjadin Editor Grant (ADR-0047).
   // `requireStaff` stays first, so a Pimpinan is refused as non-Staff.
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Perjadin Editor");
 
   const [subClusters, { staff, pimpinan }] = await Promise.all([
     plannableSubClusters(),

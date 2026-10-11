@@ -23,7 +23,7 @@ import {
   addProvince,
   addSchool,
   addSubCluster,
-  asEditor,
+  withGrant,
   constraintOf,
   resetDatabase,
 } from "./support/fixtures";
@@ -42,7 +42,7 @@ import {
 
 async function staff(fullName = "Rina Nurhayati", email = "rina@ditsama.itb.ac.id") {
   // An Editor, since planning needs the Grant (ADR-0047).
-  return asEditor(await addPerson({ fullName, email, role: "Staff" }));
+  return withGrant(await addPerson({ fullName, email, role: "Staff" }), "Perjadin Editor");
 }
 
 /**

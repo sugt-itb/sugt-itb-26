@@ -60,12 +60,15 @@ export async function addGrant(personId: string, grant: Grant) {
 }
 
 /**
- * The same Person holding the **Editor** Grant, stored and on the caller — what planning a Perjadin and
- * recording, editing or deleting an online Session need (ADR-0047).
+ * The same Person holding `grant`, stored and on the caller — Perjadin Editor to plan a Perjadin,
+ * Daring Editor to record, edit or delete an online Session (ADR-0047, ADR-0052).
  */
-export async function asEditor<P extends { id: string; grants: Grant[] }>(person: P): Promise<P> {
-  await addGrant(person.id, "Editor");
-  return { ...person, grants: [...person.grants, "Editor"] };
+export async function withGrant<P extends { id: string; grants: Grant[] }>(
+  person: P,
+  grant: Grant,
+): Promise<P> {
+  await addGrant(person.id, grant);
+  return { ...person, grants: [...person.grants, grant] };
 }
 
 /** Every `better_auth.user` row. The invite gate's job is to leave this empty. */

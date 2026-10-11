@@ -173,8 +173,8 @@ export type PendampingPerjadinResult =
  * screenshot an Administrator needs to show someone how to use their own page.
  *
  * **Administrator only, held here rather than only in the page.** `requireStaff` first, so a
- * Pimpinan is refused as non-Staff; then `requireGrant(caller, "Administrator")` — Editor is not
- * enough — before any row is read. A `personId` that names no Staff Person (a Pimpinan, an unknown id,
+ * Pimpinan is refused as non-Staff; then `requireGrant(caller, "Administrator")` — no other Grant
+ * is enough — before any row is read. A `personId` that names no Staff Person (a Pimpinan, an unknown id,
  * a malformed one) is `no-such-pendamping`, a value the page says in a sentence. Viewing writes
  * nothing to the Activity Log.
  */

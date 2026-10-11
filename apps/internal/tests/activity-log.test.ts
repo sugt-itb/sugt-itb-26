@@ -33,7 +33,7 @@ import {
   addSubCluster,
   addTransaction,
   addTransactionEvidence,
-  asEditor,
+  withGrant,
   resetDatabase,
 } from "./support/fixtures";
 
@@ -45,7 +45,7 @@ import {
 
 async function staff(email = "rina@ditsama.itb.ac.id", fullName = "Rina Setiawati") {
   // An Editor, since `planPerjadin` needs the Grant (ADR-0047); nothing logged here depends on it.
-  return asEditor(await addPerson({ fullName, email, role: "Staff" }));
+  return withGrant(await addPerson({ fullName, email, role: "Staff" }), "Perjadin Editor");
 }
 
 async function administrator() {

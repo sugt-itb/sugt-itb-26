@@ -112,7 +112,7 @@ function AcquittalTransactions({
   transactions: ViewableTransaction[];
   uploadGate: UploadGate;
   /**
-   * Whether the viewer writes this trip — its Group, an Editor or an Administrator (ADR-0048). Catat
+   * Whether the viewer writes this trip — its Group, a Perjadin Editor or an Administrator (ADR-0048). Catat
    * transaksi and every Unggah bukti are absent for anyone else, who reads the lines and their
    * receipts; the queries refuse them again.
    */

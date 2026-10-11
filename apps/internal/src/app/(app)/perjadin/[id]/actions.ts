@@ -41,8 +41,8 @@ import QRCode from "qrcode";
  * An action belongs to the route that offers it — the same rule `/sesi/[id]/actions.ts` follows —
  * which is also what keeps `revalidatePath` honest: a route's action revalidating some other route
  * is a sign it is in the wrong file. Every write is wrapped in `staffSurface`, because the query
- * throws `NotStaffError` — or `NotOnPerjadinError` for a Staff member off the trip without the Editor
- * Grant (ADR-0048) — and a Server Action's error is sanitized on the way to the client, so the
+ * throws `NotStaffError` — or `NotOnPerjadinError` for a Staff member off the trip without the Perjadin
+ * Editor Grant (ADR-0048) — and a Server Action's error is sanitized on the way to the client, so the
  * translation to a 403 has to happen here on the server. Every refusal a person can reach
  * honestly comes back as a value the client renders.
  */

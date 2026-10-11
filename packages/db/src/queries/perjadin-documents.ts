@@ -22,7 +22,7 @@ import { requirePerjadinWriter, requireStaff } from "./staff-only";
  * reconcile talk to Google and live in `@sugt/internal`; their bookkeeping is
  * `./document-drive-sync.ts`.
  *
- * **The trip's Group, an Editor or an Administrator records one** (`requirePerjadinWriter`,
+ * **The trip's Group, a Perjadin Editor or an Administrator records one** (`requirePerjadinWriter`,
  * ADR-0048), as they record a transaction; everyone else, a Pimpinan included, reads only.
  */
 

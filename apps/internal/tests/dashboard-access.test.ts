@@ -38,10 +38,18 @@ describe("canViewDashboard", () => {
     expect(canViewDashboard(viewer)).toBe(true);
   });
 
-  it("lets a Staff holding Editor read the Dashboard", async () => {
-    const editor = await resolved("Staff", "editor@ditsama.itb.ac.id", ["Editor"]);
+  it("lets a Staff holding Dashboard Editor read the Dashboard — it implies Dashboard Viewer", async () => {
+    const editor = await resolved("Staff", "editor@ditsama.itb.ac.id", ["Dashboard Editor"]);
     expect(canViewDashboard(editor)).toBe(true);
   });
+
+  it.each(["Perjadin Editor", "Daring Editor", "Keuangan"] as const)(
+    "refuses a Staff holding only %s — no other Grant reads the Dashboard (ADR-0052)",
+    async (grant) => {
+      const staff = await resolved("Staff", "only@ditsama.itb.ac.id", [grant]);
+      expect(canViewDashboard(staff)).toBe(false);
+    },
+  );
 
   it("lets a Staff holding Administrator read the Dashboard — Administrator implies every Grant", async () => {
     const admin = await resolved("Staff", "admin@ditsama.itb.ac.id", ["Administrator"]);

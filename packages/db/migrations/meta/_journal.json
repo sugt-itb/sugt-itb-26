@@ -358,6 +358,13 @@
       "when": 1791744517202,
       "tag": "0050_drop_advance_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791749531275,
+      "tag": "0051_split_editor_grant",
+      "breakpoints": true
     }
   ]
 }

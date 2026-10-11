@@ -261,7 +261,7 @@ describe("Hapus bukti", () => {
     // transaction, after the row delete — so the delete must be undone with it.
     const ghost = {
       ...(staff as Person),
-      grants: ["Editor"],
+      grants: ["Perjadin Editor"],
       id: "00000000-0000-0000-0000-00000000dead",
     } as Person;
 

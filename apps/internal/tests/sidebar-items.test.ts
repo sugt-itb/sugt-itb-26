@@ -13,7 +13,7 @@ function hrefsFor(role: Role, grants: Grant[]) {
   const person: Person = { id: "p", fullName: "P", email: "p@example.com", role, grants };
   return sidebarItems({
     role,
-    canEditMonitoring: hasGrant(person, "Editor"),
+    canEditDaring: hasGrant(person, "Daring Editor"),
     canViewDashboard: canViewDashboard(person),
     canAdminister: hasGrant(person, "Administrator"),
     driveNeedsAttention: false,
@@ -44,12 +44,37 @@ describe("sidebarItems", () => {
     ]);
   });
 
-  it("gives a Staff Editor every link but Log and Pengaturan, with or without Dashboard Viewer", () => {
-    expect(hrefsFor("Staff", ["Editor"])).toEqual(FULL);
-    expect(hrefsFor("Staff", ["Editor", "Dashboard Viewer"])).toEqual(FULL);
+  it("gives a Staff Daring Editor who reads the Dashboard every link but Log and Pengaturan", () => {
+    expect(hrefsFor("Staff", ["Daring Editor", "Dashboard Viewer"])).toEqual(FULL);
+    expect(hrefsFor("Staff", ["Daring Editor", "Dashboard Editor"])).toEqual(FULL);
   });
 
-  it("drops only Pretest for a Staff Dashboard Viewer", () => {
+  it("puts Pendamping first for a Staff holding only Daring Editor, Pretest kept (ADR-0052)", () => {
+    expect(hrefsFor("Staff", ["Daring Editor"])).toEqual([
+      "/pendamping",
+      "/kalender",
+      "/pretest",
+      "/perjadin",
+      "/sesi-daring",
+      "/feedback",
+      "/cerita",
+      "/sekolah",
+      "/kelompok-sekolah",
+      "/orang",
+    ]);
+  });
+
+  it.each(["Perjadin Editor", "Keuangan"] as const)(
+    "puts Pendamping first, with no Dashboard or Pretest, for a Staff holding only %s (ADR-0052)",
+    (grant) => {
+      expect(hrefsFor("Staff", [grant])).toEqual(hrefsFor("Staff", []));
+    },
+  );
+
+  it("drops only Pretest for a Staff Dashboard Viewer, and for a Dashboard Editor", () => {
+    expect(hrefsFor("Staff", ["Dashboard Editor"])).toEqual(
+      hrefsFor("Staff", ["Dashboard Viewer"]),
+    );
     expect(hrefsFor("Staff", ["Dashboard Viewer"])).toEqual([
       "/",
       "/kalender",
@@ -102,7 +127,7 @@ describe("sidebarItems", () => {
     const items = (driveNeedsAttention: boolean) =>
       sidebarItems({
         role: "Staff",
-        canEditMonitoring: true,
+        canEditDaring: true,
         canViewDashboard: true,
         canAdminister: hasGrant(admin, "Administrator"),
         driveNeedsAttention,

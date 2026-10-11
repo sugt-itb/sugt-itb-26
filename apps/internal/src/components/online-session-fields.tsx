@@ -23,7 +23,7 @@ import { useId, useState, useTransition } from "react";
 
 /**
  * An online Session's fields — School, the two cohort-named Pengajar, Tanggal, Jam Mulai, Jam Selesai
- * — shown, and for an Editor editable through one "Ubah Sesi" dialog (#152, #318). The online counterpart
+ * — shown, and for a Daring Editor editable through one "Ubah Sesi" dialog (#152, #318). The online counterpart
  * of the offline detail's per-Session edit (`perjadin-sessions.tsx`): the same fields the record form
  * set, corrected after the fact. **No PIC, no Aliran/Stream and no Peserta (#284, #318):** a
  * third-party LMS runs online delivery, and both cohorts are always taught.
@@ -32,8 +32,8 @@ import { useId, useState, useTransition } from "react";
  * `updateOnlineSession` sets them together and re-checks the unique index on School/date. An online
  * Session is born `delivered` now (#318), so the edit is offered on a `delivered` Session too — it is
  * the correction path that replaced the old teacher-list editor; only a `cancelled` legacy Session is
- * settled and offers none. Read for everyone (no money); the "Ubah" trigger appears only for an
- * Editor (ADR-0047), whom the write re-checks. The two time labels read **(WIB)** unconditionally (#283).
+ * settled and offers none. Read for everyone (no money); the "Ubah" trigger appears only for a
+ * Daring Editor (ADR-0047), whom the write re-checks. The two time labels read **(WIB)** unconditionally (#283).
  */
 function OnlineSessionFields({
   session,

@@ -130,8 +130,9 @@ overall" at a glance.
 
 **Reading it needs a grant.** The Dashboard (`/`) is the overview surface for leadership and
 for the Staff who steer the Programme: a **Pimpinan** reaches it by role, and a **Staff** Person
-by holding the **Editor** or **Dashboard Viewer** grant (an **Administrator** implies both). A
-grant-less Staff Person is sent to their own landing screen, `/pendamping`, instead — the mirror
+by holding **Dashboard Viewer** or **Dashboard Editor** (an **Administrator** implies both). Any
+other Staff Person — a grant-less one, or one holding only **Perjadin Editor**, **Daring Editor** or
+**Keuangan** — is sent to their own landing screen, `/pendamping`, instead — the mirror
 of the redirect a Pimpinan gets from `/pendamping`. See
 [ADR-0037](./adr/0037-dashboard-read-is-gated-by-a-grant.md).
 
@@ -216,7 +217,7 @@ Staff member how to use `/pendamping` means a screenshot of _their_ page:
 - **Every control there works, as the Administrator**, not as the other Person: a Persiapan tick, a
   Tandai or an upload is the Administrator's, and the Log names them. Viewing writes nothing.
 
-For anyone who is not an Administrator — an Editor included — those URL parameters are ignored on
+For anyone who is not an Administrator — any other Grant included — those URL parameters are ignored on
 the server: they get their own page, with no tabs, and nothing of the other Person is loaded or sent.
 
 It opens with one small line, **"Selamat datang kembali, {nama}"**. Below it are two sections, each listing the trips the person is in the
@@ -343,7 +344,7 @@ described "Upload dokumentasi kegiatan luring untuk sesi ini"
 - **Hapus** on each sheet asks first — "Hapus dokumen ini? File akan dipindahkan ke Sampah Google
   Drive." — then moves the file to the Drive trash and removes the sheet. There is no editing: a
   wrong upload is fixed by Hapus and a new upload.
-- The trip's Group, an Editor or an Administrator uploads and deletes (ADR-0048). The button, and Hapus, are disabled with the reason while
+- The trip's Group, a Perjadin Editor or an Administrator uploads and deletes (ADR-0048). The button, and Hapus, are disabled with the reason while
   Drive is not connected or broken, as Catat Transaksi is.
 
 ### Concerns list
@@ -402,7 +403,7 @@ tool does not schedule one and confirm it later — it **logs a Session that alr
 written straight to _delivered_ (ADR-0036). The form is titled "Catat Sesi daring" and its button
 reads "Tandai Terlaksana"; the date cannot be in the future.
 
-**Recording, editing and deleting an online Session need the Editor Grant** (ADR-0047, #438); an
+**Recording, editing and deleting an online Session need the Daring Editor Grant** (ADR-0047, ADR-0052); an
 Administrator has it implicitly. **Catat Sesi Daring** on `/sesi-daring` and the form on
 `/sekolah/[slug]` are shown only to them, `/sesi-daring/baru` answers 403 to anyone else, and the edit
 and delete controls on `/sesi-daring/[id]` are theirs alone. Everyone signed in still reads every
@@ -410,7 +411,7 @@ online Session.
 
 **An offline Session's own page, `/sesi/[id]`, has a Foto & Video section** (#425), so a Pimpinan —
 who has no `/pendamping` — sees its photos and videos too. Everyone signed in gets the list with
-**Buka**; whoever writes the Session's trip — its Group, an Editor or an Administrator (ADR-0048) —
+**Buka**; whoever writes the Session's trip — its Group, a Perjadin Editor or an Administrator (ADR-0048) —
 also gets **Hapus** and **Unggah Foto & Video**, which opens the same popup, and the Session's own
 writes (Tandai terlaksana, Batalkan Sesi, the date edit). A
 cancelled Session keeps its list but offers no upload. An online Session has none.
@@ -579,12 +580,12 @@ first — Perjadin by name, Kelompok 2 before Kelompok 10, and two trips of one 
 dates. The header stays in view while the list scrolls, a row opens its trip, and the search box
 above narrows it by the trip's Kelompok, its Schools, its PIC, its Narasumber and its Group.
 
-**The list's header holds two buttons**: **Rencanakan Perjadin**, for an Editor (ADR-0047, #438 — an
-Administrator has it implicitly), and beside it **Pengaturan Perjadin**, for an Administrator only.
+**The list's header holds two buttons**: **Rencanakan Perjadin**, for a Perjadin Editor (ADR-0047, ADR-0052
+— an Administrator has it implicitly), and beside it **Pengaturan Perjadin**, for an Administrator only.
 Anyone else is not shown them; neither is in the sidebar. `/perjadin/baru` answers 403 to a Staff
-member without the Editor Grant, who still runs any trip they are on but cannot plan a new one.
+member without the Perjadin Editor Grant, who still runs any trip they are on but cannot plan a new one.
 
-**A trip is written by its Group** — its PIC and its Staff members — **or by an Editor or an
+**A trip is written by its Group** — its PIC and its Staff members — **or by a Perjadin Editor or an
 Administrator** ([ADR-0048](./adr/0048-a-perjadin-is-written-by-its-group.md), #439). Everyone signed
 in reads every trip. On `/perjadin/[id]`, `/perjadin/[id]/laporan` and `/sesi/[id]`, anyone else sees
 everything with every write control absent — Ubah tanggal, Ubah Group, the
@@ -1064,7 +1065,7 @@ SUGT ITB 2026 Internal App Object Storage/
 holds the photos (JPEG, PNG, HEIC or WebP, up to 50 MB) and videos (MP4 or MOV, up to 1000 MB) of
 each offline Session, uploaded as they were taken — a photo keeps its location data — and shared one
 file at a time. A large file is sent to Drive in 16 MB pieces and picks up where it stopped if the
-connection drops. The trip's Group, an Editor or an Administrator uploads them from each Session's **Foto & Video** on `/pendamping` and on `/sesi/[id]`;
+connection drops. The trip's Group, a Perjadin Editor or an Administrator uploads them from each Session's **Foto & Video** on `/pendamping` and on `/sesi/[id]`;
 anyone signed in views them on `/sesi/[id]`.
 
 **A badge on Pengaturan** in the sidebar tells an Administrator that Drive needs them: not
