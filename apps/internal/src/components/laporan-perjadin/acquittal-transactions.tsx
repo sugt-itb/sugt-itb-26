@@ -8,6 +8,7 @@ import type {
 } from "-/app/(app)/perjadin/[id]/laporan/action-types";
 import {
   deleteReceiptAction,
+  deleteTransactionAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
   recordTransactionAction,
@@ -24,6 +25,7 @@ import {
   RECEIPT_DELETE_CONFIRM,
   receiptDeleteRefusalText,
 } from "-/components/laporan-perjadin/receipt-delete-messages";
+import { TRANSACTION_DELETE_CONFIRM } from "-/components/laporan-perjadin/transaction-delete-messages";
 import { RequiredLegend, RequiredMark } from "-/components/required-mark";
 import { UnsyncedMarker } from "-/components/unsynced-marker";
 import {
@@ -80,7 +82,7 @@ import { type ReactElement, useId, useMemo, useRef, useState, useTransition } fr
 
 /**
  * **The line items, and what a PIC does to them**: enter one with its receipts, add receipts to one
- * already entered, and take a mistaken receipt off one (#462).
+ * already entered, take a mistaken receipt off one (#462), and delete a mistaken one whole (#463).
  *
  * **A line is entered with its evidence or not at all** (ADR-0039, superseding ADR-0030's optional
  * upload). The entry form stages one to five files; Catat uploads every one of them **first** —
@@ -256,10 +258,47 @@ function TransactionCard({
               uploadGate={uploadGate}
               canWrite={canWrite}
             />
+            {canWrite && (
+              <DeleteTransaction
+                transactionId={line.id}
+                label={`${line.spentOn} · ${line.description}`}
+                uploadGate={uploadGate}
+              />
+            )}
           </div>
         </div>
       </CardHeader>
     </Card>
+  );
+}
+
+/**
+ * **Hapus** on one line, behind a confirmation (#463, ADR-0050). Its folder and receipts go to the
+ * Drive trash first, then the line, and the page revalidates.
+ */
+function DeleteTransaction({
+  transactionId,
+  label,
+  uploadGate,
+}: {
+  transactionId: string;
+  /** Which line, for a screen reader: every row's Hapus would otherwise read the same. */
+  label: string;
+  uploadGate: UploadGate;
+}) {
+  return (
+    <ConfirmHapus
+      ariaLabel={`Hapus transaksi ${label}`}
+      size="sm"
+      title="Hapus transaksi"
+      description={TRANSACTION_DELETE_CONFIRM}
+      uploadGate={uploadGate}
+      run={async () => {
+        const result = await deleteTransactionAction(transactionId);
+        if (result.outcome === "deleted" || result.outcome === "no-such-transaction") return null;
+        return driveRefusalText(result);
+      }}
+    />
   );
 }
 
@@ -519,9 +558,8 @@ function Receipts({
 
 /**
  * **Hapus** beside one receipt, behind a confirmation (#462, ADR-0050). The file goes to the Drive
- * trash first, then the row, and the page revalidates. Disabled with the gate's reason while Drive
- * cannot take it, as Unggah bukti is. On a line's only receipt the dialog says why it cannot go
- * instead of asking — the server refuses it too.
+ * trash first, then the row, and the page revalidates. On a line's only receipt the dialog says why
+ * it cannot go instead of asking — the server refuses it too.
  */
 function DeleteReceipt({
   evidenceId,
@@ -535,6 +573,46 @@ function DeleteReceipt({
   onlyReceipt: boolean;
   uploadGate: UploadGate;
 }) {
+  return (
+    <ConfirmHapus
+      ariaLabel={`Hapus ${label}`}
+      size="xs"
+      title="Hapus bukti"
+      description={onlyReceipt ? ONLY_RECEIPT : RECEIPT_DELETE_CONFIRM}
+      refused={onlyReceipt}
+      uploadGate={uploadGate}
+      run={async () => {
+        const result = await deleteReceiptAction(evidenceId);
+        if (result.outcome === "deleted" || result.outcome === "no-such-receipt") return null;
+        return receiptDeleteRefusalText(result);
+      }}
+    />
+  );
+}
+
+/**
+ * The confirmation both Hapus on the Laporan open. Disabled with the gate's reason while Drive
+ * cannot take it, as Unggah bukti is. `run` answers what to say when the server refuses, or `null`
+ * to close — deleted, or already gone. `refused` is a delete known to be refused before it is
+ * asked: the dialog only explains, with no Hapus to press.
+ */
+function ConfirmHapus({
+  ariaLabel,
+  size,
+  title,
+  description,
+  refused = false,
+  uploadGate,
+  run,
+}: {
+  ariaLabel: string;
+  size: "xs" | "sm";
+  title: string;
+  description: string;
+  refused?: boolean;
+  uploadGate: UploadGate;
+  run: () => Promise<string | null>;
+}) {
   const [open, setOpen] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [deleting, startDeleting] = useTransition();
@@ -542,12 +620,9 @@ function DeleteReceipt({
   function submit() {
     startDeleting(async () => {
       setRefusal(null);
-      const result = await deleteReceiptAction(evidenceId);
-      if (result.outcome === "deleted" || result.outcome === "no-such-receipt") {
-        setOpen(false);
-        return;
-      }
-      setRefusal(receiptDeleteRefusalText(result));
+      const said = await run();
+      if (said === null) setOpen(false);
+      else setRefusal(said);
     });
   }
 
@@ -565,8 +640,8 @@ function DeleteReceipt({
         render={
           <Button
             variant="ghost"
-            size="xs"
-            aria-label={`Hapus ${label}`}
+            size={size}
+            aria-label={ariaLabel}
           >
             Hapus
           </Button>
@@ -574,10 +649,8 @@ function DeleteReceipt({
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Hapus bukti</DialogTitle>
-          <DialogDescription>
-            {onlyReceipt ? ONLY_RECEIPT : RECEIPT_DELETE_CONFIRM}
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         {refusal !== null && <p className="text-sm text-destructive">{refusal}</p>}
         <DialogFooter>
@@ -587,9 +660,9 @@ function DeleteReceipt({
               setOpen(false);
             }}
           >
-            {onlyReceipt ? "Tutup" : "Batal"}
+            {refused ? "Tutup" : "Batal"}
           </Button>
-          {!onlyReceipt && (
+          {!refused && (
             <Button
               variant="destructive"
               disabled={deleting}

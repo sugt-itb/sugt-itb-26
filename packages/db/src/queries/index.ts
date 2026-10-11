@@ -324,22 +324,26 @@ export {
 } from "./perjadin-planning";
 export {
   attachTransactionEvidence,
+  deleteTransaction,
   deleteTransactionEvidence,
   filePerjadinReport,
   perjadinAcquittal,
   receiptDeleteTarget,
   receiptsOnLine,
   recordTransaction,
+  transactionDeleteTarget,
   type AcquittalEvidence,
   type AcquittalTransaction,
   type AttachEvidenceResult,
   type DeleteEvidenceResult,
+  type DeleteTransactionResult,
   type FilePerjadinReportResult,
   type ReceiptDeleteTarget,
   type NewEvidence,
   type NewTransaction,
   type PerjadinAcquittal,
   type RecordTransactionResult,
+  type TransactionDriveItems,
 } from "./perjadin-report";
 export {
   schoolDetail,

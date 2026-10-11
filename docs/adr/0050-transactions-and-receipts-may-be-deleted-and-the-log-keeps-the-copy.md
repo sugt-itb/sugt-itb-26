@@ -2,7 +2,7 @@
 
 A receipt uploaded to a line by mistake can now be taken off it, and a line entered by mistake can be
 removed whole. On the Laporan each **Bukti n** link carries a **Hapus**
-([#462](https://github.com/sugt-itb/sugt-itb-26/issues/462)), and so will each line
+([#462](https://github.com/sugt-itb/sugt-itb-26/issues/462)), and so does each line
 ([#463](https://github.com/sugt-itb/sugt-itb-26/issues/463)). The file goes to the Drive trash, the
 row is deleted, and an **Activity Log** entry holding a copy of what went is written in the same
 database transaction.
@@ -74,16 +74,31 @@ and the process lets a PIC strike out a wrong entry.
 
 ## Deleting a transaction (#463)
 
-> To be confirmed or completed by Hapus transaksi
-> ([#463](https://github.com/sugt-itb/sugt-itb-26/issues/463)), which has not been built yet.
-
-What the product owner settled: the line's Drive folder is trashed — which trashes what is inside —
-together with any of its receipt files outside it, such as those of a line whose reconcile never
-finished and so still sit in `_staging`. Then the line and its evidence rows are deleted with the
-`transaction_deleted` entry. A line with zero receipts, or more than five, may be deleted. A delete
-must not be undone by a reconcile or Periksa koneksi's sweep running at the same time: neither
-recreates a trashed folder, and neither may fail on a row that has gone. The line's past Log
-entries stay, and render without their "Buka folder" link once the line is gone.
+- **Any line may go**, with however many receipts it holds — none, one to five, or more than five on
+  a grandfathered line. It asks first: _"Hapus transaksi ini? Folder buktinya akan dipindahkan ke
+  Sampah Google Drive."_
+- **The folder, then any receipt outside it.** `transactionDeleteTarget` reads the line's folder and
+  its receipt files, after the writer check. The line's folder goes to the trash, which trashes
+  every receipt inside it. Then each receipt is trashed by itself, which is a no-op for those
+  already trashed with the folder. That catches files that never reached the folder: those of a line
+  whose reconcile never finished, still in `_staging`, and any a person moved out by hand. A line
+  with no folder and no receipt reaches Drive not at all.
+- **The commit answers what it deleted.** `deleteTransaction` locks the row `for update`, reads the
+  folder and receipts again, deletes the line (its evidence rows cascade) and writes
+  `transaction_deleted`, in one transaction. Between the action's first read and that lock, an
+  Unggah bukti may have added a receipt, or a reconcile may have claimed a folder for a line that
+  had none; both wait on the same row. The action trashes whatever the commit reports that it had
+  not seen. The line is gone by then, so if that trash fails the action logs the ids for a person,
+  rather than asking for a retry that has nothing to retry.
+- **The reconcile brings nothing back.** It never recreates a trashed folder, so a reconcile that
+  read the line before the delete stops at the line's folder, reports it trashed, and its
+  failure mark finds no row. One that made the line's folder itself finds no row to claim it on,
+  trashes the folder, and answers `no-such-transaction`, as it does when the row is gone at its
+  final mark. A receipt moved into a trashed folder is trashed with it. Once the line is gone, the
+  sweep's `unsyncedTransactions` no longer lists it.
+- **The line's past Log entries stay.** `/log` left-joins `transaction` for the **Buka folder** link
+  of every entry that names the line's `transactionId`. Once the row is gone those entries render
+  without it, as Dokumen and Foto & Video entries do once theirs are.
 
 ## Consequences
 

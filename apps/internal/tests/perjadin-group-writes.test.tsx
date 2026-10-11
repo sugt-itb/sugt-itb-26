@@ -22,6 +22,7 @@ import {
 } from "-/app/(app)/perjadin/[id]/dokumen/actions";
 import {
   deleteReceiptAction,
+  deleteTransactionAction,
   filePerjadinReportAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
@@ -54,6 +55,7 @@ import {
   checkDocumentFields,
   deletePerjadinDocument,
   deleteSessionFootage,
+  deleteTransaction,
   editPerjadinSession,
   filePerjadinReport,
   fileSessionRecord,
@@ -73,6 +75,7 @@ import {
   setPerjadinPimpinan,
   setPerjadinStaff,
   togglePreparationItem,
+  transactionDeleteTarget,
   updatePerjadinAdvance,
   updatePerjadinDates,
   type Person,
@@ -389,6 +392,12 @@ const WRITES: [
     "attached",
   ],
   ["Unggah bukti's early count", (c, a) => receiptsOnLine(c, a.id, a.transactionId), undefined],
+  [
+    "Hapus transaksi's early read",
+    (c, a) => transactionDeleteTarget(c, a.transactionId),
+    undefined,
+  ],
+  ["Hapus transaksi", (c, a) => deleteTransaction(c, a.transactionId), "deleted"],
   ["Laporkan", (c, a) => filePerjadinReport(c, a.id), "filed"],
   [
     "Dokumen check",
@@ -575,6 +584,7 @@ describe("the actions answer a non-member with a 403", () => {
     await expect(digestOf(deleteDocumentAction(a.documentId))).resolves.toBe(FORBIDDEN);
     await expect(digestOf(deleteFootageAction(a.footageId))).resolves.toBe(FORBIDDEN);
     await expect(digestOf(deleteReceiptAction(a.evidenceId))).resolves.toBe(FORBIDDEN);
+    await expect(digestOf(deleteTransactionAction(a.transactionId))).resolves.toBe(FORBIDDEN);
 
     expect(driveAccessToken).not.toHaveBeenCalled();
   });
