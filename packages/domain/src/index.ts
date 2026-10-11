@@ -298,7 +298,7 @@ export const PERJADIN_ROLE_LABELS: Record<Role, string> = {
  * - **Administrator** — administers Grants (assign/revoke any Grant on any Staff Person, including
  *   making another Administrator) and **implies every other Grant**, so an Administrator satisfies
  *   any grant check without holding that grant's own row.
- * - **Keuangan** — gates nothing yet; reserved for a future `/keuangan`.
+ * - **Keuangan** — reads every transaction across every Perjadin on `/keuangan`, and exports it (#472).
  * - **Perjadin Editor** — plans a Perjadin and writes every Perjadin, not only those whose Group the
  *   Person is in (ADR-0047, ADR-0048).
  * - **Daring Editor** — `/pretest` and the online Sessions: recording, editing, deleting, Tandai
@@ -347,7 +347,7 @@ export const GRANT_LABELS: Record<Grant, string> = {
  */
 export const GRANT_DESCRIPTIONS: Record<Grant, string> = {
   Administrator: "semua akses",
-  Keuangan: "belum ada fitur",
+  Keuangan: "tabel dan ekspor semua transaksi",
   "Perjadin Editor": "merencanakan dan menulis setiap Perjadin",
   "Daring Editor": "Sesi daring dan Pretest",
   "Dashboard Editor": "termasuk Dashboard Viewer",

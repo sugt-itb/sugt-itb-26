@@ -54,6 +54,7 @@ export default async function SignedInLayout({
       role={person.role}
       personName={person.fullName}
       canEditDaring={hasGrant(person, "Daring Editor")}
+      canViewKeuangan={hasGrant(person, "Keuangan")}
       canViewDashboard={canViewDashboard(person)}
       canAdminister={canAdminister}
       driveNeedsAttention={driveNeedsAttention}

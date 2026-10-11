@@ -81,11 +81,18 @@ export function perjadinFolderName(
 export function perjadinCsvFileName(
   trip: PerjadinNameParts & { schoolNames: readonly string[] },
 ): string {
-  const slug = nameWithSchools(trip)
+  return `laporan-perjadin-${slugify(nameWithSchools(trip)) || "perjadin"}.csv`;
+}
+
+/**
+ * Text as a file-name slug: accents fold to their letter, anything else that is not a letter or digit
+ * becomes one `-`, and no `-` leads or trails. `Kelompok 10 · 12–13 Okt 2026` → `kelompok-10-12-13-okt-2026`.
+ */
+export function slugify(text: string): string {
+  return text
     .normalize("NFKD")
     .replaceAll(/\p{M}/gu, "")
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  return `laporan-perjadin-${slug || "perjadin"}.csv`;
 }

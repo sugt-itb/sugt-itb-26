@@ -90,3 +90,10 @@ there is no Advance to read, and no Uang Perjalanan to correct. Settling, the tr
 the Advance written at planning were never or are no longer written by any screen. What a Pimpinan
 reads is the acquittal's spend — Uang Perjalanan Terpakai and its line items — and the `/monitoring`
 budget card; the read/write split is unchanged.
+
+## Amendment (2026-10-12): one view is Keuangan only
+
+`/keuangan`, the programme-wide transaction table and its export, is read only by a Keuangan holder or
+an Administrator ([ADR-0053](./0053-the-programme-wide-transaction-table-is-keuangan-only.md), #472).
+That narrows "money is open to read" for that one view; each Perjadin's Laporan and its export stay
+open to everyone signed in.

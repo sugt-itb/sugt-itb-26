@@ -1,3 +1,4 @@
+import { first, uuidOrNull } from "-/lib/search-params";
 import type { PreparationScope } from "@sugt/db/queries";
 
 /** The level Pengaturan Perjadin is editing, as its URL names it. */
@@ -8,12 +9,6 @@ export type LevelChoice =
 
 /** `/perjadin/pengaturan`'s query string as Next hands it over. */
 export type LevelSearchParams = Record<string, string | string[] | undefined>;
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 /**
  * **The level the URL asks for** (`?tingkat=semua|cluster|perjadin&cluster=&perjadin=`), so a level
@@ -31,11 +26,7 @@ export function parseLevelParams(params: LevelSearchParams, clusterIds: string[]
     };
   }
   if (tingkat === "perjadin") {
-    const perjadinId = first(params.perjadin);
-    return {
-      level: "perjadin",
-      perjadinId: perjadinId && UUID.test(perjadinId) ? perjadinId : null,
-    };
+    return { level: "perjadin", perjadinId: uuidOrNull(first(params.perjadin)) };
   }
   return { level: "semua" };
 }

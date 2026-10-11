@@ -58,3 +58,11 @@ An Administrator cannot revoke their own Administrator Grant or deactivate thems
 ([#470](https://github.com/sugt-itb/sugt-itb-26/issues/470)); see the amendment to ADR-0028. `/orang`
 now picks Grants through a multi-select with chips, each option saying what it gates, so the "six
 checkboxes" in the consequences above are gone.
+
+## Amendment (2026-10-12): Keuangan gates `/keuangan`
+
+The Keuangan row above no longer reads "Nothing yet". The Grant now gates `/keuangan`, the
+programme-wide transaction table and its CSV export, and its sidebar link
+([ADR-0053](./0053-the-programme-wide-transaction-table-is-keuangan-only.md),
+[#472](https://github.com/sugt-itb/sugt-itb-26/issues/472)). Administrator still implies it, and it
+still does not read `/`.
