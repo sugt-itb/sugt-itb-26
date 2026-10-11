@@ -45,7 +45,7 @@ import {
   type PreparedReceipt,
 } from "-/lib/drive/receipt-upload";
 import type { UploadGate } from "-/lib/drive/upload-gate";
-import { driveRefusalText, STALE_PAGE } from "-/lib/drive/upload-messages";
+import { driveRefusalText, RECEIPTS_UNSYNCED, STALE_PAGE } from "-/lib/drive/upload-messages";
 import {
   formatIdr,
   formatRupiah,
@@ -248,7 +248,7 @@ function TransactionCard({
           <span className="text-muted-foreground">·</span>
           <span className="text-muted-foreground">{line.category}</span>
           <Badge variant="secondary">{line.participantType}</Badge>
-          {line.unsynced && <UnsyncedMarker explanation={UNSYNCED_TOOLTIP} />}
+          {line.unsynced && <UnsyncedMarker explanation={RECEIPTS_UNSYNCED} />}
           {/* Wraps under the line on a phone rather than pushing the card sideways (#418). */}
           <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2">
             <span className="tabular-nums">{formatRupiah(line.amountIdr)}</span>
@@ -301,10 +301,6 @@ function DeleteTransaction({
     />
   );
 }
-
-/** What the "belum tersinkron" marker says, in full, on hover or focus. */
-const UNSYNCED_TOOLTIP =
-  "Bukti belum tersinkron ke Google Drive — Administrator dapat menyelesaikannya lewat Periksa koneksi.";
 
 /** The label maps for the four controls. Sort keys are the direction; each filter carries "Semua". */
 const AMOUNT_SORT_OPTIONS = { desc: "Termahal", asc: "Termurah" } satisfies Record<
@@ -1201,4 +1197,4 @@ function refusalFor(result: Exclude<RecordTransactionActionResult, { outcome: "r
   }
 }
 
-export { AcquittalTransactions, RecordTransaction, UNSYNCED_TOOLTIP };
+export { AcquittalTransactions, RecordTransaction };

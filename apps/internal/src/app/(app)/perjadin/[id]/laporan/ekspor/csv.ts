@@ -1,3 +1,4 @@
+import { csvDocument } from "-/lib/csv";
 import type { PerjadinAcquittal } from "@sugt/db/queries";
 
 /**
@@ -30,16 +31,16 @@ export function csvOf(acquittal: PerjadinAcquittal): string {
       line.description,
       line.category,
       line.participantType,
-      String(line.amountIdr),
-      String(line.evidence.length),
+      line.amountIdr,
+      line.evidence.length,
     ]),
     [],
     // Every transaction on the trip, all categories (ADR-0051) — the same figure every screen shows.
-    ["Uang Perjalanan Terpakai", "", "", "", String(acquittal.spentIdr), ""],
+    ["Uang Perjalanan Terpakai", "", "", "", acquittal.spentIdr, ""],
     // The same total split by cohort, the same two figures the page tiles show; the payload
     // carries them so nothing is retyped or re-summed here.
-    ["Total Siswa", "", "", "", String(acquittal.siswaSpentIdr), ""],
-    ["Total GTK-MS", "", "", "", String(acquittal.gtkMsSpentIdr), ""],
+    ["Total Siswa", "", "", "", acquittal.siswaSpentIdr, ""],
+    ["Total GTK-MS", "", "", "", acquittal.gtkMsSpentIdr, ""],
     // Who travelled, one labelled row per Pimpinan (#142). Omitted entirely when none joined, so
     // no stray section appears. These are existing stored names, inventing no new column.
     ...(acquittal.pimpinan.length > 0
@@ -47,18 +48,6 @@ export function csvOf(acquittal: PerjadinAcquittal): string {
       : []),
   ];
 
-  // A leading BOM, because the reader this file is opened in is Excel and Excel reads a UTF-8 CSV
-  // as the system code page without one. That mangles every category name.
-  return `﻿${rows.map((row) => row.map(quoted).join(",")).join("\r\n")}\r\n`;
-}
-
-/**
- * One CSV field.
- *
- * Everything is quoted rather than only the fields that need it: a description is free text and a
- * name can carry a comma, and a rule with no exceptions is one nobody has to check. An
- * embedded quote doubles, which is the whole of RFC 4180's escaping.
- */
-function quoted(field: string): string {
-  return `"${field.replaceAll('"', '""')}"`;
+  // The shared writer: a BOM, every field quoted, and a text cell that looks like a formula guarded.
+  return csvDocument(rows);
 }

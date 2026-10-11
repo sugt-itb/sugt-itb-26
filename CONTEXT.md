@@ -164,7 +164,7 @@ The **Grant** that administers Grants and People — an Administrator assigns an
 _Avoid_: admin, superuser, owner (it is a Grant a Staff Person holds, not a Role or an account tier)
 
 **Keuangan**:
-The **Grant** reserved for a future `/keuangan`. It can be assigned and revoked, and gates nothing yet ([ADR-0052](./docs/adr/0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md)).
+The **Grant** that reads **every money Transaction across every Perjadin** as one table, `/keuangan`, and exports it ([#472](https://github.com/sugt-itb/sugt-itb-26/issues/472), [ADR-0053](./docs/adr/0053-the-programme-wide-transaction-table-is-keuangan-only.md)). An **Administrator** holds it implicitly. It is the one exception to money being open to read: each Perjadin's own **Perjadin Report** stays readable by everyone signed in.
 _Avoid_: finance, bendahara (a Grant, not a job title)
 
 **Perjadin Editor**:

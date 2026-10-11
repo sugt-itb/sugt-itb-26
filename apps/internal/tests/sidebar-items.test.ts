@@ -14,6 +14,7 @@ function hrefsFor(role: Role, grants: Grant[]) {
   return sidebarItems({
     role,
     canEditDaring: hasGrant(person, "Daring Editor"),
+    canViewKeuangan: hasGrant(person, "Keuangan"),
     canViewDashboard: canViewDashboard(person),
     canAdminister: hasGrant(person, "Administrator"),
     driveNeedsAttention: false,
@@ -35,13 +36,45 @@ const FULL = [
 ];
 
 describe("sidebarItems", () => {
-  it("gives a Staff Administrator every link, Dashboard first and Log then Pengaturan last", () => {
-    expect(hrefsFor("Staff", ["Administrator"])).toEqual([...FULL, "/log", "/pengaturan"]);
+  /** `FULL` with Keuangan in its place, right after Pendamping and before Perjadin (#472). */
+  const WITH_KEUANGAN = FULL.flatMap((href) =>
+    href === "/pendamping" ? [href, "/keuangan"] : [href],
+  );
+
+  it("gives a Staff Administrator every link, Keuangan after Pendamping, and Log then Pengaturan last", () => {
+    expect(hrefsFor("Staff", ["Administrator"])).toEqual([...WITH_KEUANGAN, "/log", "/pengaturan"]);
     expect(hrefsFor("Staff", ["Administrator", "Dashboard Viewer"])).toEqual([
-      ...FULL,
+      ...WITH_KEUANGAN,
       "/log",
       "/pengaturan",
     ]);
+    expect(WITH_KEUANGAN.slice(3, 6)).toEqual(["/pendamping", "/keuangan", "/perjadin"]);
+  });
+
+  it("keeps Keuangan in its place when Pendamping moves to the top for a Keuangan-only Staff (#472)", () => {
+    expect(hrefsFor("Staff", ["Keuangan"])).toEqual([
+      "/pendamping",
+      "/kalender",
+      "/keuangan",
+      "/perjadin",
+      "/sesi-daring",
+      "/feedback",
+      "/cerita",
+      "/sekolah",
+      "/kelompok-sekolah",
+      "/orang",
+    ]);
+  });
+
+  it("shows no Keuangan link without the Grant, nor to a Pimpinan", () => {
+    for (const grants of [
+      [],
+      ["Perjadin Editor"],
+      ["Dashboard Editor", "Daring Editor"],
+    ] as const) {
+      expect(hrefsFor("Staff", [...grants])).not.toContain("/keuangan");
+    }
+    expect(hrefsFor("Pimpinan", [])).not.toContain("/keuangan");
   });
 
   it("gives a Staff Daring Editor who reads the Dashboard every link but Log and Pengaturan", () => {
@@ -64,12 +97,9 @@ describe("sidebarItems", () => {
     ]);
   });
 
-  it.each(["Perjadin Editor", "Keuangan"] as const)(
-    "puts Pendamping first, with no Dashboard or Pretest, for a Staff holding only %s (ADR-0052)",
-    (grant) => {
-      expect(hrefsFor("Staff", [grant])).toEqual(hrefsFor("Staff", []));
-    },
-  );
+  it("puts Pendamping first, with no Dashboard or Pretest, for a Staff holding only Perjadin Editor (ADR-0052)", () => {
+    expect(hrefsFor("Staff", ["Perjadin Editor"])).toEqual(hrefsFor("Staff", []));
+  });
 
   it("drops only Pretest for a Staff Dashboard Viewer, and for a Dashboard Editor", () => {
     expect(hrefsFor("Staff", ["Dashboard Editor"])).toEqual(
@@ -128,6 +158,7 @@ describe("sidebarItems", () => {
       sidebarItems({
         role: "Staff",
         canEditDaring: true,
+        canViewKeuangan: true,
         canViewDashboard: true,
         canAdminister: hasGrant(admin, "Administrator"),
         driveNeedsAttention,

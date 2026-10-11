@@ -133,7 +133,7 @@ describe("the Grant picker's options and lock", () => {
   it("offers the six Grants in order, each with the line saying what it gates", () => {
     expect(GRANT_OPTIONS.map((option) => [option.value, option.description])).toEqual([
       ["Administrator", "semua akses"],
-      ["Keuangan", "belum ada fitur"],
+      ["Keuangan", "tabel dan ekspor semua transaksi"],
       ["Perjadin Editor", "merencanakan dan menulis setiap Perjadin"],
       ["Daring Editor", "Sesi daring dan Pretest"],
       ["Dashboard Editor", "termasuk Dashboard Viewer"],

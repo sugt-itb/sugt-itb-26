@@ -37,3 +37,10 @@ export function driveRefusalText(result: DriveRefusal): string {
  * document that is no longer stored. No field they could edit will fix it, so it says to reload.
  */
 export const STALE_PAGE = "Halaman ini sudah tidak sesuai. Muat ulang untuk melihat keadaannya.";
+
+/**
+ * The tooltip on a transaction whose receipts the reconcile has not put in place yet — on the Laporan
+ * and on `/keuangan` (#472) alike.
+ */
+export const RECEIPTS_UNSYNCED =
+  "Bukti belum tersinkron ke Google Drive — Administrator dapat menyelesaikannya lewat Periksa koneksi.";

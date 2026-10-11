@@ -31,6 +31,7 @@ function AppShell({
   role,
   personName,
   canEditDaring,
+  canViewKeuangan,
   canViewDashboard,
   canAdminister,
   driveNeedsAttention,
@@ -42,6 +43,7 @@ function AppShell({
   personName: string;
   /** Whether the viewer holds the Daring Editor Grant — gates the `/pretest` nav link. */
   canEditDaring: boolean;
+  canViewKeuangan: boolean;
   /** Whether the viewer may read the Dashboard (`/`) — gates its nav link (#322). */
   canViewDashboard: boolean;
   /** Whether the viewer holds the Administrator Grant — gates the `/pengaturan` nav link (#372). */
@@ -59,6 +61,7 @@ function AppShell({
       role={role}
       personName={personName}
       canEditDaring={canEditDaring}
+      canViewKeuangan={canViewKeuangan}
       canViewDashboard={canViewDashboard}
       canAdminister={canAdminister}
       driveNeedsAttention={driveNeedsAttention}
@@ -103,6 +106,7 @@ function SidebarBody({
   role,
   personName,
   canEditDaring,
+  canViewKeuangan,
   canViewDashboard,
   canAdminister,
   driveNeedsAttention,
@@ -111,6 +115,7 @@ function SidebarBody({
   role: Role;
   personName: string;
   canEditDaring: boolean;
+  canViewKeuangan: boolean;
   canViewDashboard: boolean;
   canAdminister: boolean;
   driveNeedsAttention: boolean;
@@ -123,6 +128,7 @@ function SidebarBody({
       <AppSidebarNav
         role={role}
         canEditDaring={canEditDaring}
+        canViewKeuangan={canViewKeuangan}
         canViewDashboard={canViewDashboard}
         canAdminister={canAdminister}
         driveNeedsAttention={driveNeedsAttention}

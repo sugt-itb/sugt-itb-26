@@ -1,3 +1,4 @@
+import { calendarDate } from "-/lib/calendar-date";
 import {
   ACTIVITY_LOG_AKSI_FILTERS,
   type ActivityLogAksiFilter,
@@ -6,15 +7,6 @@ import {
 
 /** `/log`'s query string as Next hands it over. */
 export type LogSearchParams = Record<string, string | string[] | undefined>;
-
-/** A real calendar date in `YYYY-MM-DD`, or null — so `?dari=2026-02-30` filters nothing. */
-function calendarDate(value: string | undefined): string | null {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
-    ? value
-    : null;
-}
 
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
