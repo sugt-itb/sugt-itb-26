@@ -98,10 +98,10 @@ import {
 } from "./support/fixtures";
 
 /**
- * **A Perjadin is written by its Group; Editor and Administrator write every Perjadin** (#439,
+ * **A Perjadin is written by its Group; Perjadin Editor and Administrator write every Perjadin** (#439,
  * ADR-0048). The ticket's T3 table, on its own people and its own Perjadin A:
  * - every write on a trip and its offline Sessions, called by each of the seven — the PIC, a member,
- *   a Staff member off the trip with no Grant, one with Dashboard Viewer, an Editor and an
+ *   a Staff member off the trip with no Grant, one with Dashboard Viewer, a Perjadin Editor and an
  *   Administrator off the trip, and a Pimpinan — lands for the first two and the last-but-one two,
  *   and is refused with `NotOnPerjadinError` for the two non-members (`NotStaffError` for the
  *   Pimpinan, first, as before);
@@ -168,7 +168,7 @@ async function people() {
     andi: await staffWith([], "Andi Wijaya"),
     fajar: await staffWith([], "Fajar Pratama"),
     dewi: await staffWith(["Dashboard Viewer"], "Dewi Lestari"),
-    budi: await staffWith(["Editor"], "Budi Santoso"),
+    budi: await staffWith(["Perjadin Editor"], "Budi Santoso"),
     sari: await staffWith(["Administrator"], "Sari Utami"),
     hadi: (await addPerson({
       fullName: "Pak Hadi",
@@ -431,12 +431,12 @@ describe("every write on Perjadin A, by each of the ticket's people", () => {
       }
     };
 
-    // The PIC and a member who is not PIC; an Editor and an Administrator off the trip.
+    // The PIC and a member who is not PIC; a Perjadin Editor and an Administrator off the trip.
     await lands(who.rina);
     await lands(who.andi);
     await lands(who.budi);
     await lands(who.sari);
-    // Off the trip without the Editor Grant: no Grant, or Dashboard Viewer only.
+    // Off the trip without the Perjadin Editor Grant: no Grant, or Dashboard Viewer only.
     for (const outsider of [who.fajar, who.dewi]) {
       const answer = await outcome(outsider);
       expect(isNotOnPerjadinError((answer as { error?: unknown }).error)).toBe(true);
@@ -466,7 +466,7 @@ describe("what stays open, and what follows the Group", () => {
     expect(isNotOnPerjadinError(refusal)).toBe(true);
   });
 
-  it("lets Dewi write A, and only A, once an Editor adds her to its Group", async () => {
+  it("lets Dewi write A, and only A, once a Perjadin Editor adds her to its Group", async () => {
     const who = await people();
     const where = await place();
     const a = await perjadinA(who, where);
@@ -588,7 +588,7 @@ describe("the actions answer a non-member with a 403", () => {
 describe("the write controls follow who writes the trip", () => {
   const WRITE_CONTROLS = ["Ubah tanggal", "Ubah Group", "Tambah Sesi"];
 
-  it("hides Perjadin A's controls from a non-member and shows them to a member and an Editor", async () => {
+  it("hides Perjadin A's controls from a non-member and shows them to a member and a Perjadin Editor", async () => {
     const who = await people();
     const a = await perjadinA(who, await place());
     const render = async (viewer: Person) => {

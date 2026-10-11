@@ -53,7 +53,7 @@ import {
  * Perjadin Preparation Checklist (ADR-0018). The cards arrive read from the server; nothing here
  * fetches.
  *
- * **The Grant is the gate; `canEdit` is the courtesy.** `canEdit` is `hasGrant(person, "Editor")`,
+ * **The Grant is the gate; `canEdit` is the courtesy.** `canEdit` is `hasGrant(person, "Dashboard Editor")`,
  * computed on the server. When false this is read-only — no "Persiapan Baru", no "Edit",
  * checkboxes disabled — but the Server Actions re-check the Grant regardless (a layout does not run
  * before a Server Action), so hiding the controls only spares a non-holder a 403 they would hit

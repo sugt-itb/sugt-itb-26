@@ -18,9 +18,9 @@ import {
 } from "./support/fixtures";
 
 /**
- * **`/perjadin/pengaturan`, the page** (#422): Administrator only — a grant-less Staff member, an
- * Editor and a Pimpinan get the 403 — reached from a button on `/perjadin` that only an Administrator
- * is shown. The level is the URL, parsed leniently. Rendered to static markup with the router
+ * **`/perjadin/pengaturan`, the page** (#422): Administrator only — a grant-less Staff member, a
+ * Perjadin Editor and a Pimpinan get the 403 — reached from a button on `/perjadin` that only an
+ * Administrator is shown. The level is the URL, parsed leniently. Rendered to static markup with the router
  * stubbed, since the editor is a client component that navigates.
  */
 
@@ -57,13 +57,13 @@ beforeEach(async () => {
 });
 
 describe("only an Administrator reaches Pengaturan Perjadin", () => {
-  it("forbids a grant-less Staff member, an Editor and a Pimpinan", async () => {
+  it("forbids a grant-less Staff member, a Perjadin Editor and a Pimpinan", async () => {
     const staff = await addPerson({ fullName: "Staf", email: "staf@itb.ac.id", role: "Staff" });
     const editor = await addPerson({ fullName: "Ed", email: "ed@itb.ac.id", role: "Staff" });
-    await addGrant(editor.id, "Editor");
+    await addGrant(editor.id, "Perjadin Editor");
     const pimpinan = await addPerson({ fullName: "Pim", email: "pim@itb.ac.id", role: "Pimpinan" });
 
-    for (const person of [staff, { ...editor, grants: ["Editor"] } as Person, pimpinan]) {
+    for (const person of [staff, { ...editor, grants: ["Perjadin Editor"] } as Person, pimpinan]) {
       vi.mocked(requirePerson).mockResolvedValue(person);
       await expect(digestOf(render())).resolves.toBe(FORBIDDEN);
     }

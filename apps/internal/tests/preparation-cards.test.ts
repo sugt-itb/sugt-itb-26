@@ -26,13 +26,13 @@ import { resetDatabase } from "./support/fixtures";
  * nothing off the caller but `role` and `grants` (that is all `requireGrant` inspects), and that
  * resolution threads a real Person's grants onto the caller is proven in `grant-foundation.test.ts`.
  * So a literal caller is a faithful stand-in here, and it is the only way to drive the guard's every
- * branch — an Editor, an Administrator (who implies it), and a plain Staff who is refused.
+ * branch — a Dashboard Editor, an Administrator (who implies it), and a plain Staff who is refused.
  */
 function caller(grants: Grant[], id = "00000000-0000-0000-0000-0000000000e1"): Person {
   return { id, fullName: "Orang", email: "orang@ditsama.itb.ac.id", role: "Staff", grants };
 }
 
-const editor = () => caller(["Editor"]);
+const editor = () => caller(["Dashboard Editor"]);
 
 const A_CARD = { title: "Persiapan Teknis", startsOn: "2026-10-01" } as const;
 
@@ -351,7 +351,7 @@ describe("checklist item writes", () => {
   });
 });
 
-describe("Preparation Card writes are Editor-guarded", () => {
+describe("Preparation Card writes are Dashboard Editor-guarded", () => {
   beforeEach(resetDatabase);
 
   it("refuses a Staff Person without the Grant, with a distinguishable typed error", async () => {
@@ -373,7 +373,17 @@ describe("Preparation Card writes are Editor-guarded", () => {
     expect(isNotGrantedError(refusal)).toBe(true);
   });
 
-  it("lets an Administrator write — Administrator implies Editor", async () => {
+  it.each(["Dashboard Viewer", "Perjadin Editor", "Daring Editor", "Keuangan"] as const)(
+    "refuses a Staff Person holding only %s — reading the Dashboard is not writing it (ADR-0052)",
+    async (grant) => {
+      const refusal = await createPreparationCard(caller([grant]), A_CARD).catch(
+        (error: unknown) => error,
+      );
+      expect(isNotGrantedError(refusal)).toBe(true);
+    },
+  );
+
+  it("lets an Administrator write — Administrator implies Dashboard Editor", async () => {
     const admin = caller(["Administrator"]);
     expect((await createPreparationCard(admin, A_CARD)).outcome).toBe("created");
   });
@@ -384,7 +394,7 @@ describe("Preparation Card writes are Editor-guarded", () => {
       fullName: "Bapak",
       email: "pimpinan@ditsama.itb.ac.id",
       role: "Pimpinan",
-      grants: ["Editor"],
+      grants: ["Dashboard Editor"],
     };
     const refusal = await createPreparationCard(pimpinan, A_CARD).catch((error: unknown) => error);
     expect(isNotGrantedError(refusal)).toBe(true);

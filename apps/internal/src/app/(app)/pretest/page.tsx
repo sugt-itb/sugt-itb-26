@@ -12,16 +12,16 @@ export const metadata: Metadata = { title: "Pretest" };
  * Stream and participant-type (ticket #247). Four boxes a School: STEM·Siswa, STEM·GTK-MS,
  * Research·Siswa, Research·GTK-MS. Presence of a box = done.
  *
- * **The page is editor-only.** The Dashboard (`/`) redirects a grant-less Staff to `/pendamping`
+ * **The page is Daring Editor-only.** The Dashboard (`/`) redirects a grant-less Staff to `/pendamping`
  * (#322, ADR-0037); this surface goes further — it is a data-entry tool with nothing to show a
- * non-editor — so it gates *rendering* on the Editor Grant (an Administrator implies it, `hasGrant`)
+ * non-holder — so it gates *rendering* on the Daring Editor Grant (an Administrator implies it, `hasGrant`)
  * and `forbidden()`s everyone else into a 403. That is a courtesy gate: `requireGrant` inside `setAssessmentCompletion` is the real
  * enforcement, since a layout does not run before a Server Action. The sidebar hides the link from
  * the same non-holders (`sidebar-items.ts`), so the 403 is only ever reached by a direct URL.
  */
 export default async function Page() {
   const person = await requirePerson();
-  if (!hasGrant(person, "Editor")) forbidden();
+  if (!hasGrant(person, "Daring Editor")) forbidden();
 
   const data = await pretestEditorData(person);
 

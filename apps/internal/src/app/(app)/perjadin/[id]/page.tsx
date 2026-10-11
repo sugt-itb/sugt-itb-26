@@ -40,8 +40,8 @@ export async function generateMetadata({ params }: PageProps<"/perjadin/[id]">):
  * (#180). `perjadinDetail` still carries no money; the acquittal comes from `perjadinAcquittal`,
  * which is an open money read, so the strip below is fetched and shown to a Pimpinan too. The strip
  * carries a link to the Laporan and one figure, Uang Perjalanan Terpakai — every transaction on the
- * trip (ADR-0051, #464). **Every write on this page is the trip's Group's, an
- * Editor's or an Administrator's** (ADR-0048), enforced in each query rather than by what this page
+ * trip (ADR-0051, #464). **Every write on this page is the trip's Group's, a
+ * Perjadin Editor's or an Administrator's** (ADR-0048), enforced in each query rather than by what this page
  * renders, so a Pimpinan or a Staff member off the trip sees the figures but no edit.
  *
  * The Report deadline rides with the money because the Perjadin Report *is* the acquittal state on
@@ -61,7 +61,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
   // The trip's attendance sheets and SPPDs (#398, #441): read-only here, for everyone who can see
   // the page. Upload and Hapus live on the `/pendamping` card's Dokumen dialog.
   const dokumen = await perjadinDokumen(person, id);
-  // Who writes this trip (ADR-0048): its Group, an Editor or an Administrator. Everyone else reads
+  // Who writes this trip (ADR-0048): its Group, a Perjadin Editor or an Administrator. Everyone else reads
   // it with every write control hidden; each write's query refuses them again, which is the real gate.
   const canWrite = await canWritePerjadin(person, id);
 

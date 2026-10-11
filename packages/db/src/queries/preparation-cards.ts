@@ -15,8 +15,8 @@ import { requireGrant } from "./staff-only";
  *
  * **The read query applies no guard** — it is the reads behind the Persiapan Program tab, and whoever reaches
  * the Dashboard reads them. Reaching the Dashboard itself now needs a grant (#322, ADR-0037): a
- * Pimpinan by role, a Staff Person by `Editor` or `Dashboard Viewer`, so a grant-less Staff never
- * gets this far. **Every write opens with `requireGrant(caller, "Editor")`**: writing a Preparation
+ * Pimpinan by role, a Staff Person by `Dashboard Viewer` (or a Grant implying it), so a grant-less Staff never
+ * gets this far. **Every write opens with `requireGrant(caller, "Dashboard Editor")`**: writing a Preparation
  * Card is the one thing that Grant gates, and an Administrator implies it. A non-holder is
  * refused with `NotGrantedError`, which `staffSurface` turns into a 403 (the UI hides the controls
  * as a courtesy; the guard is the enforcement, since a layout does not run before a Server Action).
@@ -116,7 +116,7 @@ export type CreatePreparationCardResult =
   | { outcome: "too-many-items"; count: number; limit: number };
 
 /**
- * Create a Card, optionally with initial checklist items — **Editor-guarded**. The Card
+ * Create a Card, optionally with initial checklist items — **Dashboard Editor-guarded**. The Card
  * and its items commit together, items numbered `0..n-1` in the order given. Validation is here and
  * comes back as a value; only the missing Grant throws.
  */
@@ -124,7 +124,7 @@ export async function createPreparationCard(
   caller: Person,
   input: PreparationCardInput,
 ): Promise<CreatePreparationCardResult> {
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Dashboard Editor");
 
   const title = input.title.trim();
   if (title === "") return { outcome: "title-required" };
@@ -174,7 +174,7 @@ export type EditPreparationCardResult =
   | { outcome: "no-such-card" };
 
 /**
- * Edit a Card's own fields — title and dates (a Card carries no Jenis since #292). Editor-guarded. Its
+ * Edit a Card's own fields — title and dates (a Card carries no Jenis since #292). Dashboard Editor-guarded. Its
  * checklist, including each item's Jenis, is edited through the item writes below, not here.
  * `updated_at` is bumped to record the edit — the list read orders by `(starts_on, created_at)`, not
  * recency, so this is an audit timestamp, not a sort key.
@@ -184,7 +184,7 @@ export async function editPreparationCard(
   cardId: string,
   input: PreparationCardInput,
 ): Promise<EditPreparationCardResult> {
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Dashboard Editor");
 
   const title = input.title.trim();
   if (title === "") return { outcome: "title-required" };
@@ -205,12 +205,12 @@ export async function editPreparationCard(
 
 export type DeletePreparationCardResult = { outcome: "deleted" } | { outcome: "no-such-card" };
 
-/** Delete a Card — Editor-guarded. Its items go with it by `on delete cascade`. */
+/** Delete a Card — Dashboard Editor-guarded. Its items go with it by `on delete cascade`. */
 export async function deletePreparationCard(
   caller: Person,
   cardId: string,
 ): Promise<DeletePreparationCardResult> {
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Dashboard Editor");
 
   const [row] = await db
     .delete(preparationCard)
@@ -227,7 +227,7 @@ export type AddChecklistItemResult =
   | { outcome: "too-many-items"; count: number; limit: number };
 
 /**
- * Append one checklist item to a Card — Editor-guarded. It lands at the end
+ * Append one checklist item to a Card — Dashboard Editor-guarded. It lands at the end
  * (`max(position) + 1`), and the `≤ 20` cap is enforced here as a value outcome. The card row is
  * locked `for update` so two concurrent adds **serialize** on it — without the lock, at READ
  * COMMITTED both could read a count of 19 and both insert, slipping the card to 21; the exemplar
@@ -240,7 +240,7 @@ export async function addChecklistItem(
   label: string,
   jenis: PreparationJenis,
 ): Promise<AddChecklistItemResult> {
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Dashboard Editor");
 
   const trimmed = label.trim();
   if (trimmed === "") return { outcome: "label-required" };
@@ -277,12 +277,12 @@ export async function addChecklistItem(
 
 export type RemoveChecklistItemResult = { outcome: "removed" } | { outcome: "no-such-item" };
 
-/** Remove one checklist item — Editor-guarded. */
+/** Remove one checklist item — Dashboard Editor-guarded. */
 export async function removeChecklistItem(
   caller: Person,
   itemId: string,
 ): Promise<RemoveChecklistItemResult> {
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Dashboard Editor");
 
   const [row] = await db
     .delete(preparationChecklistItem)
@@ -295,7 +295,7 @@ export async function removeChecklistItem(
 export type ReorderChecklistItemsResult = { outcome: "reordered" } | { outcome: "no-such-card" };
 
 /**
- * Rewrite the checklist order for the **unchecked** items of a Card — Editor-guarded.
+ * Rewrite the checklist order for the **unchecked** items of a Card — Dashboard Editor-guarded.
  * `orderedItemIds` is the unchecked items in their new order; each is written `position = index`.
  * Checked items keep their positions and still sort after every unchecked one, because the read
  * orders `(checked, position)`. Only rows that belong to the Card **and** are unchecked are touched,
@@ -306,7 +306,7 @@ export async function reorderChecklistItems(
   cardId: string,
   orderedItemIds: string[],
 ): Promise<ReorderChecklistItemsResult> {
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Dashboard Editor");
 
   return db.transaction(async (tx) => {
     const [card] = await tx
@@ -344,7 +344,7 @@ export async function reorderChecklistItems(
 export type SetChecklistItemCheckedResult = { outcome: "updated" } | { outcome: "no-such-item" };
 
 /**
- * Tick or untick one checklist item — Editor-guarded. Both directions: a checked item
+ * Tick or untick one checklist item — Dashboard Editor-guarded. Both directions: a checked item
  * **can be unchecked**, which is what lets a Card's percentage go down as well as up.
  */
 export async function setChecklistItemChecked(
@@ -352,7 +352,7 @@ export async function setChecklistItemChecked(
   itemId: string,
   checked: boolean,
 ): Promise<SetChecklistItemCheckedResult> {
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Dashboard Editor");
 
   const [row] = await db
     .update(preparationChecklistItem)
@@ -366,7 +366,7 @@ export async function setChecklistItemChecked(
 export type SetChecklistItemJenisResult = { outcome: "updated" } | { outcome: "no-such-item" };
 
 /**
- * Set one checklist item's Jenis — Editor-guarded (#292). A single-column UPDATE on its own row, the
+ * Set one checklist item's Jenis — Dashboard Editor-guarded (#292). A single-column UPDATE on its own row, the
  * same shape as `setChecklistItemChecked`: the row is matched by id and the DB
  * `preparation_checklist_item_jenis_check` backstops the four-value set, so nothing else is read or
  * written. `jenis` is typed `PreparationJenis` at the Server Action boundary.
@@ -376,7 +376,7 @@ export async function setChecklistItemJenis(
   itemId: string,
   jenis: PreparationJenis,
 ): Promise<SetChecklistItemJenisResult> {
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Dashboard Editor");
 
   const [row] = await db
     .update(preparationChecklistItem)

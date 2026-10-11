@@ -30,7 +30,7 @@ import { Avatar, AvatarFallback } from "@sugt/ui/components/avatar";
 function AppShell({
   role,
   personName,
-  canEditMonitoring,
+  canEditDaring,
   canViewDashboard,
   canAdminister,
   driveNeedsAttention,
@@ -40,8 +40,8 @@ function AppShell({
 }: {
   role: Role;
   personName: string;
-  /** Whether the viewer holds the Editor Grant — gates the `/pretest` nav link. */
-  canEditMonitoring: boolean;
+  /** Whether the viewer holds the Daring Editor Grant — gates the `/pretest` nav link. */
+  canEditDaring: boolean;
   /** Whether the viewer may read the Dashboard (`/`) — gates its nav link (#322). */
   canViewDashboard: boolean;
   /** Whether the viewer holds the Administrator Grant — gates the `/pengaturan` nav link (#372). */
@@ -58,7 +58,7 @@ function AppShell({
     <SidebarBody
       role={role}
       personName={personName}
-      canEditMonitoring={canEditMonitoring}
+      canEditDaring={canEditDaring}
       canViewDashboard={canViewDashboard}
       canAdminister={canAdminister}
       driveNeedsAttention={driveNeedsAttention}
@@ -102,7 +102,7 @@ function AppShell({
 function SidebarBody({
   role,
   personName,
-  canEditMonitoring,
+  canEditDaring,
   canViewDashboard,
   canAdminister,
   driveNeedsAttention,
@@ -110,7 +110,7 @@ function SidebarBody({
 }: {
   role: Role;
   personName: string;
-  canEditMonitoring: boolean;
+  canEditDaring: boolean;
   canViewDashboard: boolean;
   canAdminister: boolean;
   driveNeedsAttention: boolean;
@@ -122,7 +122,7 @@ function SidebarBody({
 
       <AppSidebarNav
         role={role}
-        canEditMonitoring={canEditMonitoring}
+        canEditDaring={canEditDaring}
         canViewDashboard={canViewDashboard}
         canAdminister={canAdminister}
         driveNeedsAttention={driveNeedsAttention}

@@ -35,7 +35,7 @@ export async function generateMetadata({
  * **Readable by ANY signed-in Person now** (ADR-0004 reversed by [ADR-0026](../../../../../../../../docs/adr/0026-money-is-open-to-read-and-staff-only-to-write.md),
  * #180). `perjadinAcquittal` is an open money read, so a Pimpinan reaching this URL sees the whole
  * acquittal — money reads are open. Every **write** control on the page — Laporkan, Catat transaksi,
- * Unggah bukti and each receipt's Hapus (#462) — is the trip's Group's, an Editor's or an
+ * Unggah bukti and each receipt's Hapus (#462) — is the trip's Group's, a Perjadin Editor's or an
  * Administrator's (ADR-0048): absent for anyone else, and refused server-side by each Server
  * Action's query (or, for the receipt actions, before Drive is asked anything — by `staffOnTrip`,
  * and for Hapus by `receiptDeleteTarget`). So a Pimpinan or a Staff member off the trip
@@ -62,7 +62,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
   if (!acquittal) notFound();
 
   const transactions = acquittal.transactions.map(withLinks);
-  // Who writes this trip (ADR-0048): its Group, an Editor or an Administrator. Everyone else reads
+  // Who writes this trip (ADR-0048): its Group, a Perjadin Editor or an Administrator. Everyone else reads
   // the whole Laporan with Catat transaksi, Unggah bukti, Hapus and Laporkan absent.
   const canWrite = await canWritePerjadin(person, id);
   const gate = canWrite

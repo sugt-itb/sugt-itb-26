@@ -11,7 +11,7 @@ import { addCluster, addProvince, addSchool, resetDatabase } from "./support/fix
 
 /**
  * **Pretest/Posttest completion — the data layer** (ticket #246, ADR-0031). The open read and the
- * one Editor-guarded write behind the Dashboard (`/`) Pretest tracker.
+ * one Daring Editor-guarded write behind the Dashboard (`/`) Pretest tracker.
  *
  * A completion is a bare tuple **(School × Stream × participant-type × kind)** whose *presence* means
  * "administered"; there is no `done` column. The write callers are **hand-built** `Person`s carrying
@@ -23,7 +23,7 @@ function caller(grants: Grant[], id = "00000000-0000-0000-0000-0000000000e1"): P
   return { id, fullName: "Orang", email: "orang@ditsama.itb.ac.id", role: "Staff", grants };
 }
 
-const editor = () => caller(["Editor"]);
+const editor = () => caller(["Daring Editor"]);
 
 /** Build one School to hang completions off — its id is the only thing these tests need. */
 async function aSchool(slug = "sekolah-satu") {
@@ -141,7 +141,7 @@ describe("setAssessmentCompletion toggles a box", () => {
   });
 });
 
-describe("setAssessmentCompletion is Editor-guarded", () => {
+describe("setAssessmentCompletion is Daring Editor-guarded", () => {
   beforeEach(resetDatabase);
 
   const box = {
@@ -159,7 +159,18 @@ describe("setAssessmentCompletion is Editor-guarded", () => {
     expect(isNotGrantedError(refusal)).toBe(true);
   });
 
-  it("lets an Administrator write — Administrator implies Editor", async () => {
+  it.each(["Perjadin Editor", "Dashboard Editor", "Dashboard Viewer", "Keuangan"] as const)(
+    "refuses a Staff Person holding only %s — Pretest is the Daring Editor's (ADR-0052)",
+    async (grant) => {
+      const schoolId = await aSchool();
+      const refusal = await setAssessmentCompletion(caller([grant]), { schoolId, ...box }).catch(
+        (error: unknown) => error,
+      );
+      expect(isNotGrantedError(refusal)).toBe(true);
+    },
+  );
+
+  it("lets an Administrator write — Administrator implies Daring Editor", async () => {
     const schoolId = await aSchool();
     expect(
       (await setAssessmentCompletion(caller(["Administrator"]), { schoolId, ...box })).outcome,
@@ -173,7 +184,7 @@ describe("setAssessmentCompletion is Editor-guarded", () => {
       fullName: "Bapak",
       email: "pimpinan@ditsama.itb.ac.id",
       role: "Pimpinan",
-      grants: ["Editor"],
+      grants: ["Daring Editor"],
     };
     const refusal = await setAssessmentCompletion(pimpinan, { schoolId, ...box }).catch(
       (error: unknown) => error,

@@ -16,7 +16,7 @@ import type { SessionDetail } from "@sugt/db/queries";
  *
  * **The form is offered to the person the tool chases, which is narrower than who may file.**
  * `owed` names the PIC, empty until the Session is delivered (ADR-0009). The write is broader:
- * `fileSessionRecord` admits any member of the trip's Group — and an Editor or an Administrator
+ * `fileSessionRecord` admits any member of the trip's Group — and a Perjadin Editor or an Administrator
  * (ADR-0048) — not only the PIC, because `docs/data-model.md` says any Staff who was there may file
  * one while the PIC's is the one chased. A non-PIC member's Session Record is therefore permitted by the write and has no screen here yet —
  * a stated boundary, not an oversight.

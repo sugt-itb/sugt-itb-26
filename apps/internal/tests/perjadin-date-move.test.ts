@@ -11,7 +11,7 @@ import {
   addProvince,
   addSchool,
   addSubCluster,
-  asEditor,
+  withGrant,
   resetDatabase,
 } from "./support/fixtures";
 
@@ -25,8 +25,11 @@ import {
 
 /** The Staff Person who is PIC of the trip. */
 async function staff(email = "rina@ditsama.itb.ac.id") {
-  // An Editor, since these trips are planned through `planPerjadin` (ADR-0047).
-  return asEditor(await addPerson({ fullName: "Rina Nurhayati", email, role: "Staff" }));
+  // A Perjadin Editor, since these trips are planned through `planPerjadin` (ADR-0047).
+  return withGrant(
+    await addPerson({ fullName: "Rina Nurhayati", email, role: "Staff" }),
+    "Perjadin Editor",
+  );
 }
 
 /** One School to hang Sessions off — the free-standing kind, for the `addPerjadin` fixtures below. */

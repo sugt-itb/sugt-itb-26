@@ -9,7 +9,7 @@ import { Button } from "@sugt/ui/components/button";
 /**
  * **The Foto & Video section on `/sesi/[id]`** (#425), so a Pimpinan — who cannot open `/pendamping`
  * — sees a Session's photos and videos too. The list, with **Buka** for everyone; for whoever writes
- * the Session's trip (its Group, an Editor or an Administrator — ADR-0048), **Hapus** and the upload
+ * the Session's trip (its Group, a Perjadin Editor or an Administrator — ADR-0048), **Hapus** and the upload
  * popup. A cancelled Session keeps its list but offers no upload. An upload or a Hapus
  * revalidates this page in its own Server Action, so the list here follows without a refresh.
  */

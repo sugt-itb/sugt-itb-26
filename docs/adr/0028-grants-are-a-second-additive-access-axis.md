@@ -123,3 +123,10 @@ online Session now need the **Editor** Grant
 writes moved from the Staff Role to the Grant, so a Staff member without it can no longer do them. The
 three properties otherwise stand — a Grant is Staff-only, never reaches a Pimpinan, and never lets a
 Pimpinan write; an Administrator still implies every Grant.
+
+## Amendment (2026-10-12): Editor splits in three, and Keuangan is added
+
+The Grant set is now six — Administrator, Keuangan, Perjadin Editor, Daring Editor, Dashboard Editor
+and Dashboard Viewer ([ADR-0052](./0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md), #469). **Editor** is retired: its reach is split between Perjadin, Daring
+and Dashboard Editor, and the migration gave every Editor all three. **No Grant implies another**,
+except that Administrator still implies every Grant and Dashboard Editor implies Dashboard Viewer.

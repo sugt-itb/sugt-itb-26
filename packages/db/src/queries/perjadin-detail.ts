@@ -30,8 +30,8 @@ import { requirePerjadinWriter, requireStaff } from "./staff-only";
  * separate read — and since #180 (ADR-0026) that read is open to any signed-in Person, so the trip
  * page fetches it alongside this one and shows the money strip to a Pimpinan too. This query still
  * carries none of it, and needs no role check because there is nothing here to refuse; every
- * **write** below opens with `requireStaff` and runs `requirePerjadinWriter` — the trip's Group, an
- * Editor or an Administrator (ADR-0048) — and reading money stays a job for `perjadinAcquittal`.
+ * **write** below opens with `requireStaff` and runs `requirePerjadinWriter` — the trip's Group, a
+ * Perjadin Editor or an Administrator (ADR-0048) — and reading money stays a job for `perjadinAcquittal`.
  */
 
 /** One member of the Group. Staff-only now (ADR-0020), so `stream` is always null. */

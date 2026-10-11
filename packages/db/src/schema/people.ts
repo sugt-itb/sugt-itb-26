@@ -94,7 +94,7 @@ export const person = pgTable(
  * "a Pimpinan writes nothing" (ADR-0025) without a composite key this table deliberately avoids.
  *
  * `unique (person_id, grant)` makes "a Person holds a Grant at most once" a fact about the schema.
- * The CHECK names the two `GRANTS` values character for character — the same pattern as
+ * The CHECK names the `GRANTS` values character for character — the same pattern as
  * `person_role_check`, and widened the same way (`0018_widen_person_role_pimpinan.sql`) when a
  * future Grant is added. `$type<Grant>()` reads the column back as `Grant` rather than `string`.
  */
@@ -111,7 +111,7 @@ export const personGrant = pgTable(
     unique("person_grant_person_id_grant_key").on(t.personId, t.grant),
     check(
       "person_grant_grant_check",
-      sql`${t.grant} in ('Administrator', 'Editor', 'Dashboard Viewer')`,
+      sql`${t.grant} in ('Administrator', 'Keuangan', 'Perjadin Editor', 'Daring Editor', 'Dashboard Editor', 'Dashboard Viewer')`,
     ),
   ],
 );

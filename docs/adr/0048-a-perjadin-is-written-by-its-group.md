@@ -99,3 +99,10 @@ Uang Perjalanan is no longer one of a trip's writes ([ADR-0051](./0051-the-advan
 #464): the Advance is not tracked, so the plan form does not ask for it and the trip page has no dialog
 to correct it. "Its Uang Perjalanan" in _Why_ and in the list of guarded writes above are history. Every
 other write on the list still runs `requirePerjadinWriter`.
+
+## Amendment (2026-10-12): the Editor is now the Perjadin Editor
+
+Writing every Perjadin, not only one's own Group's, is now the **Perjadin Editor** Grant's ([ADR-0052](./0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md),
+#469); "an Editor" above means a Perjadin Editor. Pengaturan Perjadin stays Administrator-only, and
+the other Grants — Daring Editor, Dashboard Editor, Dashboard Viewer and Keuangan — write only a trip
+whose Group the Person is in.
