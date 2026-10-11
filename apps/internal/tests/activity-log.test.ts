@@ -611,6 +611,8 @@ describe("activityLogPage — /log's read", () => {
       ["report_filed", { transactionCount: 0, totalIdr: 0 }],
       ["document_uploaded", { kind: "Daftar Hadir Pendamping", documentDate: "2026-10-13" }],
       ["document_deleted", { kind: "Daftar Hadir Pendamping", documentDate: "2026-10-13" }],
+      ["evidence_deleted", {}],
+      ["transaction_deleted", {}],
     ];
     for (const [i, [action, details]] of each.entries()) {
       await addActivityLogEntry({
@@ -627,11 +629,14 @@ describe("activityLogPage — /log's read", () => {
       (await activityLogPage(admin, { ...NO_FILTERS, aksi })).rows.map((row) => row.action).sort();
 
     expect(await actions("uang-perjalanan")).toEqual(["advance_changed", "advance_set"]);
-    expect(await actions("catat-transaksi")).toEqual(["transaction_recorded"]);
-    expect(await actions("unggah-bukti")).toEqual(["evidence_uploaded"]);
+    expect(await actions("catat-transaksi")).toEqual([
+      "transaction_deleted",
+      "transaction_recorded",
+    ]);
+    expect(await actions("unggah-bukti")).toEqual(["evidence_deleted", "evidence_uploaded"]);
     expect(await actions("dokumen")).toEqual(["document_deleted", "document_uploaded"]);
     expect(await actions("laporan")).toEqual(["report_filed"]);
-    expect(await actions(null)).toHaveLength(7);
+    expect(await actions(null)).toHaveLength(9);
   });
 
   it("filters by an inclusive range of WIB calendar dates", async () => {
@@ -673,5 +678,27 @@ describe("activityLogPage — /log's read", () => {
     });
     expect(page.total).toBe(1);
     expect(page.rows.map((row) => row.details)).toEqual([{ amountIdr: 1 }]);
+  });
+});
+
+describe("transaction_deleted, which Hapus transaksi will write (#463)", () => {
+  it("reads as Transaksi dihapus, with the line as it was", () => {
+    const entry = {
+      action: "transaction_deleted",
+      details: {
+        transactionId: "00000000-0000-0000-0000-000000000001",
+        category: "Konsumsi",
+        amountIdr: 150_000,
+        participantType: "Siswa",
+        spentOn: "2026-10-13",
+        description: "Makan siang",
+        receiptCount: 2,
+      },
+    } as const;
+
+    expect(activityLogAksi(entry.action, false)).toBe("Transaksi dihapus");
+    expect(activityLogRincian(entry)).toBe(
+      "Konsumsi · Rp150.000 · Siswa · tgl 2026-10-13 · Makan siang · 2 bukti",
+    );
   });
 });

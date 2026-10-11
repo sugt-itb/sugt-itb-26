@@ -1750,6 +1750,17 @@ more than five, and `attachTransactionEvidence` refuses a batch that would take 
 counting under a lock on the parent row. There is no CHECK, because the shared database may
 already hold lines with none or more, and those are grandfathered.
 
+**A receipt may be deleted, but never a line's only one** (#462,
+[ADR-0050](./adr/0050-transactions-and-receipts-may-be-deleted-and-the-log-keeps-the-copy.md)).
+Hapus bukti trashes the file in Drive first, then `deleteTransactionEvidence` locks the parent row
+`for update` — the same lock `attachTransactionEvidence` counts under — counts again, and deletes
+the row with its `evidence_deleted` Log entry in one transaction. The count is checked twice: before
+the trash, so a line's only receipt is refused with nothing trashed, and under the lock, so two
+concurrent Hapus on a two-receipt line cannot leave it with none. The loser of that race takes its
+file back out of the Drive trash, since its row stands. A grandfathered line with more than five may
+lose any of them, down to one. The freed slot counts toward the five again. Nothing about filing
+gates it.
+
 **Every receipt is a file in the company's Google Drive** (ADR-0040). `drive_file_id` is the
 file's Drive id, written by Catat transaksi or by a line's own "Unggah bukti", and `not null`. A
 CHECK pins `content_type` to the four types the server sniffs from the first bytes. `unique` means
@@ -1819,7 +1830,8 @@ create table activity_log (
                      'advance_set', 'advance_changed', 'transaction_recorded',
                      'evidence_uploaded', 'report_filed',
                      'document_uploaded', 'document_deleted',
-                     'footage_uploaded', 'footage_deleted')),
+                     'footage_uploaded', 'footage_deleted',
+                     'evidence_deleted', 'transaction_deleted')),
   details          jsonb not null,
   search_text      text not null,
   backfilled       boolean not null default false
@@ -1831,20 +1843,23 @@ create index activity_log_occurred_at_id_idx on activity_log (occurred_at desc, 
 **One row per act on a Perjadin's money, receipts, documents or report** (#395), read only by an
 Administrator on `/log`. The `action` values are character for character `ACTIVITY_LOG_ACTIONS` in
 `packages/domain/src/index.ts`. The two `document_*` values went into the CHECK with the rest, so the
-Dokumen uploads and Hapus needed no CHECK migration.
+Dokumen uploads and Hapus needed no CHECK migration. The `footage_*` pair widened it in migration
+0044, and the two money deletes, `evidence_deleted` and `transaction_deleted` (ADR-0050), in
+migration 0049 — one migration for both, though only Hapus bukti writes yet.
 
 **Each entry is written in the same database transaction as the change it records**, so a refused
-or failed write logs nothing. Five writes log today, each through `logActivity` in
-`queries/activity-log.ts`:
+or failed write logs nothing. The money writes log as below, each through `logActivity` in
+`queries/activity-log.ts`; the Dokumen and Foto & Video writes are described with their tables:
 
-| Write                       | `action`               | `details`                                                                         |
-| --------------------------- | ---------------------- | --------------------------------------------------------------------------------- |
-| `planPerjadin`              | `advance_set`          | `{ amountIdr }`; only when planned with one (#437)                                |
-| `updatePerjadinAdvance`     | `advance_set`          | `{ amountIdr }`, when it fills an unset Advance in for the first time (#437)      |
-| `updatePerjadinAdvance`     | `advance_changed`      | `{ fromIdr, toIdr }`; the old value is read under `for update`; no change, no row |
-| `recordTransaction`         | `transaction_recorded` | `{ transactionId, category, amountIdr, participantType, spentOn, receiptCount }`  |
-| `attachTransactionEvidence` | `evidence_uploaded`    | `{ transactionId, category, amountIdr, spentOn, added, total }`                   |
-| `filePerjadinReport`        | `report_filed`         | `{ transactionCount, totalIdr }`, every category, as the acquittal totals         |
+| Write                       | `action`               | `details`                                                                          |
+| --------------------------- | ---------------------- | ---------------------------------------------------------------------------------- |
+| `planPerjadin`              | `advance_set`          | `{ amountIdr }`; only when planned with one (#437)                                 |
+| `updatePerjadinAdvance`     | `advance_set`          | `{ amountIdr }`, when it fills an unset Advance in for the first time (#437)       |
+| `updatePerjadinAdvance`     | `advance_changed`      | `{ fromIdr, toIdr }`; the old value is read under `for update`; no change, no row  |
+| `recordTransaction`         | `transaction_recorded` | `{ transactionId, category, amountIdr, participantType, spentOn, receiptCount }`   |
+| `attachTransactionEvidence` | `evidence_uploaded`    | `{ transactionId, category, amountIdr, spentOn, added, total }`                    |
+| `deleteTransactionEvidence` | `evidence_deleted`     | `{ transactionId, evidenceId, category, amountIdr, spentOn, left }`, a copy (#462) |
+| `filePerjadinReport`        | `report_filed`         | `{ transactionCount, totalIdr }`, every category, as the acquittal totals          |
 
 **`actor_email` is a copy**, taken when the act happens, so the row stays true if the Person's email
 later changes. **`search_text`** is the Aksi and Rincian text `/log` shows, lower-cased once at

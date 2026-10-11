@@ -607,6 +607,16 @@ as failed, and the rest are kept.
 - Each line shows **Bukti 1…n**, links that open each receipt in Drive in a new tab.
 - A line also shows **Buka folder**, a link to its own Drive folder that anyone holding it can
   view — the link the external audit will use.
+- Beside each **Bukti n** sits a small **Hapus** (#462,
+  [ADR-0050](./adr/0050-transactions-and-receipts-may-be-deleted-and-the-log-keeps-the-copy.md)), for
+  a receipt uploaded by mistake. It asks _"Hapus bukti ini? File akan dipindahkan ke Sampah Google
+  Drive."_, then moves the file to the Drive trash and takes the receipt off the line, freeing its
+  slot for Unggah bukti. **A line's only receipt cannot be deleted**: its Hapus says _"Satu-satunya
+  bukti tidak bisa dihapus. Unggah bukti yang benar dulu, atau hapus transaksinya."_ — so a single
+  wrong receipt is replaced by uploading the right one first. Hapus is the trip writer's alone, like
+  Unggah bukti, is disabled with the reason while Drive is not connected or broken, and still works
+  after the Laporan is filed. Each one is a **Bukti dihapus** entry on `/log`, under the Unggah
+  bukti filter.
 
 What both controls take:
 

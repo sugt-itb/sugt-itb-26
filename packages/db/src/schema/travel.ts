@@ -533,7 +533,7 @@ export const activityLog = pgTable(
   (t) => [
     check(
       "activity_log_action_check",
-      sql`${t.action} in ('advance_set', 'advance_changed', 'transaction_recorded', 'evidence_uploaded', 'report_filed', 'document_uploaded', 'document_deleted', 'footage_uploaded', 'footage_deleted')`,
+      sql`${t.action} in ('advance_set', 'advance_changed', 'transaction_recorded', 'evidence_uploaded', 'report_filed', 'document_uploaded', 'document_deleted', 'footage_uploaded', 'footage_deleted', 'evidence_deleted', 'transaction_deleted')`,
     ),
     // `/log` reads newest first, 50 at a time; this serves that order without a sort.
     index("activity_log_occurred_at_id_idx").on(t.occurredAt.desc(), t.id.desc()),

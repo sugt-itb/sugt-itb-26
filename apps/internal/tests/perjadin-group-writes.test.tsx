@@ -21,6 +21,7 @@ import {
   recordDocumentAction,
 } from "-/app/(app)/perjadin/[id]/dokumen/actions";
 import {
+  deleteReceiptAction,
   filePerjadinReportAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
@@ -251,7 +252,10 @@ async function perjadinA(who: People, where: Place) {
     spentOn: "2026-10-12",
     createdByPersonId: who.rina.id,
   });
-  await addTransactionEvidence({ transactionId: line.id, uploadedByPersonId: who.rina.id });
+  const receipt = await addTransactionEvidence({
+    transactionId: line.id,
+    uploadedByPersonId: who.rina.id,
+  });
   const documentId = randomUUID();
   await recordPerjadinDocument(who.rina, sheet(trip.id, documentId));
   const footageId = randomUUID();
@@ -262,6 +266,7 @@ async function perjadinA(who: People, where: Place) {
     deliveredId: delivered.id,
     teacherId: teacher!.id,
     transactionId: line.id,
+    evidenceId: receipt.id,
     documentId,
     footageId,
   };
@@ -543,7 +548,7 @@ describe("the actions answer a non-member with a 403", () => {
     expect(driveAccessToken).not.toHaveBeenCalled();
   });
 
-  it("before Drive is asked anything, on every upload opener and both Hapus", async () => {
+  it("before Drive is asked anything, on every upload opener and every Hapus", async () => {
     const who = await people();
     const a = await perjadinA(who, await place());
     signedInAs(who.fajar);
@@ -569,6 +574,7 @@ describe("the actions answer a non-member with a 403", () => {
     ).resolves.toBe(FORBIDDEN);
     await expect(digestOf(deleteDocumentAction(a.documentId))).resolves.toBe(FORBIDDEN);
     await expect(digestOf(deleteFootageAction(a.footageId))).resolves.toBe(FORBIDDEN);
+    await expect(digestOf(deleteReceiptAction(a.evidenceId))).resolves.toBe(FORBIDDEN);
 
     expect(driveAccessToken).not.toHaveBeenCalled();
   });

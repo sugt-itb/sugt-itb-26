@@ -7,6 +7,7 @@ import type {
   ViewableTransaction,
 } from "-/app/(app)/perjadin/[id]/laporan/action-types";
 import {
+  deleteReceiptAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
   recordTransactionAction,
@@ -18,6 +19,11 @@ import {
   type ParticipantFilter,
   type SortDirection,
 } from "-/components/laporan-perjadin/acquittal-transactions-sort";
+import {
+  ONLY_RECEIPT,
+  RECEIPT_DELETE_CONFIRM,
+  receiptDeleteRefusalText,
+} from "-/components/laporan-perjadin/receipt-delete-messages";
 import { RequiredLegend, RequiredMark } from "-/components/required-mark";
 import { UnsyncedMarker } from "-/components/unsynced-marker";
 import {
@@ -73,8 +79,8 @@ import {
 import { type ReactElement, useId, useMemo, useRef, useState, useTransition } from "react";
 
 /**
- * **The line items, and the two things a PIC does to them**: enter one with its receipts, and add
- * receipts to one already entered.
+ * **The line items, and what a PIC does to them**: enter one with its receipts, add receipts to one
+ * already entered, and take a mistaken receipt off one (#462).
  *
  * **A line is entered with its evidence or not at all** (ADR-0039, superseding ADR-0030's optional
  * upload). The entry form stages one to five files; Catat uploads every one of them **first** —
@@ -91,7 +97,7 @@ import { type ReactElement, useId, useMemo, useRef, useState, useTransition } fr
  * still appear — a grandfathered line — and is marked, and the filing check still refuses it.
  *
  * **While Drive cannot take an upload** — not connected, broken, or its folders unresolved — Catat
- * and every row's Unggah bukti render disabled, and the reason is said once beside Catat. The
+ * and every row's Unggah bukti and Hapus render disabled, and the reason is said once beside Catat. The
  * Server Actions refuse the same states themselves.
  */
 function AcquittalTransactions({
@@ -343,8 +349,8 @@ function ControlSelect<T extends string>({
  * the line already stands — and moves them into the line's folder.
  *
  * A line holds at most `MAX_RECEIPTS_PER_TRANSACTION` in total, so a pick is cut to the slots left
- * and the button is disabled once there are none. There is no receipt deletion, so a mistaken
- * upload uses a slot.
+ * and the button is disabled once there are none. A mistaken upload is taken off with the **Hapus**
+ * beside its link (#462, ADR-0050), which frees its slot — but never the line's only receipt.
  */
 function Receipts({
   perjadinId,
@@ -438,15 +444,27 @@ function Receipts({
       ) : (
         <span className="flex flex-wrap items-center gap-2">
           {line.evidence.map((file, index) => (
-            <a
+            <span
               key={file.id}
-              href={file.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:no-underline"
+              className="flex items-center gap-0.5"
             >
-              Bukti {index + 1}
-            </a>
+              <a
+                href={file.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:no-underline"
+              >
+                Bukti {index + 1}
+              </a>
+              {canWrite && (
+                <DeleteReceipt
+                  evidenceId={file.id}
+                  label={`Bukti ${index + 1}`}
+                  onlyReceipt={line.evidence.length <= 1}
+                  uploadGate={uploadGate}
+                />
+              )}
+            </span>
           ))}
         </span>
       )}
@@ -496,6 +514,93 @@ function Receipts({
       )}
       {note !== null && <span className="text-destructive">{note}</span>}
     </div>
+  );
+}
+
+/**
+ * **Hapus** beside one receipt, behind a confirmation (#462, ADR-0050). The file goes to the Drive
+ * trash first, then the row, and the page revalidates. Disabled with the gate's reason while Drive
+ * cannot take it, as Unggah bukti is. On a line's only receipt the dialog says why it cannot go
+ * instead of asking — the server refuses it too.
+ */
+function DeleteReceipt({
+  evidenceId,
+  label,
+  onlyReceipt,
+  uploadGate,
+}: {
+  evidenceId: string;
+  label: string;
+  /** The line's only receipt: the dialog says why it cannot go instead of asking. */
+  onlyReceipt: boolean;
+  uploadGate: UploadGate;
+}) {
+  const [open, setOpen] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [deleting, startDeleting] = useTransition();
+
+  function submit() {
+    startDeleting(async () => {
+      setRefusal(null);
+      const result = await deleteReceiptAction(evidenceId);
+      if (result.outcome === "deleted" || result.outcome === "no-such-receipt") {
+        setOpen(false);
+        return;
+      }
+      setRefusal(receiptDeleteRefusalText(result));
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setRefusal(null);
+      }}
+    >
+      <DialogTrigger
+        disabled={!uploadGate.open}
+        title={uploadGate.open ? undefined : uploadGate.reason}
+        render={
+          <Button
+            variant="ghost"
+            size="xs"
+            aria-label={`Hapus ${label}`}
+          >
+            Hapus
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Hapus bukti</DialogTitle>
+          <DialogDescription>
+            {onlyReceipt ? ONLY_RECEIPT : RECEIPT_DELETE_CONFIRM}
+          </DialogDescription>
+        </DialogHeader>
+        {refusal !== null && <p className="text-sm text-destructive">{refusal}</p>}
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            {onlyReceipt ? "Tutup" : "Batal"}
+          </Button>
+          {!onlyReceipt && (
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={submit}
+            >
+              {deleting ? "Menghapus…" : "Hapus"}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
