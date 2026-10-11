@@ -171,7 +171,7 @@ describe("toggling a box", () => {
       email: "dewi@ditsama.itb.ac.id",
       role: "Staff",
     });
-    // A second member of the Group: only its members, Editors and Administrators tick (ADR-0048).
+    // A second member of the Group: only its members, Perjadin Editors and Administrators tick (ADR-0048).
     await addGroupMember(perjadinId, other.id);
     const [item] = await checklistOf(pic, perjadinId);
 

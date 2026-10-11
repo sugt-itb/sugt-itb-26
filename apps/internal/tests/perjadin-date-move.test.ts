@@ -25,7 +25,7 @@ import {
 
 /** The Staff Person who is PIC of the trip. */
 async function staff(email = "rina@ditsama.itb.ac.id") {
-  // An Editor, since these trips are planned through `planPerjadin` (ADR-0047).
+  // A Perjadin Editor, since these trips are planned through `planPerjadin` (ADR-0047).
   return withGrant(
     await addPerson({ fullName: "Rina Nurhayati", email, role: "Staff" }),
     "Perjadin Editor",

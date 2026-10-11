@@ -8,7 +8,8 @@ import { addGrant, addPerson, resetDatabase } from "./support/fixtures";
 /**
  * **`canViewDashboard`** — the one predicate behind both the Dashboard (`/`) page guard and the
  * sidebar's Dashboard link (#322). Reading the Dashboard now needs a grant: a `Pimpinan` reads it by
- * Role, a `Staff` by holding `Editor` or `Dashboard Viewer` (an `Administrator` implies both). A
+ * Role, a `Staff` by holding `Dashboard Viewer` (which `Dashboard Editor` and `Administrator` imply,
+ * ADR-0052). A
  * grant-less Staff falls through to `false` — the page redirects them to `/pendamping` and the
  * sidebar hides the link.
  *

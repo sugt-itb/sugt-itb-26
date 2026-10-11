@@ -11,7 +11,7 @@ import { addCluster, addProvince, addSchool, resetDatabase } from "./support/fix
 
 /**
  * **Pretest/Posttest completion — the data layer** (ticket #246, ADR-0031). The open read and the
- * one Editor-guarded write behind the Dashboard (`/`) Pretest tracker.
+ * one Daring Editor-guarded write behind the Dashboard (`/`) Pretest tracker.
  *
  * A completion is a bare tuple **(School × Stream × participant-type × kind)** whose *presence* means
  * "administered"; there is no `done` column. The write callers are **hand-built** `Person`s carrying
@@ -141,7 +141,7 @@ describe("setAssessmentCompletion toggles a box", () => {
   });
 });
 
-describe("setAssessmentCompletion is Editor-guarded", () => {
+describe("setAssessmentCompletion is Daring Editor-guarded", () => {
   beforeEach(resetDatabase);
 
   const box = {

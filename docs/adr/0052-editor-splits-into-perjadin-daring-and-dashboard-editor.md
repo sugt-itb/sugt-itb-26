@@ -38,7 +38,6 @@ could not hand out the job without handing out the rest.
   grant-less one does (ADR-0037, #353).
 - **What does not change:**
   - A Group member writes their own Perjadin with no Grant (ADR-0048).
-  - Any Staff member files a Session Record and uploads Foto & Video on an online Session.
   - Grants stay Staff-only and never reach a Pimpinan.
   - The values are stored in English, and their labels are the stored values.
 - **The migration gives every Editor all three Editor Grants**, keeping when each was granted, so
@@ -46,7 +45,7 @@ could not hand out the job without handing out the rest.
 
 ## Consequences
 
-- **The implication rule is a table**, `GRANT_IMPLIED_BY` in `@sugt/domain`, read by `hasGrant`. A
+- **The implication rule is a table**, `GRANT_IMPLIED_BY` beside `hasGrant` in `@sugt/db`, the access rule's choke point. A
   future implication is one entry there, and a test pins every held/checked pair.
 - **`canViewDashboard` is one Grant check**: Dashboard Viewer, which Dashboard Editor and
   Administrator satisfy.

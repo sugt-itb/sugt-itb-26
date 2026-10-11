@@ -32,7 +32,7 @@ import {
  * Samarinda has none.
  */
 async function scene() {
-  // An Editor: the plan form's read needs the Grant (ADR-0047).
+  // A Perjadin Editor: the plan form's read needs the Grant (ADR-0047, ADR-0052).
   const pic = await withGrant(
     await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" }),
     "Perjadin Editor",

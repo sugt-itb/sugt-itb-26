@@ -304,7 +304,7 @@ export const PERJADIN_ROLE_LABELS: Record<Role, string> = {
  * - **Daring Editor** — `/pretest` and the online Sessions: recording, editing, deleting, Tandai
  *   terlaksana and Batalkan Sesi on one.
  * - **Dashboard Editor** — writes the Persiapan Program tab's Preparation Cards, and **implies
- *   Dashboard Viewer** (`GRANT_IMPLIED_BY`).
+ *   Dashboard Viewer** (`GRANT_IMPLIED_BY`, beside `hasGrant`).
  * - **Dashboard Viewer** — may read the Dashboard, and nothing more. A Pimpinan never holds it —
  *   Grants are Staff-only (ADR-0028); a Pimpinan's Dashboard access comes from their role.
  *
@@ -325,14 +325,6 @@ export const GRANTS = [
   "Dashboard Viewer",
 ] as const;
 export type Grant = (typeof GRANTS)[number];
-
-/**
- * **Which other Grants satisfy a Grant check** (ADR-0052), besides Administrator, which satisfies
- * every one. Only one Grant is implied by another: Dashboard Editor reads the Dashboard it writes.
- */
-export const GRANT_IMPLIED_BY: Partial<Record<Grant, readonly Grant[]>> = {
-  "Dashboard Viewer": ["Dashboard Editor"],
-};
 
 /**
  * How each Grant is **labelled in the UI**, keyed on the stored `Grant` exactly like `ROLE_LABELS`.

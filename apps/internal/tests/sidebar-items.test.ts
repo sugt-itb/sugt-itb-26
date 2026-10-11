@@ -103,7 +103,7 @@ describe("sidebarItems", () => {
     ]);
   });
 
-  it("gives a Pimpinan the Dashboard first and no Staff-only or Editor links", () => {
+  it("gives a Pimpinan the Dashboard first and no Staff-only or Grant-gated links", () => {
     expect(hrefsFor("Pimpinan", [])).toEqual([
       "/",
       "/kalender",

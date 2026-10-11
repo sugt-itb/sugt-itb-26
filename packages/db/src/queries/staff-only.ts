@@ -1,4 +1,4 @@
-import { GRANT_IMPLIED_BY, type Grant } from "@sugt/domain";
+import type { Grant } from "@sugt/domain";
 import { type SQL, sql } from "drizzle-orm";
 
 import { db } from "../client";
@@ -163,6 +163,14 @@ export function isNotGrantedError(error: unknown): error is NotGrantedError {
 }
 
 /**
+ * **Which other Grants satisfy a Grant check** (ADR-0052), besides Administrator, which satisfies
+ * every one. Only one Grant is implied by another: Dashboard Editor reads the Dashboard it writes.
+ */
+const GRANT_IMPLIED_BY: Partial<Record<Grant, readonly Grant[]>> = {
+  "Dashboard Viewer": ["Dashboard Editor"],
+};
+
+/**
  * Does this Person hold this Grant? **Staff-only first, then the grant**, and it is synchronous
  * because the caller carries its `grants` (threaded at resolution, like `role`).
  *
@@ -223,7 +231,7 @@ const NOT_ON_PERJADIN_ERROR_CODE = "sugt/not-on-perjadin";
 
 /**
  * A Staff caller reached a write on a Perjadin whose Group they are not in, without the Perjadin
- * Perjadin Editor Grant (ADR-0048, ADR-0052).
+ * Editor Grant (ADR-0048, ADR-0052).
  *
  * The third sibling at this choke point, after `NotStaffError` and `NotGrantedError`, and the same
  * kind of refusal: the UI hides every write on a trip from a Person who may not make it, so reaching

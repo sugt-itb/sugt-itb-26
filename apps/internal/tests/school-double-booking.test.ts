@@ -66,7 +66,7 @@ vi.mock("../../../packages/db/src/queries/school-slot", async (importOriginal) =
  * the 12th to the 14th, empty.
  */
 async function scene() {
-  // An Editor: planning needs the Grant (ADR-0047).
+  // A Perjadin Editor: planning needs the Grant (ADR-0047, ADR-0052).
   const pic = await withGrant(
     await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" }),
     "Perjadin Editor",

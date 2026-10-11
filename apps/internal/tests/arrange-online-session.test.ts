@@ -48,7 +48,7 @@ function nonStaff() {
 }
 
 async function staffCaller(email = "rina@ditsama.itb.ac.id") {
-  // Recording an online Session needs the Editor Grant (ADR-0047).
+  // Recording an online Session needs the Daring Editor Grant (ADR-0047, ADR-0052).
   return withGrant(
     await addPerson({ fullName: "Rina Nurhayati", email, role: "Staff" }),
     "Daring Editor",

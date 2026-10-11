@@ -160,7 +160,7 @@ An optional, revocable, **Staff-only** capability a **Person** may hold — a **
 _Avoid_: role (a Role is the one write-once axis; a Grant is the second, additive one), permission, scope, claim
 
 **Administrator**:
-The **Grant** that administers Grants — an Administrator assigns and revokes any Grant on any **Staff** Person, including making another Administrator — and that **implies every other Grant**, so an Administrator can do anything a Grant gates. The first Administrator is seeded outside the tool (the founding-Staff seed grants it), because there is otherwise no one who could grant it. Held only by Staff, like every Grant.
+The **Grant** that administers Grants — an Administrator assigns and revokes any Grant on any **Staff** Person, including making another Administrator — and that **implies every other Grant**, so an Administrator can do anything a Grant gates. It is one of only two Grants that imply another; **Dashboard Editor** is the other ([ADR-0052](./docs/adr/0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md)). The first Administrator is seeded outside the tool (the founding-Staff seed grants it), because there is otherwise no one who could grant it. Held only by Staff, like every Grant.
 _Avoid_: admin, superuser, owner (it is a Grant a Staff Person holds, not a Role or an account tier)
 
 **Keuangan**:
@@ -172,7 +172,7 @@ The **Grant** that lets a **Staff** Person **plan a Perjadin** ([ADR-0047](./doc
 _Avoid_: Editor (the Grant split in three; say which)
 
 **Daring Editor**:
-The **Grant** that lets a **Staff** Person **record, edit and delete online Sessions**, and mark one delivered or cancel it ([ADR-0047](./docs/adr/0047-planning-a-perjadin-and-online-sessions-need-the-editor-grant.md)), and keep **Pretest** completion on `/pretest`. A Session Record and Foto & Video on an online Session stay open to every Staff member. It does not read the Dashboard ([ADR-0052](./docs/adr/0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md)).
+The **Grant** that lets a **Staff** Person **record, edit and delete online Sessions**, and mark one delivered or cancel it ([ADR-0047](./docs/adr/0047-planning-a-perjadin-and-online-sessions-need-the-editor-grant.md)), and keep **Pretest** completion on `/pretest`. It does not read the Dashboard ([ADR-0052](./docs/adr/0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md)).
 _Avoid_: Editor (the Grant split in three; say which)
 
 **Dashboard Editor**:

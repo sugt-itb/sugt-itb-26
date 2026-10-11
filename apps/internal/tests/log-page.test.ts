@@ -46,7 +46,7 @@ beforeEach(async () => {
 });
 
 describe("only an Administrator reaches /log", () => {
-  it("forbids a grant-less Staff member, an Editor and a Pimpinan", async () => {
+  it("forbids a grant-less Staff member, a Perjadin Editor and a Pimpinan", async () => {
     const staff = await addPerson({ fullName: "Staf", email: "staf@itb.ac.id", role: "Staff" });
     const editor = await addPerson({ fullName: "Ed", email: "ed@itb.ac.id", role: "Staff" });
     await addGrant(editor.id, "Perjadin Editor");

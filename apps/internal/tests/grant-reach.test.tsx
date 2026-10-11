@@ -48,6 +48,21 @@ async function staffWith(grants: Grant[], email: string): Promise<Person> {
 
 const signIn = (person: Person) => vi.mocked(requirePerson).mockResolvedValue(person);
 
+/** The `canEdit` the Dashboard page hands its Persiapan Program panel, found in its element tree. */
+function persiapanProgramCanEdit(node: unknown): boolean | undefined {
+  if (typeof node !== "object" || node === null || !("props" in node)) return undefined;
+  const props = node.props as {
+    persiapanProgram?: { props: { canEdit: boolean } };
+    children?: unknown;
+  };
+  if (props.persiapanProgram) return props.persiapanProgram.props.canEdit;
+  for (const child of [props.children].flat()) {
+    const found = persiapanProgramCanEdit(child);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
 describe("the Dashboard (/)", () => {
   it.each(["Perjadin Editor", "Daring Editor", "Keuangan"] as const)(
     "redirects a Staff member holding only %s to /pendamping",
@@ -62,14 +77,18 @@ describe("the Dashboard (/)", () => {
     },
   );
 
-  it.each(["Dashboard Editor", "Dashboard Viewer"] as const)("lets %s read it", async (grant) => {
+  it.each([
+    ["Dashboard Editor", true],
+    ["Dashboard Viewer", false],
+  ] as const)("lets %s read it, editing the Preparation Cards: %s", async (grant, edits) => {
     signIn(await staffWith([grant], "dash@itb.ac.id"));
 
-    const html = renderToStaticMarkup(
-      await DashboardPage({ searchParams: Promise.resolve({}) } as never),
-    );
+    const page = await DashboardPage({ searchParams: Promise.resolve({}) } as never);
 
-    expect(html).toContain("Persiapan Program");
+    expect(renderToStaticMarkup(page)).toContain("Persiapan Program");
+    // The tab is a client component showing one panel at a time, so what the page hands the
+    // Persiapan Program panel is read off the element rather than off the markup.
+    expect(persiapanProgramCanEdit(page)).toBe(edits);
   });
 });
 

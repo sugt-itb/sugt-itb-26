@@ -22,7 +22,7 @@ import { school } from "./reference";
 
 /**
  * **Preparation Cards** — the free-standing cards on the Dashboard (`/`) Persiapan
- * tab (ADR-0028's Dashboard Editor Grant gates writing them). A Card is a title, a date or date-range, and a
+ * tab (the Dashboard Editor Grant, ADR-0052, gates writing them). A Card is a title, a date or date-range, and a
  * variable checklist; the **Jenis category lives on each checklist item**, not on the Card (#292).
  *
  * **This is a different concept from the Perjadin Preparation Checklist** ([ADR-0018](../../../../docs/adr/0018-the-preparation-checklist-stores-ticks-and-derives-the-list.md)),

@@ -41,7 +41,7 @@ import {
  */
 
 async function staff(fullName = "Rina Nurhayati", email = "rina@ditsama.itb.ac.id") {
-  // An Editor, since planning needs the Grant (ADR-0047).
+  // A Perjadin Editor, since planning needs the Grant (ADR-0047, ADR-0052).
   return withGrant(await addPerson({ fullName, email, role: "Staff" }), "Perjadin Editor");
 }
 
