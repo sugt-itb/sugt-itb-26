@@ -90,7 +90,8 @@ function bySesiRank(a: RankableSession, b: RankableSession): number {
  * **A Session's Sesi** — its per-School, per-mode date rank
  * (`docs/adr/0027-a-sessions-sesi-is-its-per-school-date-rank.md`), computed on the fly and never
  * stored. Each School's Sessions in Sesi order: index 0 is Sesi 1, index 1 is
- * Sesi 2. The one ranking, shared by the `/monitoring` matrix and the planning note (#409).
+ * Sesi 2. The one ranking, shared by the `/monitoring` matrix, the planning note (#409) and
+ * `/feedback`'s Sesi line (#466).
  *
  * The caller passes **one mode's live Sessions** — cancelled ones are left out, so the next Session
  * after a cancelled one takes its rank rather than one past it — and **all** of a School's, whichever
@@ -186,14 +187,18 @@ export function formatSessionStartTimeWithWib(time: string, zone: TimeZone): str
   return `${local} · ${minutesToHhMm(wibMinutes)} WIB`;
 }
 
+/** A Postgres `time` value the Indonesian way, with a dot: `"08.00"`. No zone. */
+export function formatDottedTime(time: string): string {
+  return formatWallClockTime(time).replace(":", ".");
+}
+
 /**
  * A wall-clock span in its zone, the Indonesian way — `"08.00–11.30 WITA"` — as a Perjadin
  * Document's Waktu Mulai and Waktu Selesai read (#397). Both are Postgres `time` values local to
  * the School.
  */
 export function formatTimeRange(startsAt: string, endsAt: string, zone: TimeZone): string {
-  const dotted = (time: string) => formatWallClockTime(time).replace(":", ".");
-  return `${dotted(startsAt)}–${dotted(endsAt)} ${zone}`;
+  return `${formatDottedTime(startsAt)}–${formatDottedTime(endsAt)} ${zone}`;
 }
 
 /**

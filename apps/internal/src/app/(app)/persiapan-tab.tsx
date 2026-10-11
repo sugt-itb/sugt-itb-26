@@ -41,7 +41,11 @@ import {
   setChecklistItemCheckedAction,
   setChecklistItemJenisAction,
 } from "./preparation-actions";
-import { preparationPercent } from "./preparation-derive";
+import {
+  preparationPercent,
+  type PreparationSort,
+  sortPreparationCards,
+} from "./preparation-derive";
 
 /**
  * **The Dashboard (`/`) Persiapan Program tab** (Persiapan until #423) — the free-standing Preparation Cards (#221, ADR-0028), a Card
@@ -55,15 +59,13 @@ import { preparationPercent } from "./preparation-derive";
  * before a Server Action), so hiding the controls only spares a non-holder a 403 they would hit
  * anyway.
  *
- * **Two client-side sorts, no refetch.** "Urutkan" reorders the loaded cards in place — by nearest
- * date, or by lowest completion (the pure `preparationPercent` fold) so the least-ready cards rise.
- * The list read already arrives date-ascending, so that is the default and its own option.
+ * **Two client-side orders, no refetch** (#466, `sortPreparationCards`). "Urutkan" reorders the loaded
+ * cards in place: by start date and then the least-prepared first (the default), or by the
+ * least-prepared first and then start date — so on either, the cards needing work rise.
  */
 
-/** The two client-side orderings, in Indonesian. Nearest-date is the default and the read's order. */
-type SortKey = "tanggal" | "persiapan";
-
-const SORT_OPTIONS: Record<SortKey, string> = {
+/** The two client-side orders, in Indonesian. Nearest date, then lowest progress, is the default. */
+const SORT_OPTIONS: Record<PreparationSort, string> = {
   tanggal: "Tanggal: Terdekat",
   persiapan: "Persiapan: Terendah",
 };
@@ -117,19 +119,9 @@ function JenisSelect({
 }
 
 function PersiapanTab({ cards, canEdit }: { cards: PreparationCard[]; canEdit: boolean }) {
-  const [sort, setSort] = useState<SortKey>("tanggal");
+  const [sort, setSort] = useState<PreparationSort>("tanggal");
 
-  const sortedCards = useMemo(() => {
-    const copy = [...cards];
-    if (sort === "persiapan") {
-      // Least-ready first — the reading the tab wants, so the cards needing work rise to the top.
-      copy.sort((a, b) => preparationPercent(a.items) - preparationPercent(b.items));
-    } else {
-      // Nearest date first — a plain string compare, since `startsOn` is `YYYY-MM-DD`.
-      copy.sort((a, b) => (a.startsOn < b.startsOn ? -1 : a.startsOn > b.startsOn ? 1 : 0));
-    }
-    return copy;
-  }, [cards, sort]);
+  const sortedCards = useMemo(() => sortPreparationCards(cards, sort), [cards, sort]);
 
   return (
     <div className="flex flex-col gap-5 px-4 py-6 sm:px-7">
@@ -138,14 +130,14 @@ function PersiapanTab({ cards, canEdit }: { cards: PreparationCard[]; canEdit: b
           items={SORT_OPTIONS}
           value={sort}
           onValueChange={(value) => {
-            setSort(value as SortKey);
+            setSort(value as PreparationSort);
           }}
         >
           <SelectTrigger aria-label="Urutkan">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {(Object.entries(SORT_OPTIONS) as [SortKey, string][]).map(([key, label]) => (
+            {(Object.entries(SORT_OPTIONS) as [PreparationSort, string][]).map(([key, label]) => (
               <SelectItem
                 key={key}
                 value={key}

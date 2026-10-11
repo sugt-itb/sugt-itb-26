@@ -1,3 +1,4 @@
+import { db, schema } from "@sugt/db";
 import {
   addChecklistItem,
   createPreparationCard,
@@ -12,6 +13,7 @@ import {
   type Person,
 } from "@sugt/db/queries";
 import type { Grant, PreparationJenis } from "@sugt/domain";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { resetDatabase } from "./support/fixtures";
@@ -41,6 +43,30 @@ function labeled(labels: string[], jenis: PreparationJenis = "Teknis") {
 
 describe("preparationCards read", () => {
   beforeEach(resetDatabase);
+
+  it("hands cards over by start date, then creation time, then id — the order the tab's ties keep (#466)", async () => {
+    const me = editor();
+    const made = [];
+    for (const title of ["Satu", "Dua", "Tiga"]) {
+      const result = await createPreparationCard(me, { title, startsOn: "2026-10-05" });
+      if (result.outcome !== "created") throw new Error(result.outcome);
+      made.push(result.cardId);
+    }
+    await createPreparationCard(me, { title: "Lebih awal", startsOn: "2026-10-01" });
+    // Creation order made the opposite of id order, so only `created_at` can explain the result.
+    const byIdDescending = made.toSorted().toReversed();
+    for (const [index, id] of byIdDescending.entries()) {
+      await db
+        .update(schema.preparationCard)
+        .set({ createdAt: new Date(Date.UTC(2026, 8, 1 + index)) })
+        .where(eq(schema.preparationCard.id, id));
+    }
+
+    const cards = await preparationCards(me);
+
+    expect(cards.map((card) => card.title)[0]).toBe("Lebih awal");
+    expect(cards.slice(1).map((card) => card.id)).toEqual(byIdDescending);
+  });
 
   it("returns cards with items ordered (checked, position) — unchecked first, then checked", async () => {
     const me = editor();

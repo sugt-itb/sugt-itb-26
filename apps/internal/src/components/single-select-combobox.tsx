@@ -34,6 +34,7 @@ function SingleSelectCombobox({
   onValueChange,
   placeholder,
   emptyLabel = "Tidak ada pilihan.",
+  disabled = false,
   id,
   "aria-label": ariaLabel,
 }: {
@@ -43,6 +44,8 @@ function SingleSelectCombobox({
   placeholder?: string;
   /** Shown in the popup when the filter matches nothing. */
   emptyLabel?: string;
+  /** Locks the input and its clear button, e.g. while the pick it made is still loading. */
+  disabled?: boolean;
   id?: string;
   "aria-label"?: string;
 }) {
@@ -62,11 +65,13 @@ function SingleSelectCombobox({
       isItemEqualToValue={(a: SingleSelectOption, b: SingleSelectOption) => a.value === b.value}
       itemToStringLabel={(option: SingleSelectOption) => option.label}
       filter={(option: SingleSelectOption, query: string) => optionMatchesQuery(option, query)}
+      disabled={disabled}
     >
       <ComboboxInput
         id={id}
         aria-label={ariaLabel}
         placeholder={placeholder}
+        disabled={disabled}
         showClear
       />
       <ComboboxContent>

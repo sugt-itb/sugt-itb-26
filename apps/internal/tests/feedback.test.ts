@@ -1,7 +1,9 @@
 import {
   DEFAULT_FEEDBACK_SORT,
   NO_FEEDBACK_FILTERS,
+  NO_PARTICIPANT_FEEDBACK_SCOPE,
   NO_PERJADIN_FEEDBACK_FILTERS,
+  NO_PERJADIN_FEEDBACK_SCOPE,
   participantFeedbackAverages,
   participantFeedbackPage,
   perjadinFeedbackAverages,
@@ -103,6 +105,7 @@ describe("participantFeedbackPage", () => {
     });
 
     const page = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: NO_FEEDBACK_FILTERS,
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -129,6 +132,7 @@ describe("participantFeedbackPage", () => {
     });
 
     const page = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: NO_FEEDBACK_FILTERS,
       cursor: null,
       sort: sort({ score: "desc" }),
@@ -156,6 +160,7 @@ describe("participantFeedbackPage", () => {
     });
 
     const page = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: NO_FEEDBACK_FILTERS,
       cursor: null,
       sort: sort({ date: "asc" }),
@@ -176,6 +181,7 @@ describe("participantFeedbackPage", () => {
 
     const [row] = (
       await participantFeedbackPage(person, {
+        scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
         filters: NO_FEEDBACK_FILTERS,
         cursor: null,
         sort: DEFAULT_FEEDBACK_SORT,
@@ -217,6 +223,7 @@ describe("participantFeedbackPage", () => {
     });
 
     const { rows } = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: NO_FEEDBACK_FILTERS,
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -254,6 +261,7 @@ describe("participantFeedbackPage", () => {
     const page = async (handsOnRbl: "le7" | "gt7") =>
       (
         await participantFeedbackPage(person, {
+          scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
           filters: filters({ handsOnRbl }),
           cursor: null,
           sort: DEFAULT_FEEDBACK_SORT,
@@ -280,6 +288,7 @@ describe("participantFeedbackPage", () => {
     });
 
     const low = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: filters({ instructor: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -287,6 +296,7 @@ describe("participantFeedbackPage", () => {
     expect(low.rows.map((row) => row.name)).toEqual(["Rendah"]);
 
     const high = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: filters({ instructor: "gt7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -311,6 +321,7 @@ describe("participantFeedbackPage", () => {
     });
 
     const low = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: filters({ materials: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -335,6 +346,7 @@ describe("participantFeedbackPage", () => {
     });
 
     const low = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: filters({ relevance: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -342,6 +354,7 @@ describe("participantFeedbackPage", () => {
     // 7 is at the threshold, so le7 (<= 7) keeps it and gt7 (> 7) does not.
     expect(low.rows.map((row) => row.name)).toEqual(["Rendah"]);
     const high = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: filters({ relevance: "gt7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -362,6 +375,7 @@ describe("participantFeedbackPage", () => {
     });
 
     const gt = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: filters({ reviewType: "gt7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -370,6 +384,7 @@ describe("participantFeedbackPage", () => {
     expect(gt.rows[0]?.rowAverage).toBeCloseTo((8 + 8 + 6) / 3, 5);
 
     const le = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: filters({ reviewType: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -403,6 +418,7 @@ describe("participantFeedbackPage", () => {
     });
 
     const both = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: filters({ instructor: "le7", materials: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -431,6 +447,7 @@ describe("participantFeedbackPage", () => {
     let pages = 0;
     do {
       const page = await participantFeedbackPage(person, {
+        scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
         filters: NO_FEEDBACK_FILTERS,
         cursor,
         sort: DEFAULT_FEEDBACK_SORT,
@@ -472,6 +489,7 @@ describe("participantFeedbackPage", () => {
     let cursor: FeedbackCursor | null = null;
     do {
       const page = await participantFeedbackPage(person, {
+        scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
         filters: NO_FEEDBACK_FILTERS,
         cursor,
         sort: sort({ score: "desc" }),
@@ -512,6 +530,7 @@ describe("participantFeedbackPage", () => {
     let pages = 0;
     do {
       const page = await participantFeedbackPage(person, {
+        scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
         filters: NO_FEEDBACK_FILTERS,
         cursor,
         sort: sort({ date: "asc" }),
@@ -558,6 +577,7 @@ describe("participantFeedbackPage", () => {
     });
 
     const page = await participantFeedbackPage(person, {
+      scope: NO_PARTICIPANT_FEEDBACK_SCOPE,
       filters: filters({ reviewType: "le7" }),
       cursor: null,
       sort: sort({ score: "desc" }),
@@ -573,7 +593,7 @@ describe("participantFeedbackAverages", () => {
 
   it("defaults to zero on an empty table", async () => {
     const person = await signedIn();
-    expect(await participantFeedbackAverages(person)).toEqual({
+    expect(await participantFeedbackAverages(person, NO_PARTICIPANT_FEEDBACK_SCOPE)).toEqual({
       // "—" on screen until any row has one (#446), never a 0 average.
       handsOnRbl: null,
       instructor: 0,
@@ -599,7 +619,9 @@ describe("participantFeedbackAverages", () => {
     await addParticipantFeedback({ sessionId: session.id, classKind: "Student" });
     await addParticipantFeedback({ sessionId: session.id, classKind: "GTK" });
 
-    expect((await participantFeedbackAverages(person)).handsOnRbl).toBeCloseTo(6, 5);
+    expect(
+      (await participantFeedbackAverages(person, NO_PARTICIPANT_FEEDBACK_SCOPE)).handsOnRbl,
+    ).toBeCloseTo(6, 5);
   });
 
   it("averages every row, dataset-wide", async () => {
@@ -616,7 +638,7 @@ describe("participantFeedbackAverages", () => {
       ratings: { instructor: 8, materials: 10, relevance: 10 },
     });
 
-    const averages = await participantFeedbackAverages(person);
+    const averages = await participantFeedbackAverages(person, NO_PARTICIPANT_FEEDBACK_SCOPE);
     expect(averages.instructor).toBeCloseTo((4 + 8) / 2, 5);
     expect(averages.materials).toBeCloseTo((6 + 10) / 2, 5);
     expect(averages.relevance).toBeCloseTo((8 + 10) / 2, 5);
@@ -671,6 +693,7 @@ describe("perjadinFeedbackPage", () => {
     });
 
     const page = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: NO_PERJADIN_FEEDBACK_FILTERS,
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -714,6 +737,7 @@ describe("perjadinFeedbackPage", () => {
     });
 
     const page = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: NO_PERJADIN_FEEDBACK_FILTERS,
       cursor: null,
       sort: sort({ score: "desc" }),
@@ -741,6 +765,7 @@ describe("perjadinFeedbackPage", () => {
     });
 
     const page = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: NO_PERJADIN_FEEDBACK_FILTERS,
       cursor: null,
       sort: sort({ date: "asc" }),
@@ -773,6 +798,7 @@ describe("perjadinFeedbackPage", () => {
     });
 
     const transportLow = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: perjadinFilters({ transport: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -780,6 +806,7 @@ describe("perjadinFeedbackPage", () => {
     expect(transportLow.rows.map((row) => row.filedByName)).toEqual(["Transport rendah"]);
 
     const mealsLow = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: perjadinFilters({ meals: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -788,6 +815,7 @@ describe("perjadinFeedbackPage", () => {
 
     // 7 is at the threshold, so le7 (<= 7) keeps it and gt7 (> 7) does not.
     const punctualityLow = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: perjadinFilters({ punctuality: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -795,6 +823,7 @@ describe("perjadinFeedbackPage", () => {
     expect(punctualityLow.rows.map((row) => row.filedByName)).toEqual(["Ketepatan rendah"]);
 
     const lodgingLow = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: perjadinFilters({ lodging: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -815,6 +844,7 @@ describe("perjadinFeedbackPage", () => {
     });
 
     const gt = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: perjadinFilters({ reviewType: "gt7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -823,6 +853,7 @@ describe("perjadinFeedbackPage", () => {
     expect(gt.rows[0]?.rowAverage).toBeCloseTo((8 + 8 + 8 + 6) / 4, 5);
 
     const le = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: perjadinFilters({ reviewType: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -851,6 +882,7 @@ describe("perjadinFeedbackPage", () => {
     });
 
     const both = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: perjadinFilters({ transport: "le7", meals: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -870,6 +902,7 @@ describe("perjadinFeedbackPage", () => {
     });
 
     const page = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: NO_PERJADIN_FEEDBACK_FILTERS,
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -884,12 +917,14 @@ describe("perjadinFeedbackPage", () => {
     await addPerjadinEvaluation({ perjadinId: trip.id, name: "Sehari", lodging: null });
 
     const low = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: perjadinFilters({ lodging: "le7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
     });
     expect(low.rows).toHaveLength(0);
     const high = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
       filters: perjadinFilters({ lodging: "gt7" }),
       cursor: null,
       sort: DEFAULT_FEEDBACK_SORT,
@@ -918,6 +953,7 @@ describe("perjadinFeedbackPage", () => {
     let pages = 0;
     do {
       const page = await perjadinFeedbackPage(person, {
+        scope: NO_PERJADIN_FEEDBACK_SCOPE,
         filters: NO_PERJADIN_FEEDBACK_FILTERS,
         cursor,
         sort: DEFAULT_FEEDBACK_SORT,
@@ -957,6 +993,7 @@ describe("perjadinFeedbackPage", () => {
     let cursor: PerjadinFeedbackCursor | null = null;
     do {
       const page = await perjadinFeedbackPage(person, {
+        scope: NO_PERJADIN_FEEDBACK_SCOPE,
         filters: NO_PERJADIN_FEEDBACK_FILTERS,
         cursor,
         sort: sort({ score: "desc" }),
@@ -981,7 +1018,7 @@ describe("perjadinFeedbackAverages", () => {
 
   it("defaults to zero on an empty table", async () => {
     const person = await signedIn();
-    expect(await perjadinFeedbackAverages(person)).toEqual({
+    expect(await perjadinFeedbackAverages(person, NO_PERJADIN_FEEDBACK_SCOPE)).toEqual({
       lodging: 0,
       transport: 0,
       meals: 0,
@@ -1004,7 +1041,7 @@ describe("perjadinFeedbackAverages", () => {
       ratings: { transport: 8, meals: 10, punctuality: 10 },
     });
 
-    const averages = await perjadinFeedbackAverages(person);
+    const averages = await perjadinFeedbackAverages(person, NO_PERJADIN_FEEDBACK_SCOPE);
     // avg(lodging) ignores the NULL — it is 10, not (10 + 0) / 2.
     expect(averages.lodging).toBeCloseTo(10, 5);
     expect(averages.transport).toBeCloseTo((4 + 8) / 2, 5);

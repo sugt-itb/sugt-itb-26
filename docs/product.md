@@ -157,6 +157,18 @@ School: _which Schools are next_, and the trip is planned around the Sub-Cluster
 **Persiapan Program** (the free-standing Preparation Cards, named Persiapan until #423) and
 **Persiapan Luring**.
 
+#### Persiapan Program — two orders
+
+**Urutkan** offers two orders, each combining date and progress (#466):
+
+- **Tanggal: Terdekat**, the default: by start date, earliest first; on one date, the least-prepared
+  card first.
+- **Persiapan: Terendah**: the least-prepared card first; equally prepared ones by start date.
+
+Progress is the share of a card's items ticked, an empty checklist counting as 0%. What is still tied
+keeps the order the cards were made in. The date is the start date, not counted from today, so past
+cards stay where they are. Neither order touches the Peringatan block.
+
 #### Persiapan Luring — one week's Preparation Checklists
 
 **Persiapan Luring** follows, week by week, how far each Perjadin's Preparation Checklist has got
@@ -784,6 +796,22 @@ of the Ratings it has. Each card shows the two written answers under **"Peningka
 pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengkapnya" /
 "sembunyikan"); an empty one shows no heading.
 
+**The Peserta tab narrows by School, then by Session** (#466):
+
+- **Sekolah** is a searchable picker, "Semua Sekolah" until one is chosen. It lists only the Schools
+  with at least one response, by name, so a pick never reads empty.
+- **Sesi** is disabled until a School is picked, then reads "Semua Sesi". It lists that School's
+  Sessions with responses, offline and online, by date, each as
+  `Sesi 1 · Luring · 12 Okt 2026 · 09.00 WITA`. The number is the Session's Sesi
+  ([ADR-0027](./adr/0027-a-sessions-sesi-is-its-per-school-date-rank.md)), the number the Dashboard
+  matrix and the planning note give it. An online Session's time is in WIB. Picking another School resets it to "Semua Sesi".
+- **Each response card carries the same line**, linking to the Session.
+- Both AND with the score filters, and sorting and "Tampilkan lebih banyak" work as before.
+- **The four averages follow the School and Session, never the score filters**, and their titles say
+  what they cover: `Nilai rata-rata · Narasumber · SMAN 1 Bontang`, or
+  `… · SMAN 1 Bontang · Sesi 1 Luring`. With neither picked they are programme-wide.
+- The choice lives in the browser, not the URL, like the other filters; switching tabs resets it.
+
 **Nothing asks them to rate themselves.** Comprehension, Participation and Readiness sit on the
 Class Record precisely because they are judgements about the room, and a room grading its own
 readiness is not evidence. Materials and Instructor overlap with the Class Record on purpose —
@@ -832,6 +860,16 @@ box saying they may not look is worse than no box.
 **Lodging is the one Aspect a Group may leave blank**, because not every Perjadin involves a
 night away — a School close enough for a day trip has no hotel to rate, and asking for a Rating
 anyway would produce an invented one.
+
+**On `/feedback`'s Perjadin tab, the list narrows by trip and by Peran pengisi** (#466):
+
+- **Perjadin** is a searchable picker, "Semua Perjadin" until one is chosen. It lists only the trips
+  with at least one evaluation, earliest first, by name (`Kelompok 10 · 12–13 Okt 2026`) with the
+  trip's Schools beneath. Typing a School's or a Kelompok's name finds the trip.
+- **Peran pengisi** is Semua Peran, Narasumber, Pendamping or Pimpinan: the role the filer declared.
+- There is no School filter; the Perjadin picker finds a trip by its Schools.
+- As on the Peserta tab, both AND with the score filters, and the four averages follow them — never
+  the score filters — with titles naming the trip and the Peran.
 
 The form deliberately matches the Session Record's shape. Two evaluation forms that behaved
 differently would be two things to learn.
