@@ -237,7 +237,6 @@ describe("myPerjadin carries the same money as the acquittal", () => {
 
     expect(mine.spentIdr).toBe(1_550_000);
     expect(mine.spentIdr).toBe(acquittal.spentIdr);
-    expect(mine).not.toHaveProperty("advanceIdr");
   });
 
   it("is zero for a trip with no transactions", async () => {

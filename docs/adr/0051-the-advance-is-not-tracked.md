@@ -44,7 +44,7 @@ and toward **Penyerapan Anggaran** on the Dashboard. Neither needs the Advance.
 - **The columns stay for now.** `advance_idr`, `returned_to_treasurer_idr` and `returned_at`, with
   their CHECKs, stay in the schema, unread and unwritten by app code. This ticket adds no migration;
   [#465](https://github.com/sugt-itb/sugt-itb-26/issues/465) drops them once this has shipped, so a
-  deployed app never reads a column that is already gone.
+  deployed app never reads a column that is already gone. _(Done: migration 0050, #465.)_
 
 ## Consequences
 

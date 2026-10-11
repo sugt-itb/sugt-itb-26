@@ -71,15 +71,9 @@ export const perjadin = pgTable(
     startsOn: date("starts_on").notNull(),
     endsOn: date("ends_on").notNull(),
 
-    // The Advance (Uang Perjalanan). **Unused**: the app no longer tracks it (ADR-0051, #464) and
-    // neither reads nor writes it. It and the two `returned_*` columns below wait for their drop (#465).
-    advanceIdr: bigint("advance_idr", { mode: "number" }),
-
     picPersonId: uuid("pic_person_id").notNull(),
     picRole: text("pic_role").$type<"Staff">().notNull().default("Staff"),
 
-    returnedToTreasurerIdr: bigint("returned_to_treasurer_idr", { mode: "number" }),
-    returnedAt: timestamp("returned_at", { withTimezone: true }),
     reportFiledAt: timestamp("report_filed_at", { withTimezone: true }),
     // The Perjadin's folder in the company Google Drive (ADR-0040), set by compare-and-set the
     // first time a transaction on it is reconciled — never under a row lock held across a call
@@ -94,13 +88,8 @@ export const perjadin = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    check("perjadin_advance_check", sql`${t.advanceIdr} >= 0`),
     check("perjadin_pic_role_check", sql`${t.picRole} = 'Staff'`),
     check("perjadin_dates_check", sql`${t.endsOn} >= ${t.startsOn}`),
-    check(
-      "perjadin_returned_check",
-      sql`(${t.returnedAt} is null) = (${t.returnedToTreasurerIdr} is null)`,
-    ),
     foreignKey({
       name: "perjadin_pic_is_staff",
       columns: [t.picPersonId, t.picRole],

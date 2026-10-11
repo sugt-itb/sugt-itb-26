@@ -895,7 +895,7 @@ describe("the Perjadin list and detail", () => {
     expect(detail?.picFullName).toBe("Rina Nurhayati");
     expect(detail?.group).toHaveLength(1);
     expect(detail?.sessions).toHaveLength(2);
-    expect(detail).not.toHaveProperty("advanceIdr");
+    expect(detail).not.toHaveProperty("spentIdr");
     expect(detail).not.toHaveProperty("reportDueOn");
   });
 

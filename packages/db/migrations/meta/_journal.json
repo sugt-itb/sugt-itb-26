@@ -351,6 +351,13 @@
       "when": 1791735449627,
       "tag": "0049_hapus_bukti_and_transaksi",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791744517202,
+      "tag": "0050_drop_advance_columns",
+      "breakpoints": true
     }
   ]
 }

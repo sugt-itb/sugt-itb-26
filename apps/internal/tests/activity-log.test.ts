@@ -121,16 +121,11 @@ describe("each money write logs one entry with the change", () => {
     });
   }
 
-  it("planPerjadin logs nothing, and leaves the Advance column unwritten (ADR-0051)", async () => {
+  it("planPerjadin logs nothing — there is no Advance to set (ADR-0051)", async () => {
     const pic = await staff();
     const result = await plan(pic);
     if (result.outcome !== "planned") throw new Error(result.outcome);
 
-    const [row] = await db
-      .select({ advanceIdr: schema.perjadin.advanceIdr })
-      .from(schema.perjadin)
-      .where(eq(schema.perjadin.id, result.perjadinId));
-    expect(row).toEqual({ advanceIdr: null });
     await expect(entries()).resolves.toEqual([]);
   });
 
