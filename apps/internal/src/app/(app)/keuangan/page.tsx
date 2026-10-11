@@ -1,19 +1,18 @@
 import { StickyTable, StickyTableHeader } from "-/components/sortable-table";
+import { ariaSort, nextTableSort } from "-/components/table-sort";
 import { UnsyncedMarker } from "-/components/unsynced-marker";
 import { driveFileUrl } from "-/lib/drive/receipt-files";
-import { RECEIPTS_UNSYNCED } from "-/lib/drive/upload-messages";
+import { RECEIPTS_UNSYNCED_TOOLTIP } from "-/lib/drive/upload-messages";
 import { perjadinName } from "-/lib/perjadin-name";
 import { requirePerson } from "-/lib/person";
 import {
   hasGrant,
-  KEUANGAN_RECEIPT_LINKS,
   keuanganPage,
   keuanganPerjadinOptions,
   type KeuanganRow,
-  type KeuanganSort,
   type KeuanganSortKey,
 } from "@sugt/db/queries";
-import { formatRupiah } from "@sugt/domain";
+import { formatRupiah, MAX_RECEIPTS_PER_TRANSACTION } from "@sugt/domain";
 import { Button } from "@sugt/ui/components/button";
 import { Input } from "@sugt/ui/components/input";
 import { Label } from "@sugt/ui/components/label";
@@ -30,7 +29,6 @@ import {
   keuanganHref,
   type KeuanganView,
   parseKeuanganParams,
-  sortAfterClick,
 } from "./keuangan-params";
 import { PerjadinPicker } from "./perjadin-picker";
 
@@ -182,7 +180,7 @@ export default async function Page({ searchParams }: PageProps<"/keuangan">) {
                 >
                   Jumlah (Rp)
                 </SortHead>
-                {Array.from({ length: KEUANGAN_RECEIPT_LINKS }, (_, index) => (
+                {Array.from({ length: MAX_RECEIPTS_PER_TRANSACTION }, (_, index) => (
                   <TableHead key={index}>Link Bukti {index + 1}</TableHead>
                 ))}
               </TableRow>
@@ -232,8 +230,9 @@ export default async function Page({ searchParams }: PageProps<"/keuangan">) {
 }
 
 /**
- * A sortable header, as a link: the sort `/perjadin`'s headers make — a new column descending first,
- * the sorted one flipped — but carried in the URL and applied on the server, back to page one.
+ * A sortable header, as a link: `SortableTableHead`'s click rule (`nextTableSort`) and look, but the
+ * sort is carried in the URL and applied on the server, back to page one. A server component, so it
+ * cannot take that client header's `onSort` callback.
  */
 function SortHead({
   view,
@@ -248,11 +247,11 @@ function SortHead({
 }) {
   const sorted = view.sort.key === column;
   const Icon = !sorted ? ArrowUpDown : view.sort.direction === "asc" ? ArrowUp : ArrowDown;
-  const next: KeuanganSort = sortAfterClick(view.sort, column);
+  const next = nextTableSort(view.sort, column);
 
   return (
     <TableHead
-      aria-sort={!sorted ? "none" : view.sort.direction === "asc" ? "ascending" : "descending"}
+      aria-sort={ariaSort(view.sort, column)}
       className={className}
     >
       <Link
@@ -276,7 +275,7 @@ function KeuanganTableRow({ row }: { row: KeuanganRow }) {
         {row.spentOn}
         {row.driveSyncedAt === null && row.receiptFileIds.length > 0 && (
           <div>
-            <UnsyncedMarker explanation={RECEIPTS_UNSYNCED} />
+            <UnsyncedMarker explanation={RECEIPTS_UNSYNCED_TOOLTIP} />
           </div>
         )}
       </TableCell>
@@ -292,7 +291,7 @@ function KeuanganTableRow({ row }: { row: KeuanganRow }) {
       </TableCell>
       <TableCell>{row.participantType}</TableCell>
       <TableCell className="text-right tabular-nums">{formatRupiah(row.amountIdr)}</TableCell>
-      {Array.from({ length: KEUANGAN_RECEIPT_LINKS }, (_, index) => {
+      {Array.from({ length: MAX_RECEIPTS_PER_TRANSACTION }, (_, index) => {
         const fileId = row.receiptFileIds[index];
         return (
           <TableCell key={index}>

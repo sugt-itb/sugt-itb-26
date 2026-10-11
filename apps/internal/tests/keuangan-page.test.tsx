@@ -157,6 +157,35 @@ describe("the page", () => {
     expect(html).toContain(`href="/keuangan/ekspor"`);
   });
 
+  it("makes each header a link to its sort, keeping the filter and going back to page one", async () => {
+    const { keuangan, trip } = await scene();
+    signIn(keuangan);
+
+    const html = await render({ perjadin: trip.id, page: "2" });
+    const head = (label: string) => {
+      const start = html.lastIndexOf("<th", html.indexOf(`>${label}<`));
+      return html.slice(start, html.indexOf("</th>", start));
+    };
+
+    // The sorted column flips; another column starts descending.
+    expect(head("Tanggal Transaksi")).toContain('aria-sort="descending"');
+    expect(head("Tanggal Transaksi")).toContain(
+      `href="/keuangan?perjadin=${trip.id}&amp;urut=spentOn&amp;arah=asc"`,
+    );
+    expect(head("Jumlah (Rp)")).toContain('aria-sort="none"');
+    expect(head("Jumlah (Rp)")).toContain(
+      `href="/keuangan?perjadin=${trip.id}&amp;urut=amountIdr&amp;arah=desc"`,
+    );
+  });
+
+  it("says when there is no transaction at all", async () => {
+    signIn(await person("keu@itb.ac.id", "Staff", ["Keuangan"]));
+
+    const html = await render();
+    expect(html).toContain("Belum ada transaksi.");
+    expect(html).toContain("0 transaksi · Rp0");
+  });
+
   it("says when a filter matches nothing, and when Dari falls after Sampai", async () => {
     const { keuangan } = await scene();
     signIn(keuangan);

@@ -3,7 +3,6 @@ import {
   keuanganExportHref,
   keuanganHref,
   parseKeuanganParams,
-  sortAfterClick,
 } from "-/app/(app)/keuangan/keuangan-params";
 import { csvOf } from "-/app/(app)/perjadin/[id]/laporan/ekspor/csv";
 import { csvDocument } from "-/lib/csv";
@@ -89,13 +88,6 @@ describe("the URL", () => {
       rangeReversed: true,
       entered: { dari: "2026-11-01", sampai: "2026-10-01" },
     });
-  });
-
-  it("sorts a newly chosen column descending first, and flips the sorted one", () => {
-    const byDate = { key: "spentOn", direction: "desc" } as const;
-    expect(sortAfterClick(byDate, "amountIdr")).toEqual({ key: "amountIdr", direction: "desc" });
-    expect(sortAfterClick(byDate, "spentOn")).toEqual({ key: "spentOn", direction: "asc" });
-    expect(sortAfterClick({ key: "spentOn", direction: "asc" }, "spentOn")).toEqual(byDate);
   });
 });
 
@@ -226,6 +218,17 @@ describe("the export", () => {
     ).toBe("keuangan-2026-10-01_2026-10-31-2026-10-12.csv");
     expect(keuanganCsvFileName({ ...none, dari: "2026-10-01" }, null, "2026-10-12")).toBe(
       "keuangan-2026-10-01_-2026-10-12.csv",
+    );
+    expect(
+      keuanganCsvFileName(
+        { perjadinId: UUID, dari: "2026-10-01", sampai: null },
+        trip,
+        "2026-10-12",
+      ),
+    ).toBe("keuangan-kelompok-10-12-13-okt-2026-2026-10-01_-2026-10-12.csv");
+    // A Perjadin filter that names no trip with transactions is not "semua".
+    expect(keuanganCsvFileName({ ...none, perjadinId: UUID }, null, "2026-10-12")).toBe(
+      "keuangan-perjadin-tanpa-transaksi-2026-10-12.csv",
     );
   });
 });

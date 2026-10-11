@@ -76,11 +76,11 @@ export type VisibleNavItem = NavItem & { badge: boolean };
  * exactly the callers it would bounce. The shell computes `canViewDashboard` once (the one predicate
  * the page guard shares) and passes the boolean down.
  *
- * `keuanganOnly` gates **Keuangan** (#472) the same way, on the Keuangan Grant (an Administrator
+ * `keuanganOnly` is a fourth (#472): **Keuangan** is gated the same way, on the Keuangan Grant (an Administrator
  * implies it), since its page `forbidden()`s everyone else. It sits after Pendamping and keeps that
  * place when Pendamping moves to the top.
  *
- * `administratorOnly` is a fourth (#372): **Pengaturan** is shown only to an Administrator, because
+ * `administratorOnly` is a fifth (#372): **Pengaturan** is shown only to an Administrator, because
  * its page `forbidden()`s everyone else — the same "worse than no link" rule once more. **Log**,
  * the Activity Log (#395), carries it for the same reason.
  *

@@ -169,6 +169,89 @@ describe("the table", () => {
     ).resolves.toMatchObject({ page: 2, total: 58 });
   });
 
+  it("sorts, counts and totals the whole filtered set, not the page shown", async () => {
+    const { keuangan, k1 } = await scene();
+    // 52 newer lines of Rp1.000: the default sort fills page one with them alone.
+    for (let index = 0; index < 52; index += 1) {
+      await addTransaction({
+        perjadinId: k1.id,
+        spentOn: "2026-12-01",
+        amountIdr: 1_000,
+        createdByPersonId: keuangan.id,
+      });
+    }
+    const byAmount = (page: number) =>
+      keuanganPage(keuangan, {
+        filters: NO_FILTERS,
+        sort: { key: "amountIdr", direction: "desc" },
+        page,
+      });
+
+    const [first, second] = [await byAmount(1), await byAmount(2)];
+    expect(first.rows.slice(0, 6).map((row) => row.amountIdr)).toEqual([
+      1_200_000, 900_000, 300_000, 150_000, 75_000, 40_000,
+    ]);
+    expect(second.rows.map((row) => row.amountIdr)).toEqual(Array(8).fill(1_000));
+    for (const page of [first, second]) {
+      expect(page).toMatchObject({ total: 58, totalIdr: 2_665_000 + 52_000 });
+    }
+  });
+
+  it("breaks ties by entry time, then id, the same way as the column", async () => {
+    const { keuangan, k1 } = await scene();
+    // Pairs entered in the same instant, the pairs a second apart, the later pairs inserted first.
+    const base = Date.parse("2026-12-01T00:00:00Z");
+    for (let index = 0; index < 52; index += 1) {
+      const line = await addTransaction({
+        perjadinId: k1.id,
+        spentOn: "2026-12-01",
+        amountIdr: 1_000,
+        createdByPersonId: keuangan.id,
+      });
+      await db
+        .update(schema.transaction)
+        .set({ createdAt: new Date(base - Math.floor(index / 2) * 1_000) })
+        .where(eq(schema.transaction.id, line.id));
+    }
+    const tied = await db
+      .select({ id: schema.transaction.id, createdAt: schema.transaction.createdAt })
+      .from(schema.transaction)
+      .where(eq(schema.transaction.spentOn, "2026-12-01"));
+    const expected = tied
+      .toSorted(
+        (a, b) =>
+          b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0),
+      )
+      .map((row) => row.id);
+
+    const pages = await Promise.all(
+      [1, 2].map((page) =>
+        keuanganPage(keuangan, { filters: NO_FILTERS, sort: DEFAULT_KEUANGAN_SORT, page }),
+      ),
+    );
+    const shown = pages.flatMap((page) => page.rows).filter((row) => row.spentOn === "2026-12-01");
+    expect(shown.map((row) => row.id)).toEqual(expected);
+  });
+
+  it("sorts by Perjadin on its start date, not its name", async () => {
+    const { keuangan, k1 } = await scene();
+    // Kelompok 9 starts first, though its name sorts last.
+    await db
+      .update(schema.subCluster)
+      .set({ name: "Kelompok 9" })
+      .where(eq(schema.subCluster.id, k1.subClusterId));
+
+    const { rows } = await all(keuangan, NO_FILTERS, { key: "perjadin", direction: "asc" });
+    expect(rows.map((row) => row.perjadin.subClusterName)).toEqual([
+      "Kelompok 9",
+      "Kelompok 9",
+      "Kelompok 2",
+      "Kelompok 2",
+      "Kelompok 3",
+      "Kelompok 3",
+    ]);
+  });
+
   it.each(KEUANGAN_SORT_KEYS)("sorts by %s both ways over the whole set", async (key) => {
     const { keuangan } = await scene();
     const expected = (direction: "asc" | "desc") => {

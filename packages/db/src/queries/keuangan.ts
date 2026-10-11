@@ -1,4 +1,8 @@
-import type { TransactionCategory, TransactionParticipantType } from "@sugt/domain";
+import {
+  MAX_RECEIPTS_PER_TRANSACTION,
+  type TransactionCategory,
+  type TransactionParticipantType,
+} from "@sugt/domain";
 import { and, asc, count, desc, eq, exists, inArray, sql, type SQL } from "drizzle-orm";
 
 import { db } from "../client";
@@ -21,10 +25,7 @@ import { requireGrant } from "./staff-only";
  */
 
 /** How many rows a page shows. */
-export const KEUANGAN_PAGE_SIZE = 50;
-
-/** How many receipt links a row carries; a grandfathered line with more shows its first five. */
-export const KEUANGAN_RECEIPT_LINKS = 5;
+const KEUANGAN_PAGE_SIZE = 50;
 
 /** What `/keuangan` narrows to. `null` is no filter. */
 export type KeuanganFilters = {
@@ -64,7 +65,10 @@ export type KeuanganRow = {
   perjadin: { id: string; subClusterName: string; startsOn: string; endsOn: string };
   /** Null while the reconcile has not finished the line: its receipts may still be in `_staging`. */
   driveSyncedAt: Date | null;
-  /** Up to five receipts' Drive file ids, by upload time then id. */
+  /**
+   * Up to `MAX_RECEIPTS_PER_TRANSACTION` receipts' Drive file ids, by upload time then id — a
+   * grandfathered line holding more shows its first five.
+   */
   receiptFileIds: string[];
 };
 
@@ -144,7 +148,7 @@ async function withReceipts(rows: Omit<KeuanganRow, "receiptFileIds">[]): Promis
   const byLine = new Map<string, string[]>();
   for (const { transactionId, driveFileId } of receipts) {
     const list = byLine.get(transactionId) ?? [];
-    if (list.length < KEUANGAN_RECEIPT_LINKS) list.push(driveFileId);
+    if (list.length < MAX_RECEIPTS_PER_TRANSACTION) list.push(driveFileId);
     byLine.set(transactionId, list);
   }
   return rows.map((row) => ({ ...row, receiptFileIds: byLine.get(row.id) ?? [] }));

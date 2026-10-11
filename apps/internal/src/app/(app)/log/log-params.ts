@@ -1,4 +1,4 @@
-import { calendarDate } from "-/lib/calendar-date";
+import { calendarDate, first } from "-/lib/search-params";
 import {
   ACTIVITY_LOG_AKSI_FILTERS,
   type ActivityLogAksiFilter,
@@ -7,10 +7,6 @@ import {
 
 /** `/log`'s query string as Next hands it over. */
 export type LogSearchParams = Record<string, string | string[] | undefined>;
-
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 /**
  * **The filters `/log`'s URL asks for** (`?q=&aksi=&dari=&sampai=&page=`), so a view can be

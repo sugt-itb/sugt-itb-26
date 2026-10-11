@@ -12,7 +12,7 @@ import { FakeDrive, MY_DRIVE } from "-/lib/drive/fake-drive";
 import type { ReadyFolders } from "-/lib/drive/fixed-folders";
 import { DRIVE_FILE_SCOPE, openDrive } from "-/lib/drive/google";
 import { uploadGate } from "-/lib/drive/upload-gate";
-import { RECEIPTS_UNSYNCED } from "-/lib/drive/upload-messages";
+import { RECEIPTS_UNSYNCED_TOOLTIP } from "-/lib/drive/upload-messages";
 import { requirePerson } from "-/lib/person";
 import { db, schema } from "@sugt/db";
 import type { Person } from "@sugt/db/queries";
@@ -549,7 +549,7 @@ describe("the belum tersinkron marker", () => {
 
     const cards = html.split('data-slot="card"').slice(1);
     const marked = cards
-      .filter((card) => card.includes(RECEIPTS_UNSYNCED))
+      .filter((card) => card.includes(RECEIPTS_UNSYNCED_TOOLTIP))
       .map((card) => /(Belum|Sudah|Kosong)/.exec(card)?.[1]);
     expect(marked).toEqual(["Belum"]);
   });

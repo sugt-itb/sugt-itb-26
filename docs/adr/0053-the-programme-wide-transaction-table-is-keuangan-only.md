@@ -7,8 +7,9 @@ only by a Staff Person holding the **Keuangan** Grant or **Administrator**
 Pimpinan included, gets a 403 from the page and from the export, and sees no sidebar link.
 
 This **narrows [ADR-0026](./0026-money-is-open-to-read-and-staff-only-to-write.md)** — "money is open to
-read" — for this one view. Each Perjadin's Laporan and its CSV export stay readable by any signed-in
-Person, as before. Settled with the product owner when the ticket was written, on 2026-10-11.
+read" — for this one view, as [ADR-0037](./0037-dashboard-read-is-gated-by-a-grant.md) did for the
+Dashboard and the programme budget it shows. Each Perjadin's Laporan and its CSV export stay readable
+by any signed-in Person, as before. Settled with the product owner when the ticket was written, on 2026-10-11.
 
 ## Why
 
@@ -34,7 +35,7 @@ Group and leadership follow it.
 
 ## Consequences
 
-- Reading money is open except here. A future programme-wide money view should follow this ADR rather
-  than ADR-0026.
+- Reading money is open except here and on the Dashboard (ADR-0037). A future programme-wide money
+  view should follow this ADR rather than ADR-0026.
 - The export carries no Perjadin column, by decision: it is a line-by-line ledger, and a reader who
   needs the trip filters by it first.

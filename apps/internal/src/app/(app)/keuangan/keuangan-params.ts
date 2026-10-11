@@ -1,10 +1,9 @@
-import { calendarDate } from "-/lib/calendar-date";
+import { calendarDate, first, uuidOrNull } from "-/lib/search-params";
 import {
   DEFAULT_KEUANGAN_SORT,
   KEUANGAN_SORT_KEYS,
   type KeuanganFilters,
   type KeuanganSort,
-  type KeuanganSortKey,
 } from "@sugt/db/queries";
 
 /** `/keuangan`'s query string as Next hands it over. */
@@ -23,12 +22,6 @@ export type KeuanganView = {
   entered: { dari: string | null; sampai: string | null };
 };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
 /**
  * **What `/keuangan`'s URL asks for** (`?perjadin=&dari=&sampai=&urut=&arah=&page=`), so a view can be
  * bookmarked and the export reuses its filter exactly. Anything malformed falls back to the default:
@@ -36,7 +29,6 @@ function first(value: string | string[] | undefined): string | undefined {
  * page the first. A column named without a direction starts descending, as a header click does.
  */
 export function parseKeuanganParams(params: KeuanganSearchParams): KeuanganView {
-  const perjadin = first(params.perjadin);
   const dari = calendarDate(first(params.dari));
   const sampai = calendarDate(first(params.sampai));
   const rangeReversed = dari !== null && sampai !== null && dari > sampai;
@@ -46,7 +38,7 @@ export function parseKeuanganParams(params: KeuanganSearchParams): KeuanganView 
   const page = Number.parseInt(first(params.page) ?? "", 10);
   return {
     filters: {
-      perjadinId: perjadin && UUID.test(perjadin) ? perjadin : null,
+      perjadinId: uuidOrNull(first(params.perjadin)),
       dari: rangeReversed ? null : dari,
       sampai: rangeReversed ? null : sampai,
     },
@@ -87,10 +79,4 @@ export function keuanganHref(view: {
 export function keuanganExportHref(filters: KeuanganFilters): string {
   const search = filterQuery(filters).toString();
   return search ? `/keuangan/ekspor?${search}` : "/keuangan/ekspor";
-}
-
-/** The sort a click on `key`'s header asks for: a new column descending, the sorted one flipped. */
-export function sortAfterClick(current: KeuanganSort, key: KeuanganSortKey): KeuanganSort {
-  if (current.key !== key) return { key, direction: "desc" };
-  return { key, direction: current.direction === "desc" ? "asc" : "desc" };
 }

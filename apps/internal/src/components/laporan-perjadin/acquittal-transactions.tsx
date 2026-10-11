@@ -45,7 +45,11 @@ import {
   type PreparedReceipt,
 } from "-/lib/drive/receipt-upload";
 import type { UploadGate } from "-/lib/drive/upload-gate";
-import { driveRefusalText, RECEIPTS_UNSYNCED, STALE_PAGE } from "-/lib/drive/upload-messages";
+import {
+  driveRefusalText,
+  RECEIPTS_UNSYNCED_TOOLTIP,
+  STALE_PAGE,
+} from "-/lib/drive/upload-messages";
 import {
   formatIdr,
   formatRupiah,
@@ -248,7 +252,7 @@ function TransactionCard({
           <span className="text-muted-foreground">·</span>
           <span className="text-muted-foreground">{line.category}</span>
           <Badge variant="secondary">{line.participantType}</Badge>
-          {line.unsynced && <UnsyncedMarker explanation={RECEIPTS_UNSYNCED} />}
+          {line.unsynced && <UnsyncedMarker explanation={RECEIPTS_UNSYNCED_TOOLTIP} />}
           {/* Wraps under the line on a phone rather than pushing the card sideways (#418). */}
           <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2">
             <span className="tabular-nums">{formatRupiah(line.amountIdr)}</span>

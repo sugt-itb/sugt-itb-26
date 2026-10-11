@@ -42,5 +42,5 @@ export const STALE_PAGE = "Halaman ini sudah tidak sesuai. Muat ulang untuk meli
  * The tooltip on a transaction whose receipts the reconcile has not put in place yet — on the Laporan
  * and on `/keuangan` (#472) alike.
  */
-export const RECEIPTS_UNSYNCED =
+export const RECEIPTS_UNSYNCED_TOOLTIP =
   "Bukti belum tersinkron ke Google Drive — Administrator dapat menyelesaikannya lewat Periksa koneksi.";

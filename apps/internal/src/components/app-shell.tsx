@@ -43,6 +43,7 @@ function AppShell({
   personName: string;
   /** Whether the viewer holds the Daring Editor Grant — gates the `/pretest` nav link. */
   canEditDaring: boolean;
+  /** Whether the viewer holds the Keuangan Grant — gates the `/keuangan` nav link (#472). */
   canViewKeuangan: boolean;
   /** Whether the viewer may read the Dashboard (`/`) — gates its nav link (#322). */
   canViewDashboard: boolean;
