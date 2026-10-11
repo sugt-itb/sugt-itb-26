@@ -956,13 +956,29 @@ Two things the screen refuses, both saying why rather than failing quietly:
 
 ### People — the invite list
 
-Staff add and revoke People here. This is the invite list from
+An Administrator adds and revokes People here (#470). This is the invite list from
 [ADR-0003](./adr/0003-google-sign-in-with-an-invite-list.md): a `person` row **is** an
 invitation, and nobody whose email has no row can sign in at all.
 
-Writes are Staff-only; reads follow the open-delivery rule, since a Group is assembled
-from the roster. Schools, Clusters and Topics have no admin screen because they are fixed
-reference data — People are not, so they do.
+**Every write is an Administrator's**; reads follow the open-delivery rule, since a Group is
+assembled from the roster. Schools, Clusters and Topics have no admin screen because they are fixed
+reference data — People are not, so they do. The header says only an Administrator adds and
+deactivates people.
+
+- **Tambah orang** and each row's **Nonaktifkan** are shown only to an Administrator. Anyone else
+  calling either write gets a 403, and nothing is written.
+- **An Administrator cannot Nonaktifkan themselves**: their own row has no button, and the write
+  refuses it. Deactivating another Administrator is allowed.
+- **Akses** is a column only an Administrator sees. Each active Staff row has a searchable
+  multi-select of the six Grants, held ones as chips; adding or removing a chip assigns or revokes
+  at once. Each option carries a line saying what it gates — Administrator "semua akses", Keuangan
+  "belum ada fitur", Perjadin Editor "merencanakan dan menulis setiap Perjadin", Daring Editor "Sesi
+  daring dan Pretest", Dashboard Editor "termasuk Dashboard Viewer", Dashboard Viewer "membaca
+  Dashboard". Only Grants actually held are chips: choosing Dashboard Editor shows Dashboard Editor
+  alone. A Pimpinan or deactivated row shows "—".
+- **An Administrator cannot revoke their own Administrator Grant**: that chip is locked on their
+  row, and the write refuses it. With the rule above, no Administrator can remove their own
+  access.
 
 **A Person's role cannot be changed once they have been used.** The database refuses it,
 and correcting a wrong one means revoking that Person and adding a new one, which keeps

@@ -182,6 +182,23 @@ describe("assigning and revoking Grants", () => {
     await expect(personGrants(admin, pimpinan.id)).resolves.toEqual([]);
   });
 
+  it("refuses an Administrator revoking their own Administrator Grant, and nothing else of theirs (#470)", async () => {
+    const admin = await anAdministrator();
+    await assignGrant(admin, admin.id, "Keuangan");
+    const other = await resolved("Staff", "sari@ditsama.itb.ac.id", ["Administrator"]);
+
+    await expect(revokeGrant(admin, admin.id, "Administrator")).resolves.toEqual({
+      outcome: "own-administrator",
+    });
+    await expect(personGrants(admin, admin.id)).resolves.toEqual(["Administrator", "Keuangan"]);
+
+    // Another Grant of their own, and another Administrator's Administrator, are theirs to revoke.
+    await expect(revokeGrant(admin, admin.id, "Keuangan")).resolves.toEqual({ outcome: "revoked" });
+    await expect(revokeGrant(admin, other.id, "Administrator")).resolves.toEqual({
+      outcome: "revoked",
+    });
+  });
+
   it("refuses the write to a Staff Person who is not an Administrator", async () => {
     // A Perjadin Editor is Staff and holds a Grant, but administering Grants is Administrator-only.
     const editor = await resolved("Staff", "editor@ditsama.itb.ac.id", ["Perjadin Editor"]);

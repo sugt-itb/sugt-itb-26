@@ -51,3 +51,10 @@ could not hand out the job without handing out the rest.
   Administrator satisfy.
 - **`/orang` shows six checkboxes** until its grant dropdown lands
   ([#470](https://github.com/sugt-itb/sugt-itb-26/issues/470)).
+
+## Amendment (2026-10-12): no self-lockout
+
+An Administrator cannot revoke their own Administrator Grant or deactivate themselves
+([#470](https://github.com/sugt-itb/sugt-itb-26/issues/470)); see the amendment to ADR-0028. `/orang`
+now picks Grants through a multi-select with chips, each option saying what it gates, so the "six
+checkboxes" in the consequences above are gone.

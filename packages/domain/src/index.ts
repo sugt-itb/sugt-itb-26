@@ -342,6 +342,19 @@ export const GRANT_LABELS: Record<Grant, string> = {
 };
 
 /**
+ * **What each Grant gates, in one line** — shown under its label in `/orang`'s Grant picker (#470).
+ * Beside `GRANT_LABELS` so a new Grant gets both at once; presentation only.
+ */
+export const GRANT_DESCRIPTIONS: Record<Grant, string> = {
+  Administrator: "semua akses",
+  Keuangan: "belum ada fitur",
+  "Perjadin Editor": "merencanakan dan menulis setiap Perjadin",
+  "Daring Editor": "Sesi daring dan Pretest",
+  "Dashboard Editor": "termasuk Dashboard Viewer",
+  "Dashboard Viewer": "membaca Dashboard",
+};
+
+/**
  * The two kinds a Story may be. They share one editor and one upload path; they differ only
  * in where the public site lists them — a Final Project reaches the public this way without
  * becoming a tracked record (see `docs/adr/0009-the-tool-tracks-delivery-not-outcomes.md`).
