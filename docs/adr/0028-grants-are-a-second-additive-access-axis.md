@@ -135,6 +135,7 @@ except that Administrator still implies every Grant and Dashboard Editor implies
 
 An Administrator **cannot revoke their own Administrator Grant** (`revokeGrant` answers
 `own-administrator`; `/orang` locks the chip) **nor deactivate themselves**
-([#470](https://github.com/sugt-itb/sugt-itb-26/issues/470)). Together they guarantee that there is
-always an Administrator who can sign in and grant the Grant again — the bootstrap above is needed only
-once. On `/orang` the Grants are now a searchable multi-select with chips, not checkboxes.
+([#470](https://github.com/sugt-itb/sugt-itb-26/issues/470)). So no Administrator removes their own
+access; only another Administrator can, which keeps the bootstrap above a one-off in practice. (Two
+Administrators revoking each other at the same moment could still leave none — the seed then
+restores one.) On `/orang` the Grants are now a searchable multi-select with chips, not checkboxes.

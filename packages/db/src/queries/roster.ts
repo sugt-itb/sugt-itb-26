@@ -43,8 +43,8 @@ export type RosterEntry = {
   /** Referenced by one of the six composite foreign keys, so their `role` is now write-once. */
   used: boolean;
   /**
-   * The Grants this Person holds (ADR-0028), ordered, so the roster's Grant-management controls
-   * render each toggle's state without a per-row round trip. Empty for anyone with none — and always
+   * The Grants this Person holds (ADR-0028), ordered, so the roster's Grant picker shows each
+   * row's chips without a per-row round trip. Empty for anyone with none — and always
    * empty for a Pimpinan, who holds none by construction (Grants are Staff-only).
    */
   grants: Grant[];
@@ -150,9 +150,10 @@ export type AddPersonResult =
  * Add a Person — an invitation.
  *
  * **An Administrator's** (#470): `requireStaff` first, so a Pimpinan is still refused as non-Staff,
- * then `requireGrant(caller, "Administrator")`. The gate is the invite list alone (ADR-0003, amended by #115): a row's email is
- * simply whatever the person signs in with, and Staff no longer need any particular address —
- * the `@ditsama.itb.ac.id` domain rule that used to sit beside this write is gone.
+ * then `requireGrant(caller, "Administrator")`. The gate is the invite list alone (ADR-0003,
+ * amended by #115): a row's email is simply whatever the person signs in with, and Staff no longer
+ * need any particular address — the `@ditsama.itb.ac.id` domain rule that used to sit beside this
+ * write is gone.
  *
  * The duplicate-email refusal is caught outside the insert, as the record writes catch theirs.
  * The index is **partial** (`where active`), which is what lets revoke-and-re-add leave two rows
@@ -183,8 +184,8 @@ export type RevokePersonResult =
   /** No active Person has that id — already revoked, or a stale screen. */
   | { outcome: "no-such-person" }
   /**
-   * The Administrator named themselves (#470). Refused, so the last Administrator can never lock
-   * everyone out; deactivating another Administrator is allowed. The UI never offers it.
+   * The Administrator named themselves (#470). Refused, so no Administrator deactivates their own
+   * access; deactivating another Administrator is allowed. The UI never offers it.
    */
   | { outcome: "self" };
 

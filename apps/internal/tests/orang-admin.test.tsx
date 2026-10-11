@@ -1,5 +1,7 @@
 import { addPersonAction, revokePersonAction } from "-/app/(app)/orang/actions";
 import OrangPage from "-/app/(app)/orang/page";
+import { keepLocked } from "-/components/multi-select-combobox";
+import { GRANT_OPTIONS } from "-/components/orang-roster";
 import { requirePerson } from "-/lib/person";
 import { db, schema } from "@sugt/db";
 import type { Person } from "@sugt/db/queries";
@@ -124,5 +126,37 @@ describe("the roster's writes", () => {
     ).resolves.toMatchObject({ outcome: "added" });
     await expect(revokePersonAction(who.sari.id)).resolves.toEqual({ outcome: "self" });
     await expect(revokePersonAction(who.rina.id)).resolves.toEqual({ outcome: "revoked" });
+  });
+});
+
+describe("the Grant picker's options and lock", () => {
+  it("offers the six Grants in order, each with the line saying what it gates", () => {
+    expect(GRANT_OPTIONS.map((option) => [option.value, option.description])).toEqual([
+      ["Administrator", "semua akses"],
+      ["Keuangan", "belum ada fitur"],
+      ["Perjadin Editor", "merencanakan dan menulis setiap Perjadin"],
+      ["Daring Editor", "Sesi daring dan Pretest"],
+      ["Dashboard Editor", "termasuk Dashboard Viewer"],
+      ["Dashboard Viewer", "membaca Dashboard"],
+    ]);
+  });
+
+  it("puts back a locked value a change dropped, and leaves every other change alone", () => {
+    const held = ["Administrator", "Keuangan"];
+
+    // A Backspace, or a click on the locked row, drops Administrator: it comes back.
+    expect(keepLocked(["Keuangan"], held, ["Administrator"])).toEqual([
+      "Keuangan",
+      "Administrator",
+    ]);
+    // Removing another chip, or adding one, goes through.
+    expect(keepLocked(["Administrator"], held, ["Administrator"])).toEqual(["Administrator"]);
+    expect(keepLocked([...held, "Daring Editor"], held, ["Administrator"])).toEqual([
+      ...held,
+      "Daring Editor",
+    ]);
+    // Nothing locked, or a locked value never chosen, changes nothing.
+    expect(keepLocked(["Keuangan"], held, [])).toEqual(["Keuangan"]);
+    expect(keepLocked([], [], ["Administrator"])).toEqual([]);
   });
 });

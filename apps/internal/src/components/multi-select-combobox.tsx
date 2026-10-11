@@ -74,9 +74,13 @@ function MultiSelectCombobox({
       multiple
       value={selected}
       onValueChange={(next: ComboboxOption[]) => {
-        const values = next.map((option) => option.value);
-        const kept = locked.filter((held) => value.includes(held) && !values.includes(held));
-        onValueChange([...values, ...kept]);
+        onValueChange(
+          keepLocked(
+            next.map((option) => option.value),
+            value,
+            locked,
+          ),
+        );
       }}
       isItemEqualToValue={(a: ComboboxOption, b: ComboboxOption) => a.value === b.value}
     >
@@ -126,4 +130,13 @@ function MultiSelectCombobox({
   );
 }
 
-export { MultiSelectCombobox, type ComboboxOption };
+/**
+ * A change with every `locked` value that was chosen put back — what a Backspace or a click on a
+ * locked row would otherwise drop. Pure, so the rule is tested without a DOM.
+ */
+function keepLocked(next: string[], previous: string[], locked: string[]): string[] {
+  const dropped = locked.filter((held) => previous.includes(held) && !next.includes(held));
+  return [...next, ...dropped];
+}
+
+export { keepLocked, MultiSelectCombobox, type ComboboxOption };

@@ -101,4 +101,4 @@ Adding and revoking People — writing the invite list — is now an **Administr
 member's ([#470](https://github.com/sugt-itb/sugt-itb-26/issues/470)). `addPerson` and
 `revokePerson` require the Administrator Grant, and `/orang` shows Tambah orang and Nonaktifkan to an
 Administrator alone. Everyone signed in still reads the roster. An Administrator cannot deactivate
-themselves, so the list always keeps one who can sign in.
+themselves, so no Administrator removes their own access.

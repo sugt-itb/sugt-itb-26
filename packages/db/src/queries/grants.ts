@@ -18,7 +18,8 @@ import { requireGrant, requireStaff } from "./staff-only";
  *   Grant from ever punching through "a Pimpinan writes nothing" (ADR-0025).
  * - **Administering Grants is itself a Grant.** `assignGrant`/`revokeGrant` open with
  *   `requireGrant(caller, "Administrator")` — an Administrator administers any Grant on any Staff
- *   Person, including making another Administrator, because Administrator implies every Grant.
+ *   Person, including making another Administrator, because Administrator implies every Grant —
+ *   except their own Administrator Grant, which `revokeGrant` refuses (#470).
  *
  * The current Person's own Grants are **not** read here: they are threaded onto the caller at
  * resolution (`findActivePersonByEmail` in `@sugt/internal`), the same as `role`, so a guard has
@@ -50,8 +51,8 @@ export type SetGrantResult =
   /** The target Person is not Staff. Grants are Staff-only, so a Grant is refused to a Pimpinan. */
   | { outcome: "not-staff-target" }
   /**
-   * An Administrator revoking their own Administrator Grant (#470). Refused, so there is always an
-   * Administrator who can sign in and grant it back. The UI locks the chip.
+   * An Administrator revoking their own Administrator Grant (#470). Refused, so no Administrator
+   * removes their own access. The UI locks the chip.
    */
   | { outcome: "own-administrator" };
 

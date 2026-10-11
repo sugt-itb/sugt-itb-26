@@ -22,8 +22,8 @@ import { revalidatePath } from "next/cache";
  *
  * `staffSurface` turns a non-Administrator's `NotGrantedError`, or a Pimpinan's `NotStaffError`, into
  * a 403 rather than a crash — the enforcement is `requireStaff` and `requireGrant` inside each write,
- * because a layout does not run before a Server Action. Every other refusal is a value the form
- * places on a field, `self` included.
+ * because a layout does not run before a Server Action. Every other refusal is a value the screen
+ * says in a sentence — `self` (an Administrator naming themselves) included.
  *
  * `revalidatePath` clears the client router cache for the roster the user is looking at, on the
  * outcome that changed it.

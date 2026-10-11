@@ -977,8 +977,8 @@ deactivates people.
   Dashboard". Only Grants actually held are chips: choosing Dashboard Editor shows Dashboard Editor
   alone. A Pimpinan or deactivated row shows "—".
 - **An Administrator cannot revoke their own Administrator Grant**: that chip is locked on their
-  row, and the write refuses it. With the rule above, there is always an Administrator who can
-  sign in.
+  row, and the write refuses it. With the rule above, no Administrator can remove their own
+  access.
 
 **A Person's role cannot be changed once they have been used.** The database refuses it,
 and correcting a wrong one means revoking that Person and adding a new one, which keeps

@@ -7,7 +7,15 @@ import {
   revokePersonAction,
 } from "-/app/(app)/orang/actions";
 import type { RosterEntry } from "@sugt/db/queries";
-import { type Grant, GRANTS, GRANT_LABELS, type Role, ROLES, ROLE_LABELS } from "@sugt/domain";
+import {
+  type Grant,
+  GRANT_DESCRIPTIONS,
+  GRANT_LABELS,
+  GRANTS,
+  type Role,
+  ROLES,
+  ROLE_LABELS,
+} from "@sugt/domain";
 import { Badge } from "@sugt/ui/components/badge";
 import { Button } from "@sugt/ui/components/button";
 import { Input } from "@sugt/ui/components/input";
@@ -238,19 +246,6 @@ function PersonRow({
   );
 }
 
-/**
- * What each Grant gates, as one line under its name in the picker (#470). Indonesian copy, so it
- * lives here beside the picker rather than in `@sugt/domain`, which keeps the stored values.
- */
-const GRANT_DESCRIPTIONS: Record<Grant, string> = {
-  Administrator: "semua akses",
-  Keuangan: "belum ada fitur",
-  "Perjadin Editor": "merencanakan dan menulis setiap Perjadin",
-  "Daring Editor": "Sesi daring dan Pretest",
-  "Dashboard Editor": "termasuk Dashboard Viewer",
-  "Dashboard Viewer": "membaca Dashboard",
-};
-
 const GRANT_OPTIONS = GRANTS.map((grant) => ({
   value: grant,
   label: GRANT_LABELS[grant],
@@ -323,11 +318,11 @@ function StateBadge({ entry }: { entry: RosterEntry }) {
  * Revoking is one write. `no-such-person` means somebody else already revoked this row while the
  * page was open — the ordinary case for a roster two Administrators scan at once — so it earns a
  * message rather than a silent no-op, because nothing revalidates and the row would otherwise not
- * move. The viewer's own row never shows this button, so `self` (#470) is never reached from here.
+ * move. The viewer's own row never shows this button, but `self` (#470) still gets its own sentence.
  */
 function RevokeButton({ personId }: { personId: string }) {
   const [saving, startSaving] = useTransition();
-  const [stale, setStale] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   return (
     <>
@@ -338,17 +333,13 @@ function RevokeButton({ personId }: { personId: string }) {
         onClick={() => {
           startSaving(async () => {
             const result = await revokePersonAction(personId);
-            if (result.outcome !== "revoked") setStale(true);
+            if (result.outcome !== "revoked") setRefusal(REVOKE_REFUSALS[result.outcome]);
           });
         }}
       >
         {saving ? "Menonaktifkan…" : "Nonaktifkan"}
       </Button>
-      {stale && (
-        <p className="mt-1 text-xs text-destructive">
-          Sudah dinonaktifkan. Muat ulang halaman untuk melihat keadaannya.
-        </p>
-      )}
+      {refusal !== null && <p className="mt-1 text-xs text-destructive">{refusal}</p>}
     </>
   );
 }
@@ -452,9 +443,15 @@ function AddPersonForm() {
   );
 }
 
+/** Nonaktifkan's two refusals, by outcome. */
+const REVOKE_REFUSALS = {
+  "no-such-person": "Sudah dinonaktifkan. Muat ulang halaman untuk melihat keadaannya.",
+  self: "Anda tidak bisa menonaktifkan diri sendiri.",
+} as const;
+
 const MESSAGES = {
   incomplete: "Nama dan email wajib diisi.",
   "email-taken": "Email itu sudah dipakai oleh orang yang masih aktif.",
 } as const;
 
-export { OrangRoster };
+export { GRANT_OPTIONS, OrangRoster };
