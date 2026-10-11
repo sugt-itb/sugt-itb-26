@@ -617,6 +617,14 @@ as failed, and the rest are kept.
   Unggah bukti, is disabled with the reason while Drive is not connected or broken, and still works
   after the Laporan is filed. Each one is a **Bukti dihapus** entry on `/log`, under the Unggah
   bukti filter.
+- Each line carries its own **Hapus** (#463), for a line entered by mistake — against the wrong
+  trip, or twice. It asks _"Hapus transaksi ini? Folder buktinya akan dipindahkan ke Sampah Google
+  Drive."_, then moves the line's folder and receipts to the Drive trash and takes the line off the
+  Laporan. The totals, the Siswa and GTK-MS subtotals, the remainder and the export no longer count
+  it. Any line can be deleted, with or without receipts. Like Hapus bukti, it is the trip writer's
+  alone, is disabled with the reason while Drive is not connected or broken, and still works after
+  filing. Each one is a **Transaksi dihapus** entry on `/log`, under the Catat transaksi filter; the
+  line's earlier entries stay, without their Buka folder link.
 
 What both controls take:
 

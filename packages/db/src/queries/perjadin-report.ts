@@ -18,10 +18,10 @@ import { requirePerjadinWriter, requireStaff } from "./staff-only";
 
 /**
  * **Perjadin Report** — the acquittal of one Perjadin. Reading it is now open to any signed-in
- * Person (ADR-0026 reversed ADR-0004's money-read half, #180); only **writing** it — recording a
- * transaction, attaching or deleting a receipt, settling, filing — is the trip's Group's, an Editor's or an
- * Administrator's (ADR-0048), each write query below opening with its own `requireStaff` and
- * running `requirePerjadinWriter`.
+ * Person (ADR-0026 reversed ADR-0004's money-read half, #180); only **writing** it — recording or
+ * deleting a transaction, attaching or deleting a receipt, settling, filing — is the trip's Group's,
+ * an Editor's or an Administrator's (ADR-0048), each write query below opening with its own
+ * `requireStaff` and running `requirePerjadinWriter`.
  *
  * There is no `perjadin_report` table: a Perjadin yields exactly one Report, always, so the
  * acquittal is the state already on `perjadin`, plus its line items and their evidence.
@@ -654,6 +654,114 @@ export async function deleteTransactionEvidence(
     });
 
     return { outcome: "deleted", perjadinId: line.perjadinId };
+  });
+}
+
+/** What a line holds in Drive: its folder, if it has one, and every receipt file on it. */
+export type TransactionDriveItems = {
+  driveFolderId: string | null;
+  driveFileIds: string[];
+};
+
+/**
+ * **The line Hapus transaksi is about to delete, read before any Drive call** (ADR-0050, #463):
+ * what it must trash. `null` when there is no such line — a second Hapus, or a stale screen.
+ *
+ * Exported as the guard the action runs **ahead of Drive**, like `receiptDeleteTarget`: Staff, then
+ * the trip's writer (ADR-0048), so a non-writer causes no Drive call.
+ */
+export async function transactionDeleteTarget(
+  caller: Person,
+  transactionId: string,
+): Promise<TransactionDriveItems | null> {
+  requireStaff(caller);
+
+  const [line] = await db
+    .select({ perjadinId: transaction.perjadinId, driveFolderId: transaction.driveFolderId })
+    .from(transaction)
+    .where(sql`${transaction.id}::text = ${transactionId}`);
+  if (!line) return null;
+  await requirePerjadinWriter(caller, line.perjadinId);
+
+  const receipts = await db
+    .select({ driveFileId: transactionEvidence.driveFileId })
+    .from(transactionEvidence)
+    .where(eq(transactionEvidence.transactionId, transactionId));
+  return {
+    driveFolderId: line.driveFolderId,
+    driveFileIds: receipts.map((receipt) => receipt.driveFileId),
+  };
+}
+
+export type DeleteTransactionResult =
+  /**
+   * Gone, with what it held in Drive **at the commit** — which the action compares with what it
+   * trashed, since a reconcile or an Unggah bukti may have added a folder or a receipt in between.
+   */
+  | ({ outcome: "deleted"; perjadinId: string } & TransactionDriveItems)
+  /** No such line — deleted already, by this Hapus pressed twice or by another. */
+  | { outcome: "no-such-transaction" };
+
+/**
+ * **Delete one line, its receipts with it, and log `transaction_deleted`, in one transaction**
+ * (ADR-0050, #463). The action has already trashed the line's folder and receipt files in Drive.
+ *
+ * The row is locked `for update` first — the lock `attachTransactionEvidence` counts under and a
+ * reconcile's folder claim waits on — so what it held is read once nothing more can join it, and
+ * answered for the action to trash whatever arrived after its own read. A line with no receipt, or
+ * grandfathered with more than five, is deleted like any other; nothing about filing gates it.
+ *
+ * The Log entry is a copy of the line, since the row is gone after.
+ */
+export async function deleteTransaction(
+  caller: Person,
+  transactionId: string,
+): Promise<DeleteTransactionResult> {
+  requireStaff(caller);
+
+  return db.transaction(async (tx) => {
+    const [line] = await tx
+      .select({
+        perjadinId: transaction.perjadinId,
+        category: transaction.category,
+        amountIdr: transaction.amountIdr,
+        participantType: transaction.participantType,
+        spentOn: transaction.spentOn,
+        description: transaction.description,
+        driveFolderId: transaction.driveFolderId,
+      })
+      .from(transaction)
+      .where(sql`${transaction.id}::text = ${transactionId}`)
+      .for("update");
+    if (!line) return { outcome: "no-such-transaction" };
+    await requirePerjadinWriter(caller, line.perjadinId, tx);
+
+    const receipts = await tx
+      .select({ driveFileId: transactionEvidence.driveFileId })
+      .from(transactionEvidence)
+      .where(eq(transactionEvidence.transactionId, transactionId));
+
+    // The evidence rows go with it (`on delete cascade`).
+    await tx.delete(transaction).where(eq(transaction.id, transactionId));
+    await logActivity(tx, caller, line.perjadinId, {
+      action: "transaction_deleted",
+      details: {
+        transactionId,
+        category: line.category,
+        amountIdr: line.amountIdr,
+        participantType: line.participantType,
+        spentOn: line.spentOn,
+        description: line.description,
+        receiptCount: receipts.length,
+      },
+    });
+
+    return {
+      outcome: "deleted",
+      perjadinId: line.perjadinId,
+      driveFolderId: line.driveFolderId,
+      driveFileIds: receipts.map((receipt) => receipt.driveFileId),
+    };
   });
 }
 

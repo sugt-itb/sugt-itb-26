@@ -103,6 +103,17 @@ export type DeleteReceiptActionResult =
   | DriveRefusal;
 
 /**
+ * What `deleteTransactionAction` did (#463, ADR-0050): the line's folder and receipts trashed and the
+ * line gone, or why not. Every refusal leaves the line listed. One that failed after part of the
+ * trash leaves some of its files in the trash; Hapus again finishes it.
+ */
+export type DeleteTransactionActionResult =
+  | { outcome: "deleted" }
+  /** Already deleted — a second Hapus, or a stale screen. */
+  | { outcome: "no-such-transaction" }
+  | DriveRefusal;
+
+/**
  * One receipt as the screen renders it: the row, minus its Drive id, plus the link to the file in
  * Drive (ADR-0040), opened in a new tab — the app renders nothing of the file. The link opens for
  * anyone once its transaction folder is shared.

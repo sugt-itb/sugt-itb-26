@@ -1761,6 +1761,15 @@ file back out of the Drive trash, since its row stands. A grandfathered line wit
 lose any of them, down to one. The freed slot counts toward the five again. Nothing about filing
 gates it.
 
+**A line may be deleted whole** (#463, ADR-0050), with however many receipts it holds. Hapus
+transaksi trashes the line's Drive folder, and with it the receipts inside, then any receipt file
+outside it, for example one still in `_staging`. Then `deleteTransaction` locks the row
+`for update`, deletes it, its evidence rows cascading, and writes its `transaction_deleted` entry in
+one transaction. The commit answers the folder and receipt files the row held under the lock, and
+the action trashes any it had not already trashed: a receipt an Unggah bukti added, or a folder a
+reconcile claimed, between its first read and the lock. The totals, the remainder and the export are
+derived, so they drop the line without a write of their own.
+
 **Every receipt is a file in the company's Google Drive** (ADR-0040). `drive_file_id` is the
 file's Drive id, written by Catat transaksi or by a line's own "Unggah bukti", and `not null`. A
 CHECK pins `content_type` to the four types the server sniffs from the first bytes. `unique` means
@@ -1787,6 +1796,12 @@ receipt is never unsynced. A reconcile that fails after the commit leaves the li
 unsynced, and its files wait in private `_staging` until the next reconcile finishes it. A reconcile marks a line
 synced only for the receipts it read. If a newer receipt was committed while it ran, the mark does
 not land, so that receipt stays owed rather than stranded under a line that claims to be done.
+
+**A deleted line leaves only trashed items behind.** Its folder and receipts are in the Drive trash,
+and nothing in the database points at them. A reconcile that was running when it went never
+recreates the trashed folder. One that made the folder itself finds no row to claim it on
+(`claimTransactionDriveFolder` answers `null`) and trashes it again, and the sweep no longer lists
+the line.
 
 **A Perjadin's folder names are app-owned, and re-asserted.** Both of a trip's folders are named
 from its Sub-Cluster, both dates and the trip's Schools, read live
@@ -1859,6 +1874,7 @@ or failed write logs nothing. The money writes log as below, each through `logAc
 | `recordTransaction`         | `transaction_recorded` | `{ transactionId, category, amountIdr, participantType, spentOn, receiptCount }`   |
 | `attachTransactionEvidence` | `evidence_uploaded`    | `{ transactionId, category, amountIdr, spentOn, added, total }`                    |
 | `deleteTransactionEvidence` | `evidence_deleted`     | `{ transactionId, evidenceId, category, amountIdr, spentOn, left }`, a copy (#462) |
+| `deleteTransaction`         | `transaction_deleted`  | as `transaction_recorded`, plus `description`; a copy (#463)                       |
 | `filePerjadinReport`        | `report_filed`         | `{ transactionCount, totalIdr }`, every category, as the acquittal totals          |
 
 **`actor_email` is a copy**, taken when the act happens, so the row stays true if the Person's email

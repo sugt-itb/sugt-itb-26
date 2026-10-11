@@ -8,6 +8,7 @@ import type {
 } from "-/app/(app)/perjadin/[id]/laporan/action-types";
 import {
   deleteReceiptAction,
+  deleteTransactionAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
   recordTransactionAction,
@@ -24,6 +25,7 @@ import {
   RECEIPT_DELETE_CONFIRM,
   receiptDeleteRefusalText,
 } from "-/components/laporan-perjadin/receipt-delete-messages";
+import { TRANSACTION_DELETE_CONFIRM } from "-/components/laporan-perjadin/transaction-delete-messages";
 import { RequiredLegend, RequiredMark } from "-/components/required-mark";
 import { UnsyncedMarker } from "-/components/unsynced-marker";
 import {
@@ -80,7 +82,7 @@ import { type ReactElement, useId, useMemo, useRef, useState, useTransition } fr
 
 /**
  * **The line items, and what a PIC does to them**: enter one with its receipts, add receipts to one
- * already entered, and take a mistaken receipt off one (#462).
+ * already entered, take a mistaken receipt off one (#462), and delete a mistaken one whole (#463).
  *
  * **A line is entered with its evidence or not at all** (ADR-0039, superseding ADR-0030's optional
  * upload). The entry form stages one to five files; Catat uploads every one of them **first** —
@@ -256,10 +258,97 @@ function TransactionCard({
               uploadGate={uploadGate}
               canWrite={canWrite}
             />
+            {canWrite && (
+              <DeleteTransaction
+                transactionId={line.id}
+                label={`${line.spentOn} · ${line.description}`}
+                uploadGate={uploadGate}
+              />
+            )}
           </div>
         </div>
       </CardHeader>
     </Card>
+  );
+}
+
+/**
+ * **Hapus** on one line, behind a confirmation (#463, ADR-0050). Its folder and receipts go to the
+ * Drive trash first, then the line, and the page revalidates. Disabled with the gate's reason while
+ * Drive cannot take it, as Unggah bukti is.
+ */
+function DeleteTransaction({
+  transactionId,
+  label,
+  uploadGate,
+}: {
+  transactionId: string;
+  /** Which line, for a screen reader: every row's Hapus would otherwise read the same. */
+  label: string;
+  uploadGate: UploadGate;
+}) {
+  const [open, setOpen] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [deleting, startDeleting] = useTransition();
+
+  function submit() {
+    startDeleting(async () => {
+      setRefusal(null);
+      const result = await deleteTransactionAction(transactionId);
+      if (result.outcome === "deleted" || result.outcome === "no-such-transaction") {
+        setOpen(false);
+        return;
+      }
+      setRefusal(driveRefusalText(result));
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setRefusal(null);
+      }}
+    >
+      <DialogTrigger
+        disabled={!uploadGate.open}
+        title={uploadGate.open ? undefined : uploadGate.reason}
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Hapus transaksi ${label}`}
+          >
+            Hapus
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Hapus transaksi</DialogTitle>
+          <DialogDescription>{TRANSACTION_DELETE_CONFIRM}</DialogDescription>
+        </DialogHeader>
+        {refusal !== null && <p className="text-sm text-destructive">{refusal}</p>}
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            Batal
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={deleting}
+            onClick={submit}
+          >
+            {deleting ? "Menghapus…" : "Hapus"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

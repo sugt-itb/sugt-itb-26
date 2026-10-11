@@ -167,12 +167,16 @@ export async function claimPerjadinDriveFolder(
   return winner!.id!;
 }
 
-/** The same compare-and-set, for a line's own folder — a line from before Drive has none. */
+/**
+ * The same compare-and-set, for a line's own folder — a line from before Drive has none. `null` when
+ * the line is gone: a Hapus transaksi committed while the reconcile was making the folder (#463), so
+ * the caller trashes its own and stops.
+ */
 export async function claimTransactionDriveFolder(
   caller: Person,
   transactionId: string,
   folderId: string,
-): Promise<string> {
+): Promise<string | null> {
   requireStaff(caller);
 
   const [claimed] = await db
@@ -186,7 +190,7 @@ export async function claimTransactionDriveFolder(
     .select({ id: transaction.driveFolderId })
     .from(transaction)
     .where(eq(transaction.id, transactionId));
-  return winner!.id!;
+  return winner?.id ?? null;
 }
 
 /**
@@ -199,13 +203,14 @@ export async function claimTransactionDriveFolder(
  * line synced then would strand the new file in `_staging` under a line that claims to be done, and
  * the sweep only visits unsynced lines. So the mark is a compare-and-set: it lands only when no
  * receipt on the line is outside `handledEvidenceIds`. If it does not land, the line is synced
- * only if some later reconcile already finished it.
+ * only if some later reconcile already finished it — `owed` otherwise, and `gone` when a Hapus
+ * transaksi deleted it meanwhile (#463).
  */
 export async function markTransactionSynced(
   caller: Person,
   transactionId: string,
   handledEvidenceIds: string[],
-): Promise<boolean> {
+): Promise<"synced" | "owed" | "gone"> {
   requireStaff(caller);
 
   const unhandled = db
@@ -224,13 +229,14 @@ export async function markTransactionSynced(
     .set({ driveSyncedAt: sql`now()`, driveSyncFailedAt: null })
     .where(and(eq(transaction.id, transactionId), notExists(unhandled)))
     .returning({ id: transaction.id });
-  if (marked) return true;
+  if (marked) return "synced";
 
   const [line] = await db
     .select({ syncedAt: transaction.driveSyncedAt })
     .from(transaction)
     .where(eq(transaction.id, transactionId));
-  return line?.syncedAt != null;
+  if (!line) return "gone";
+  return line.syncedAt != null ? "synced" : "owed";
 }
 
 /**

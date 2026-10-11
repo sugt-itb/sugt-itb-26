@@ -94,7 +94,9 @@ My Drive/
 - **Names are app-owned.** The app computes them from the database. Transaction folders and files
   are named once, as they leave `_staging`, and never renamed: a transaction cannot be edited. The
   reconcile re-asserts the Perjadin folder's name, which follows a corrected start date. The README
-  asks people not to rename.
+  asks people not to rename. _Amended by
+  [ADR-0050](./0050-transactions-and-receipts-may-be-deleted-and-the-log-keeps-the-copy.md): a
+  transaction still cannot be edited, but it can be deleted, and the app then trashes its folder._
 - **Moving the root by hand is allowed**, and recommended over Google Picker for putting it where
   the company files things. The new parent must be **owned by the company account**: a folder owned
   by anyone else would put the evidence under an account the company does not control.
