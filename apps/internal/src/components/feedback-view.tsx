@@ -6,7 +6,8 @@ import {
   loadPerjadinFeedback,
   loadPerjadinFeedbackAverages,
 } from "-/app/(app)/feedback/actions";
-import { sesiLabel, sesiShortLabel } from "-/components/session-labels";
+import { participantScopeLabel, perjadinScopeLabel, withSchool } from "-/components/feedback-scope";
+import { sesiLabel } from "-/components/session-labels";
 import { SingleSelectCombobox } from "-/components/single-select-combobox";
 import {
   PARTICIPANT_ASPECT_LABELS,
@@ -24,6 +25,7 @@ import type {
   ParticipantFeedbackAverages,
   ParticipantFeedbackRow,
   ParticipantFeedbackScope,
+  PerjadinFeedbackAverages,
   PerjadinFeedbackCursor,
   PerjadinFeedbackFilters,
   PerjadinFeedbackRow,
@@ -119,18 +121,21 @@ const DATE_SORT_OPTIONS: Record<FeedbackSort["date"], string> = {
 };
 
 /** Every School, every Session — the Peserta tab's starting scope, mirroring the server's. */
-const ALL_SCHOOLS: ParticipantFeedbackScope = { schoolId: null, sessionId: null };
+const ALL_PARTICIPANT_SCOPE: ParticipantFeedbackScope = { schoolId: null, sessionId: null };
 
 /** Every trip, every Peran — the Perjadin tab's starting scope, mirroring the server's. */
-const ALL_TRIPS: PerjadinFeedbackScope = { perjadinId: null, role: null };
+const ALL_PERJADIN_SCOPE: PerjadinFeedbackScope = { perjadinId: null, role: null };
 
 /** The Sesi and Peran selects' "everything" option — a plain `Select` needs a value for it. */
-const ALL = "semua";
+const ALL = "semua" as const;
 
 /** The Peran pengisi select: Semua Peran, then the three self-declared roles as stored. */
-const ROLE_OPTIONS: Record<string, string> = {
+const ROLE_OPTIONS: Record<PerjadinEvaluationRole | typeof ALL, string> = {
   [ALL]: "Semua Peran",
-  ...Object.fromEntries(PERJADIN_EVALUATION_ROLES.map((role) => [role, role])),
+  ...(Object.fromEntries(PERJADIN_EVALUATION_ROLES.map((role) => [role, role])) as Record<
+    PerjadinEvaluationRole,
+    string
+  >),
 };
 
 /** One filter's three options, in Indonesian. `label` prefixes name the column the filter gates. */
@@ -197,7 +202,7 @@ function FeedbackView({
   participantSchools: FeedbackSchoolOption[];
   perjadinInitialRows: PerjadinFeedbackRow[];
   perjadinInitialCursor: PerjadinFeedbackCursor | null;
-  perjadinAverages: PerjadinAverages;
+  perjadinAverages: PerjadinFeedbackAverages;
   /** The Perjadin picker's options: the trips with evaluations (#466). */
   perjadinTrips: FeedbackPerjadinOption[];
 }) {
@@ -239,9 +244,6 @@ function FeedbackView({
   );
 }
 
-/** The Perjadin tab's four averages. */
-type PerjadinAverages = { lodging: number; transport: number; meals: number; punctuality: number };
-
 /**
  * The Peserta tab: four summary cards, the Sekolah and Sesi pickers, five server-side filters, two
  * sort dropdowns, and an OFFSET-paged card list.
@@ -264,10 +266,13 @@ function ParticipantTab({
 }) {
   const [rows, setRows] = useState(initialRows);
   const [cursor, setCursor] = useState(initialCursor);
-  const [scope, setScope] = useState<ParticipantFeedbackScope>(ALL_SCHOOLS);
+  const [scope, setScope] = useState<ParticipantFeedbackScope>(ALL_PARTICIPANT_SCOPE);
   // The averages and the scope they were read for travel together, so a card's title never names a
   // scope its number is not yet over.
-  const [averages, setAverages] = useState({ values: initialAverages, scope: ALL_SCHOOLS });
+  const [averages, setAverages] = useState({
+    values: initialAverages,
+    scope: ALL_PARTICIPANT_SCOPE,
+  });
   const [filters, setFilters] = useState<FeedbackFilters>(ALL_FILTERS);
   const [sort, setSort] = useState<FeedbackSort>(DEFAULT_SORT);
   const [pending, startTransition] = useTransition();
@@ -368,7 +373,7 @@ function ParticipantTab({
           value={scope.schoolId}
           disabled={pending}
           onValueChange={(schoolId) => {
-            changeScope({ schoolId, sessionId: null });
+            changeScope(withSchool(schoolId));
           }}
         />
         <OptionSelect
@@ -490,13 +495,13 @@ function PerjadinTab({
 }: {
   initialRows: PerjadinFeedbackRow[];
   initialCursor: PerjadinFeedbackCursor | null;
-  initialAverages: PerjadinAverages;
+  initialAverages: PerjadinFeedbackAverages;
   trips: FeedbackPerjadinOption[];
 }) {
   const [rows, setRows] = useState(initialRows);
   const [cursor, setCursor] = useState(initialCursor);
-  const [scope, setScope] = useState<PerjadinFeedbackScope>(ALL_TRIPS);
-  const [averages, setAverages] = useState({ values: initialAverages, scope: ALL_TRIPS });
+  const [scope, setScope] = useState<PerjadinFeedbackScope>(ALL_PERJADIN_SCOPE);
+  const [averages, setAverages] = useState({ values: initialAverages, scope: ALL_PERJADIN_SCOPE });
   const [filters, setFilters] = useState<PerjadinFeedbackFilters>(ALL_PERJADIN_FILTERS);
   const [sort, setSort] = useState<FeedbackSort>(DEFAULT_SORT);
   const [pending, startTransition] = useTransition();
@@ -603,7 +608,7 @@ function PerjadinTab({
           value={scope.role ?? ALL}
           disabled={pending}
           onChange={(role) => {
-            changeScope({ ...scope, role: role === ALL ? null : (role as PerjadinEvaluationRole) });
+            changeScope({ ...scope, role: role === ALL ? null : role });
           }}
         />
       </div>
@@ -716,30 +721,6 @@ function LoadMore({ pending, onClick }: { pending: boolean; onClick: () => void 
       </Button>
     </div>
   );
-}
-
-/**
- * What the Peserta averages cover, for their titles: the School, then the Session — `SMAN 1 Bontang ·
- * Sesi 1 Luring` — or `null`, programme-wide, with neither picked.
- */
-function participantScopeLabel(
-  schools: FeedbackSchoolOption[],
-  scope: ParticipantFeedbackScope,
-): string | null {
-  const school = schools.find((option) => option.id === scope.schoolId);
-  if (!school) return null;
-  const session = school.sessions.find((option) => option.id === scope.sessionId);
-  return session ? `${school.name} · ${sesiShortLabel(session)}` : school.name;
-}
-
-/** What the Perjadin averages cover: the trip's name, then the Peran — or `null` with neither. */
-function perjadinScopeLabel(
-  trips: FeedbackPerjadinOption[],
-  scope: PerjadinFeedbackScope,
-): string | null {
-  const trip = trips.find((option) => option.id === scope.perjadinId);
-  const parts = [trip ? perjadinName(trip) : null, scope.role].filter((part) => part !== null);
-  return parts.length === 0 ? null : parts.join(" · ");
 }
 
 /**

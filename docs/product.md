@@ -803,8 +803,8 @@ pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengka
 - **Sesi** is disabled until a School is picked, then reads "Semua Sesi". It lists that School's
   Sessions with responses, offline and online, by date, each as
   `Sesi 1 · Luring · 12 Okt 2026 · 09.00 WITA`. The number is the Session's Sesi
-  ([ADR-0027](./adr/0027-a-sessions-sesi-is-its-per-school-date-rank.md)), the one `/sesi/[id]`
-  shows. An online Session's time is in WIB. Picking another School resets it to "Semua Sesi".
+  ([ADR-0027](./adr/0027-a-sessions-sesi-is-its-per-school-date-rank.md)), the number the Dashboard
+  matrix and the planning note give it. An online Session's time is in WIB. Picking another School resets it to "Semua Sesi".
 - **Each response card carries the same line**, linking to the Session.
 - Both AND with the score filters, and sorting and "Tampilkan lebih banyak" work as before.
 - **The four averages follow the School and Session, never the score filters**, and their titles say
@@ -867,8 +867,7 @@ anyway would produce an invented one.
   with at least one evaluation, earliest first, by name (`Kelompok 10 · 12–13 Okt 2026`) with the
   trip's Schools beneath. Typing a School's or a Kelompok's name finds the trip.
 - **Peran pengisi** is Semua Peran, Narasumber, Pendamping or Pimpinan: the role the filer declared.
-- There is no School filter: an evaluation is about a whole trip, often over several Schools, and the
-  Perjadin picker already finds a trip by its Schools.
+- There is no School filter; the Perjadin picker finds a trip by its Schools.
 - As on the Peserta tab, both AND with the score filters, and the four averages follow them — never
   the score filters — with titles naming the trip and the Peran.
 

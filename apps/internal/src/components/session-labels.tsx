@@ -1,6 +1,6 @@
 import { formatTripDates } from "-/lib/perjadin-name";
 import {
-  formatWallClockTime,
+  formatDottedTime,
   type SessionMode,
   type SessionStatus,
   type TimeZone,
@@ -62,7 +62,7 @@ type SesiParts = {
  * Sesi, and reads "Dibatalkan" in its place.
  */
 function sesiLabel({ sesi, mode, heldOn, startsAt, timeZone }: SesiParts): string {
-  const time = `${formatWallClockTime(startsAt).replace(":", ".")} ${timeZone}`;
+  const time = `${formatDottedTime(startsAt)} ${timeZone}`;
   return [
     sesi === null ? "Dibatalkan" : `Sesi ${sesi}`,
     MODE_LABELS[mode],

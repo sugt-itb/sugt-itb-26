@@ -107,6 +107,7 @@ export {
   type ParticipantFeedbackAverages,
   type ParticipantFeedbackRow,
   type ParticipantFeedbackScope,
+  type PerjadinFeedbackAverages,
   type PerjadinFeedbackCursor,
   type PerjadinFeedbackFilters,
   type PerjadinFeedbackRow,

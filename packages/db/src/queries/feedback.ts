@@ -140,7 +140,8 @@ const sessionTimeZoneExpr = sql<TimeZone>`case when ${session.mode} = 'online' t
 /**
  * **Each of `schoolIds`' live Sessions' Sesi** (ADR-0027), by Session id: the School's date rank
  * within its mode, over **all** its live Sessions of that mode, by `rankBySchool` — the one ranking,
- * so a Session carries the number `/sesi/[id]` shows. A cancelled Session has none.
+ * so a Session carries the number the `/monitoring` matrix and the planning note give it. A cancelled
+ * Session has none.
  */
 async function sesiNumbers(schoolIds: string[]): Promise<Map<string, number>> {
   const numbers = new Map<string, number>();
@@ -184,7 +185,7 @@ export type ParticipantFeedbackRow = {
   /** The Session the feedback was filed against — the origin the card links through to (#194). */
   sessionId: string;
   sessionMode: SessionMode;
-  /** The Session's Sesi (ADR-0027), as `/sesi/[id]` numbers it; `null` once it is cancelled. */
+  /** The Session's Sesi (ADR-0027, `rankBySchool`); `null` once it is cancelled. */
   sesi: number | null;
   /** The Session's date as `YYYY-MM-DD`; a `date` column, so already a string. */
   heldOn: string;
@@ -554,6 +555,14 @@ export async function perjadinFeedbackPage(
   return { rows, nextCursor: null };
 }
 
+/** The Perjadin tab's four summary averages. */
+export type PerjadinFeedbackAverages = {
+  lodging: number;
+  transport: number;
+  meals: number;
+  punctuality: number;
+};
+
 /**
  * **The four Perjadin summary averages, over the tab's scope and never its score filters** (#466),
  * as the Peserta tab's are: programme-wide with no trip or Peran picked, narrowed to them once one
@@ -566,7 +575,7 @@ export async function perjadinFeedbackPage(
 export async function perjadinFeedbackAverages(
   _caller: Person,
   scope: PerjadinFeedbackScope,
-): Promise<{ lodging: number; transport: number; meals: number; punctuality: number }> {
+): Promise<PerjadinFeedbackAverages> {
   const [row] = await db
     .select({
       lodging: sql<number>`coalesce(avg(${perjadinEvaluation.lodging}), 0)`.mapWith(Number),

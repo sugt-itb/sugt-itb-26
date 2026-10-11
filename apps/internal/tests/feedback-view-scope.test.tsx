@@ -1,6 +1,11 @@
+import { participantScopeLabel, perjadinScopeLabel, withSchool } from "-/components/feedback-scope";
 import { FeedbackView } from "-/components/feedback-view";
 import { sesiLabel, sesiShortLabel } from "-/components/session-labels";
-import type { FeedbackSchoolOption, ParticipantFeedbackRow } from "@sugt/db/queries";
+import type {
+  FeedbackPerjadinOption,
+  FeedbackSchoolOption,
+  ParticipantFeedbackRow,
+} from "@sugt/db/queries";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -133,5 +138,43 @@ describe("the Peserta tab's scope", () => {
 
     expect(html).toContain("Nilai rata-rata · Narasumber</div>");
     expect(html).not.toContain("Nilai rata-rata · Narasumber · ");
+  });
+});
+
+describe("the scope's rules", () => {
+  it("resets the Session whenever the School changes or is cleared", () => {
+    expect(withSchool("samarinda")).toEqual({ schoolId: "samarinda", sessionId: null });
+    expect(withSchool(null)).toEqual({ schoolId: null, sessionId: null });
+  });
+
+  it("titles the Peserta averages by School, then Session, and programme-wide with neither", () => {
+    expect(participantScopeLabel(schools, { schoolId: null, sessionId: null })).toBeNull();
+    expect(participantScopeLabel(schools, { schoolId: "bontang", sessionId: null })).toBe(
+      "SMAN 1 Bontang",
+    );
+    expect(participantScopeLabel(schools, { schoolId: "bontang", sessionId: "sesi-1" })).toBe(
+      "SMAN 1 Bontang · Sesi 1 Luring",
+    );
+  });
+
+  it("titles the Perjadin averages by trip, then Peran, and programme-wide with neither", () => {
+    const trips: FeedbackPerjadinOption[] = [
+      {
+        id: "k10",
+        subClusterName: "Kelompok 10",
+        startsOn: "2026-10-12",
+        endsOn: "2026-10-13",
+        schoolNames: ["SMAN 1 Bontang"],
+      },
+    ];
+
+    expect(perjadinScopeLabel(trips, { perjadinId: null, role: null })).toBeNull();
+    expect(perjadinScopeLabel(trips, { perjadinId: "k10", role: null })).toBe(
+      "Kelompok 10 · 12–13 Okt 2026",
+    );
+    expect(perjadinScopeLabel(trips, { perjadinId: "k10", role: "Narasumber" })).toBe(
+      "Kelompok 10 · 12–13 Okt 2026 · Narasumber",
+    );
+    expect(perjadinScopeLabel(trips, { perjadinId: null, role: "Pimpinan" })).toBe("Pimpinan");
   });
 });

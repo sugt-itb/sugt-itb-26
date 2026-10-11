@@ -12,6 +12,7 @@ import {
   type ParticipantFeedbackAverages,
   type ParticipantFeedbackRow,
   type ParticipantFeedbackScope,
+  type PerjadinFeedbackAverages,
   type PerjadinFeedbackCursor,
   type PerjadinFeedbackFilters,
   type PerjadinFeedbackRow,
@@ -77,7 +78,7 @@ export async function loadPerjadinFeedback(
 /** **The Perjadin averages for a new scope** (#466), the twin of `loadParticipantFeedbackAverages`. */
 export async function loadPerjadinFeedbackAverages(
   scope: PerjadinFeedbackScope,
-): Promise<{ lodging: number; transport: number; meals: number; punctuality: number }> {
+): Promise<PerjadinFeedbackAverages> {
   const person = await requirePerson();
   return perjadinFeedbackAverages(person, scope);
 }
