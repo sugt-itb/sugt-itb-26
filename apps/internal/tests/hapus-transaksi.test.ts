@@ -355,6 +355,45 @@ describe("Hapus transaksi", () => {
     await expect(deletions()).resolves.toMatchObject([{ details: { receiptCount: 2 } }]);
   });
 
+  it("reads what the line holds under its lock, so a receipt committed while it waited is answered", async () => {
+    const { staff, trip, transactionId } = await scene({ receipts: 1 });
+    const [late] = await upload(drive, trip.id, [jpeg()], { transactionId });
+    // An Unggah bukti holding the line's lock, as `attachTransactionEvidence` does, commits its
+    // receipt while the delete waits on that lock.
+    let locked!: () => void;
+    const isLocked = new Promise<void>((resolve) => (locked = resolve));
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    const attach = db.transaction(async (tx) => {
+      await tx
+        .select({ id: schema.transaction.id })
+        .from(schema.transaction)
+        .where(eq(schema.transaction.id, transactionId))
+        .for("update");
+      locked();
+      await released;
+      await tx.insert(schema.transactionEvidence).values({
+        transactionId,
+        driveFileId: late!,
+        contentType: "image/jpeg",
+        byteSize: 4096,
+        uploadedByPersonId: staff.id,
+      });
+    });
+    await isLocked;
+
+    const deleting = real.deleteTransaction(staff as Person, transactionId);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    release();
+    await attach;
+
+    await expect(deleting).resolves.toMatchObject({
+      outcome: "deleted",
+      driveFileIds: expect.arrayContaining([late]),
+    });
+    await expect(deletions()).resolves.toMatchObject([{ details: { receiptCount: 2 } }]);
+  });
+
   it("trashes a folder a reconcile claimed between its read and the commit", async () => {
     // A line from before Drive, with no folder: a reconcile claims one after this Hapus read it.
     const { staff, trip } = await scene();
@@ -627,6 +666,8 @@ describe("on the Laporan", () => {
     const html = await render(staff as Person, trip.id);
     const hapus = html.match(/<button[^>]*aria-label="Hapus transaksi 2026-10-13[^"]*"[^>]*>/)?.[0];
     expect(hapus).toContain("disabled");
+    // On the button itself, as well as once beside Catat transaksi.
+    expect(hapus).toMatch(reason);
     expect(html).toMatch(reason);
   });
 });

@@ -97,7 +97,7 @@ and the process lets a PIC strike out a wrong entry.
   final mark. A receipt moved into a trashed folder is trashed with it. Once the line is gone, the
   sweep's `unsyncedTransactions` no longer lists it.
 - **The line's past Log entries stay.** `/log` left-joins `transaction` for the **Buka folder** link
-  of `transaction_recorded` and `evidence_uploaded`. Once the row is gone those entries render
+  of every entry that names the line's `transactionId`. Once the row is gone those entries render
   without it, as Dokumen and Foto & Video entries do once theirs are.
 
 ## Consequences

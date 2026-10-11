@@ -1800,7 +1800,7 @@ not land, so that receipt stays owed rather than stranded under a line that clai
 **A deleted line leaves only trashed items behind.** Its folder and receipts are in the Drive trash,
 and nothing in the database points at them. A reconcile that was running when it went never
 recreates the trashed folder. One that made the folder itself finds no row to claim it on
-(`claimTransactionDriveFolder` answers `null`) and trashes it again, and the sweep no longer lists
+(`claimTransactionDriveFolder` answers `null`) and trashes it, and the sweep no longer lists
 the line.
 
 **A Perjadin's folder names are app-owned, and re-asserted.** Both of a trip's folders are named

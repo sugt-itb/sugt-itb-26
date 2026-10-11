@@ -62,8 +62,7 @@ import type {
  * guard itself, first, through `staffOnTrip`
  * (`-/lib/drive/upload-guard`), because Google is reached before any query runs; deleting a receipt
  * or a line runs `receiptDeleteTarget` or `transactionDeleteTarget` first for the same reason. Every
- * refusal
- * comes back as a value.
+ * refusal comes back as a value.
  */
 
 /**
@@ -456,14 +455,14 @@ export async function deleteTransactionAction(
   const result = await staffSurface(() => deleteTransaction(person, transactionId));
   if (result.outcome === "no-such-transaction") return staleTransaction();
 
-  const late: TransactionDriveItems = {
+  const joinedMeanwhile: TransactionDriveItems = {
     driveFolderId: result.driveFolderId === target.driveFolderId ? null : result.driveFolderId,
     driveFileIds: result.driveFileIds.filter((id) => !target.driveFileIds.includes(id)),
   };
-  await trashLine(drive, late).catch((error: unknown) => {
+  await trashLine(drive, joinedMeanwhile).catch((error: unknown) => {
     console.error(
       `Transaction ${transactionId} is deleted, but what joined it meanwhile is not all in the ` +
-        `trash: folder ${late.driveFolderId ?? "none"}, receipts ${late.driveFileIds.join(", ") || "none"}.`,
+        `trash: folder ${joinedMeanwhile.driveFolderId ?? "none"}, receipts ${joinedMeanwhile.driveFileIds.join(", ") || "none"}.`,
       error,
     );
   });
