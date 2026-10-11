@@ -65,7 +65,7 @@ list below exists so nobody later "completes" the schema by adding the rest.
 | Perjadin Report                                              | Not a table. It is the acquittal state on `perjadin` — see [Money](#money).                                                                                |
 | Participant                                                  | Not a table. Nobody enrols Participants; one exists in the records only as a name they typed on their own feedback.                                        |
 | Project Team, Final Project                                  | Not stored at all. [ADR-0009](./adr/0009-the-tool-tracks-delivery-not-outcomes.md) is explicit; they reach the public as curated pieces, never as records. |
-| Advance                                                      | Not tracked (ADR-0051). `perjadin.advance_idr` stays, unread and unwritten, until #465 drops it.                                                           |
+| Advance                                                      | Not stored (ADR-0051). Its column was dropped in migration 0050 (#465).                                                                                    |
 | Uang Perjalanan Terpakai                                     | Not a column. The sum of a Perjadin's transactions, all categories, derived on every read.                                                                 |
 | Report deadline                                              | Not a column. Two days after the Group returns, derived from `perjadin.ends_on` and a constant.                                                            |
 | Aspect                                                       | Not a table and not a value. Every Aspect on all four evaluations is a **column**; `@sugt/domain` names each rubric.                                       |
@@ -1211,19 +1211,14 @@ create table perjadin (
   starts_on                   date not null,
   ends_on                     date not null,
 
-  advance_idr                 bigint check (advance_idr >= 0),
-
   pic_person_id               uuid not null,
   pic_role                    text not null default 'Staff' check (pic_role = 'Staff'),
 
-  returned_to_treasurer_idr   bigint,
-  returned_at                 timestamptz,
   report_filed_at             timestamptz,
   drive_folder_id             text,
   created_at                  timestamptz not null default now(),
 
   check (ends_on >= starts_on),
-  check ((returned_at is null) = (returned_to_treasurer_idr is null)),
 
   foreign key (pic_person_id, pic_role) references person (id, role)
 );
@@ -1259,11 +1254,12 @@ alter table perjadin
   deferrable initially deferred;
 ```
 
-**`advance_idr`, `returned_to_treasurer_idr` and `returned_at` are unused** (ADR-0051, #464). The
-Advance is not tracked: no app code reads or writes the three columns, and the rows keep whatever
-they held. They stay, with `perjadin_advance_check` and `perjadin_returned_check`, until
-[#465](https://github.com/sugt-itb/sugt-itb-26/issues/465) drops them once the app that stopped using
-them has shipped.
+**There is no Advance column.** The Advance is not tracked
+([ADR-0051](./adr/0051-the-advance-is-not-tracked.md)): #464 stopped the app reading or writing
+`advance_idr`, `returned_to_treasurer_idr` and `returned_at`, and migration 0050
+([#465](https://github.com/sugt-itb/sugt-itb-26/issues/465)) dropped the three with their two CHECKs.
+Any amounts they held went with them; the Activity Log's `advance_set` / `advance_changed` entries
+keep the history.
 
 **There is no `report_deadline` column.** The Report is due two days after the Group gets back,
 always, so the deadline is `ends_on + REPORT_DEADLINE_DAYS_AFTER_RETURN` and nothing stores it.
@@ -1856,7 +1852,7 @@ Administrator on `/log`. The `action` values are character for character `ACTIVI
 `packages/domain/src/index.ts`. The two `document_*` values went into the CHECK with the rest, so the
 Dokumen uploads and Hapus needed no CHECK migration. The `footage_*` pair widened it in migration
 0044, and the two money deletes, `evidence_deleted` and `transaction_deleted` (ADR-0050), in
-migration 0049 — one migration for both, though only Hapus bukti writes yet.
+migration 0049 — one migration for both.
 
 **Each entry is written in the same database transaction as the change it records**, so a refused
 or failed write logs nothing. The money writes log as below, each through `logActivity` in

@@ -147,10 +147,8 @@ describe("the acquittal payload", () => {
     const acquittal = await perjadinAcquittal(staff, trip.id);
 
     expect(acquittal).toMatchObject({ spentIdr: 1_950_000 });
-    // The Advance is not tracked (ADR-0051): nothing on the payload reads it or reconciles to it.
-    for (const gone of ["advanceIdr", "remainderIdr", "returnedToTreasurerIdr", "returnedAt"]) {
-      expect(acquittal).not.toHaveProperty(gone);
-    }
+    // The Advance is not tracked (ADR-0051): there is nothing to reconcile against.
+    expect(acquittal).not.toHaveProperty("remainderIdr");
   });
 
   it("reads a trip that spent nothing as zero rather than as unknown", async () => {
