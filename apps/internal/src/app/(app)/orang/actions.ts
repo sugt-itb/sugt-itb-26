@@ -16,12 +16,14 @@ import type { Grant } from "@sugt/domain";
 import { revalidatePath } from "next/cache";
 
 /**
- * **Orang's two writes** — add a Person and revoke one. Both Staff-only, both the same three
- * lines: resolve the Person, hand it to `@sugt/db` through `staffSurface`, return what came back.
+ * **Orang's two writes** — add a Person and revoke one. Both an Administrator's (#470), both the
+ * same three lines: resolve the Person, hand it to `@sugt/db` through `staffSurface`, return what
+ * came back.
  *
- * `staffSurface` turns a Teaching Team caller's `NotStaffError` into a 403 rather than a crash —
- * the enforcement is `requireStaff` inside each write, because a layout does not run before a
- * Server Action. Every other refusal is a value the form places on a field.
+ * `staffSurface` turns a non-Administrator's `NotGrantedError`, or a Pimpinan's `NotStaffError`, into
+ * a 403 rather than a crash — the enforcement is `requireStaff` and `requireGrant` inside each write,
+ * because a layout does not run before a Server Action. Every other refusal is a value the form
+ * places on a field, `self` included.
  *
  * `revalidatePath` clears the client router cache for the roster the user is looking at, on the
  * outcome that changed it.

@@ -10,7 +10,6 @@ import type { RosterEntry } from "@sugt/db/queries";
 import { type Grant, GRANTS, GRANT_LABELS, type Role, ROLES, ROLE_LABELS } from "@sugt/domain";
 import { Badge } from "@sugt/ui/components/badge";
 import { Button } from "@sugt/ui/components/button";
-import { Checkbox } from "@sugt/ui/components/checkbox";
 import { Input } from "@sugt/ui/components/input";
 import {
   Select,
@@ -28,28 +27,32 @@ import {
   TableRow,
 } from "@sugt/ui/components/table";
 import { Lock } from "lucide-react";
-import { useId, useMemo, useOptimistic, useState, useTransition } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
+
+import { MultiSelectCombobox } from "./multi-select-combobox";
 
 /**
  * **Orang** — the roster and the invite list, a dense table scanned for a name.
  *
- * The add form and the revoke controls render only for Staff (`canWrite`); hiding them is a
- * courtesy, and `requireStaff` inside each write is the enforcement. Revoked rows sit behind a
- * foot toggle — they exist because correcting a role is revoke-and-re-add, which leaves the old
- * row beside the new one sharing an email.
+ * **Everything that writes here is an Administrator's** (`canAdminister`; #470, ADR-0028): the add
+ * form, Nonaktifkan, and the **Akses** column's Grant picker. Hiding them is a courtesy;
+ * `requireGrant("Administrator")` inside each write is the enforcement. Everyone signed in still
+ * reads the roster, since a Group is assembled from it. Revoked rows sit behind a foot toggle — they
+ * exist because correcting a role is revoke-and-re-add, which leaves the old row beside the new one
+ * sharing an email.
  *
- * The **Akses** column and its Grant toggles render only for an Administrator (`canManageGrants`,
- * ADR-0028) — the same courtesy, with `requireGrant("Administrator")` inside each assign/revoke as
- * the enforcement. An Administrator is always Staff, so `canManageGrants` implies `canWrite`.
+ * **An Administrator never locks themselves out** (#470): their own row offers no Nonaktifkan, and
+ * their own Administrator chip cannot be removed. Both writes refuse it server-side too.
  */
 function OrangRoster({
   people,
-  canWrite,
-  canManageGrants,
+  viewerId,
+  canAdminister,
 }: {
   people: RosterEntry[];
-  canWrite: boolean;
-  canManageGrants: boolean;
+  /** The signed-in Person, whose own row offers no lockout. */
+  viewerId: string;
+  canAdminister: boolean;
 }) {
   const [showRevoked, setShowRevoked] = useState(false);
   const [query, setQuery] = useState("");
@@ -84,7 +87,7 @@ function OrangRoster({
 
   return (
     <div className="flex min-h-full flex-col p-4 sm:p-7">
-      {canWrite && <AddPersonForm />}
+      {canAdminister && <AddPersonForm />}
 
       {/* The roster search, distinct from the add-person form above — this one filters the table,
           it does not create anyone. */}
@@ -116,8 +119,8 @@ function OrangRoster({
                 <TableHead>Email</TableHead>
                 <TableHead>Peran</TableHead>
                 <TableHead>Status</TableHead>
-                {canManageGrants && <TableHead>Akses</TableHead>}
-                {canWrite && <TableHead className="text-right">Tindakan</TableHead>}
+                {canAdminister && <TableHead>Akses</TableHead>}
+                {canAdminister && <TableHead className="text-right">Tindakan</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -125,8 +128,8 @@ function OrangRoster({
                 <PersonRow
                   key={entry.id}
                   entry={entry}
-                  canWrite={canWrite}
-                  canManageGrants={canManageGrants}
+                  isViewer={entry.id === viewerId}
+                  canAdminister={canAdminister}
                 />
               ))}
 
@@ -135,8 +138,8 @@ function OrangRoster({
                   <PersonRow
                     key={entry.id}
                     entry={entry}
-                    canWrite={canWrite}
-                    canManageGrants={canManageGrants}
+                    isViewer={entry.id === viewerId}
+                    canAdminister={canAdminister}
                   />
                 ))}
             </TableBody>
@@ -162,18 +165,18 @@ function OrangRoster({
 }
 
 /**
- * One row. `canWrite` is whether the viewer is Staff — it decides whether the actions column
- * exists at all, so every row a Staff member sees keeps the column count of the header. The
- * revoke button inside it shows only on an active row: a revoked one is already off.
+ * One row. `canAdminister` decides whether the Akses and actions columns exist at all, so every row
+ * keeps the header's column count. Nonaktifkan shows only on an active row — a revoked one is
+ * already off — and never on the viewer's own (`isViewer`).
  */
 function PersonRow({
   entry,
-  canWrite,
-  canManageGrants,
+  isViewer,
+  canAdminister,
 }: {
   entry: RosterEntry;
-  canWrite: boolean;
-  canManageGrants: boolean;
+  isViewer: boolean;
+  canAdminister: boolean;
 }) {
   return (
     <TableRow className={entry.active ? undefined : "text-muted-foreground"}>
@@ -206,27 +209,29 @@ function PersonRow({
       <TableCell>
         <StateBadge entry={entry} />
       </TableCell>
-      {canManageGrants && (
+      {canAdminister && (
         <TableCell>
           {/*
-            Grants are Staff-only, so only an active Staff row offers toggles; a Pimpinan or a
+            Grants are Staff-only, so only an active Staff row offers the picker; a Pimpinan or a
             revoked row shows a dash. The assign/revoke writes still enforce this server-side —
-            `assignGrant` refuses a non-Staff target — so hiding the toggles is the courtesy and the
+            `assignGrant` refuses a non-Staff target — so hiding the picker is the courtesy and the
             write is the gate, the same split the roster's other controls follow.
           */}
           {entry.active && entry.role === "Staff" ? (
-            <GrantToggles
+            <GrantPicker
               personId={entry.id}
+              personName={entry.fullName}
               grants={entry.grants}
+              isViewer={isViewer}
             />
           ) : (
             <span className="text-xs text-muted-foreground">—</span>
           )}
         </TableCell>
       )}
-      {canWrite && (
+      {canAdminister && (
         <TableCell className="text-right">
-          {entry.active && <RevokeButton personId={entry.id} />}
+          {entry.active && !isViewer && <RevokeButton personId={entry.id} />}
         </TableCell>
       )}
     </TableRow>
@@ -234,59 +239,75 @@ function PersonRow({
 }
 
 /**
- * The per-Grant toggles on one Staff row — a checkbox per `GRANTS` value, checked when the Person
- * holds it (ADR-0028). Toggling assigns or revokes through the Server Action; the optimistic list
- * flips the box immediately and the action's `revalidatePath("/orang")` re-reads the roster, so
- * `useOptimistic` falls back to the true state — the same shape as the Preparation checklist.
- *
- * Only an Administrator ever sees this (the column is gated), and `requireGrant("Administrator")`
- * inside each write is the real enforcement: a non-Administrator who calls the action directly is
- * refused with a 403. `Administrator` implies every other Grant, so a Person holding Administrator
- * shows only the Administrator box ticked — the implication is a guard rule, not a stored row.
+ * What each Grant gates, as one line under its name in the picker (#470). Indonesian copy, so it
+ * lives here beside the picker rather than in `@sugt/domain`, which keeps the stored values.
  */
-function GrantToggles({ personId, grants }: { personId: string; grants: Grant[] }) {
-  const fields = useId();
-  const [held, setHeld] = useOptimistic(
-    grants,
-    (state, patch: { grant: Grant; granted: boolean }) =>
-      patch.granted ? [...state, patch.grant] : state.filter((grant) => grant !== patch.grant),
-  );
-  const [, startToggle] = useTransition();
+const GRANT_DESCRIPTIONS: Record<Grant, string> = {
+  Administrator: "semua akses",
+  Keuangan: "belum ada fitur",
+  "Perjadin Editor": "merencanakan dan menulis setiap Perjadin",
+  "Daring Editor": "Sesi daring dan Pretest",
+  "Dashboard Editor": "termasuk Dashboard Viewer",
+  "Dashboard Viewer": "membaca Dashboard",
+};
 
-  function toggle(grant: Grant, granted: boolean) {
-    startToggle(async () => {
-      // Inside the transition so the flip and the pending state are one update, then the action —
-      // its `revalidatePath` re-reads the real grants and `useOptimistic` falls back to them.
-      setHeld({ grant, granted });
-      await (granted ? assignGrantAction(personId, grant) : revokeGrantAction(personId, grant));
+const GRANT_OPTIONS = GRANTS.map((grant) => ({
+  value: grant,
+  label: GRANT_LABELS[grant],
+  description: GRANT_DESCRIPTIONS[grant],
+}));
+
+/**
+ * The Grants on one Staff row, as removable chips (#470, ADR-0028). Each add or remove assigns or
+ * revokes at once through the Server Action; the optimistic list moves the chip immediately and the
+ * action's `revalidatePath("/orang")` re-reads the roster, so `useOptimistic` falls back to the true
+ * state — the same shape as the Preparation checklist.
+ *
+ * Only the Grants stored on the row are chips: an implied one is a guard rule, not a row, so choosing
+ * Dashboard Editor shows Dashboard Editor alone. **The viewer's own Administrator chip is locked**,
+ * and `revokeGrant` refuses that revoke server-side as `own-administrator`.
+ */
+function GrantPicker({
+  personId,
+  personName,
+  grants,
+  isViewer,
+}: {
+  personId: string;
+  personName: string;
+  grants: Grant[];
+  isViewer: boolean;
+}) {
+  const [held, setHeld] = useOptimistic(grants, (_state, next: Grant[]) => next);
+  const [, startSaving] = useTransition();
+
+  function change(next: Grant[]) {
+    const added = next.filter((grant) => !held.includes(grant));
+    const removed = held.filter((grant) => !next.includes(grant));
+    startSaving(async () => {
+      // Inside the transition so the chips and the pending state are one update, then the actions —
+      // their `revalidatePath` re-reads the real grants and `useOptimistic` falls back to them.
+      setHeld(next);
+      await Promise.all([
+        ...added.map((grant) => assignGrantAction(personId, grant)),
+        ...removed.map((grant) => revokeGrantAction(personId, grant)),
+      ]);
     });
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      {GRANTS.map((grant) => {
-        const id = `${fields}-${grant}`;
-        return (
-          <div
-            key={grant}
-            className="flex items-center gap-2 text-sm"
-          >
-            <Checkbox
-              id={id}
-              checked={held.includes(grant)}
-              onCheckedChange={(checked) => {
-                toggle(grant, checked === true);
-              }}
-            />
-            <label
-              htmlFor={id}
-              className="cursor-pointer"
-            >
-              {GRANT_LABELS[grant]}
-            </label>
-          </div>
-        );
-      })}
+    <div className="min-w-56">
+      <MultiSelectCombobox
+        aria-label={`Akses ${personName}`}
+        placeholder="Tambah akses"
+        emptyLabel="Tidak ada akses yang cocok."
+        options={GRANT_OPTIONS}
+        value={held}
+        locked={isViewer ? ["Administrator"] : []}
+        onValueChange={(next) => {
+          change(next as Grant[]);
+        }}
+      />
     </div>
   );
 }
@@ -300,8 +321,9 @@ function StateBadge({ entry }: { entry: RosterEntry }) {
 
 /**
  * Revoking is one write. `no-such-person` means somebody else already revoked this row while the
- * page was open — the ordinary case for a roster two Staff scan at once — so it earns a message
- * rather than a silent no-op, because nothing revalidates and the row would otherwise not move.
+ * page was open — the ordinary case for a roster two Administrators scan at once — so it earns a
+ * message rather than a silent no-op, because nothing revalidates and the row would otherwise not
+ * move. The viewer's own row never shows this button, so `self` (#470) is never reached from here.
  */
 function RevokeButton({ personId }: { personId: string }) {
   const [saving, startSaving] = useTransition();
@@ -340,7 +362,7 @@ function RevokeButton({ personId }: { personId: string }) {
  * `Teaching Team` Person role was retired and Staff stood alone; `Pimpinan` — a signed-in, read-only
  * role — is the second role a Person may hold, so an invite chooses which. The options iterate
  * `ROLES` and are labelled through `ROLE_LABELS`, so the picker cannot drift from the role set. The
- * gating above is unchanged: only Staff manage the roster, and a Pimpinan added here manages nobody.
+ * form is an Administrator's (#470), and a Pimpinan added here manages nobody.
  */
 function AddPersonForm() {
   const [fullName, setFullName] = useState("");

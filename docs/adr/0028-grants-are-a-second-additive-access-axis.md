@@ -130,3 +130,11 @@ The Grant set is now six — Administrator, Keuangan, Perjadin Editor, Daring Ed
 and Dashboard Viewer ([ADR-0052](./0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md), #469). **Editor** is retired: its reach is split between Perjadin, Daring
 and Dashboard Editor, and the migration gave every Editor all three. **No Grant implies another**,
 except that Administrator still implies every Grant and Dashboard Editor implies Dashboard Viewer.
+
+## Amendment (2026-10-12): an Administrator cannot lock themselves out
+
+An Administrator **cannot revoke their own Administrator Grant** (`revokeGrant` answers
+`own-administrator`; `/orang` locks the chip) **nor deactivate themselves**
+([#470](https://github.com/sugt-itb/sugt-itb-26/issues/470)). Together they guarantee that there is
+always an Administrator who can sign in and grant the Grant again — the bootstrap above is needed only
+once. On `/orang` the Grants are now a searchable multi-select with chips, not checkboxes.
