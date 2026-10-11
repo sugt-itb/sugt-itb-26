@@ -1,25 +1,39 @@
 "use client";
 
-import { loadParticipantFeedback, loadPerjadinFeedback } from "-/app/(app)/feedback/actions";
-import { MODE_LABELS } from "-/components/session-labels";
+import {
+  loadParticipantFeedback,
+  loadParticipantFeedbackAverages,
+  loadPerjadinFeedback,
+  loadPerjadinFeedbackAverages,
+} from "-/app/(app)/feedback/actions";
+import { sesiLabel, sesiShortLabel } from "-/components/session-labels";
+import { SingleSelectCombobox } from "-/components/single-select-combobox";
 import {
   PARTICIPANT_ASPECT_LABELS,
   PARTICIPANT_CLASS_LABELS,
   PARTICIPANT_WRITTEN_QUESTIONS,
 } from "-/lib/participant-feedback-copy";
-import { perjadinName } from "-/lib/perjadin-name";
+import { perjadinName, perjadinSchoolsLine } from "-/lib/perjadin-name";
 import type {
   FeedbackCursor,
   FeedbackFilters,
   FeedbackFilterValue,
+  FeedbackPerjadinOption,
+  FeedbackSchoolOption,
   FeedbackSort,
   ParticipantFeedbackAverages,
   ParticipantFeedbackRow,
+  ParticipantFeedbackScope,
   PerjadinFeedbackCursor,
   PerjadinFeedbackFilters,
   PerjadinFeedbackRow,
+  PerjadinFeedbackScope,
 } from "@sugt/db/queries";
-import { formatSessionStartTime, PARTICIPANT_FEEDBACK_ASPECTS_BY_CLASS } from "@sugt/domain";
+import {
+  PARTICIPANT_FEEDBACK_ASPECTS_BY_CLASS,
+  PERJADIN_EVALUATION_ROLES,
+  type PerjadinEvaluationRole,
+} from "@sugt/domain";
 import { Badge } from "@sugt/ui/components/badge";
 import { Button } from "@sugt/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@sugt/ui/components/card";
@@ -32,17 +46,18 @@ import {
 } from "@sugt/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@sugt/ui/components/tabs";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 /**
  * **The Feedback screen.** Two tabs — Peserta (what Participants said about a Session) and Perjadin
- * (what a filer said about a trip) — each with summary cards that never move, server-side filters,
- * two sort dropdowns (average, then date), and an OFFSET-paged card list driven from its own Server
- * Action. The list is sorted lowest-average-first by default, so the rows that need attention rise.
+ * (what a filer said about a trip) — each with summary cards, a scope (#466: Sekolah and Sesi, or
+ * Perjadin and Peran pengisi), server-side score filters, two sort dropdowns (average, then date),
+ * and an OFFSET-paged card list driven from its own Server Action. The list is sorted
+ * lowest-average-first by default, so the rows that need attention rise.
  *
- * **The averages are props and stay props.** They are dataset-wide and unfiltered by design, so
- * nothing here recomputes them when the filters narrow the list; the cards read the overall standing
- * while the list below reads a slice of it.
+ * **The averages follow the scope, never the score filters.** A scope change refetches them with the
+ * list, and each card's title names what it covers; a score filter leaves them alone, since averaging
+ * only the low rows would read as the standing and mislead.
  *
  * **Filtering, sorting and paging are the server's, not the browser's.** The set is unbounded — a
  * submission per Participant, an evaluation per filer — so the filters, the sort and "load more" all
@@ -50,7 +65,7 @@ import { useState, useTransition } from "react";
  * the list, resetting paging; "load more" carries the current sort and the cursor (an OFFSET) and
  * APPENDS the next page.
  *
- * **Switching tabs resets filters, sort and pagination to defaults.** Each tab is its own child
+ * **Switching tabs resets scope, filters, sort and pagination to defaults.** Each tab is its own child
  * component, seeded from the server's initial page and averages; only the active one is mounted, so
  * switching away unmounts it and switching back mounts it fresh — the target tab always shows its
  * first page with all filters at `all` and the default sort, and no round trip is needed because the
@@ -101,6 +116,21 @@ const SCORE_SORT_OPTIONS: Record<FeedbackSort["score"], string> = {
 const DATE_SORT_OPTIONS: Record<FeedbackSort["date"], string> = {
   desc: "Terbaru",
   asc: "Terlama",
+};
+
+/** Every School, every Session — the Peserta tab's starting scope, mirroring the server's. */
+const ALL_SCHOOLS: ParticipantFeedbackScope = { schoolId: null, sessionId: null };
+
+/** Every trip, every Peran — the Perjadin tab's starting scope, mirroring the server's. */
+const ALL_TRIPS: PerjadinFeedbackScope = { perjadinId: null, role: null };
+
+/** The Sesi and Peran selects' "everything" option — a plain `Select` needs a value for it. */
+const ALL = "semua";
+
+/** The Peran pengisi select: Semua Peran, then the three self-declared roles as stored. */
+const ROLE_OPTIONS: Record<string, string> = {
+  [ALL]: "Semua Peran",
+  ...Object.fromEntries(PERJADIN_EVALUATION_ROLES.map((role) => [role, role])),
 };
 
 /** One filter's three options, in Indonesian. `label` prefixes name the column the filter gates. */
@@ -154,16 +184,22 @@ function FeedbackView({
   participantInitialRows,
   participantInitialCursor,
   participantAverages,
+  participantSchools,
   perjadinInitialRows,
   perjadinInitialCursor,
   perjadinAverages,
+  perjadinTrips,
 }: {
   participantInitialRows: ParticipantFeedbackRow[];
   participantInitialCursor: FeedbackCursor | null;
   participantAverages: ParticipantFeedbackAverages;
+  /** The Sekolah and Sesi pickers' options: the Schools and Sessions with responses (#466). */
+  participantSchools: FeedbackSchoolOption[];
   perjadinInitialRows: PerjadinFeedbackRow[];
   perjadinInitialCursor: PerjadinFeedbackCursor | null;
-  perjadinAverages: { lodging: number; transport: number; meals: number; punctuality: number };
+  perjadinAverages: PerjadinAverages;
+  /** The Perjadin picker's options: the trips with evaluations (#466). */
+  perjadinTrips: FeedbackPerjadinOption[];
 }) {
   const [tab, setTab] = useState<Tab>("peserta");
 
@@ -188,47 +224,87 @@ function FeedbackView({
         <ParticipantTab
           initialRows={participantInitialRows}
           initialCursor={participantInitialCursor}
-          averages={participantAverages}
+          initialAverages={participantAverages}
+          schools={participantSchools}
         />
       ) : (
         <PerjadinTab
           initialRows={perjadinInitialRows}
           initialCursor={perjadinInitialCursor}
-          averages={perjadinAverages}
+          initialAverages={perjadinAverages}
+          trips={perjadinTrips}
         />
       )}
     </div>
   );
 }
 
+/** The Perjadin tab's four averages. */
+type PerjadinAverages = { lodging: number; transport: number; meals: number; punctuality: number };
+
 /**
- * The Peserta tab: four summary cards, five server-side filters, two sort dropdowns, and an
- * OFFSET-paged card list.
+ * The Peserta tab: four summary cards, the Sekolah and Sesi pickers, five server-side filters, two
+ * sort dropdowns, and an OFFSET-paged card list.
  *
- * A filter or sort change refetches the first page (cursor `null`) and REPLACES the list; "load
- * more" carries the current filters, sort and cursor and APPENDS what comes back. The pending state
- * covers each round trip so a second change cannot race the first.
+ * A scope, filter or sort change refetches the first page (cursor `null`) and REPLACES the list; a
+ * scope change refetches the averages with it. "Load more" carries the current scope, filters, sort
+ * and cursor and APPENDS what comes back. The pending state covers each round trip so a second change
+ * cannot race the first.
  */
 function ParticipantTab({
   initialRows,
   initialCursor,
-  averages,
+  initialAverages,
+  schools,
 }: {
   initialRows: ParticipantFeedbackRow[];
   initialCursor: FeedbackCursor | null;
-  averages: ParticipantFeedbackAverages;
+  initialAverages: ParticipantFeedbackAverages;
+  schools: FeedbackSchoolOption[];
 }) {
   const [rows, setRows] = useState(initialRows);
   const [cursor, setCursor] = useState(initialCursor);
+  const [scope, setScope] = useState<ParticipantFeedbackScope>(ALL_SCHOOLS);
+  // The averages and the scope they were read for travel together, so a card's title never names a
+  // scope its number is not yet over.
+  const [averages, setAverages] = useState({ values: initialAverages, scope: ALL_SCHOOLS });
   const [filters, setFilters] = useState<FeedbackFilters>(ALL_FILTERS);
   const [sort, setSort] = useState<FeedbackSort>(DEFAULT_SORT);
   const [pending, startTransition] = useTransition();
+
+  const school = schools.find((option) => option.id === scope.schoolId) ?? null;
+  const schoolOptions = useMemo(
+    () =>
+      schools.map((option) => ({
+        value: option.id,
+        label: option.name,
+        keywords: option.kabupatenKota,
+      })),
+    [schools],
+  );
+  const sessionOptions: Record<string, string> = {
+    [ALL]: "Semua Sesi",
+    ...Object.fromEntries((school?.sessions ?? []).map((option) => [option.id, sesiLabel(option)])),
+  };
+
+  function changeScope(next: ParticipantFeedbackScope) {
+    setScope(next);
+    startTransition(async () => {
+      const [page, values] = await Promise.all([
+        loadParticipantFeedback(filters, next, null, sort),
+        loadParticipantFeedbackAverages(next),
+      ]);
+      setRows(page.rows);
+      setCursor(page.nextCursor);
+      setAverages({ values, scope: next });
+    });
+  }
 
   function changeFilter(key: keyof FeedbackFilters, value: FeedbackFilterValue) {
     const next = { ...filters, [key]: value };
     setFilters(next);
     startTransition(async () => {
-      const page = await loadParticipantFeedback(next, null, sort);
+      const page = await loadParticipantFeedback(next, scope, null, sort);
       setRows(page.rows);
       setCursor(page.nextCursor);
     });
@@ -237,7 +313,7 @@ function ParticipantTab({
   function changeSort(next: FeedbackSort) {
     setSort(next);
     startTransition(async () => {
-      const page = await loadParticipantFeedback(filters, null, next);
+      const page = await loadParticipantFeedback(filters, scope, null, next);
       setRows(page.rows);
       setCursor(page.nextCursor);
     });
@@ -246,38 +322,69 @@ function ParticipantTab({
   function loadMore() {
     if (cursor === null) return;
     startTransition(async () => {
-      const page = await loadParticipantFeedback(filters, cursor, sort);
+      const page = await loadParticipantFeedback(filters, scope, cursor, sort);
       setRows((previous) => [...previous, ...page.rows]);
       setCursor(page.nextCursor);
     });
   }
 
+  const covers = participantScopeLabel(schools, averages.scope);
+
   return (
     <>
-      {/* The overall standing — dataset-wide, and unmoved by the filters below. */}
+      {/* The standing over the picked School or Session — programme-wide with neither — and unmoved
+          by the score filters below. */}
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <AverageCard
           label={PARTICIPANT_ASPECT_LABELS.instructor}
-          value={averages.instructor}
+          covers={covers}
+          value={averages.values.instructor}
         />
         <AverageCard
           label={PARTICIPANT_ASPECT_LABELS.materials}
-          value={averages.materials}
+          covers={covers}
+          value={averages.values.materials}
         />
         <AverageCard
           label={PARTICIPANT_ASPECT_LABELS.relevance}
-          value={averages.relevance}
+          covers={covers}
+          value={averages.values.relevance}
         />
         {/* Over the rows that have one; "—" until any does (#446). */}
         <AverageCard
           label={PARTICIPANT_ASPECT_LABELS.hands_on_rbl}
-          value={averages.handsOnRbl}
+          covers={covers}
+          value={averages.values.handsOnRbl}
+        />
+      </div>
+
+      {/* The scope (#466): a School, then one of its Sessions. Changing the School resets the Sesi. */}
+      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <SingleSelectCombobox
+          aria-label="Sekolah"
+          placeholder="Semua Sekolah"
+          emptyLabel="Tidak ada Sekolah yang cocok."
+          options={schoolOptions}
+          value={scope.schoolId}
+          disabled={pending}
+          onValueChange={(schoolId) => {
+            changeScope({ schoolId, sessionId: null });
+          }}
+        />
+        <OptionSelect
+          ariaLabel="Sesi"
+          options={sessionOptions}
+          value={scope.sessionId ?? ALL}
+          disabled={pending || school === null}
+          onChange={(sessionId) => {
+            changeScope({ ...scope, sessionId: sessionId === ALL ? null : sessionId });
+          }}
         />
       </div>
 
       {/* The two sort dropdowns. Each change refetches the first page and resets paging. */}
       <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <SortSelect
+        <OptionSelect
           ariaLabel="Urutkan nilai"
           options={SCORE_SORT_OPTIONS}
           value={sort.score}
@@ -286,7 +393,7 @@ function ParticipantTab({
             changeSort({ ...sort, score: value });
           }}
         />
-        <SortSelect
+        <OptionSelect
           ariaLabel="Urutkan tanggal"
           options={DATE_SORT_OPTIONS}
           value={sort.date}
@@ -378,23 +485,52 @@ function ParticipantTab({
 function PerjadinTab({
   initialRows,
   initialCursor,
-  averages,
+  initialAverages,
+  trips,
 }: {
   initialRows: PerjadinFeedbackRow[];
   initialCursor: PerjadinFeedbackCursor | null;
-  averages: { lodging: number; transport: number; meals: number; punctuality: number };
+  initialAverages: PerjadinAverages;
+  trips: FeedbackPerjadinOption[];
 }) {
   const [rows, setRows] = useState(initialRows);
   const [cursor, setCursor] = useState(initialCursor);
+  const [scope, setScope] = useState<PerjadinFeedbackScope>(ALL_TRIPS);
+  const [averages, setAverages] = useState({ values: initialAverages, scope: ALL_TRIPS });
   const [filters, setFilters] = useState<PerjadinFeedbackFilters>(ALL_PERJADIN_FILTERS);
   const [sort, setSort] = useState<FeedbackSort>(DEFAULT_SORT);
   const [pending, startTransition] = useTransition();
+
+  // A trip is found by its name or its Schools; the Schools are its second line too (ADR-0044).
+  const tripOptions = useMemo(
+    () =>
+      trips.map((trip) => ({
+        value: trip.id,
+        label: perjadinName(trip),
+        keywords: trip.schoolNames.join(" "),
+        description: perjadinSchoolsLine(trip.schoolNames),
+      })),
+    [trips],
+  );
+
+  function changeScope(next: PerjadinFeedbackScope) {
+    setScope(next);
+    startTransition(async () => {
+      const [page, values] = await Promise.all([
+        loadPerjadinFeedback(filters, next, null, sort),
+        loadPerjadinFeedbackAverages(next),
+      ]);
+      setRows(page.rows);
+      setCursor(page.nextCursor);
+      setAverages({ values, scope: next });
+    });
+  }
 
   function changeFilter(key: keyof PerjadinFeedbackFilters, value: FeedbackFilterValue) {
     const next = { ...filters, [key]: value };
     setFilters(next);
     startTransition(async () => {
-      const page = await loadPerjadinFeedback(next, null, sort);
+      const page = await loadPerjadinFeedback(next, scope, null, sort);
       setRows(page.rows);
       setCursor(page.nextCursor);
     });
@@ -403,7 +539,7 @@ function PerjadinTab({
   function changeSort(next: FeedbackSort) {
     setSort(next);
     startTransition(async () => {
-      const page = await loadPerjadinFeedback(filters, null, next);
+      const page = await loadPerjadinFeedback(filters, scope, null, next);
       setRows(page.rows);
       setCursor(page.nextCursor);
     });
@@ -412,37 +548,69 @@ function PerjadinTab({
   function loadMore() {
     if (cursor === null) return;
     startTransition(async () => {
-      const page = await loadPerjadinFeedback(filters, cursor, sort);
+      const page = await loadPerjadinFeedback(filters, scope, cursor, sort);
       setRows((previous) => [...previous, ...page.rows]);
       setCursor(page.nextCursor);
     });
   }
 
+  const covers = perjadinScopeLabel(trips, averages.scope);
+
   return (
     <>
-      {/* The overall standing — dataset-wide, and unmoved by the filters below. */}
+      {/* The standing over the picked trip and Peran — programme-wide with neither — and unmoved by
+          the score filters below. */}
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <AverageCard
           label="Penginapan"
-          value={averages.lodging}
+          covers={covers}
+          value={averages.values.lodging}
         />
         <AverageCard
           label="Transportasi"
-          value={averages.transport}
+          covers={covers}
+          value={averages.values.transport}
         />
         <AverageCard
           label="Konsumsi"
-          value={averages.meals}
+          covers={covers}
+          value={averages.values.meals}
         />
         <AverageCard
           label="Ketepatan Waktu"
-          value={averages.punctuality}
+          covers={covers}
+          value={averages.values.punctuality}
+        />
+      </div>
+
+      {/* The scope (#466): one trip, and the filer's self-declared Peran. No School — a trip covers
+          several, and the Perjadin picker finds one by its Schools. */}
+      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <SingleSelectCombobox
+          aria-label="Perjadin"
+          placeholder="Semua Perjadin"
+          emptyLabel="Tidak ada Perjadin yang cocok."
+          options={tripOptions}
+          value={scope.perjadinId}
+          disabled={pending}
+          onValueChange={(perjadinId) => {
+            changeScope({ ...scope, perjadinId });
+          }}
+        />
+        <OptionSelect
+          ariaLabel="Peran pengisi"
+          options={ROLE_OPTIONS}
+          value={scope.role ?? ALL}
+          disabled={pending}
+          onChange={(role) => {
+            changeScope({ ...scope, role: role === ALL ? null : (role as PerjadinEvaluationRole) });
+          }}
         />
       </div>
 
       {/* The two sort dropdowns. Each change refetches the first page and resets paging. */}
       <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <SortSelect
+        <OptionSelect
           ariaLabel="Urutkan nilai"
           options={SCORE_SORT_OPTIONS}
           value={sort.score}
@@ -451,7 +619,7 @@ function PerjadinTab({
             changeSort({ ...sort, score: value });
           }}
         />
-        <SortSelect
+        <OptionSelect
           ariaLabel="Urutkan tanggal"
           options={DATE_SORT_OPTIONS}
           value={sort.date}
@@ -550,13 +718,49 @@ function LoadMore({ pending, onClick }: { pending: boolean; onClick: () => void 
   );
 }
 
-/** One summary card: the Aspect's name over its dataset-wide average, kept to one decimal. */
-function AverageCard({ label, value }: { label: string; value: number | null }) {
+/**
+ * What the Peserta averages cover, for their titles: the School, then the Session — `SMAN 1 Bontang ·
+ * Sesi 1 Luring` — or `null`, programme-wide, with neither picked.
+ */
+function participantScopeLabel(
+  schools: FeedbackSchoolOption[],
+  scope: ParticipantFeedbackScope,
+): string | null {
+  const school = schools.find((option) => option.id === scope.schoolId);
+  if (!school) return null;
+  const session = school.sessions.find((option) => option.id === scope.sessionId);
+  return session ? `${school.name} · ${sesiShortLabel(session)}` : school.name;
+}
+
+/** What the Perjadin averages cover: the trip's name, then the Peran — or `null` with neither. */
+function perjadinScopeLabel(
+  trips: FeedbackPerjadinOption[],
+  scope: PerjadinFeedbackScope,
+): string | null {
+  const trip = trips.find((option) => option.id === scope.perjadinId);
+  const parts = [trip ? perjadinName(trip) : null, scope.role].filter((part) => part !== null);
+  return parts.length === 0 ? null : parts.join(" · ");
+}
+
+/**
+ * One summary card: the Aspect's name and what it `covers` over its average, kept to one decimal.
+ * `covers` is null when the average is programme-wide.
+ */
+function AverageCard({
+  label,
+  covers,
+  value,
+}: {
+  label: string;
+  covers: string | null;
+  value: number | null;
+}) {
   return (
     <Card size="sm">
       <CardHeader>
         <CardTitle className="text-sm font-medium text-muted-foreground">
           Nilai rata-rata · {label}
+          {covers !== null && ` · ${covers}`}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -615,11 +819,12 @@ function FilterSelect({
 }
 
 /**
- * One sort dropdown — the `FilterSelect` shape over a generic string value rather than the three
- * filter arms. Both the average sort (`asc`/`desc`) and the date tiebreak (`desc`/`asc`) drive one,
- * so the value type is the option map's own key. The value is always a valid key, so no placeholder.
+ * One dropdown over a fixed option map — the `FilterSelect` shape over a generic string value rather
+ * than the three filter arms. The average sort (`asc`/`desc`), the date tiebreak (`desc`/`asc`), the
+ * Sesi and the Peran pengisi (#466) each drive one, so the value type is the option map's own key.
+ * The value is always a valid key, so no placeholder.
  */
-function SortSelect<T extends string>({
+function OptionSelect<T extends string>({
   ariaLabel,
   options,
   value,
@@ -664,10 +869,9 @@ function SortSelect<T extends string>({
 /**
  * One Participant's submission.
  *
- * The header names who left it, from which Class, at which School, in which mode, on which Session
- * day and start time (in the School's zone), the day the Participant filed it ("Diisi"), and the
- * row average as the headline number. The mode label is the mode word only — `Luring` / `Daring` —
- * because the data model carries no session ordinal to number them with (#168).
+ * The header names who left it, from which Class, at which School, the Session — its Sesi (ADR-0027),
+ * mode, day and start time, in WIB when online, the line the Sesi picker shows (#466) — the day the
+ * Participant filed it ("Diisi"), and the row average as the headline number.
  *
  * Below it, the Aspects in a fixed order, each with its score and — when the Participant left one
  * — the comment they wrote about that Aspect. A Siswa's card also carries **Hands-on RBL** (#446),
@@ -684,8 +888,6 @@ function ParticipantCard({ row }: { row: ParticipantFeedbackRow }) {
           <span className="text-muted-foreground">·</span>
           <span className="text-sm text-muted-foreground">{row.schoolName}</span>
           <span className="text-muted-foreground">·</span>
-          <span className="text-sm text-muted-foreground">{MODE_LABELS[row.sessionMode]}</span>
-          <span className="text-muted-foreground">·</span>
           {/*
             The Session this feedback was filed against, linked through to its detail page (#194) —
             the Participant half of "every feedback links to its origin", parallel to how PerjadinCard
@@ -700,7 +902,7 @@ function ParticipantCard({ row }: { row: ParticipantFeedbackRow }) {
             }
             className="text-sm text-primary hover:underline"
           >
-            Sesi {row.heldOn} {formatSessionStartTime(row.startsAt, row.timeZone)}
+            {sesiLabel({ ...row, mode: row.sessionMode })}
           </Link>
           <span className="ml-auto text-sm text-muted-foreground">Diisi {row.submittedOn}</span>
           <span className="flex items-center gap-1.5 text-sm text-muted-foreground">

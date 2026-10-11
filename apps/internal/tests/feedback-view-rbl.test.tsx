@@ -11,16 +11,20 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("-/app/(app)/feedback/actions", () => ({
   loadParticipantFeedback: vi.fn(),
+  loadParticipantFeedbackAverages: vi.fn(),
   loadPerjadinFeedback: vi.fn(),
+  loadPerjadinFeedbackAverages: vi.fn(),
 }));
 
 const base: ParticipantFeedbackRow = {
   id: "row",
   name: "Rani",
   classKind: "Student",
+  schoolId: "school",
   schoolName: "SMAN 1 Bontang",
   sessionId: "session",
   sessionMode: "offline",
+  sesi: 1,
   heldOn: "2026-10-12",
   startsAt: "08:00:00",
   timeZone: "WITA",
@@ -45,9 +49,11 @@ function render(rows: ParticipantFeedbackRow[], handsOnRbl: number | null) {
       participantInitialRows={rows}
       participantInitialCursor={null}
       participantAverages={{ handsOnRbl, instructor: 8, materials: 8, relevance: 8 }}
+      participantSchools={[]}
       perjadinInitialRows={[]}
       perjadinInitialCursor={null}
       perjadinAverages={{ lodging: 0, transport: 0, meals: 0, punctuality: 0 }}
+      perjadinTrips={[]}
     />,
   );
 }

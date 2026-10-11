@@ -21,6 +21,33 @@ export function preparationPercent(
   return Math.round((checked / items.length) * 100);
 }
 
+/** The Persiapan Program tab's two orders: "Tanggal: Terdekat" (the default) and "Persiapan: Terendah". */
+export type PreparationSort = "tanggal" | "persiapan";
+
+/**
+ * **The Persiapan Program tab's card order** (#466), as one combined order rather than one key alone.
+ *
+ * - `tanggal`: start date, earliest first, then the least-prepared first among cards on one date.
+ * - `persiapan`: the least-prepared first, then start date among cards equally prepared.
+ *
+ * Progress is `preparationPercent`, an empty checklist counting as 0%. The date is the start date,
+ * not relative to today, so past cards stay where they are. Either way, what is still tied keeps the
+ * read's order — `preparationCards` hands them over by start date, then creation time, then id — so
+ * the last two keys are the read's own. Returns a new array; the read is not touched.
+ */
+export function sortPreparationCards(
+  cards: readonly PreparationCard[],
+  sort: PreparationSort,
+): PreparationCard[] {
+  const byDate = (a: PreparationCard, b: PreparationCard) =>
+    a.startsOn < b.startsOn ? -1 : a.startsOn > b.startsOn ? 1 : 0;
+  const byProgress = (a: PreparationCard, b: PreparationCard) =>
+    preparationPercent(a.items) - preparationPercent(b.items);
+  const [first, second] = sort === "tanggal" ? [byDate, byProgress] : [byProgress, byDate];
+  // `toSorted` is stable, so a tie on both keys keeps the read's creation-time, then id, order.
+  return cards.toSorted((a, b) => first(a, b) || second(a, b));
+}
+
 /**
  * How many days ahead of `today` a Preparation Card starts warning: a Card whose `starts_on` is
  * within this window (or today, or already past) and is not yet complete raises a warning.
