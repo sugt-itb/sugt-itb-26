@@ -43,7 +43,7 @@ const NOT_STAFF_ERROR_CODE = "sugt/not-staff";
  *
  * **Reaching this is a bug or an attack, never a user state.**
  * [#9](https://github.com/mafiefa02/sugt/issues/9) specifies the money-free Perjadin
- * variant as having the Advance strip, transactions and Report **absent rather than
+ * variant as having the money strip, transactions and Report **absent rather than
  * disabled**, so the UI decides by role and never offers the surface to a Teaching
  * Team member.
  *

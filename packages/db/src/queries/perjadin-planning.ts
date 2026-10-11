@@ -31,9 +31,9 @@ import { requireGrant, requireStaff } from "./staff-only";
  * Perjadin, its Group, its Teaching Team names, its Pimpinan and its Sessions into existence
  * together.
  *
- * Staff-only, by the surface list: arranging delivery is one of `./staff-only.ts`'s two reasons. It
- * once wrote the Advance too, which made it the other; the Advance is no longer tracked (ADR-0051).
- * **And it needs the Editor Grant** (ADR-0047): planning a trip is a deliberate choice of who plans, not every Staff member's.
+ * Staff-only, by the surface list: arranging delivery is one of `./staff-only.ts`'s two reasons. **And
+ * it needs the Editor Grant** (ADR-0047): planning a trip is a deliberate choice of who plans, not
+ * every Staff member's.
  *
  * **Planning starts from a Sub-Cluster**, not from a Coverage selection
  * ([#69](https://github.com/mafiefa02/sugt/issues/69)). The screen picks a Sub-Cluster and

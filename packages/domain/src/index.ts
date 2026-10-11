@@ -211,7 +211,7 @@ export function timeZoneSuffix(zone: TimeZone | "" | null | undefined): string {
  * Group a Rupiah amount the way every screen shows it: `id-ID` locale, dot separators,
  * `formatIdr(1000000) === "1.000.000"`. Returns the grouped digits only, no `Rp` prefix —
  * this is exactly the `n.toLocaleString("id-ID")` the display sites used inline, named once
- * so the plan form's masked input and every read-back amount cannot drift apart. The amount
+ * so the masked amount inputs and every read-back amount cannot drift apart. The amount
  * inputs render this directly (the value carries digits only); displays wrap it in
  * {@link formatRupiah}, which is the single place the `Rp` prefix lives.
  */
@@ -222,8 +222,8 @@ export function formatIdr(n: number): string {
 /**
  * The one way money is displayed: `Rp` immediately followed by the grouped digits, with no
  * space — `formatRupiah(15000000000) === "Rp15.000.000.000"`. The `Rp` prefix lives here and
- * nowhere else, so no display site carries its own literal `"Rp "`. A negative amount — an
- * overspent travel float (ADR-0029) — carries its sign before the prefix: `"-Rp50.000"`.
+ * nowhere else, so no display site carries its own literal `"Rp "`. A negative amount carries
+ * its sign before the prefix: `"-Rp50.000"`.
  */
 export function formatRupiah(n: number): string {
   return n < 0 ? `-Rp${formatIdr(-n)}` : `Rp${formatIdr(n)}`;

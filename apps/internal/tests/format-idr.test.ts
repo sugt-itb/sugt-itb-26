@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 /**
  * The one helper behind every Rupiah amount on screen: `id-ID` grouping with dot
  * separators, no `Rp` prefix — the amount inputs render this directly. It exists so a
- * seven-figure advance reads as `1.000.000` at the point it is entered and everywhere it is
+ * seven-figure amount reads as `1.000.000` at the point it is entered and everywhere it is
  * read back, from one implementation rather than five inline `toLocaleString` calls.
  */
 describe("formatIdr", () => {
@@ -32,8 +32,7 @@ describe("formatRupiah", () => {
     expect(formatRupiah(7000)).toBe("Rp7.000");
   });
 
-  // An overspent travel float is a real negative remainder (ADR-0029); its sign reads before the
-  // prefix, not between `Rp` and the digits (#348).
+  // A negative amount's sign reads before the prefix, not between `Rp` and the digits (#348).
   it("puts a negative amount's sign before Rp", () => {
     expect(formatRupiah(-50000)).toBe("-Rp50.000");
   });

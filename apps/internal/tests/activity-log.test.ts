@@ -150,8 +150,8 @@ describe("each money write logs one entry with the change", () => {
   });
 
   it("cannot be handed advance_set or advance_changed — they are history only (ADR-0051)", () => {
-    // Never called: the assertion is the typecheck gate. Each `@ts-expect-error` fails the build the
-    // day `logActivity` accepts the action again.
+    // Never called: the assertion is the typecheck gate, which fails on an unused `@ts-expect-error`
+    // the day `logActivity` accepts the action again.
     const set = { action: "advance_set", details: { amountIdr: 1 } } as const;
     const changed = { action: "advance_changed", details: { fromIdr: 1, toIdr: 2 } } as const;
     const neverRun = (tx: Parameters<typeof logActivity>[0], actor: Person) => [
@@ -270,7 +270,7 @@ describe("each money write logs one entry with the change", () => {
   it("filePerjadinReport logs report_filed with every category's lines and total", async () => {
     const pic = await staff();
     const trip = await addPerjadin({ picPersonId: pic.id });
-    // Akomodasi does not draw down the float (ADR-0029); the entry counts it anyway.
+    // Every category counts, as the acquittal's totals do.
     for (const [category, amountIdr] of [
       ["Konsumsi", 1_250_000],
       ["Akomodasi", 3_400_000],

@@ -98,5 +98,4 @@ Dated amendments point here from:
 Uang Perjalanan is no longer one of a trip's writes ([ADR-0051](./0051-the-advance-is-not-tracked.md),
 #464): the Advance is not tracked, so the plan form does not ask for it and the trip page has no dialog
 to correct it. "Its Uang Perjalanan" in _Why_ and in the list of guarded writes above are history. Every
-other write on the list still runs `requirePerjadinWriter`, and Hapus bukti and Hapus transaksi
-([ADR-0050](./0050-transactions-and-receipts-may-be-deleted-and-the-log-keeps-the-copy.md)) joined it.
+other write on the list still runs `requirePerjadinWriter`.

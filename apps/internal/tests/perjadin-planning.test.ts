@@ -880,7 +880,7 @@ describe("the Perjadin list and detail", () => {
   });
 
   /**
-   * No money on this payload, for either role. The Advance and the acquittal are
+   * No money on this payload, for either role. The acquittal is
    * `perjadinAcquittal`'s, a separate read (open to any signed-in Person since #180). The Group is
    * the PIC alone now.
    */

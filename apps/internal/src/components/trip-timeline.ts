@@ -3,7 +3,7 @@ import type { MyPerjadinSchool, MyPerjadinSession, MyPerjadinTrip } from "@sugt/
 /**
  * **A `/pendamping` trip card's timeline** (#349). The ordering and the done/pending state are plain
  * functions so each rule is testable without React; the card renders what they return, deciding only
- * which controls a Session row offers. (Its money bar went with the Advance, ADR-0051.)
+ * which controls a Session row offers.
  *
  * The timeline is the trip's live Sessions and nothing else: a Perjadin carries no departure or
  * return leg (ADR-0041), so there is no journey to draw around them.

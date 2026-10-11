@@ -347,7 +347,7 @@ async function perjadinOf(personId: string): Promise<MyPerjadin> {
       preparationChecklists(tripIds),
     ]);
 
-  // Float draw-down keyed by trip; a trip absent from the grouped sum drew nothing down.
+  // Uang Perjalanan Terpakai keyed by trip; a trip absent from the grouped sum spent nothing.
   const spentByTrip = new Map(spentRows.map((row) => [row.perjadinId, row.spentIdr]));
 
   const staffByTrip = new Map<string, MyPerjadinStaff[]>();
