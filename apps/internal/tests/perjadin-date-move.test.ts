@@ -81,7 +81,6 @@ describe("Planning writes the typed range", () => {
 
     const planned = await planPerjadin(pic, {
       subClusterId: subCluster.id,
-      advanceIdr: 5_000_000,
       picPersonId: pic.id,
       teacherNames: [],
       pimpinan: [],
@@ -113,7 +112,6 @@ describe("Ubah tanggal resizes the range", () => {
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-05",
     });
@@ -135,7 +133,6 @@ describe("Ubah tanggal resizes the range", () => {
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-10",
     });
@@ -170,7 +167,6 @@ describe("Ubah tanggal resizes the range", () => {
     ]);
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-10",
     });
@@ -203,7 +199,6 @@ describe("Ubah tanggal resizes the range", () => {
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-05",
     });
@@ -224,7 +219,6 @@ describe("Ubah tanggal resizes the range", () => {
     await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-05",
     });

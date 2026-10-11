@@ -12,7 +12,6 @@ import {
   setPerjadinPimpinanAction,
   setPerjadinStaffAction,
   togglePreparationItemAction,
-  updatePerjadinAdvanceAction,
   updatePerjadinDatesAction,
 } from "-/app/(app)/perjadin/[id]/actions";
 import {
@@ -76,7 +75,6 @@ import {
   setPerjadinStaff,
   togglePreparationItem,
   transactionDeleteTarget,
-  updatePerjadinAdvance,
   updatePerjadinDates,
   type Person,
 } from "@sugt/db/queries";
@@ -227,7 +225,6 @@ async function perjadinA(who: People, where: Place) {
   const trip = await addPerjadin({
     subClusterId: where.subCluster.id,
     picPersonId: who.rina.id,
-    advanceIdr: 5_000_000,
     startsOn: "2026-10-12",
     endsOn: "2026-10-13",
   });
@@ -307,6 +304,10 @@ const receipt = () => [
  * **Every write in the ticket's §2**, called as `caller` on a fresh Perjadin A, with the outcome it
  * lands with when the caller may write.
  */
+/** Ubah tanggal on trip `perjadinId` — any write a member may make will do. */
+const moveDates = (caller: Person, perjadinId: string) =>
+  updatePerjadinDates(caller, perjadinId, { startsOn: "2026-10-12", endsOn: "2026-10-14" });
+
 const WRITES: [
   string,
   (caller: Person, a: PerjadinA, who: People, where: Place) => Promise<unknown>,
@@ -317,7 +318,6 @@ const WRITES: [
     (c, a) => updatePerjadinDates(c, a.id, { startsOn: "2026-10-12", endsOn: "2026-10-14" }),
     "updated",
   ],
-  ["Uang Perjalanan", (c, a) => updatePerjadinAdvance(c, a.id, 6_000_000), "updated"],
   ["Group Staff", (c, a, who) => setPerjadinStaff(c, a.id, [who.andi.id]), "set"],
   ["Change PIC", (c, a, who) => changePerjadinPic(c, a.id, who.andi.id), "changed"],
   ["Pimpinan", (c, a, who) => setPerjadinPimpinan(c, a.id, [who.hadi.id]), "set"],
@@ -462,7 +462,7 @@ describe("what stays open, and what follows the Group", () => {
 
     await expect(setPerjadinStaff(who.andi, a.id, [])).resolves.toEqual({ outcome: "set" });
 
-    const refusal = await refusalOf(() => updatePerjadinAdvance(who.andi, a.id, 1_000));
+    const refusal = await refusalOf(() => moveDates(who.andi, a.id));
     expect(isNotOnPerjadinError(refusal)).toBe(true);
   });
 
@@ -474,20 +474,16 @@ describe("what stays open, and what follows the Group", () => {
 
     await setPerjadinStaff(who.budi, a.id, [who.andi.id, who.dewi.id]);
 
-    await expect(updatePerjadinAdvance(who.dewi, a.id, 1_000)).resolves.toEqual({
-      outcome: "updated",
-    });
-    expect(
-      isNotOnPerjadinError(await refusalOf(() => updatePerjadinAdvance(who.dewi, b.id, 1_000))),
-    ).toBe(true);
+    await expect(moveDates(who.dewi, a.id)).resolves.toMatchObject({ outcome: "updated" });
+    expect(isNotOnPerjadinError(await refusalOf(() => moveDates(who.dewi, b.id)))).toBe(true);
   });
 
   it("still answers a stale Perjadin id as a value, not a refusal", async () => {
     const who = await people();
 
-    await expect(
-      updatePerjadinAdvance(who.fajar, "00000000-0000-4000-8000-000000000000", 1_000),
-    ).resolves.toEqual({ outcome: "no-such-perjadin" });
+    await expect(moveDates(who.fajar, "00000000-0000-4000-8000-000000000000")).resolves.toEqual({
+      outcome: "no-such-perjadin",
+    });
   });
 });
 
@@ -497,7 +493,6 @@ describe("the actions answer a non-member with a 403", () => {
     const a = await perjadinA(who, await place());
     signedInAs(who.dewi);
 
-    await expect(digestOf(updatePerjadinAdvanceAction(a.id, 1_000))).resolves.toBe(FORBIDDEN);
     await expect(
       digestOf(updatePerjadinDatesAction(a.id, { startsOn: "2026-10-12", endsOn: "2026-10-14" })),
     ).resolves.toBe(FORBIDDEN);
@@ -667,7 +662,6 @@ describe("the write controls follow who writes the trip", () => {
     await addPerjadin({
       subClusterId: where.subCluster.id,
       picPersonId: who.fajar.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-11-09",
       endsOn: "2026-11-10",
     });

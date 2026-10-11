@@ -18,7 +18,7 @@ import { perjadinWriterSql } from "./staff-only";
  * detail are two surfaces that happen to be about the same noun.
  *
  * No money here and no role check, for the reason `./perjadin-detail.ts` gives at length:
- * the Advance is `./perjadin-report.ts`'s, behind the Staff-only choke point.
+ * money is `./perjadin-report.ts`'s `perjadinAcquittal`.
  */
 
 /** One trip, as the list shows it. */

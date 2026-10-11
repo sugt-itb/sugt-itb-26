@@ -100,7 +100,6 @@ describe("only an Administrator reaches Pengaturan Perjadin", () => {
     const clusterId = (await addCluster({ slug: "c", name: "Cluster Satu" })).id;
     const subClusterId = (await addSubCluster({ slug: "k", name: "Kelompok 1", clusterId })).id;
     const trip = await addPerjadin({
-      advanceIdr: 1,
       picPersonId: admin.id,
       subClusterId,
       startsOn: wibDaysFromToday(1),

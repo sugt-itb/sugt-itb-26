@@ -95,7 +95,6 @@ async function scene() {
     addPerjadin({
       subClusterId: subCluster.id,
       picPersonId: pic.id,
-      advanceIdr: 1_000_000,
       startsOn,
       endsOn,
     });
@@ -151,7 +150,6 @@ describe("the same School at the same moment on another trip", () => {
     const { pic, subCluster, bontang, a } = await scene();
     const input: PlanPerjadinInput = {
       subClusterId: subCluster.id,
-      advanceIdr: 1_000_000,
       picPersonId: pic.id,
       teacherNames: [],
       pimpinan: [],
@@ -171,7 +169,6 @@ describe("the same School at the same moment on another trip", () => {
     await expect(
       planPerjadin(pic, {
         subClusterId: subCluster.id,
-        advanceIdr: 1_000_000,
         picPersonId: pic.id,
         teacherNames: [],
         pimpinan: [],
@@ -323,7 +320,6 @@ describe("the database holds it on its own", () => {
     await expect(
       planPerjadin(pic, {
         subClusterId: subCluster.id,
-        advanceIdr: 1_000_000,
         picPersonId: pic.id,
         teacherNames: [],
         pimpinan: [],

@@ -518,8 +518,6 @@ export type PerjadinFixture = {
   subClusterName?: string;
   startsOn?: string;
   endsOn?: string;
-  /** Uang Perjalanan; `null` is a trip planned without one, not yet filled in (#437). */
-  advanceIdr: number | null;
   /**
    * Where the trip goes. A Perjadin needs one, so `addPerjadin` builds a throwaway Cluster
    * and Sub-Cluster when a test does not supply this — the Schools-belong-to-the-Sub-Cluster
@@ -573,7 +571,6 @@ export async function addPerjadin(fixture: PerjadinFixture) {
         subClusterId,
         startsOn: fixture.startsOn ?? "2026-09-01",
         endsOn: fixture.endsOn ?? "2026-09-03",
-        advanceIdr: fixture.advanceIdr,
         picPersonId: fixture.picPersonId,
         picRole: "Staff",
       })
@@ -622,7 +619,7 @@ export type TransactionFixture = {
 };
 
 /**
- * One line item against the Advance.
+ * One line item on a trip.
  *
  * The default category matches the default description — a taxi is
  * `Transport Lokal Dalam Provinsi` — so a test that cares about neither still reads as a

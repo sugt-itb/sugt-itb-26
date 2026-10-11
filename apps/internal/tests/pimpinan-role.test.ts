@@ -54,7 +54,7 @@ describe("Pimpinan is record-only", () => {
       email: "pimpinan@ditsama.itb.ac.id",
       role: "Pimpinan",
     });
-    const perjadin = await addPerjadin({ advanceIdr: 5_000_000, picPersonId: pic.id });
+    const perjadin = await addPerjadin({ picPersonId: pic.id });
 
     // role: "Staff" satisfies group_member_role_check, so the refusal is the composite foreign key
     // itself — no `(pimpinan.id, 'Staff')` pair exists in `person`, because that Person is Pimpinan.
@@ -90,7 +90,6 @@ describe("Pimpinan is record-only", () => {
         subClusterId: subCluster.id,
         startsOn: "2026-09-01",
         endsOn: "2026-09-03",
-        advanceIdr: 5_000_000,
         picPersonId: pimpinan.id,
       }),
     );

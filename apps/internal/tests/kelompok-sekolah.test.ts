@@ -233,7 +233,7 @@ describe("deleteSubCluster", () => {
       name: "Dikunjungi",
       clusterId: cluster.id,
     });
-    await addPerjadin({ advanceIdr: 5_000_000, picPersonId: staff.id, subClusterId: sub.id });
+    await addPerjadin({ picPersonId: staff.id, subClusterId: sub.id });
 
     expect(await deleteSubCluster(staff, sub.id)).toEqual({ outcome: "planned-against" });
     const rows = await db.select().from(schema.subCluster).where(eq(schema.subCluster.id, sub.id));
@@ -290,7 +290,6 @@ describe("moveSchool", () => {
     const { from, to, school } = await twoSubClusters();
     // A trip planned against the Sub-Cluster the School is leaving, with an arranged Session there.
     const perjadin = await addPerjadin({
-      advanceIdr: 5_000_000,
       picPersonId: staff.id,
       subClusterId: from.id,
     });
@@ -320,7 +319,6 @@ describe("moveSchool", () => {
     const staff = await staffCaller();
     const { from, to, school } = await twoSubClusters();
     const perjadin = await addPerjadin({
-      advanceIdr: 5_000_000,
       picPersonId: staff.id,
       subClusterId: from.id,
     });

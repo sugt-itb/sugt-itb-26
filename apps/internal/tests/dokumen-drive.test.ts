@@ -63,10 +63,8 @@ async function scene(
   options: {
     connection?: "connected" | "broken" | "none";
     dokumen?: boolean;
-    advanceIdr?: number | null;
   } = {},
 ) {
-  const { advanceIdr = 5_000_000 } = options;
   const staff = await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" });
   await addGrant(staff.id, "Administrator");
   const pimpinan = await addPerson({ fullName: "Fa", email: "fa@itb.ac.id", role: "Pimpinan" });
@@ -85,7 +83,6 @@ async function scene(
     provinceCode: "KT",
   });
   const trip = await addPerjadin({
-    advanceIdr,
     picPersonId: staff.id,
     subClusterId: subCluster.id,
     startsOn: "2026-10-12",
@@ -255,18 +252,6 @@ describe("an upload, recorded and reconciled", () => {
     });
   });
 
-  it("records a sheet while Uang Perjalanan is not filled in yet (#437)", async () => {
-    const { trip, school } = await scene({ advanceIdr: null });
-    const fileId = await upload(trip.id, pdf());
-
-    await expect(recordDocumentAction(pesertaSheet(trip.id, school.id, fileId))).resolves.toEqual({
-      outcome: "recorded",
-      documentId: expect.any(String),
-      synced: true,
-    });
-    await expect(documents()).resolves.toHaveLength(1);
-  });
-
   it("reuses the trip's folders for the next sheet, and makes a folder per kind", async () => {
     const { trip, school } = await scene();
     await recordDocumentAction(pesertaSheet(trip.id, school.id, await upload(trip.id, pdf())));
@@ -309,7 +294,6 @@ describe("an upload, recorded and reconciled", () => {
   it("refuses a file uploaded for another Perjadin", async () => {
     const { staff, trip, school } = await scene();
     const other = await addPerjadin({
-      advanceIdr: 1,
       picPersonId: staff.id,
       subClusterId: (await db.select().from(schema.perjadin))[0]!.subClusterId,
       startsOn: "2026-10-12",

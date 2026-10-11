@@ -92,7 +92,6 @@ async function trip() {
   const perjadin = await addPerjadin({
     subClusterId: subCluster.id,
     picPersonId: pic.id,
-    advanceIdr: 5_000_000,
     startsOn: "2026-09-01",
     endsOn: "2026-09-03",
   });

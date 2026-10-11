@@ -71,9 +71,8 @@ export const perjadin = pgTable(
     startsOn: date("starts_on").notNull(),
     endsOn: date("ends_on").notNull(),
 
-    // Uang Perjalanan. Null means "not filled in yet" — never the same as Rp 0, which stays a real
-    // amount. A Perjadin is often planned before anyone knows it, so it may be set later; once set it
-    // can be changed but not cleared, and the Laporan cannot be filed while it is null (#437).
+    // The Advance (Uang Perjalanan). **Unused**: the app no longer tracks it (ADR-0051, #464) and
+    // neither reads nor writes it. It and the two `returned_*` columns below wait for their drop (#465).
     advanceIdr: bigint("advance_idr", { mode: "number" }),
 
     picPersonId: uuid("pic_person_id").notNull(),
@@ -114,7 +113,7 @@ export const perjadin = pgTable(
  * The Group. **Replaced wholesale, never edited** — there is no "remove one member"
  * operation. Substituting a professor submits an entire replacement Group, and one
  * transaction deletes every member row and inserts the new set, so the Perjadin
- * keeps its id and its Sessions, Advance and transactions are untouched.
+ * keeps its id and its Sessions and transactions are untouched.
  *
  * `role` is denormalised from `person`, but it cannot drift: the composite foreign
  * key means a row can only exist if the pair is true there.
@@ -226,8 +225,8 @@ export const perjadinPimpinan = pgTable(
 );
 
 /**
- * The acquittal's line items. **The Advance is one pot and the acquittal reconciles the
- * pot** — a transaction consumes the Advance, not a person's share of it.
+ * The acquittal's line items: every transaction on the trip, a line for the trip as a whole rather
+ * than a person's share of it. Their sum is Uang Perjalanan Terpakai (ADR-0051).
  *
  * **Two orthogonal axes describe each line.** `category` is *what kind of spend* it was — a
  * closed set read off DITSAMA's own approved budget. `participantType` is *which cohort* it

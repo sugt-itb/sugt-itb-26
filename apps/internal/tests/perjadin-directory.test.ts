@@ -57,7 +57,7 @@ describe("perjadinDirectory — the table's counts", () => {
   it("counts delivered over non-cancelled Sessions, and only Schools with a non-cancelled Session", async () => {
     const pic = await staff();
     const [first, second] = await twoSchools();
-    const perjadin = await addPerjadin({ picPersonId: pic.id, advanceIdr: 5_000_000 });
+    const perjadin = await addPerjadin({ picPersonId: pic.id });
     await addOfflineSession({
       schoolId: first.id,
       heldOn: "2026-09-01",
@@ -92,7 +92,7 @@ describe("perjadinDirectory — the table's counts", () => {
 
   it("reads 0/0 and zero Schools for a Perjadin with no Sessions", async () => {
     const pic = await staff();
-    await addPerjadin({ picPersonId: pic.id, advanceIdr: 5_000_000 });
+    await addPerjadin({ picPersonId: pic.id });
 
     const [trip] = await perjadinDirectory(caller);
 
@@ -105,7 +105,6 @@ describe("perjadinDirectory — the table's counts", () => {
     const pic = await staff();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: wibDaysFromToday(0),
       endsOn: wibDaysFromToday(2),
     });
@@ -135,7 +134,6 @@ describe("perjadinDirectory — the table's counts", () => {
     const pic = await staff();
     await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: wibDaysFromToday(0),
       endsOn: wibDaysFromToday(2),
     });

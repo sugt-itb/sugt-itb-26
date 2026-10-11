@@ -94,7 +94,6 @@ async function scene({ receipts = 2 }: { receipts?: number } = {}) {
   await addGrant(admin.id, "Administrator");
   const pimpinan = await addPerson({ fullName: "Fa", email: "fa@itb.ac.id", role: "Pimpinan" });
   const trip = await addPerjadin({
-    advanceIdr: 5_000_000,
     picPersonId: staff.id,
     subClusterName: "Kelompok 3",
     startsOn: "2026-10-12",
@@ -220,14 +219,13 @@ describe("Hapus transaksi", () => {
     expect(revalidatePath).toHaveBeenLastCalledWith(`/perjadin/${trip.id}/laporan`);
   });
 
-  it("drops the line from the totals, the subtotals, the remainder and the export", async () => {
+  it("drops the line from the totals, the subtotals and the export", async () => {
     const { staff, trip, transactionId } = await scene();
     const before = await perjadinAcquittal(staff as Person, trip.id);
     expect(before).toMatchObject({
       spentIdr: 450_000,
       siswaSpentIdr: 150_000,
       gtkMsSpentIdr: 300_000,
-      remainderIdr: 4_850_000,
     });
     expect(csvOf(before!)).toContain("Makan siang");
 
@@ -238,7 +236,6 @@ describe("Hapus transaksi", () => {
       spentIdr: 300_000,
       siswaSpentIdr: 0,
       gtkMsSpentIdr: 300_000,
-      remainderIdr: 5_000_000,
     });
     expect(after!.transactions.map((line) => line.description)).toEqual(["Hotel"]);
     expect(csvOf(after!)).not.toContain("Makan siang");

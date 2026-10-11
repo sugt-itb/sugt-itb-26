@@ -1,5 +1,4 @@
 import { MoneyFigure } from "-/components/money-figure";
-import { EditAdvance } from "-/components/perjadin-advance";
 import { PerjadinDates } from "-/components/perjadin-dates";
 import { PerjadinDokumenList } from "-/components/perjadin-dokumen-list";
 import { PerjadinFeedbackTokenDialog } from "-/components/perjadin-feedback-token";
@@ -38,11 +37,10 @@ export async function generateMetadata({ params }: PageProps<"/perjadin/[id]">):
  *
  * **The money strip renders for ANY signed-in Person now** (Staff or Pimpinan), because money
  * reads are open — ADR-0004 reversed by [ADR-0026](../../../../../../../docs/adr/0026-money-is-open-to-read-and-staff-only-to-write.md)
- * (#180). `perjadinDetail` still carries no money; the Advance and the acquittal come from
- * `perjadinAcquittal`, which is an open money read, so the strip below is fetched and shown to a
- * Pimpinan too. The strip carries a link to the Laporan, three figures, and — for whoever writes the
- * trip — an "Ubah Uang Perjalanan" edit that corrects the Advance after planning (#192); the acquittal
- * recomputes the remainder live from it. **Every write on this page is the trip's Group's, an
+ * (#180). `perjadinDetail` still carries no money; the acquittal comes from `perjadinAcquittal`,
+ * which is an open money read, so the strip below is fetched and shown to a Pimpinan too. The strip
+ * carries a link to the Laporan and one figure, Uang Perjalanan Terpakai — every transaction on the
+ * trip (ADR-0051, #464). **Every write on this page is the trip's Group's, an
  * Editor's or an Administrator's** (ADR-0048), enforced in each query rather than by what this page
  * renders, so a Pimpinan or a Staff member off the trip sees the figures but no edit.
  *
@@ -97,18 +95,8 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
       {acquittal !== null && (
         <div className="border-b border-border px-4 py-5 sm:px-7">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h2 className="font-heading text-sm font-medium">Uang Perjalanan</h2>
+            <h2 className="font-heading text-sm font-medium">Pengeluaran</h2>
             <div className="flex flex-wrap items-center gap-2">
-              {/*
-                Correcting the Advance is a money write on this trip, so the trigger is offered only
-                to whoever writes it (#192, ADR-0048). The strip itself renders for any signed-in
-                Person, since money reads are open.
-              */}
-              <EditAdvance
-                perjadinId={trip.id}
-                advanceIdr={acquittal.advanceIdr}
-                canEdit={canWrite}
-              />
               {/*
                 The Report is the acquittal state on this row, so it is a child of this page
                 rather than a surface of its own. Reading it is open to any signed-in Person now
@@ -134,22 +122,8 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
           </p>
           <dl className="mt-2.5 flex flex-wrap gap-x-8 gap-y-2 text-sm">
             <MoneyFigure
-              label="Diterima"
-              amountIdr={acquittal.advanceIdr}
-              unsetLabel="Belum diisi"
-            />
-            <MoneyFigure
-              label="Terpakai"
+              label="Uang Perjalanan Terpakai"
               amountIdr={acquittal.spentIdr}
-            />
-            {/*
-              Derived and never stored: the Advance less the travel-float draw-down — only Konsumsi
-              and Lainnya draw down (ADR-0029), so this can differ from Diterima − Terpakai.
-              Negative means the Group overspent the float, which is a real state and not an error.
-            */}
-            <MoneyFigure
-              label="Sisa"
-              amountIdr={acquittal.remainderIdr}
             />
           </dl>
         </div>

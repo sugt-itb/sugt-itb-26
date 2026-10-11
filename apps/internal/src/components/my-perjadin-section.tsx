@@ -8,7 +8,7 @@ import { PerjadinFeedbackTokenDialog } from "-/components/perjadin-feedback-toke
 import { SessionMarkDeliveredDialog } from "-/components/perjadin-mark-delivered";
 import { PerjadinPreparationDialog } from "-/components/perjadin-preparation";
 import { progressTone } from "-/components/progress-tone";
-import { spentPercent, tripTimeline, type TimelineNode } from "-/components/trip-timeline";
+import { tripTimeline, type TimelineNode } from "-/components/trip-timeline";
 import type { UploadGate } from "-/lib/drive/upload-gate";
 import { perjadinName, perjadinSchoolsLine } from "-/lib/perjadin-name";
 import type { MyPerjadinTrip } from "@sugt/db/queries";
@@ -27,7 +27,6 @@ import {
   CollapsibleTrigger,
 } from "@sugt/ui/components/collapsible";
 import { LinkButton } from "@sugt/ui/components/link-button";
-import { Progress } from "@sugt/ui/components/progress";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
@@ -199,10 +198,7 @@ function TripCard({
       <AccordionPanel className="text-foreground *:px-3 sm:*:px-4">
         <div className="grid gap-6 pt-2 pb-1 lg:grid-cols-[11fr_9fr]">
           <div className="flex min-w-0 flex-col gap-4">
-            <TripMoney
-              advanceIdr={trip.advanceIdr}
-              drawnDownIdr={trip.drawnDownIdr}
-            />
+            <TripMoney spentIdr={trip.spentIdr} />
 
             {/* A full-width two-column grid on a phone, each button stretched to its cell. */}
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
@@ -277,49 +273,15 @@ function TripCard({
 }
 
 /**
- * **The card's Uang Perjalanan**: Tersisa, Terpakai against the Advance, and the bar.
- *
- * Unset (`null`, #437) it reads "Uang Perjalanan belum diisi", with Terpakai but no Tersisa and no
- * bar — there is nothing to measure against, and `null - x` would silently read as `-x`.
+ * **The card's Uang Perjalanan Terpakai** (ADR-0051): every transaction on the trip, all categories —
+ * the same figure as the trip page, the Laporan and the CSV, pinned equal by a query test. There is
+ * no Advance to measure it against, so no remainder and no bar.
  */
-function TripMoney({
-  advanceIdr,
-  drawnDownIdr,
-}: {
-  advanceIdr: number | null;
-  drawnDownIdr: number;
-}) {
+function TripMoney({ spentIdr }: { spentIdr: number }) {
   return (
     <div>
-      {advanceIdr === null ? (
-        // Terpakai stays: spending does not wait for the Advance.
-        <>
-          <p className="font-heading text-lg">Uang Perjalanan belum diisi</p>
-          <p className="mt-1 text-sm tabular-nums">Terpakai {formatRupiah(drawnDownIdr)}</p>
-        </>
-      ) : (
-        <>
-          <p className="text-xs text-muted-foreground">Uang Perjalanan</p>
-          {/*
-          The same travel-float remainder the acquittal derives (`advanceIdr -
-          drawnDownIdr`, only ADVANCE_DRAWDOWN_CATEGORIES draw down — ADR-0029), pinned
-          equal by a query test so the two screens never show two answers. Shown as is,
-          negative included; only the bar clamps.
-        */}
-          <p className="mt-1 font-heading text-lg tabular-nums">
-            Tersisa {formatRupiah(advanceIdr - drawnDownIdr)}
-          </p>
-          <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 text-sm tabular-nums">
-            <span>Terpakai {formatRupiah(drawnDownIdr)}</span>
-            <span>{formatRupiah(advanceIdr)}</span>
-          </div>
-          <Progress
-            value={spentPercent(advanceIdr, drawnDownIdr)}
-            aria-label="Uang Perjalanan terpakai"
-            className="mt-2 *:data-[slot=progress-track]:h-3"
-          />
-        </>
-      )}
+      <p className="text-xs text-muted-foreground">Uang Perjalanan Terpakai</p>
+      <p className="mt-1 font-heading text-lg tabular-nums">{formatRupiah(spentIdr)}</p>
     </div>
   );
 }

@@ -69,7 +69,6 @@ describe("only an Administrator reaches /log", () => {
     });
     const trip = await addPerjadin({
       picPersonId: rina.id,
-      advanceIdr: 15_000_000,
       subClusterName: "Kelompok 18",
       startsOn: "2026-10-12",
       endsOn: "2026-10-15",

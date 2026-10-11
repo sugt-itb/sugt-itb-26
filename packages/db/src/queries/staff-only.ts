@@ -16,8 +16,8 @@ import type { Executor } from "./preparation-checklist";
  * **What passes through here is writes, not money reads.** Money READS are now open to any
  * signed-in Person — a Pimpinan reads all money (the acquittal, the CSV export, the trip money
  * strip, the `/monitoring` budget card), so `perjadinAcquittal` no longer opens with this guard.
- * What this choke point guards is money **WRITES** — recording, attaching, settling and filing a
- * transaction, plus the treasurer return — and delivery-*arranging* writes: Jadwalkan Sesi daring
+ * What this choke point guards is money **WRITES** — recording, attaching, deleting and filing a
+ * transaction — and delivery-*arranging* writes: Jadwalkan Sesi daring
  * and Rencanakan Perjadin are Staff-only because [#9](https://github.com/mafiefa02/sugt/issues/9)
  * says so (and since ADR-0047 also need the Editor Grant, through `requireGrant` below), and ADR-0004 is silent on it (that ADR opens delivery data to both roles for **reading**
  * and leaves writes with "the record's owner", which a Session nobody has arranged yet does not

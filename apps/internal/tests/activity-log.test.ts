@@ -11,7 +11,6 @@ import {
   isNotStaffError,
   planPerjadin,
   recordTransaction,
-  updatePerjadinAdvance,
   type ActivityLogEntry,
   type ActivityLogFilters,
   type NewEvidence,
@@ -21,6 +20,7 @@ import type { ActivityLogAction, Role } from "@sugt/domain";
 import { asc, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { logActivity } from "../../../packages/db/src/queries/activity-log";
 import {
   addActivityLogEntry,
   addCluster,
@@ -85,8 +85,8 @@ function searchTextOf(entry: ActivityLogEntry, backfilled = false) {
 describe("each money write logs one entry with the change", () => {
   beforeEach(resetDatabase);
 
-  /** A one-School plan on a real Sub-Cluster, with the Advance a test names. */
-  async function plan(pic: Person, advanceIdr: number | null) {
+  /** A one-School plan on a real Sub-Cluster. */
+  async function plan(pic: Person) {
     await addProvince("JB", "Jawa Barat");
     const cluster = await addCluster({ slug: "alpha", name: "Cluster Alpha" });
     const subCluster = await addSubCluster({
@@ -105,7 +105,6 @@ describe("each money write logs one entry with the change", () => {
 
     return planPerjadin(pic, {
       subClusterId: subCluster.id,
-      advanceIdr,
       picPersonId: pic.id,
       teacherNames: [],
       pimpinan: [],
@@ -122,37 +121,9 @@ describe("each money write logs one entry with the change", () => {
     });
   }
 
-  it("planPerjadin logs advance_set with the planned Advance", async () => {
+  it("planPerjadin logs nothing, and leaves the Advance column unwritten (ADR-0051)", async () => {
     const pic = await staff();
-    const result = await plan(pic, 15_000_000);
-    if (result.outcome !== "planned") throw new Error(result.outcome);
-
-    const logged = await entries();
-    expect(logged).toHaveLength(1);
-    expect(logged[0]).toMatchObject({
-      actorPersonId: pic.id,
-      actorEmail: "rina@ditsama.itb.ac.id",
-      perjadinId: result.perjadinId,
-      action: "advance_set",
-      details: { amountIdr: 15_000_000 },
-      searchText: "uang perjalanan ditetapkan · rp15.000.000",
-      backfilled: false,
-    });
-  });
-
-  it("planPerjadin logs advance_set for Rp 0 — zero is an amount, not an empty field (#437)", async () => {
-    const pic = await staff();
-    const result = await plan(pic, 0);
-    if (result.outcome !== "planned") throw new Error(result.outcome);
-
-    await expect(entries()).resolves.toMatchObject([
-      { action: "advance_set", details: { amountIdr: 0 } },
-    ]);
-  });
-
-  it("planPerjadin without an Advance stores null and logs nothing about it (#437)", async () => {
-    const pic = await staff();
-    const result = await plan(pic, null);
+    const result = await plan(pic);
     if (result.outcome !== "planned") throw new Error(result.outcome);
 
     const [row] = await db
@@ -163,19 +134,10 @@ describe("each money write logs one entry with the change", () => {
     await expect(entries()).resolves.toEqual([]);
   });
 
-  it("planPerjadin refuses a negative Advance, writing and logging nothing (#437)", async () => {
-    const pic = await staff();
-
-    await expect(plan(pic, -1)).resolves.toEqual({ outcome: "negative-advance" });
-    await expect(db.select().from(schema.perjadin)).resolves.toEqual([]);
-    await expect(entries()).resolves.toEqual([]);
-  });
-
   it("planPerjadin's refusal logs nothing", async () => {
     const pic = await staff();
     const result = await planPerjadin(pic, {
       subClusterId: randomUUID(),
-      advanceIdr: 15_000_000,
       picPersonId: pic.id,
       teacherNames: [],
       pimpinan: [],
@@ -187,71 +149,23 @@ describe("each money write logs one entry with the change", () => {
     await expect(entries()).resolves.toEqual([]);
   });
 
-  it("updatePerjadinAdvance logs advance_changed from → to, and nothing for an unchanged value", async () => {
-    const pic = await staff();
-    const budi = await staff("budi@ditsama.itb.ac.id", "Budi");
-    const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: 15_000_000 });
-
-    await expect(updatePerjadinAdvance(budi, trip.id, 15_000_000)).resolves.toEqual({
-      outcome: "updated",
-    });
-    await expect(entries()).resolves.toEqual([]);
-
-    await expect(updatePerjadinAdvance(budi, trip.id, 18_500_000)).resolves.toEqual({
-      outcome: "updated",
-    });
-    const logged = await entries();
-    expect(logged).toHaveLength(1);
-    expect(logged[0]).toMatchObject({
-      actorPersonId: budi.id,
-      actorEmail: "budi@ditsama.itb.ac.id",
-      perjadinId: trip.id,
-      action: "advance_changed",
-      details: { fromIdr: 15_000_000, toIdr: 18_500_000 },
-      searchText: "uang perjalanan diubah · rp15.000.000 → rp18.500.000",
-    });
-  });
-
-  it("updatePerjadinAdvance logs advance_set when it fills an unset Advance in, then advance_changed (#437)", async () => {
-    const pic = await staff();
-    const budi = await staff("budi@ditsama.itb.ac.id", "Budi");
-    const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: null });
-
-    await expect(updatePerjadinAdvance(budi, trip.id, 12_000_000)).resolves.toEqual({
-      outcome: "updated",
-    });
-    await expect(updatePerjadinAdvance(budi, trip.id, 0)).resolves.toEqual({
-      outcome: "updated",
-    });
-
-    await expect(entries()).resolves.toMatchObject([
-      {
-        actorPersonId: budi.id,
-        action: "advance_set",
-        details: { amountIdr: 12_000_000 },
-        searchText: "uang perjalanan ditetapkan · rp12.000.000",
-      },
-      { action: "advance_changed", details: { fromIdr: 12_000_000, toIdr: 0 } },
-    ]);
-  });
-
-  it("updatePerjadinAdvance logs nothing when it refuses", async () => {
-    const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: 15_000_000 });
-
-    await expect(updatePerjadinAdvance(pic, trip.id, -1)).resolves.toEqual({
-      outcome: "negative-advance",
-    });
-    await expect(updatePerjadinAdvance(pic, randomUUID(), 1)).resolves.toEqual({
-      outcome: "no-such-perjadin",
-    });
-    await expect(updatePerjadinAdvance(nonStaff(), trip.id, 1)).rejects.toSatisfy(isNotStaffError);
-    await expect(entries()).resolves.toEqual([]);
+  it("cannot be handed advance_set or advance_changed — they are history only (ADR-0051)", () => {
+    // Never called: the assertion is the typecheck gate. Each `@ts-expect-error` fails the build the
+    // day `logActivity` accepts the action again.
+    const set = { action: "advance_set", details: { amountIdr: 1 } } as const;
+    const changed = { action: "advance_changed", details: { fromIdr: 1, toIdr: 2 } } as const;
+    const neverRun = (tx: Parameters<typeof logActivity>[0], actor: Person) => [
+      // @ts-expect-error -- advance_set is no longer written
+      logActivity(tx, actor, randomUUID(), set),
+      // @ts-expect-error -- advance_changed is no longer written
+      logActivity(tx, actor, randomUUID(), changed),
+    ];
+    expect(neverRun).toBeTypeOf("function");
   });
 
   it("recordTransaction logs transaction_recorded with the line and its receipt count", async () => {
     const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: 15_000_000 });
+    const trip = await addPerjadin({ picPersonId: pic.id });
 
     const result = await recordTransaction(pic, {
       perjadinId: trip.id,
@@ -284,7 +198,7 @@ describe("each money write logs one entry with the change", () => {
 
   it("recordTransaction logs nothing for a sixth receipt or a non-Staff caller", async () => {
     const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: 15_000_000 });
+    const trip = await addPerjadin({ picPersonId: pic.id });
     const line = {
       perjadinId: trip.id,
       spentOn: "2026-10-12",
@@ -304,7 +218,7 @@ describe("each money write logs one entry with the change", () => {
 
   it("attachTransactionEvidence logs evidence_uploaded with the batch and the line's new total", async () => {
     const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: 15_000_000 });
+    const trip = await addPerjadin({ picPersonId: pic.id });
     const line = await addTransaction({
       perjadinId: trip.id,
       amountIdr: 1_250_000,
@@ -340,7 +254,7 @@ describe("each money write logs one entry with the change", () => {
 
   it("attachTransactionEvidence logs nothing for a batch past five", async () => {
     const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: 15_000_000 });
+    const trip = await addPerjadin({ picPersonId: pic.id });
     const line = await addTransaction({
       perjadinId: trip.id,
       amountIdr: 1_250_000,
@@ -355,7 +269,7 @@ describe("each money write logs one entry with the change", () => {
 
   it("filePerjadinReport logs report_filed with every category's lines and total", async () => {
     const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: 15_000_000 });
+    const trip = await addPerjadin({ picPersonId: pic.id });
     // Akomodasi does not draw down the float (ADR-0029); the entry counts it anyway.
     for (const [category, amountIdr] of [
       ["Konsumsi", 1_250_000],
@@ -386,14 +300,14 @@ describe("each money write logs one entry with the change", () => {
 
   it("filePerjadinReport logs nothing when a line has no receipt, or when filed already", async () => {
     const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: 15_000_000 });
+    const trip = await addPerjadin({ picPersonId: pic.id });
     await addTransaction({ perjadinId: trip.id, amountIdr: 1_250_000, createdByPersonId: pic.id });
 
     const refused = await filePerjadinReport(pic, trip.id);
     expect(refused.outcome).toBe("evidence-missing");
     await expect(entries()).resolves.toEqual([]);
 
-    const empty = await addPerjadin({ picPersonId: pic.id, advanceIdr: 0 });
+    const empty = await addPerjadin({ picPersonId: pic.id });
     expect((await filePerjadinReport(pic, empty.id)).outcome).toBe("filed");
     expect((await filePerjadinReport(pic, empty.id)).outcome).toBe("already-filed");
     const logged = await entries();
@@ -404,8 +318,8 @@ describe("each money write logs one entry with the change", () => {
 
   it("keeps the email the actor had at the time, after it changes", async () => {
     const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id, advanceIdr: 15_000_000 });
-    await updatePerjadinAdvance(pic, trip.id, 18_500_000);
+    const trip = await addPerjadin({ picPersonId: pic.id });
+    await filePerjadinReport(pic, trip.id);
 
     await db
       .update(schema.person)
@@ -429,14 +343,12 @@ describe("activityLogPage — /log's read", () => {
     const budi = await staff("budi@ditsama.itb.ac.id", "Budi Hartono");
     const samarinda = await addPerjadin({
       picPersonId: rina.id,
-      advanceIdr: 15_000_000,
       subClusterName: "Kelompok 18",
       startsOn: "2026-10-12",
       endsOn: "2026-10-15",
     });
     const bandung = await addPerjadin({
       picPersonId: budi.id,
-      advanceIdr: 5_000_000,
       subClusterName: "Kelompok 3",
     });
     await addSchoolOnTrip({ perjadin: samarinda, name: "SMAN 1 Bontang" });

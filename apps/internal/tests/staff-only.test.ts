@@ -44,11 +44,10 @@ describe("money writes are Staff-only", () => {
     vi.unstubAllEnvs();
   });
 
-  /** A Perjadin with an Advance and one line item against it. */
+  /** A Perjadin with one line item on it. */
   async function aPerjadinWithSpending() {
     const pic = await signInAsPerson("Staff", "rina@ditsama.itb.ac.id", "Rina Nurhayati");
-    const perjadin = await addPerjadin({ advanceIdr: 5_000_000, picPersonId: pic.id });
-    // Konsumsi draws down the float (ADR-0029), so it reduces the remainder the reconciliation checks.
+    const perjadin = await addPerjadin({ picPersonId: pic.id });
     await addTransaction({
       perjadinId: perjadin.id,
       amountIdr: 1_250_000,
@@ -92,25 +91,21 @@ describe("money writes are Staff-only", () => {
     });
   });
 
-  it("gives Staff the reconciliation, derived rather than stored", async () => {
+  it("gives Staff Uang Perjalanan Terpakai, derived rather than stored", async () => {
     const { pic, perjadin } = await aPerjadinWithSpending();
 
     await expect(perjadinAcquittal(pic, perjadin.id)).resolves.toMatchObject({
       perjadinId: perjadin.id,
-      advanceIdr: 5_000_000,
       spentIdr: 1_250_000,
-      remainderIdr: 3_750_000,
-      returnedToTreasurerIdr: null,
     });
   });
 
   it("reads a Perjadin that has spent nothing as zero, not as unknown", async () => {
     const pic = await signInAsPerson("Staff", "rina@ditsama.itb.ac.id", "Rina Nurhayati");
-    const perjadin = await addPerjadin({ advanceIdr: 2_000_000, picPersonId: pic.id });
+    const perjadin = await addPerjadin({ picPersonId: pic.id });
 
     await expect(perjadinAcquittal(pic, perjadin.id)).resolves.toMatchObject({
       spentIdr: 0,
-      remainderIdr: 2_000_000,
     });
   });
 

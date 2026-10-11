@@ -7,7 +7,7 @@ import type { TransactionCategory, TransactionParticipantType } from "@sugt/doma
  * pagination), so — unlike `/feedback`, whose dataset is unbounded and sorts/filters server-side —
  * this is a pure lens over the array the component already holds. It is a plain function rather than
  * a hook so the compound-order and AND-filter rules can be tested without React. It touches nothing
- * but the list: the acquittal's money figures (advance/spent/remainder, the CSV export) are computed
+ * but the list: the acquittal's money figures (the spend totals, the CSV export) are computed
  * upstream from the full set and never routed through this.
  */
 

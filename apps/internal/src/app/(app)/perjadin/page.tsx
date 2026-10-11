@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Perjadin" };
  *
  * One `requirePerson()`, one query, no role check: a trip's name, its Schools and how
  * many Schools it reaches are delivery data, and ADR-0004 opens that to everyone signed in.
- * The Advance is not here at all — it is `perjadinAcquittal`'s, which any signed-in Person may
+ * Money is not here at all — it is `perjadinAcquittal`'s, which any signed-in Person may
  * read now (ADR-0004 reversed by ADR-0026, #180); this list simply never fetches money, and
  * writing it is the trip's writers' (ADR-0048).
  *

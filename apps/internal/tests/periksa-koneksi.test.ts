@@ -72,7 +72,6 @@ async function scene() {
   const staff = await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" });
   const pimpinan = await addPerson({ fullName: "Pim", email: "pim@itb.ac.id", role: "Pimpinan" });
   const trip = await addPerjadin({
-    advanceIdr: 5_000_000,
     picPersonId: staff.id,
     subClusterName: "Kelompok 3",
     startsOn: "2026-10-12",
@@ -415,7 +414,6 @@ describe("the folder names (#407)", () => {
   /** A second trip, in another Kelompok, a week later. */
   async function anotherTrip(staffId: string) {
     return addPerjadin({
-      advanceIdr: 1_000_000,
       picPersonId: staffId,
       subClusterName: "Kelompok 4",
       startsOn: "2026-10-19",

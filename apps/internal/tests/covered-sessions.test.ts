@@ -57,7 +57,6 @@ async function scene() {
     addPerjadin({
       subClusterId: subCluster.id,
       picPersonId: pic.id,
-      advanceIdr: 1_000_000,
       startsOn,
       endsOn,
     });
@@ -124,7 +123,6 @@ describe("the plan form", () => {
     await expect(
       planPerjadin(pic, {
         subClusterId: subCluster.id,
-        advanceIdr: 1_000_000,
         picPersonId: pic.id,
         teacherNames: [],
         pimpinan: [],
