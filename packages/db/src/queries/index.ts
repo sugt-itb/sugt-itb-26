@@ -324,14 +324,18 @@ export {
 } from "./perjadin-planning";
 export {
   attachTransactionEvidence,
+  deleteTransactionEvidence,
   filePerjadinReport,
   perjadinAcquittal,
+  receiptDeleteTarget,
   receiptsOnLine,
   recordTransaction,
   type AcquittalEvidence,
   type AcquittalTransaction,
   type AttachEvidenceResult,
+  type DeleteEvidenceResult,
   type FilePerjadinReportResult,
+  type ReceiptDeleteTarget,
   type NewEvidence,
   type NewTransaction,
   type PerjadinAcquittal,

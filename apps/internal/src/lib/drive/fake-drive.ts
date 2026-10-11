@@ -100,6 +100,11 @@ export class FakeDrive implements DriveClient {
     this.require("files.update(trash)", id).explicitlyTrashed = true;
   }
 
+  async untrashFile(id: string) {
+    this.calls += 1;
+    this.require("files.update(untrash)", id).explicitlyTrashed = false;
+  }
+
   async readRange(id: string, start: number, end: number) {
     this.calls += 1;
     return this.require("files.get(media)", id).content.slice(start, end + 1);

@@ -681,7 +681,9 @@ export type SessionFootageContentType = keyof typeof SESSION_FOOTAGE_CONTENT_TYP
  * The two `document_*` values went into the set with the rest, so the Dokumen uploads
  * ([#397](https://github.com/sugt-itb/sugt-itb-26/issues/397)) and Hapus
  * ([#398](https://github.com/sugt-itb/sugt-itb-26/issues/398)) needed no CHECK migration. The two
- * `footage_*` values (Session Footage, #424) came later and widened the CHECK in migration 0044.
+ * `footage_*` values (Session Footage, #424) came later and widened the CHECK in migration 0044, and
+ * `evidence_deleted` and `transaction_deleted` (Hapus bukti, #462, and Hapus transaksi, #463;
+ * ADR-0050) widened it again in migration 0049.
  */
 export const ACTIVITY_LOG_ACTIONS = [
   "advance_set",
@@ -693,6 +695,8 @@ export const ACTIVITY_LOG_ACTIONS = [
   "document_deleted",
   "footage_uploaded",
   "footage_deleted",
+  "evidence_deleted",
+  "transaction_deleted",
 ] as const;
 export type ActivityLogAction = (typeof ACTIVITY_LOG_ACTIONS)[number];
 
@@ -707,6 +711,8 @@ export const ACTIVITY_LOG_ACTION_LABELS: Record<ActivityLogAction, string> = {
   document_deleted: "Dokumen dihapus",
   footage_uploaded: "Foto/Video diunggah",
   footage_deleted: "Foto/Video dihapus",
+  evidence_deleted: "Bukti dihapus",
+  transaction_deleted: "Transaksi dihapus",
 };
 
 /**

@@ -19,7 +19,7 @@ import { requirePerjadinWriter, requireStaff } from "./staff-only";
 /**
  * **Perjadin Report** — the acquittal of one Perjadin. Reading it is now open to any signed-in
  * Person (ADR-0026 reversed ADR-0004's money-read half, #180); only **writing** it — recording a
- * transaction, attaching a receipt, settling, filing — is the trip's Group's, an Editor's or an
+ * transaction, attaching or deleting a receipt, settling, filing — is the trip's Group's, an Editor's or an
  * Administrator's (ADR-0048), each write query below opening with its own `requireStaff` and
  * running `requirePerjadinWriter`.
  *
@@ -540,6 +540,121 @@ export async function receiptsOnLine(
     .where(and(eq(transaction.id, transactionId), eq(transaction.perjadinId, perjadinId)))
     .groupBy(transaction.id);
   return line ? line.held : null;
+}
+
+/** What Hapus needs before it reaches Drive: the receipt's file, its line, and the line's count. */
+export type ReceiptDeleteTarget = {
+  perjadinId: string;
+  transactionId: string;
+  driveFileId: string;
+  /** The receipts the line holds now, this one included. */
+  held: number;
+};
+
+/**
+ * **The receipt Hapus is about to delete, read before any Drive call** (ADR-0050, #462). `null` when
+ * there is no such receipt — a second Hapus, or a stale screen.
+ *
+ * Exported for the same reason `receiptsOnLine` is: it is the guard the action runs **ahead of
+ * Drive** — Staff, then the trip's writer (ADR-0048), then the count — so a non-writer causes no
+ * Drive call and a line's only receipt is refused before its file is trashed.
+ * `deleteTransactionEvidence` counts again under the line's lock; this read is the early answer,
+ * not the rule.
+ */
+export async function receiptDeleteTarget(
+  caller: Person,
+  evidenceId: string,
+): Promise<ReceiptDeleteTarget | null> {
+  requireStaff(caller);
+
+  const [found] = await db
+    .select({
+      perjadinId: transaction.perjadinId,
+      transactionId: transactionEvidence.transactionId,
+      driveFileId: transactionEvidence.driveFileId,
+    })
+    .from(transactionEvidence)
+    .innerJoin(transaction, eq(transaction.id, transactionEvidence.transactionId))
+    .where(sql`${transactionEvidence.id}::text = ${evidenceId}`);
+  if (!found) return null;
+  await requirePerjadinWriter(caller, found.perjadinId);
+
+  const [line] = await db
+    .select({ held: count() })
+    .from(transactionEvidence)
+    .where(eq(transactionEvidence.transactionId, found.transactionId));
+  return { ...found, held: line?.held ?? 0 };
+}
+
+export type DeleteEvidenceResult =
+  | { outcome: "deleted"; perjadinId: string }
+  /** No such receipt — deleted already, by this Hapus pressed twice or by another. */
+  | { outcome: "no-such-evidence" }
+  /** The line's only receipt (ADR-0039): a line keeps at least one. Nothing is deleted. */
+  | { outcome: "only-receipt" };
+
+/**
+ * **Delete one receipt and log `evidence_deleted`, in one transaction** (ADR-0050, #462). The action
+ * has already trashed its file in Drive.
+ *
+ * **A line keeps at least one receipt.** The parent `transaction` row is locked `for update` before
+ * its receipts are counted — the same lock `attachTransactionEvidence` counts under — so two Hapus
+ * on a two-receipt line serialise: the second counts once the first has committed, finds its own
+ * receipt the only one left, and is refused. A line grandfathered with more than five may lose any of
+ * them, down to one.
+ *
+ * Nothing about filing gates it: a filed Laporan's `report_filed` entry keeps the totals as filed.
+ * The Log entry is a copy of what went, since the row is gone after.
+ */
+export async function deleteTransactionEvidence(
+  caller: Person,
+  evidenceId: string,
+): Promise<DeleteEvidenceResult> {
+  requireStaff(caller);
+
+  return db.transaction(async (tx) => {
+    const [found] = await tx
+      .select({ transactionId: transactionEvidence.transactionId })
+      .from(transactionEvidence)
+      .where(sql`${transactionEvidence.id}::text = ${evidenceId}`);
+    if (!found) return { outcome: "no-such-evidence" };
+
+    const [line] = await tx
+      .select({
+        perjadinId: transaction.perjadinId,
+        category: transaction.category,
+        amountIdr: transaction.amountIdr,
+        spentOn: transaction.spentOn,
+      })
+      .from(transaction)
+      .where(eq(transaction.id, found.transactionId))
+      .for("update");
+    if (!line) return { outcome: "no-such-evidence" };
+    await requirePerjadinWriter(caller, line.perjadinId, tx);
+
+    // Read under the lock: a Hapus that committed while this one waited is already gone from it.
+    const held = await tx
+      .select({ id: transactionEvidence.id })
+      .from(transactionEvidence)
+      .where(eq(transactionEvidence.transactionId, found.transactionId));
+    if (!held.some((receipt) => receipt.id === evidenceId)) return { outcome: "no-such-evidence" };
+    if (held.length <= 1) return { outcome: "only-receipt" };
+
+    await tx.delete(transactionEvidence).where(eq(transactionEvidence.id, evidenceId));
+    await logActivity(tx, caller, line.perjadinId, {
+      action: "evidence_deleted",
+      details: {
+        transactionId: found.transactionId,
+        evidenceId,
+        category: line.category,
+        amountIdr: line.amountIdr,
+        spentOn: line.spentOn,
+        left: held.length - 1,
+      },
+    });
+
+    return { outcome: "deleted", perjadinId: line.perjadinId };
+  });
 }
 
 export type FilePerjadinReportResult =

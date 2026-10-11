@@ -15,13 +15,16 @@ import {
   type ReceiptContentType,
 } from "-/lib/drive/receipt-files";
 import { reconcileTransaction } from "-/lib/drive/reconcile";
+import { trashIfLive, untrashIfPresent } from "-/lib/drive/trash-if-live";
 import { driveRefusal, isStagedUploadFor, staffOnTrip } from "-/lib/drive/upload-guard";
 import { requireEnv } from "-/lib/env";
 import { requirePerson, type Person } from "-/lib/person";
 import { staffSurface } from "-/lib/staff-surface";
 import {
   attachTransactionEvidence,
+  deleteTransactionEvidence,
   filePerjadinReport,
+  receiptDeleteTarget,
   receiptsOnLine,
   recordTransaction,
   type FilePerjadinReportResult,
@@ -32,6 +35,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
 import type {
+  DeleteReceiptActionResult,
   FinalizeReceiptsResult,
   OpenReceiptSessionsResult,
   ReceiptToOpen,
@@ -52,7 +56,8 @@ import type {
  * close the path, since a layout does not run before a Server Action. Every one that touches
  * Drive — opening upload sessions, recording a line, attaching receipts to one — also calls the
  * guard itself, first, through `staffOnTrip`
- * (`-/lib/drive/upload-guard`), because Google is reached before any query runs. Every refusal
+ * (`-/lib/drive/upload-guard`), because Google is reached before any query runs; deleting one runs
+ * `receiptDeleteTarget` first for the same reason. Every refusal
  * comes back as a value.
  */
 
@@ -341,6 +346,59 @@ export async function finalizeReceiptsAction(
   const synced = await reconcileAfterCommit(person, drive, access.folders, transactionId);
   revalidatePath(`/perjadin/${perjadinId}/laporan`);
   return { outcome: "attached", attached: result.count, failed, synced };
+}
+
+/**
+ * **Hapus bukti — delete one receipt from its line** (#462, ADR-0050). **The file is trashed first,
+ * then the row**, as Dokumen Hapus does (ADR-0042), so a row never vanishes while its link-shared
+ * file stays live:
+ *
+ * 1. **Guard** — Staff, the receipt and its trip's writer (ADR-0048) — then **the count**: a line's
+ *    only receipt is refused here, with nothing trashed. Then the connection. All before any Drive
+ *    call.
+ * 2. **Trash the file.** One already in the trash, or gone, counts as done: a retry is safe. A
+ *    receipt still unsynced is trashed from `_staging` the same way.
+ * 3. **Delete the row and log `evidence_deleted`**, in one transaction, counting again under the
+ *    line's lock (`deleteTransactionEvidence`). If that fails after the trash, the row stays,
+ *    pointing at a trashed file; Hapus again ends it.
+ * 4. **If the commit refuses the count** — a concurrent Hapus on the line won the race and this
+ *    receipt is now its only one — **take the file back out of the trash**, so the surviving
+ *    receipt's link opens, and refuse.
+ */
+export async function deleteReceiptAction(evidenceId: string): Promise<DeleteReceiptActionResult> {
+  const person = await requirePerson();
+
+  const target = await staffSurface(() => receiptDeleteTarget(person, evidenceId));
+  if (!target) return { outcome: "no-such-receipt" };
+  if (target.held <= 1) return { outcome: "only-receipt" };
+
+  const access = await driveAccessToken(person);
+  if (access.outcome !== "ok") return driveRefusal(person, access.outcome);
+  const drive = openDrive(access.accessToken);
+
+  try {
+    await trashIfLive(drive, target.driveFileId);
+  } catch (error) {
+    if (isDriveFailure(error)) return { outcome: "drive-unreachable" };
+    throw error;
+  }
+
+  const result = await staffSurface(() => deleteTransactionEvidence(person, evidenceId));
+  if (result.outcome === "only-receipt") {
+    try {
+      await untrashIfPresent(drive, target.driveFileId);
+    } catch (error) {
+      // The row stands with its file in the trash, which only restoring it by hand from the Drive
+      // trash puts right — so say which file, for whoever does.
+      console.error(`Receipt ${evidenceId} kept its row, but its file stayed in the trash.`, error);
+      if (isDriveFailure(error)) return { outcome: "drive-unreachable" };
+      throw error;
+    }
+    return result;
+  }
+  if (result.outcome === "no-such-evidence") return { outcome: "no-such-receipt" };
+  revalidatePath(`/perjadin/${result.perjadinId}/laporan`);
+  return { outcome: "deleted" };
 }
 
 /**

@@ -89,6 +89,18 @@ export type FinalizeReceiptsResult =
   | DriveRefusal;
 
 /**
+ * What `deleteReceiptAction` did (#462, ADR-0050): the file trashed and the row gone, or why not.
+ * Every refusal leaves the receipt listed and its file where it was.
+ */
+export type DeleteReceiptActionResult =
+  | { outcome: "deleted" }
+  /** Already deleted — a second Hapus, or a stale screen. */
+  | { outcome: "no-such-receipt" }
+  /** The line's only receipt (ADR-0039): a line keeps at least one. */
+  | { outcome: "only-receipt" }
+  | DriveRefusal;
+
+/**
  * One receipt as the screen renders it: the row, minus its Drive id, plus the link to the file in
  * Drive (ADR-0040), opened in a new tab — the app renders nothing of the file. The link opens for
  * anyone once its transaction folder is shared.
