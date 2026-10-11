@@ -1,7 +1,6 @@
 "use client";
 
 import type {
-  DeleteReceiptActionResult,
   OpenReceiptSessionsResult,
   RecordTransactionActionResult,
   UploadedReceipt,
@@ -20,6 +19,11 @@ import {
   type ParticipantFilter,
   type SortDirection,
 } from "-/components/laporan-perjadin/acquittal-transactions-sort";
+import {
+  ONLY_RECEIPT,
+  RECEIPT_DELETE_CONFIRM,
+  receiptDeleteRefusalText,
+} from "-/components/laporan-perjadin/receipt-delete-messages";
 import { RequiredLegend, RequiredMark } from "-/components/required-mark";
 import { UnsyncedMarker } from "-/components/unsynced-marker";
 import {
@@ -456,7 +460,7 @@ function Receipts({
                 <DeleteReceipt
                   evidenceId={file.id}
                   label={`Bukti ${index + 1}`}
-                  only={line.evidence.length <= 1}
+                  onlyReceipt={line.evidence.length <= 1}
                   uploadGate={uploadGate}
                 />
               )}
@@ -513,11 +517,6 @@ function Receipts({
   );
 }
 
-/** The entry form. One line item at a time, which is how a PIC has them. */
-/** Why the line's only receipt has no Hapus to confirm (ADR-0039, ADR-0050). */
-const ONLY_RECEIPT =
-  "Satu-satunya bukti tidak bisa dihapus. Unggah bukti yang benar dulu, atau hapus transaksinya.";
-
 /**
  * **Hapus** beside one receipt, behind a confirmation (#462, ADR-0050). The file goes to the Drive
  * trash first, then the row, and the page revalidates. Disabled with the gate's reason while Drive
@@ -527,12 +526,13 @@ const ONLY_RECEIPT =
 function DeleteReceipt({
   evidenceId,
   label,
-  only,
+  onlyReceipt,
   uploadGate,
 }: {
   evidenceId: string;
   label: string;
-  only: boolean;
+  /** The line's only receipt: the dialog says why it cannot go instead of asking. */
+  onlyReceipt: boolean;
   uploadGate: UploadGate;
 }) {
   const [open, setOpen] = useState(false);
@@ -547,7 +547,7 @@ function DeleteReceipt({
         setOpen(false);
         return;
       }
-      setRefusal(deleteRefusalFor(result));
+      setRefusal(receiptDeleteRefusalText(result));
     });
   }
 
@@ -576,7 +576,7 @@ function DeleteReceipt({
         <DialogHeader>
           <DialogTitle>Hapus bukti</DialogTitle>
           <DialogDescription>
-            {only ? ONLY_RECEIPT : "Hapus bukti ini? File akan dipindahkan ke Sampah Google Drive."}
+            {onlyReceipt ? ONLY_RECEIPT : RECEIPT_DELETE_CONFIRM}
           </DialogDescription>
         </DialogHeader>
         {refusal !== null && <p className="text-sm text-destructive">{refusal}</p>}
@@ -587,9 +587,9 @@ function DeleteReceipt({
               setOpen(false);
             }}
           >
-            {only ? "Tutup" : "Batal"}
+            {onlyReceipt ? "Tutup" : "Batal"}
           </Button>
-          {!only && (
+          {!onlyReceipt && (
             <Button
               variant="destructive"
               disabled={deleting}
@@ -604,14 +604,7 @@ function DeleteReceipt({
   );
 }
 
-/** What a refused Hapus bukti says. */
-function deleteRefusalFor(
-  result: Exclude<DeleteReceiptActionResult, { outcome: "deleted" | "no-such-receipt" }>,
-) {
-  if (result.outcome === "only-receipt") return ONLY_RECEIPT;
-  return driveRefusalText(result);
-}
-
+/** The entry form. One line item at a time, which is how a PIC has them. */
 function RecordTransaction({
   perjadinId,
   uploadGate,

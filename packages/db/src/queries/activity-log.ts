@@ -149,7 +149,7 @@ export function activityLogRincian(entry: ActivityLogEntry): string {
     }
     case "evidence_deleted": {
       const { category, amountIdr, spentOn, left } = entry.details;
-      return `${category} · ${formatRupiah(amountIdr)} · tgl ${spentOn} · −1 bukti (kini ${left}/${MAX_RECEIPTS_PER_TRANSACTION})`;
+      return `${category} · ${formatRupiah(amountIdr)} · tgl ${spentOn} · -1 bukti (kini ${left}/${MAX_RECEIPTS_PER_TRANSACTION})`;
     }
     case "transaction_deleted": {
       const { category, amountIdr, participantType, spentOn, description, receiptCount } =

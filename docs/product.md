@@ -615,7 +615,7 @@ as failed, and the rest are kept.
   bukti tidak bisa dihapus. Unggah bukti yang benar dulu, atau hapus transaksinya."_ — so a single
   wrong receipt is replaced by uploading the right one first. Hapus is the trip writer's alone, like
   Unggah bukti, is disabled with the reason while Drive is not connected or broken, and still works
-  after the Laporan is filed. Each one is an **Bukti dihapus** entry on `/log`, under the Unggah
+  after the Laporan is filed. Each one is a **Bukti dihapus** entry on `/log`, under the Unggah
   bukti filter.
 
 What both controls take:

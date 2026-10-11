@@ -90,7 +90,9 @@ export type FinalizeReceiptsResult =
 
 /**
  * What `deleteReceiptAction` did (#462, ADR-0050): the file trashed and the row gone, or why not.
- * Every refusal leaves the receipt listed and its file where it was.
+ * Every refusal leaves the receipt listed and, but for one rare double failure, its file where it
+ * was: a Hapus that lost the race to the line's last receipt, and whose file Drive then would not
+ * take back out of the trash, answers `drive-unreachable` with that file still trashed.
  */
 export type DeleteReceiptActionResult =
   | { outcome: "deleted" }

@@ -6,6 +6,10 @@ import {
   recordTransactionAction,
 } from "-/app/(app)/perjadin/[id]/laporan/actions";
 import LaporanPage from "-/app/(app)/perjadin/[id]/laporan/page";
+import {
+  RECEIPT_DELETE_CONFIRM,
+  receiptDeleteRefusalText,
+} from "-/components/laporan-perjadin/receipt-delete-messages";
 import { FakeDrive } from "-/lib/drive/fake-drive";
 import type { ReadyFolders } from "-/lib/drive/fixed-folders";
 import { DriveRequestError, openDrive } from "-/lib/drive/google";
@@ -18,6 +22,7 @@ import {
   type Person,
 } from "@sugt/db/queries";
 import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -158,7 +163,7 @@ describe("Hapus bukti", () => {
         spentOn: "2026-10-13",
         left: 1,
       },
-      searchText: "bukti dihapus · konsumsi · rp150.000 · tgl 2026-10-13 · −1 bukti (kini 1/5)",
+      searchText: "bukti dihapus · konsumsi · rp150.000 · tgl 2026-10-13 · -1 bukti (kini 1/5)",
     });
   });
 
@@ -320,7 +325,7 @@ describe("Hapus bukti", () => {
     expect(trashed(receipts[0]!.driveFileId)).toBe(false);
   });
 
-  it("answers no-such-receipt for a receipt already deleted", async () => {
+  it("answers no-such-receipt for a receipt already deleted, and revalidates", async () => {
     const { receipts } = await scene({ receipts: 3 });
     await deleteReceiptAction(receipts[0]!.id);
 
@@ -328,6 +333,8 @@ describe("Hapus bukti", () => {
       outcome: "no-such-receipt",
     });
     await expect(deletions()).resolves.toHaveLength(1);
+    // A stale screen: the Laporan on it is revalidated, so the receipt drops off.
+    expect(revalidatePath).toHaveBeenLastCalledWith("/perjadin/[id]/laporan", "page");
   });
 
   it("still works after the Laporan has been filed", async () => {
@@ -408,13 +415,34 @@ describe("on the Laporan", () => {
     expect(forPimpinan).not.toContain("Hapus");
   });
 
-  it("disables Hapus while Drive is broken", async () => {
+  it.each([
+    ["broken", /Koneksi Google Drive terputus sejak/],
+    ["never connected", /Google Drive belum terhubung/],
+  ] as const)("disables Hapus, with the reason, while Drive is %s", async (state, reason) => {
     const { staff, trip } = await scene();
-    await db.update(schema.driveConnection).set({ status: "broken", brokenAt: new Date() });
+    if (state === "broken") {
+      await db.update(schema.driveConnection).set({ status: "broken", brokenAt: new Date() });
+    } else {
+      await db.delete(schema.driveConnection);
+    }
 
     const html = await render(staff as Person, trip.id);
     const hapus = html.match(/<button[^>]*aria-label="Hapus Bukti 1"[^>]*>/)?.[0];
     expect(hapus).toContain("disabled");
-    expect(html).toMatch(/Koneksi Google Drive terputus sejak/);
+    expect(html).toMatch(reason);
+  });
+});
+
+describe("what Hapus bukti says", () => {
+  it("asks, and refuses the only receipt, in the ticket's words", () => {
+    expect(RECEIPT_DELETE_CONFIRM).toBe(
+      "Hapus bukti ini? File akan dipindahkan ke Sampah Google Drive.",
+    );
+    expect(receiptDeleteRefusalText({ outcome: "only-receipt" })).toBe(
+      "Satu-satunya bukti tidak bisa dihapus. Unggah bukti yang benar dulu, atau hapus transaksinya.",
+    );
+    expect(receiptDeleteRefusalText({ outcome: "drive-disconnected", reason: "Terputus." })).toBe(
+      "Terputus.",
+    );
   });
 });

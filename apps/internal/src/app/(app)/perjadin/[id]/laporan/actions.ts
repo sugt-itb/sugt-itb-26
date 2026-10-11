@@ -369,7 +369,7 @@ export async function deleteReceiptAction(evidenceId: string): Promise<DeleteRec
   const person = await requirePerson();
 
   const target = await staffSurface(() => receiptDeleteTarget(person, evidenceId));
-  if (!target) return { outcome: "no-such-receipt" };
+  if (!target) return staleReceipt();
   if (target.held <= 1) return { outcome: "only-receipt" };
 
   const access = await driveAccessToken(person);
@@ -396,9 +396,18 @@ export async function deleteReceiptAction(evidenceId: string): Promise<DeleteRec
     }
     return result;
   }
-  if (result.outcome === "no-such-evidence") return { outcome: "no-such-receipt" };
+  if (result.outcome === "no-such-evidence") return staleReceipt();
   revalidatePath(`/perjadin/${result.perjadinId}/laporan`);
   return { outcome: "deleted" };
+}
+
+/**
+ * A receipt already gone — Hapus pressed twice, or on a stale screen. Its trip is unknown by now, so
+ * every Laporan is revalidated and the one on screen drops the receipt.
+ */
+function staleReceipt(): DeleteReceiptActionResult {
+  revalidatePath("/perjadin/[id]/laporan", "page");
+  return { outcome: "no-such-receipt" };
 }
 
 /**
