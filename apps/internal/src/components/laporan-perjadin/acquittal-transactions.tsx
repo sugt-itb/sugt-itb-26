@@ -163,7 +163,7 @@ function AcquittalTransactions({
 
       {transactions.length === 0 ? (
         <p className="mt-2.5 text-sm text-muted-foreground">
-          Belum ada transaksi terhadap Uang Perjalanan ini.
+          Belum ada transaksi pada Perjadin ini.
         </p>
       ) : (
         <>
@@ -827,7 +827,7 @@ function RecordTransaction({
         <DialogHeader>
           <DialogTitle>Catat transaksi</DialogTitle>
           <DialogDescription>
-            Satu pengeluaran terhadap Uang Perjalanan, beserta buktinya.
+            Satu pengeluaran pada Perjadin ini, beserta buktinya.
           </DialogDescription>
           <RequiredLegend />
         </DialogHeader>
@@ -897,10 +897,9 @@ function RecordTransaction({
               </Label>
               {/*
                 A masked text input, not `type="number"`: it groups the thousands as they type so a
-                large amount's magnitude is legible at the point of entry — the same pattern the plan
-                form's Uang Perjalanan uses. `amount` stays a plain digit string in state; every non-digit
-                is stripped back out on change, so submit's `Number(...)` and the `complete` guard are
-                unchanged.
+                large amount's magnitude is legible at the point of entry. `amount` stays a plain digit
+                string in state; every non-digit is stripped back out on change, so submit's
+                `Number(...)` and the `complete` guard are unchanged.
               */}
               <Input
                 id={`${fields}-amount`}

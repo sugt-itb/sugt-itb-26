@@ -70,7 +70,6 @@ async function scene({ synced = true }: { synced?: boolean } = {}) {
     provinceCode: "KT",
   });
   const trip = await addPerjadin({
-    advanceIdr: 5_000_000,
     picPersonId: staff.id,
     subClusterId: subCluster.id,
     startsOn: "2026-10-12",

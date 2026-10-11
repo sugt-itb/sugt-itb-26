@@ -75,21 +75,18 @@ describe("myPerjadin returns only the caller's own trips", () => {
     // Led by the caller — they are a member by the deferred PIC-is-a-member FK the fixture honours.
     const led = await addPerjadin({
       picPersonId: caller.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(2),
       endsOn: daysFromToday(6),
     });
     // Led by someone else, but the caller is added to the Group — one current, one past.
     const joined = await addPerjadin({
       picPersonId: other.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(3),
       endsOn: daysFromToday(7),
     });
     await addGroupMember(joined.id, caller.id);
     const joinedPast = await addPerjadin({
       picPersonId: other.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(-20),
       endsOn: daysFromToday(-15),
     });
@@ -97,13 +94,11 @@ describe("myPerjadin returns only the caller's own trips", () => {
     // Led by someone else and the caller is nowhere on them — excluded, current and past alike.
     await addPerjadin({
       picPersonId: other.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(4),
       endsOn: daysFromToday(8),
     });
     await addPerjadin({
       picPersonId: other.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(-30),
       endsOn: daysFromToday(-25),
     });
@@ -132,7 +127,6 @@ describe("myPerjadin splits at today (WIB) and orders each section", () => {
     const trip = (startsOn: number, endsOn: number) =>
       addPerjadin({
         picPersonId: caller.id,
-        advanceIdr: 1_000_000,
         startsOn: daysFromToday(startsOn),
         endsOn: daysFromToday(endsOn),
       });
@@ -158,13 +152,11 @@ describe("myPerjadin splits at today (WIB) and orders each section", () => {
     // `> today` cutoff would drop it, `>= today` keeps it.
     const endsToday = await addPerjadin({
       picPersonId: caller.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(-3),
       endsOn: wibToday(),
     });
     const endedYesterday = await addPerjadin({
       picPersonId: caller.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(-10),
       endsOn: wibDaysFromToday(-1),
     });
@@ -191,13 +183,11 @@ describe("myPerjadin gives the PIC and a member the same card", () => {
     // Ended three days ago with nothing filed: the trip that used to carry the red overdue line.
     const led = await addPerjadin({
       picPersonId: caller.id,
-      advanceIdr: 1_000_000,
       startsOn: wibDaysFromToday(-6),
       endsOn: wibDaysFromToday(-3),
     });
     const joined = await addPerjadin({
       picPersonId: other.id,
-      advanceIdr: 1_000_000,
       startsOn: wibDaysFromToday(-8),
       endsOn: wibDaysFromToday(-5),
     });
@@ -215,30 +205,29 @@ describe("myPerjadin gives the PIC and a member the same card", () => {
 describe("myPerjadin carries the same money as the acquittal", () => {
   beforeEach(resetDatabase);
 
-  it("draws the float down only for drawdown categories and agrees with the acquittal's remainder", async () => {
-    // ADR-0029: only Konsumsi/Lainnya draw down. A Konsumsi 1.2M draws down; a non-drawdown Akomodasi
-    // 300k does not — so drawnDownIdr is 1.2M, not the 1.5M full spend, and Tersisa = advance − 1.2M.
+  it("is Uang Perjalanan Terpakai: every category, the acquittal's spentIdr (ADR-0051)", async () => {
+    // Konsumsi and Lainnya once drew the float down and Akomodasi did not (ADR-0029). The card now
+    // counts all three, like every other screen.
     const caller = asPerson(
       await addPerson({ fullName: "Rina", email: "rina@ditsama.itb.ac.id", role: "Staff" }),
     );
     const trip = await addPerjadin({
       picPersonId: caller.id,
-      advanceIdr: 5_000_000,
       startsOn: daysFromToday(1),
       endsOn: daysFromToday(4),
     });
-    await addTransaction({
-      perjadinId: trip.id,
-      amountIdr: 1_200_000,
-      category: "Konsumsi",
-      createdByPersonId: caller.id,
-    });
-    await addTransaction({
-      perjadinId: trip.id,
-      amountIdr: 300_000,
-      category: "Akomodasi",
-      createdByPersonId: caller.id,
-    });
+    for (const [amountIdr, category] of [
+      [1_200_000, "Konsumsi"],
+      [300_000, "Akomodasi"],
+      [50_000, "Lainnya"],
+    ] as const) {
+      await addTransaction({
+        perjadinId: trip.id,
+        amountIdr,
+        category,
+        createdByPersonId: caller.id,
+      });
+    }
 
     const {
       current: [mine],
@@ -246,20 +235,17 @@ describe("myPerjadin carries the same money as the acquittal", () => {
     const acquittal = await perjadinAcquittal(caller, trip.id);
     if (!mine || !acquittal) throw new Error("expected the trip on both reads");
 
-    expect(mine.advanceIdr).toBe(5_000_000);
-    expect(mine.drawnDownIdr).toBe(1_200_000);
-    // The acquittal still logs the full 1.5M spend, but its remainder draws down only the 1.2M.
-    expect(acquittal.spentIdr).toBe(1_500_000);
-    expect(mine.advanceIdr! - mine.drawnDownIdr).toBe(acquittal.remainderIdr);
+    expect(mine.spentIdr).toBe(1_550_000);
+    expect(mine.spentIdr).toBe(acquittal.spentIdr);
+    expect(mine).not.toHaveProperty("advanceIdr");
   });
 
-  it("draws nothing down for a trip with no transactions", async () => {
+  it("is zero for a trip with no transactions", async () => {
     const caller = asPerson(
       await addPerson({ fullName: "Rina", email: "rina@ditsama.itb.ac.id", role: "Staff" }),
     );
     const trip = await addPerjadin({
       picPersonId: caller.id,
-      advanceIdr: 2_000_000,
       startsOn: daysFromToday(1),
       endsOn: daysFromToday(4),
     });
@@ -268,7 +254,7 @@ describe("myPerjadin carries the same money as the acquittal", () => {
       current: [mine],
     } = await myPerjadin(caller);
     expect(mine?.id).toBe(trip.id);
-    expect(mine?.drawnDownIdr).toBe(0);
+    expect(mine?.spentIdr).toBe(0);
   });
 });
 
@@ -294,7 +280,6 @@ describe("myPerjadin lists the trip's members", () => {
 
     const trip = await addPerjadin({
       picPersonId: caller.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(1),
       endsOn: daysFromToday(4),
       pimpinan: [pimpinan.id],
@@ -359,7 +344,6 @@ describe("myPerjadin builds the visited-Schools tree", () => {
     const trip = await addPerjadin({
       picPersonId: caller.id,
       subClusterId: subCluster.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(1),
       endsOn: daysFromToday(6),
     });
@@ -420,7 +404,6 @@ describe("myPerjadin resolves the Preparation Checklist", () => {
     );
     const trip = await addPerjadin({
       picPersonId: caller.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(1),
       endsOn: daysFromToday(4),
     });
@@ -453,7 +436,6 @@ describe("myPerjadin resolves the Preparation Checklist", () => {
     );
     const trip = await addPerjadin({
       picPersonId: caller.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(1),
       endsOn: daysFromToday(4),
     });
@@ -488,7 +470,6 @@ describe("myPerjadin lists the Narasumber by School (#447)", () => {
     const trip = await addPerjadin({
       picPersonId: caller.id,
       subClusterId: subCluster.id,
-      advanceIdr: 1_000_000,
       startsOn: daysFromToday(1),
       endsOn: daysFromToday(8),
     });

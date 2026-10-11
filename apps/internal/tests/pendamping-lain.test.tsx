@@ -114,7 +114,6 @@ async function perjadinA(who: People) {
   const trip = await addPerjadin({
     subClusterId: subCluster.id,
     picPersonId: who.rina.id,
-    advanceIdr: 5_000_000,
     startsOn: "2026-10-12",
     endsOn: "2026-10-13",
   });

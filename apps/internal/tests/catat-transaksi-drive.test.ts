@@ -50,10 +50,7 @@ let folders: ReadyFolders;
 let perjadinFolderName: string;
 
 /** A Staff PIC, a Pimpinan, a trip, and Drive connected with its fixed tree built in the fake. */
-async function scene(
-  options: { connection?: "connected" | "broken" | "none"; advanceIdr?: number | null } = {},
-) {
-  const { advanceIdr = 5_000_000 } = options;
+async function scene(options: { connection?: "connected" | "broken" | "none" } = {}) {
   const staff = await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" });
   const pimpinan = await addPerson({
     fullName: "Fatimah",
@@ -61,7 +58,6 @@ async function scene(
     role: "Pimpinan",
   });
   const trip = await addPerjadin({
-    advanceIdr,
     picPersonId: staff.id,
     subClusterName: "Kelompok 18",
     startsOn: "2026-10-12",
@@ -283,27 +279,12 @@ describe("recording a line with its Drive receipts", () => {
     expect(a!.parents).toEqual(b!.parents);
     expect(drive.named(perjadinFolderName)).toHaveLength(1);
   });
-
-  it.each(["Konsumsi", "Transport Bandara/Stasiun"] as const)(
-    "records a %s line while Uang Perjalanan is not filled in yet (#437)",
-    async (category) => {
-      const { trip } = await scene({ advanceIdr: null });
-
-      const result = await recordTransactionAction({
-        ...aLine(trip.id, await upload(trip.id, [jpeg()])),
-        category,
-      });
-
-      expect(result).toMatchObject({ outcome: "recorded", synced: true });
-      await expect(lines()).resolves.toEqual([expect.objectContaining({ category })]);
-    },
-  );
 });
 
 describe("a receipt that is not what it claims records nothing", () => {
   it("refuses another Perjadin's file", async () => {
     const { trip, staff } = await scene();
-    const other = await addPerjadin({ advanceIdr: 1_000_000, picPersonId: staff.id });
+    const other = await addPerjadin({ picPersonId: staff.id });
     const [theirs] = await upload(other.id, [jpeg()]);
 
     await expect(recordTransactionAction(aLine(trip.id, [theirs!]))).resolves.toEqual({

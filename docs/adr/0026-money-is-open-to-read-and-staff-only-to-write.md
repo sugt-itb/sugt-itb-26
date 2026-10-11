@@ -82,3 +82,11 @@ Staff members — or by an **Editor** or an **Administrator**, not by every Staf
 ([ADR-0048](./0048-a-perjadin-is-written-by-its-group.md), #439). A Staff member off the trip is
 refused with `NotOnPerjadinError`, a 403 like `NotStaffError`. Reading money is unchanged: open to
 everyone signed in.
+
+## Amendment (2026-10-12): the Advance is not tracked
+
+Two of the money surfaces above are gone ([ADR-0051](./0051-the-advance-is-not-tracked.md), #464):
+there is no Advance to read, and no Uang Perjalanan to correct. Settling, the treasurer return and
+the Advance written at planning were never or are no longer written by any screen. What a Pimpinan
+reads is the acquittal's spend — Uang Perjalanan Terpakai and its line items — and the `/monitoring`
+budget card; the read/write split is unchanged.

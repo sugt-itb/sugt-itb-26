@@ -63,7 +63,6 @@ async function scene(
 ) {
   const pic = await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" });
   const trip = await addPerjadin({
-    advanceIdr: 5_000_000,
     picPersonId: pic.id,
     subClusterName: "Kelompok 3",
     startsOn: "2026-10-12",

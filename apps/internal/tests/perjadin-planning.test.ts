@@ -110,7 +110,6 @@ async function validPlan(kabupatenKota?: [string, string]) {
 
   const input: PlanPerjadinInput = {
     subClusterId: subCluster.id,
-    advanceIdr: 5_000_000,
     picPersonId: pic.id,
     teacherNames: [],
     pimpinan: [],
@@ -259,7 +258,6 @@ describe("Rencanakan Perjadin", () => {
 
     const planned = await planPerjadin(pic, {
       subClusterId: subCluster.id,
-      advanceIdr: 5_000_000,
       picPersonId: pic.id,
       teacherNames: ["Dr. Andi", "Dr. Bella"],
       pimpinan: [pimpinanA.id, pimpinanB.id],
@@ -688,7 +686,6 @@ describe("Rencanakan Perjadin", () => {
           subClusterId: subCluster.id,
           startsOn: "2026-09-01",
           endsOn: "2026-09-03",
-          advanceIdr: 5_000_000,
           picPersonId: pic.id,
           picRole: "Staff",
         });
@@ -883,7 +880,7 @@ describe("the Perjadin list and detail", () => {
   });
 
   /**
-   * No money on this payload, for either role. The Advance and the acquittal are
+   * No money on this payload, for either role. The acquittal is
    * `perjadinAcquittal`'s, a separate read (open to any signed-in Person since #180). The Group is
    * the PIC alone now.
    */

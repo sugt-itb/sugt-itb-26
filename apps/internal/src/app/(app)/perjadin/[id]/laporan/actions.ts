@@ -198,7 +198,7 @@ async function reconcileAfterCommit(
 }
 
 /**
- * Record one line item against the Advance, **with the receipts the dialog has already uploaded to
+ * Record one line item on the trip, **with the receipts the dialog has already uploaded to
  * Drive** (ADR-0039, ADR-0040). The write order is the ADR's:
  *
  * 1. **Check** — Staff, the Perjadin, the count, the amount, the connection — before any Drive call.

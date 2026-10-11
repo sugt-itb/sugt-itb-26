@@ -638,7 +638,6 @@ describe("participantFeedbackAverages", () => {
 async function oneTrip(picPersonId: string) {
   return addPerjadin({
     subClusterName: "Kelompok 3",
-    advanceIdr: 5_000_000,
     picPersonId,
   });
 }

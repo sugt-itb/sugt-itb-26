@@ -58,6 +58,19 @@ as optional and it is filled in later; once set it can be changed but not cleare
 rests on is unchanged: the acquittal still reconciles against the Advance, which is why filing the
 Perjadin Report is the one write that waits for it.
 
+_Overtaken by the amendment below: the Advance is no longer tracked at all, and Laporkan no longer
+waits for it._
+
+## Amendment (2026-10-12): the Advance is not tracked
+
+The Advance is gone from the tool ([ADR-0051](./0051-the-advance-is-not-tracked.md),
+[#464](https://github.com/sugt-itb/sugt-itb-26/issues/464)): how much Uang Perjalanan a trip received
+is usually unknown, so nothing asks for it. The "running reconciliation against the Advance", the
+derived remainder and the returned-to-Treasurer mark above no longer describe the acquittal. It is now
+every transaction on the trip, each with its evidence, summed as **Uang Perjalanan Terpakai** and split
+by cohort, reconciled against nothing. The bet is unchanged in kind: an itemised, evidenced record
+assembled on a phone, exported in one click, beats a spreadsheet and a folder of photos.
+
 ## Amendment (2026-10-08): SPPD is uploaded, not generated
 
 **SPPD** is no longer among the unconfirmed paperwork

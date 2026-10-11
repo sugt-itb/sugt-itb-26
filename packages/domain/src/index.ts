@@ -211,7 +211,7 @@ export function timeZoneSuffix(zone: TimeZone | "" | null | undefined): string {
  * Group a Rupiah amount the way every screen shows it: `id-ID` locale, dot separators,
  * `formatIdr(1000000) === "1.000.000"`. Returns the grouped digits only, no `Rp` prefix —
  * this is exactly the `n.toLocaleString("id-ID")` the display sites used inline, named once
- * so the plan form's masked input and every read-back amount cannot drift apart. The amount
+ * so the masked amount inputs and every read-back amount cannot drift apart. The amount
  * inputs render this directly (the value carries digits only); displays wrap it in
  * {@link formatRupiah}, which is the single place the `Rp` prefix lives.
  */
@@ -222,8 +222,8 @@ export function formatIdr(n: number): string {
 /**
  * The one way money is displayed: `Rp` immediately followed by the grouped digits, with no
  * space — `formatRupiah(15000000000) === "Rp15.000.000.000"`. The `Rp` prefix lives here and
- * nowhere else, so no display site carries its own literal `"Rp "`. A negative amount — an
- * overspent travel float (ADR-0029) — carries its sign before the prefix: `"-Rp50.000"`.
+ * nowhere else, so no display site carries its own literal `"Rp "`. A negative amount carries
+ * its sign before the prefix: `"-Rp50.000"`.
  */
 export function formatRupiah(n: number): string {
   return n < 0 ? `-Rp${formatIdr(-n)}` : `Rp${formatIdr(n)}`;
@@ -489,7 +489,7 @@ export const CONCERN_AT_OR_BELOW = 7;
 export const REPORT_DEADLINE_DAYS_AFTER_RETURN = 2;
 
 /**
- * What a transaction against an Advance was spent on. A closed set of twelve, and the
+ * What a transaction on a Perjadin was spent on. A closed set of twelve, and the
  * one fixed set here that was **read off a document rather than agreed in conversation**:
  * the first eleven are the line items the Programme's approved budget repeats across every
  * travel group, and `Lainnya` is the escape hatch.
@@ -523,45 +523,6 @@ export const TRANSACTION_CATEGORIES = [
   "Lainnya",
 ] as const;
 export type TransactionCategory = (typeof TRANSACTION_CATEGORIES)[number];
-
-/**
- * The transaction categories that **draw down a Perjadin's travel float** (ADR-0029). Only these
- * reduce the remaining float (`advanceIdr − drawn-down`); every other category is recorded against
- * the trip and shown in the acquittal, but is paid outside the float (pre-paid before departure or
- * handled by other Staff) and does **not** reduce what is left.
- *
- * This is the single source of truth for that split. It is deliberately a **narrower** subset of
- * `TRANSACTION_CATEGORIES` — the two values here are members of that list, character for character —
- * and it is intended to be extensible: widening the float later is one edit here. It does **not**
- * change `/monitoring`'s "Anggaran terpakai", which still sums **every** category (that figure is
- * programme spend, not float draw-down — the two are two different numbers by design).
- */
-export const ADVANCE_DRAWDOWN_CATEGORIES = [
-  "Konsumsi",
-  "Lainnya",
-] as const satisfies readonly TransactionCategory[];
-export type AdvanceDrawdownCategory = (typeof ADVANCE_DRAWDOWN_CATEGORIES)[number];
-
-/** Whether a category draws down the travel float. Widened to `string` so a DB-read row's `category` compares without a cast. */
-export function isAdvanceDrawdownCategory(category: string): boolean {
-  return (ADVANCE_DRAWDOWN_CATEGORIES as readonly string[]).includes(category);
-}
-
-/**
- * The **drawn-down total** of a list of transactions — the sum of only those whose category is an
- * `ADVANCE_DRAWDOWN_CATEGORIES` member. The one place the JS render/query sites compute float
- * consumption, so the rule lives here beside the constant rather than being re-expressed per site.
- * The two SQL sums (`my-perjadin`, `dashboard`) can't call this, so they carry a `category in (…)`
- * built from the same constant; a test pins all three equal.
- */
-export function sumAdvanceDrawdownIdr(
-  lines: readonly { category: string; amountIdr: number }[],
-): number {
-  return lines.reduce(
-    (total, line) => (isAdvanceDrawdownCategory(line.category) ? total + line.amountIdr : total),
-    0,
-  );
-}
 
 /**
  * Which cohort a transaction's spend served — an axis orthogonal to `category`. `category` is what
@@ -684,6 +645,10 @@ export type SessionFootageContentType = keyof typeof SESSION_FOOTAGE_CONTENT_TYP
  * `footage_*` values (Session Footage, #424) came later and widened the CHECK in migration 0044, and
  * `evidence_deleted` and `transaction_deleted` (Hapus bukti, #462, and Hapus transaksi, #463;
  * ADR-0050) widened it again in migration 0049.
+ *
+ * `advance_set` and `advance_changed` are **history only** (ADR-0051, #464): the Advance is no
+ * longer tracked, so nothing writes them, but the entries already in the Log stay readable and
+ * searchable.
  */
 export const ACTIVITY_LOG_ACTIONS = [
   "advance_set",

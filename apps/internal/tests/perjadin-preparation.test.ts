@@ -53,16 +53,13 @@ function nonStaff() {
  * against a real Postgres. The levels and their dates are `preparation-items.test.ts`'s.
  */
 
-async function trip(
-  dates: { startsOn: string; endsOn: string },
-  advanceIdr: number | null = 5_000_000,
-) {
+async function trip(dates: { startsOn: string; endsOn: string }) {
   const pic = await addPerson({
     fullName: "Rina Nurhayati",
     email: "rina@ditsama.itb.ac.id",
     role: "Staff",
   });
-  const perjadin = await addPerjadin({ advanceIdr, picPersonId: pic.id, ...dates });
+  const perjadin = await addPerjadin({ picPersonId: pic.id, ...dates });
   return { pic, perjadinId: perjadin.id };
 }
 
@@ -150,19 +147,6 @@ describe("toggling a box", () => {
 
     await togglePreparationItem(pic, { perjadinId, itemId: item!.itemId, checked: false });
     expect(await ticksOf(perjadinId)).toEqual([]);
-  });
-
-  it("ticks a box while Uang Perjalanan is not filled in yet (#437)", async () => {
-    const { pic, perjadinId } = await trip(
-      { startsOn: wibDaysFromToday(-2), endsOn: wibDaysFromToday(0) },
-      null,
-    );
-    const [item] = await checklistOf(pic, perjadinId);
-
-    expect(
-      await togglePreparationItem(pic, { perjadinId, itemId: item!.itemId, checked: true }),
-    ).toEqual({ outcome: "toggled" });
-    expect(await ticksOf(perjadinId)).toHaveLength(1);
   });
 
   it("is idempotent both ways — a second tick is one row, a second un-tick is a no-op", async () => {
@@ -308,7 +292,6 @@ describe("the one automatic un-tick — the system item", () => {
       clusterId: (await addCluster({ slug: "c-lain", name: "C Lain" })).id,
     });
     const otherTrip = await addPerjadin({
-      advanceIdr: 1_000_000,
       picPersonId: pic.id,
       subClusterId: subCluster.id,
       startsOn: wibDaysFromToday(1),

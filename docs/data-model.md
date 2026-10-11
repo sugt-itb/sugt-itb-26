@@ -65,8 +65,8 @@ list below exists so nobody later "completes" the schema by adding the rest.
 | Perjadin Report                                              | Not a table. It is the acquittal state on `perjadin` — see [Money](#money).                                                                                |
 | Participant                                                  | Not a table. Nobody enrols Participants; one exists in the records only as a name they typed on their own feedback.                                        |
 | Project Team, Final Project                                  | Not stored at all. [ADR-0009](./adr/0009-the-tool-tracks-delivery-not-outcomes.md) is explicit; they reach the public as curated pieces, never as records. |
-| Treasurer                                                    | Not a role. A Treasurer is Staff; what is stored is that an Advance was returned, not to whom.                                                             |
-| Advance                                                      | A column on `perjadin`, not a row. Set at planning or later (null until then, #437) and never exists independently.                                        |
+| Advance                                                      | Not tracked (ADR-0051). `perjadin.advance_idr` stays, unread and unwritten, until #465 drops it.                                                           |
+| Uang Perjalanan Terpakai                                     | Not a column. The sum of a Perjadin's transactions, all categories, derived on every read.                                                                 |
 | Report deadline                                              | Not a column. Two days after the Group returns, derived from `perjadin.ends_on` and a constant.                                                            |
 | Aspect                                                       | Not a table and not a value. Every Aspect on all four evaluations is a **column**; `@sugt/domain` names each rubric.                                       |
 | Rating                                                       | Not a table. A Rating is one Aspect column on one row of an evaluation.                                                                                    |
@@ -1259,12 +1259,11 @@ alter table perjadin
   deferrable initially deferred;
 ```
 
-`advance_idr` is **nullable** (#437, migration 0045). Null means "not filled in yet": a trip is often
-planned before anyone knows its Advance. It is never the same as 0, which stays a real amount, and
-`perjadin_advance_check` passes for null. Three rules the application holds, not the database:
-once set it can be changed but not cleared (`updatePerjadinAdvance` answers `advance-required`);
-the remainder is null while it is (never `null − spend`); and `filePerjadinReport` refuses with
-`advance-missing` — the one write that waits for it. Rows that existed before kept their values.
+**`advance_idr`, `returned_to_treasurer_idr` and `returned_at` are unused** (ADR-0051, #464). The
+Advance is not tracked: no app code reads or writes the three columns, and the rows keep whatever
+they held. They stay, with `perjadin_advance_check` and `perjadin_returned_check`, until
+[#465](https://github.com/sugt-itb/sugt-itb-26/issues/465) drops them once the app that stopped using
+them has shipped.
 
 **There is no `report_deadline` column.** The Report is due two days after the Group gets back,
 always, so the deadline is `ends_on + REPORT_DEADLINE_DAYS_AFTER_RETURN` and nothing stores it.
@@ -1343,8 +1342,8 @@ migration. The professors themselves live in `perjadin_teacher`, which carries n
 
 **A Group is replaced wholesale, never edited.** There is no "remove one member" operation.
 Substituting a professor submits an entire replacement Group, and one transaction deletes
-every member row and inserts the new set. The Perjadin keeps its id, so its Sessions, Advance
-and transactions are untouched — only the membership is destroyed and rebuilt.
+every member row and inserts the new set. The Perjadin keeps its id, so its Sessions and
+transactions are untouched — only the membership is destroyed and rebuilt.
 
 That is what makes the last Group rule cheap. See
 [what the database does not hold](#what-the-database-does-not-hold).
@@ -1656,8 +1655,8 @@ Offline`, named as its other two; `session.drive_footage_folder_id` is the Sessi
 ## Money
 
 **There is no `perjadin_report` table.** A Perjadin yields exactly one Report, always, so the
-acquittal is the state already on `perjadin`: `report_deadline`, `report_filed_at`,
-`returned_to_treasurer_idr`, `returned_at`.
+acquittal is the state already on `perjadin` — `report_filed_at` — plus the trip's transactions and
+their evidence: every transaction on the trip, reconciled against nothing (ADR-0051).
 
 ```sql
 create table transaction (
@@ -1693,8 +1692,7 @@ create table transaction_evidence (
 );
 ```
 
-**The Advance is one pot and the acquittal reconciles the pot** — a transaction consumes the
-Advance rather than a person's share of it. Worth knowing:
+**A transaction is a line for the trip as a whole**, not a person's share of it. Worth knowing:
 [ADR-0004](./adr/0004-delivery-data-is-open-internally-money-is-not.md) justified hiding money
 from Teaching Team by citing "per-diem amounts and personal travel claims" — but that money-read
 gate is reversed by [ADR-0026](./adr/0026-money-is-open-to-read-and-staff-only-to-write.md) (#180):
@@ -1702,8 +1700,8 @@ money is now open to any signed-in Person to **read**, so a Pimpinan reads these
 _writing_ them stays Staff-only.
 
 **`incurred_by_person_id` is gone (#182).** The column shipped in migration `0006` as a nullable
-"who a per-diem was paid to" and never earned its keep: naming that person said nothing about how
-the pot reconciles, and the Laporan needed a different cut of the spend than it offered. It is
+"who a per-diem was paid to" and never earned its keep: naming that person said nothing about the
+trip's spend, and the Laporan needed a different cut of the spend than it offered. It is
 dropped, replaced by the required `participant_type` below. (ADR-0004 still names the column as a
 point-in-time record; that is history and is left as written.)
 
@@ -1726,23 +1724,21 @@ difference, not a different kind of spend.
 **`participant_type` is required, and it is an axis orthogonal to `category` (#182).** `category`
 is _what kind of spend_ a line was; `participant_type` is _which cohort_ it served — `Siswa` (the
 Student Class) or `GTK-MS` (the GTK and MS Classes together). The Laporan splits every acquittal's
-Terpakai total into a Siswa and a GTK-MS subtotal, so the column is `NOT NULL`: there is no unset
+Uang Perjalanan Terpakai into a Siswa and a GTK-MS subtotal, so the column is `NOT NULL`: there is no unset
 state to carry and no third `Umum` value — a shared cost is attributed to whichever type it
 predominantly served. It is character-for-character `TRANSACTION_PARTICIPANT_TYPES` in
-`packages/domain/src/index.ts`, CHECKed the same way `category` is. **The Advance is still one pot
-and the acquittal still reconciles the pot**, so
-[ADR-0004](./adr/0004-delivery-data-is-open-internally-money-is-not.md)'s reconciliation model is
-untouched — though its money-_read_ gate is amended by
-[ADR-0026](./adr/0026-money-is-open-to-read-and-staff-only-to-write.md) (money read opened to any
+`packages/domain/src/index.ts`, CHECKed the same way `category` is.
+[ADR-0004](./adr/0004-delivery-data-is-open-internally-money-is-not.md)'s money-_read_ gate is amended
+by [ADR-0026](./adr/0026-money-is-open-to-read-and-staff-only-to-write.md) (money read opened to any
 signed-in Person; writing money stays Staff-only).
 
 Note what did **not** enter the table: no cost-centre, no account code, no payee, no
 `Ref Standar Biaya` — the RAB carries the last of these on most lines (`PMK 32/2025 No.28.1`
 and the like) and it stays out until a real form asks for it.
 
-**The reconciliation is derived, never stored.** `advance_idr - sum(amount_idr)` is the
-running remainder the acquittal screen shows, and it is a query. Only the fact that money was
-returned is a stored event.
+**Uang Perjalanan Terpakai is derived, never stored.** It is `sum(amount_idr)` over the trip's lines,
+all categories, and the same query answer on every screen that shows it. There is no Advance to
+subtract it from, and so no remainder (ADR-0051, which supersedes ADR-0029's draw-down categories).
 
 Evidence is **one to five per transaction** (ADR-0039). The application holds that range, not
 the database: `recordTransaction` writes a line and its evidence together and refuses zero or
@@ -1767,8 +1763,8 @@ outside it, for example one still in `_staging`. Then `deleteTransaction` locks 
 `for update`, deletes it, its evidence rows cascading, and writes its `transaction_deleted` entry in
 one transaction. The commit answers the folder and receipt files the row held under the lock, and
 the action trashes any it had not already trashed: a receipt an Unggah bukti added, or a folder a
-reconcile claimed, between its first read and the lock. The totals, the remainder and the export are
-derived, so they drop the line without a write of their own.
+reconcile claimed, between its first read and the lock. The totals and the export are derived, so they
+drop the line without a write of their own.
 
 **Every receipt is a file in the company's Google Drive** (ADR-0040). `drive_file_id` is the
 file's Drive id, written by Catat transaksi or by a line's own "Unggah bukti", and `not null`. A
@@ -1868,9 +1864,8 @@ or failed write logs nothing. The money writes log as below, each through `logAc
 
 | Write                       | `action`               | `details`                                                                          |
 | --------------------------- | ---------------------- | ---------------------------------------------------------------------------------- |
-| `planPerjadin`              | `advance_set`          | `{ amountIdr }`; only when planned with one (#437)                                 |
-| `updatePerjadinAdvance`     | `advance_set`          | `{ amountIdr }`, when it fills an unset Advance in for the first time (#437)       |
-| `updatePerjadinAdvance`     | `advance_changed`      | `{ fromIdr, toIdr }`; the old value is read under `for update`; no change, no row  |
+| nothing, since ADR-0051     | `advance_set`          | `{ amountIdr }`; history only — past rows stay readable (#464)                     |
+| nothing, since ADR-0051     | `advance_changed`      | `{ fromIdr, toIdr }`; history only, like `advance_set`                             |
 | `recordTransaction`         | `transaction_recorded` | `{ transactionId, category, amountIdr, participantType, spentOn, receiptCount }`   |
 | `attachTransactionEvidence` | `evidence_uploaded`    | `{ transactionId, category, amountIdr, spentOn, added, total }`                    |
 | `deleteTransactionEvidence` | `evidence_deleted`     | `{ transactionId, evidenceId, category, amountIdr, spentOn, left }`, a copy (#462) |

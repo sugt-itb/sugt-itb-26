@@ -9,7 +9,6 @@ import { db } from "../client";
 import { session, sessionTeachingTeam } from "../schema/delivery";
 import { cluster, province, school, subCluster } from "../schema/reference";
 import { groupMember, perjadin, perjadinPimpinan, perjadinTeacher } from "../schema/travel";
-import { logActivity } from "./activity-log";
 import type { Person } from "./caller";
 import { type CoveredSession, offlineSessionsElsewhere } from "./covered-sessions";
 import { duplicatedStaff } from "./group-rules";
@@ -32,9 +31,9 @@ import { requireGrant, requireStaff } from "./staff-only";
  * Perjadin, its Group, its Teaching Team names, its Pimpinan and its Sessions into existence
  * together.
  *
- * Staff-only, by the surface list and by ADR-0004 alike: this one writes the Advance, so
- * both of `./staff-only.ts`'s two reasons apply rather than only the second. **And it needs the Editor
- * Grant** (ADR-0047): planning a trip is a deliberate choice of who plans, not every Staff member's.
+ * Staff-only, by the surface list: arranging delivery is one of `./staff-only.ts`'s two reasons. **And
+ * it needs the Editor Grant** (ADR-0047): planning a trip is a deliberate choice of who plans, not
+ * every Staff member's.
  *
  * **Planning starts from a Sub-Cluster**, not from a Coverage selection
  * ([#69](https://github.com/mafiefa02/sugt/issues/69)). The screen picks a Sub-Cluster and
@@ -93,12 +92,6 @@ export type PlannedSession = {
  */
 export type PlanPerjadinInput = {
   subClusterId: string;
-  /**
-   * Uang Perjalanan, or `null` to plan without it (#437) — a trip is often planned before anyone
-   * knows the figure. Null is "not filled in yet", never Rp 0; it is filled in later through
-   * `updatePerjadinAdvance`, and only filing the Laporan waits for it.
-   */
-  advanceIdr: number | null;
   /** A Staff member. `perjadin_pic_is_staff` refuses anyone else, at the database. */
   picPersonId: string;
   /**
@@ -160,11 +153,6 @@ export type PlanPerjadinResult =
    * database too; this repeats it so the form can point at Tanggal selesai.
    */
   | { outcome: "ends-before-starts" }
-  /**
-   * A negative Uang Perjalanan. `perjadin_advance_check` holds `advance_idr >= 0` at the database
-   * too; refused here so the form can point at the field, as `updatePerjadinAdvance` does.
-   */
-  | { outcome: "negative-advance" }
   /**
    * An extra Staff member repeated, or the same as the PIC. A Group holds each person once by
    * `(perjadin_id, person_id)`, so this is refused up front rather than left to a PK violation
@@ -276,8 +264,6 @@ export async function planPerjadin(
   // `ends_on >= starts_on` too; this is repeated here so the form can point at Tanggal selesai
   // rather than showing the page a constraint violation produces.
   if (input.endsOn < input.startsOn) return { outcome: "ends-before-starts" };
-
-  if (input.advanceIdr !== null && input.advanceIdr < 0) return { outcome: "negative-advance" };
 
   if (input.sessions.length === 0) return { outcome: "no-schools" };
 
@@ -432,7 +418,6 @@ export async function planPerjadin(
           // `ends_on >= starts_on`, guarded above.
           startsOn: input.startsOn,
           endsOn: input.endsOn,
-          advanceIdr: input.advanceIdr,
           picPersonId: input.picPersonId,
         })
         .returning({ id: perjadin.id });
@@ -504,16 +489,6 @@ export async function planPerjadin(
         await tx
           .insert(perjadinPimpinan)
           .values(uniquePimpinan.map((personId) => ({ perjadinId: id, personId })));
-      }
-
-      // The Activity Log (#395): the planned Advance, in this transaction, committing with the trip.
-      // Planned without one (#437), nothing is logged about it here; `advance_set` is logged when it
-      // is first filled in through `updatePerjadinAdvance`.
-      if (input.advanceIdr !== null) {
-        await logActivity(tx, caller, id, {
-          action: "advance_set",
-          details: { amountIdr: input.advanceIdr },
-        });
       }
 
       return id;

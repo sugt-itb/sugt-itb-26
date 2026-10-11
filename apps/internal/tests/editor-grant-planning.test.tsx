@@ -134,7 +134,6 @@ function guarded(caller: Person, where: Awaited<ReturnType<typeof place>>) {
     planPerjadin: () =>
       planPerjadin(caller, {
         subClusterId: where.subCluster.id,
-        advanceIdr: null,
         picPersonId: caller.id,
         teacherNames: [],
         pimpinan: [],
@@ -225,7 +224,6 @@ describe("the pages", () => {
     const { rina, dewi, budi, sari, hadi } = await people();
     const where = await place();
     await addPerjadin({
-      advanceIdr: null,
       picPersonId: budi.id,
       subClusterId: where.subCluster.id,
     });

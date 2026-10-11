@@ -16,7 +16,7 @@ import type { PerjadinAcquittal } from "@sugt/db/queries";
  */
 
 /**
- * The itemisation, plus the reconciliation as trailing rows, plus who travelled.
+ * The itemisation, plus its totals as trailing rows, plus who travelled.
  *
  * The totals ride in the same file rather than in a second one because the point of the export is
  * that nothing is retyped — a PIC who has to add the column up themselves has been handed a
@@ -34,15 +34,12 @@ export function csvOf(acquittal: PerjadinAcquittal): string {
       String(line.evidence.length),
     ]),
     [],
-    // Uang Perjalanan and Sisa are null while the Advance is not filled in yet (#437): an empty
-    // cell, never the text "null".
-    ["Uang Perjalanan", "", "", "", amountCell(acquittal.advanceIdr), ""],
-    ["Terpakai", "", "", "", String(acquittal.spentIdr), ""],
-    // The Terpakai total split by cohort, the same two figures the page tiles show; the payload
+    // Every transaction on the trip, all categories (ADR-0051) — the same figure every screen shows.
+    ["Uang Perjalanan Terpakai", "", "", "", String(acquittal.spentIdr), ""],
+    // The same total split by cohort, the same two figures the page tiles show; the payload
     // carries them so nothing is retyped or re-summed here.
     ["Total Siswa", "", "", "", String(acquittal.siswaSpentIdr), ""],
     ["Total GTK-MS", "", "", "", String(acquittal.gtkMsSpentIdr), ""],
-    ["Sisa", "", "", "", amountCell(acquittal.remainderIdr), ""],
     // Who travelled, one labelled row per Pimpinan (#142). Omitted entirely when none joined, so
     // no stray section appears. These are existing stored names, inventing no new column.
     ...(acquittal.pimpinan.length > 0
@@ -53,11 +50,6 @@ export function csvOf(acquittal: PerjadinAcquittal): string {
   // A leading BOM, because the reader this file is opened in is Excel and Excel reads a UTF-8 CSV
   // as the system code page without one. That mangles every category name.
   return `﻿${rows.map((row) => row.map(quoted).join(",")).join("\r\n")}\r\n`;
-}
-
-/** An amount as its plain digits, or an empty cell when there is none to give. */
-function amountCell(amountIdr: number | null): string {
-  return amountIdr === null ? "" : String(amountIdr);
 }
 
 /**

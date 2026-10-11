@@ -88,9 +88,8 @@ account they have, and a `person` row required either way. See
 [ADR-0003](./adr/0003-google-sign-in-with-an-invite-list.md).
 
 **Nothing is approved.** There is no approver, no queue, no submitted-and-returned state on an
-Advance or an acquittal, and no lifecycle on a Perjadin beyond its dates. Whatever sign-off
-DITSAMA does happens where it happens today; the tool records that an Advance exists and what it
-was spent on. This is said plainly because the shape is so common that its absence reads as an
+acquittal, and no lifecycle on a Perjadin beyond its dates. Whatever sign-off DITSAMA does happens
+where it happens today; the tool records what a trip spent, with the evidence. This is said plainly because the shape is so common that its absence reads as an
 omission, and because an early design drew it in full.
 
 Access splits along one line: **delivery data is open, money is not.** Anyone signed in
@@ -234,7 +233,8 @@ SMA Pradita Dirgantara, SMA Trensains Muhammadiyah Sragen
 - The two sides share a line whenever they fit, and the name never wraps to make room for the
   right side. On a phone, PIC and Persiapan wrap onto their own line under the Schools.
 
-A card opens to show Uang Perjalanan, then **Catat Transaksi**, **Dokumen**, **Evaluasi Perjadin**
+A card opens to show **Uang Perjalanan Terpakai** — every transaction on the trip, all categories,
+the same figure as the trip's screen and its Laporan — then **Catat Transaksi**, **Dokumen**, **Evaluasi Perjadin**
 and **Edit**, then the timeline of Sessions and who is on the trip. On a phone those four buttons
 are a full-width two-column grid, and the money row and each Session's buttons wrap rather than
 spill sideways. Each section shows three cards with **Tampilkan lebih banyak** for the rest, and is
@@ -452,13 +452,12 @@ corrects them with **Ubah tanggal** beside the range; the edit moves no Session,
 if a Session still to be delivered would fall outside the new range. Everyone else sees the dates
 read-only.
 
-**Uang Perjalanan is optional on the form** — labelled "Uang Perjalanan (Rp) — opsional" — because a
-trip often has to be planned before anyone knows its figure (#437). Left empty it is "not filled in
-yet", which is not Rp 0. Whoever writes the trip fills it in later with **Isi Uang Perjalanan** on the trip's screen (the
-button reads **Ubah Uang Perjalanan** once it is set); once set it can be changed, to zero included,
-but not emptied again. While it is empty, the money strip on the trip's screen and the Laporan read
-Diterima **"Belum diisi"** and Sisa **"—"**, the `/pendamping` card reads "Uang Perjalanan belum
-diisi" with no Tersisa and no bar, and the export leaves its cell empty.
+**The form asks for no money.** The tool does not track how much Uang Perjalanan a trip received
+([ADR-0051](./adr/0051-the-advance-is-not-tracked.md), #464): the figure is usually unknown unless
+someone asks the trip's members. The trip's screen carries a **Pengeluaran** strip — when the Laporan
+is due, a link to it, and one figure, **Uang Perjalanan Terpakai**: the sum of every transaction on
+the trip, all categories. The Laporan, its export and the `/pendamping` card show that same number.
+Nothing shows an amount received, a remainder or a progress bar.
 
 **A trip goes to one Sub-Cluster.** A Sub-Cluster is a set of Schools near enough that any of
 them can share a journey. Choosing it is what decides which Schools may appear on the trip at
@@ -504,9 +503,6 @@ leaving out this trip's own Sessions, which the screen already lists ("Belum ada
 Perjadin lain" when there are none). **The note is read-only and never blocks**: the cap of two
 offline Sessions per School is still not enforced, and a School with Sessions elsewhere can be
 planned like any other — only the same School at the same date and time is refused.
-
-The **Advance** is set at planning or later (#437) and transferred to the PIC before departure; the
-Laporan cannot be filed until it is set.
 
 Offline Sessions happen during a Perjadin. **Online Sessions have no Perjadin at all** —
 which is why counting trips never tells you how much teaching has happened, and why six
@@ -579,7 +575,7 @@ member without the Editor Grant, who still runs any trip they are on but cannot 
 **A trip is written by its Group** — its PIC and its Staff members — **or by an Editor or an
 Administrator** ([ADR-0048](./adr/0048-a-perjadin-is-written-by-its-group.md), #439). Everyone signed
 in reads every trip. On `/perjadin/[id]`, `/perjadin/[id]/laporan` and `/sesi/[id]`, anyone else sees
-everything with every write control absent — Ubah tanggal, Isi/Ubah Uang Perjalanan, Ubah Group, the
+everything with every write control absent — Ubah tanggal, Ubah Group, the
 Pimpinan and Narasumber edits, Tambah/Ubah/Batalkan Sesi, Tandai, the Persiapan boxes, Catat
 transaksi, Unggah bukti, Laporkan, Foto & Video's upload and Hapus — and a forced request answers 403.
 Only **Evaluasi Perjadin**'s link stays open to everyone signed in. A Staff member added to a Group
@@ -588,9 +584,11 @@ trips, so every control on its cards stays theirs.
 
 ### The acquittal — the most important screen
 
-The PIC accounts for the whole Group. They enter each transaction that consumed the
-Advance together with its evidence, and export a filled template of the acquittal paperwork.
-Whatever is left is returned to the Treasurer.
+The PIC accounts for the whole Group. They enter each transaction on the trip together with its
+evidence, and export a filled template of the acquittal paperwork. Nothing is reconciled against an
+amount received, which the tool does not track (ADR-0051): the Laporan is every transaction, each with
+its receipts, totalled as **Uang Perjalanan Terpakai** and split into **Total Siswa** and **Total
+GTK-MS**.
 
 **A transaction is entered with its receipts: one to five, image or PDF** (ADR-0039). The
 "Catat transaksi" dialog uploads them all before it records the line. If any fails to upload,
@@ -620,8 +618,7 @@ as failed, and the rest are kept.
 - Each line carries its own **Hapus** (#463), for a line entered by mistake — against the wrong
   trip, or twice. It asks _"Hapus transaksi ini? Folder buktinya akan dipindahkan ke Sampah Google
   Drive."_, then moves the line's folder and receipts to the Drive trash and takes the line off the
-  Laporan. The totals, the Siswa and GTK-MS subtotals, the remainder and the export no longer count
-  it. Any line can be deleted, with or without receipts. Like Hapus bukti, it is the trip writer's
+  Laporan. The totals, the Siswa and GTK-MS subtotals and the export no longer count it. Any line can be deleted, with or without receipts. Like Hapus bukti, it is the trip writer's
   alone, is disabled with the reason while Drive is not connected or broken, and still works after
   filing. Each one is a **Transaksi dihapus** entry on `/log`, under the Catat transaksi filter; the
   line's earlier entries stay, without their Buka folder link.
@@ -647,8 +644,7 @@ approved budget repeats across every travel group, so they are what DITSAMA alre
 rather than a scheme invented here, and they are in Indonesian because that is what goes on the
 paperwork. Each transaction also carries a **participant type** — _Siswa_ or _GTK-MS_ — an axis
 orthogonal to the category that records which cohort the spend served, so the acquittal can split
-how much of the Advance went to the Student cohort versus the GTK and MS cohorts (#182). The
-Advance is still one pot and the acquittal still reconciles the pot.
+how much of the trip's spend went to the Student cohort versus the GTK and MS cohorts (#182).
 
 **The export is generic until the real paperwork exists.** Nobody has filed an acquittal
 for this Programme yet and no prior trip's completed set is available to borrow, so the
@@ -670,13 +666,11 @@ cannot be typed wrong and it moves by itself if the trip's dates are corrected.
 
 **Nothing is gated on the deadline.** DITSAMA sets that deadline itself, and the tool is never
 stricter than the process it serves — invented friction has the same escape route as duplicated
-work. **Laporkan does wait for Uang Perjalanan** (#437): while it is empty, filing is refused with
-"Isi Uang Perjalanan sebelum melaporkan.", since the Laporan accounts for it. Nothing else waits for
-it — transactions, receipts, Dokumen, Foto & Video, Sessions and Persiapan all work while it is
-empty.
+work. Laporkan does not wait for Uang Perjalanan either, which the tool no longer tracks (ADR-0051).
+It refuses only a line without a receipt, and a Laporan that is already filed.
 
 This screen is load-bearing in a way the others are not. Nothing structurally compels a
-PIC to use this tool: the Treasurer accepts any format. So it has to be plainly better
+PIC to use this tool: the paperwork is accepted in any format. So it has to be plainly better
 than a spreadsheet, a calculator and a folder of WhatsApp photos — evidence attached to
 the line it belongs to, arithmetic done for you, nothing retyped to produce the document.
 See [ADR-0007](./adr/0007-the-tool-generates-the-acquittal.md), including what to do if
@@ -831,7 +825,7 @@ saying plainly because it hangs off a Perjadin, and Teaching Team members are th
 slept in the hotel.
 
 Which means **the Perjadin screens have a money-free variant**, and Teaching Team see it: the
-same trip, its dates, its Group, its Schools, with the Advance, the transactions and the Report
+same trip, its dates, its Group, its Schools, with the transactions and the Report
 absent rather than disabled. They need it to find the trip they are filing about, and a greyed
 box saying they may not look is worse than no box.
 
@@ -1063,7 +1057,9 @@ A table, newest first, 50 rows a page:
 - **Aksi** is one of Uang Perjalanan ditetapkan, Uang Perjalanan diubah, Catat transaksi, Unggah
   bukti, Laporan dikirim, Dokumen diunggah, Dokumen dihapus, Foto/Video diunggah and Foto/Video
   dihapus. Entries derived from data recorded
-  before the Log existed read "(dari data lama)" after it.
+  before the Log existed read "(dari data lama)" after it. The two Uang Perjalanan actions are
+  history only: nothing writes them since the Advance stopped being tracked (ADR-0051), and past
+  entries still read as they did.
 - **Rincian** says what changed. A transaction's row links to its folder in Drive, when it has one.
 
 **Above the table**, a search box, an Aksi filter and a Rentang tanggal:
@@ -1071,7 +1067,7 @@ A table, newest first, 50 rows a page:
 - the search matches, ignoring case, the email, the trip's Kelompok (its Sub-Cluster's name), its
   Schools, its PIC's name, and the Aksi and Rincian text;
 - Aksi is Semua, Uang Perjalanan, Catat transaksi, Unggah bukti, Dokumen, Foto & Video or Laporan
-  dikirim;
+  dikirim; Uang Perjalanan now finds history only;
 - Rentang tanggal is two WIB dates, dari and sampai, both included.
 
 They combine, and **all of them are in the URL**, with the page number, so a view can be bookmarked.

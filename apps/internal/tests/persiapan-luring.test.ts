@@ -102,7 +102,6 @@ async function tripStarting(startsOn: string, inSubCluster = subClusterId) {
   const end = new Date(`${startsOn}T00:00:00Z`);
   end.setUTCDate(end.getUTCDate() + 2);
   const row = await addPerjadin({
-    advanceIdr: 1,
     picPersonId: admin.id,
     subClusterId: inSubCluster,
     startsOn,
@@ -322,7 +321,6 @@ describe("the Dashboard's tabs", () => {
     const cluster = (await addCluster({ slug: "c", name: "Cluster" })).id;
     const sub = (await addSubCluster({ slug: "k", name: "Kelompok 7", clusterId: cluster })).id;
     await addPerjadin({
-      advanceIdr: 1,
       picPersonId: staff.id,
       subClusterId: sub,
       startsOn: "2027-03-09",

@@ -70,7 +70,6 @@ beforeEach(async () => {
 /** A trip ending `endsIn` days from today (WIB), in Cluster Satu unless told otherwise. */
 async function tripEnding(endsIn: number, inSubCluster = subClusterId) {
   const row = await addPerjadin({
-    advanceIdr: 1_000_000,
     picPersonId: admin.id,
     subClusterId: inSubCluster,
     startsOn: wibDaysFromToday(endsIn - 2),

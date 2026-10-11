@@ -84,7 +84,6 @@ async function scene({ receipts = 2 }: { receipts?: number } = {}) {
   await addGrant(admin.id, "Administrator");
   const pimpinan = await addPerson({ fullName: "Fa", email: "fa@itb.ac.id", role: "Pimpinan" });
   const trip = await addPerjadin({
-    advanceIdr: 5_000_000,
     picPersonId: staff.id,
     subClusterName: "Kelompok 3",
     startsOn: "2026-10-12",

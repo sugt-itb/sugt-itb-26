@@ -160,7 +160,6 @@ describe("Detail Sesi daring — read", () => {
     const { first } = await twoSchools();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-01-01",
       endsOn: "2026-01-03",
     });
@@ -368,7 +367,6 @@ describe("Detail Sesi daring — hard delete", () => {
     const { first } = await twoSchools();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-01-01",
       endsOn: "2026-01-03",
     });

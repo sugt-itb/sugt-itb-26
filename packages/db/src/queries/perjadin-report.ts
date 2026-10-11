@@ -1,6 +1,5 @@
 import {
   MAX_RECEIPTS_PER_TRANSACTION,
-  sumAdvanceDrawdownIdr,
   type TransactionCategory,
   type TransactionParticipantType,
 } from "@sugt/domain";
@@ -19,16 +18,18 @@ import { requirePerjadinWriter, requireStaff } from "./staff-only";
 /**
  * **Perjadin Report** — the acquittal of one Perjadin. Reading it is now open to any signed-in
  * Person (ADR-0026 reversed ADR-0004's money-read half, #180); only **writing** it — recording or
- * deleting a transaction, attaching or deleting a receipt, settling, filing — is the trip's Group's,
+ * deleting a transaction, attaching or deleting a receipt, filing — is the trip's Group's,
  * an Editor's or an Administrator's (ADR-0048), each write query below opening with its own
  * `requireStaff` and running `requirePerjadinWriter`.
  *
  * There is no `perjadin_report` table: a Perjadin yields exactly one Report, always, so the
- * acquittal is the state already on `perjadin`, plus its line items and their evidence.
+ * acquittal is the state already on `perjadin`, plus its line items and their evidence. It is
+ * **every transaction on the trip, each with its receipts, reconciled against nothing**: the
+ * Advance is not tracked (ADR-0051, #464), so there is no remainder to account for.
  *
- * **Three things on this payload are derived and never stored** — the remainder, the report
- * deadline and the days left against it. Each follows from something already on the row, so
- * none can be typed wrong and each moves by itself when the trip's dates are corrected.
+ * **Three things on this payload are derived and never stored** — Uang Perjalanan Terpakai, the
+ * report deadline and the days left against it. Each follows from something already stored, so
+ * none can be typed wrong and each moves by itself when the trip's lines or dates are corrected.
  * Nothing is gated on the deadline: DITSAMA sets it for itself, and the tool is never
  * stricter than the process it serves.
  */
@@ -43,7 +44,7 @@ export type AcquittalEvidence = {
 };
 
 /**
- * One line item against the Advance.
+ * One line item on the trip.
  *
  * `category` and `participantType` are two orthogonal axes: what kind of spend it was, and which
  * cohort it served (`Siswa` or `GTK-MS`). The latter is what the Laporan's per-type subtotals sum.
@@ -79,28 +80,15 @@ export type PerjadinAcquittal = {
   startsOn: string;
   endsOn: string;
   /**
-   * Uang Perjalanan, or `null` while it is not filled in yet (#437) — never the same as Rp 0. A
-   * Perjadin may be planned before anyone knows it; the Laporan cannot be filed until it is set.
-   */
-  advanceIdr: number | null;
-  /**
-   * The sum of **every** transaction against the Advance — the "Terpakai" total and the full spend
-   * log. Zero when none has been entered. Not the same as what draws the float down (ADR-0029): the
-   * remainder below is `advance − drawn-down`, which only `ADVANCE_DRAWDOWN_CATEGORIES` reduce.
+   * **Uang Perjalanan Terpakai** (ADR-0051): the sum of **every** transaction on the trip, all
+   * categories. Zero when none has been entered. `/perjadin/[id]`, the Laporan, its CSV and the
+   * `/pendamping` card all show this one number.
    */
   spentIdr: number;
   /** Of `spentIdr`, the spend attributed to the Siswa cohort — every category, like `spentIdr`. */
   siswaSpentIdr: number;
   /** Of `spentIdr`, the spend attributed to the GTK-MS cohort — every category, like `spentIdr`. */
   gtkMsSpentIdr: number;
-  /**
-   * What is left of the **travel float** to hand back: `advance − drawn-down`, where only
-   * `ADVANCE_DRAWDOWN_CATEGORIES` (Konsumsi, Lainnya) draw down (ADR-0029). Not `advance − spentIdr`
-   * — other categories are recorded but paid outside the float. Negative means the Group overspent
-   * the float. `null` while the Advance is not set (#437): there is nothing to subtract from, and
-   * `null - x` would silently read as `-x`.
-   */
-  remainderIdr: number | null;
   /**
    * **Derived, never stored.** Two days after the Group gets back, so it cannot be typed
    * wrong and it moves by itself if the trip's dates are corrected.
@@ -130,8 +118,6 @@ export type PerjadinAcquittal = {
    * rather than a delivery surface ([#142], ADR-0004). Empty when none joined.
    */
   pimpinan: string[];
-  returnedToTreasurerIdr: number | null;
-  returnedAt: Date | null;
   reportFiledAt: Date | null;
 };
 
@@ -168,7 +154,6 @@ export async function perjadinAcquittal(
       schoolNames: tripSchoolNames(perjadin.id),
       startsOn: perjadin.startsOn,
       endsOn: perjadin.endsOn,
-      advanceIdr: perjadin.advanceIdr,
       // Computed in Postgres rather than in JavaScript, so the arithmetic happens in the
       // same calendar the dates are stored in. A `Date` here would introduce a time zone the
       // domain does not have — a Session is a calendar day, and so is a deadline.
@@ -179,8 +164,6 @@ export async function perjadinAcquittal(
       daysRemaining: sql<number>`(${perjadinReportDeadline} - ${todayInDeadlineZone})`.mapWith(
         Number,
       ),
-      returnedToTreasurerIdr: perjadin.returnedToTreasurerIdr,
-      returnedAt: perjadin.returnedAt,
       reportFiledAt: perjadin.reportFiledAt,
     })
     .from(perjadin)
@@ -196,12 +179,7 @@ export async function perjadinAcquittal(
 
   // Summed here rather than in a second `sum()` round trip: every row is already loaded, and
   // two sources for one figure is a way for the screen's total to disagree with its own list.
-  // `spentIdr` stays **every** category — it is the "Terpakai" total and the full spend log.
   const spentIdr = transactions.reduce((total, line) => total + line.amountIdr, 0);
-  // The **travel-float draw-down** (ADR-0029): only `ADVANCE_DRAWDOWN_CATEGORIES` reduce what is
-  // left, so the remainder is `advance − drawn-down`, not `advance − spentIdr`. The full spend still
-  // shows as Terpakai and every row stays in the log; these are two different numbers by design.
-  const drawnDownIdr = sumAdvanceDrawdownIdr(transactions);
   // The two cohort subtotals, summed off the same loaded rows for the same reason `spentIdr` is:
   // a second `sum()` round trip is a second place for the screen's split to disagree with its list.
   const siswaSpentIdr = transactions
@@ -216,7 +194,6 @@ export async function perjadinAcquittal(
     spentIdr,
     siswaSpentIdr,
     gtkMsSpentIdr,
-    remainderIdr: trip.advanceIdr === null ? null : trip.advanceIdr - drawnDownIdr,
     transactions,
     pimpinan,
   };
@@ -329,7 +306,7 @@ export type RecordTransactionResult =
   | { outcome: "too-many-receipts"; limit: number; count: number };
 
 /**
- * Record one line item against the Advance, **with its receipts, in one transaction** (ADR-0039).
+ * Record one line item on the trip, **with its receipts, in one transaction** (ADR-0039).
  *
  * This is the one write path that holds "every transaction has one to five pieces of evidence" —
  * no CHECK does, because the shared database may already hold lines with none or more than five,
@@ -771,11 +748,6 @@ export type FilePerjadinReportResult =
   /** Filed already. Re-filing would move the timestamp and lose when it actually happened. */
   | { outcome: "already-filed"; filedAt: Date }
   /**
-   * Uang Perjalanan is not filled in yet (#437). The Laporan accounts for the Advance, so it cannot
-   * be filed without one; nothing else on the trip waits for it.
-   */
-  | { outcome: "advance-missing" }
-  /**
    * At least one line item has no receipt against it. The ids come back so the screen can
    * point at the rows rather than say "something is missing".
    */
@@ -793,11 +765,9 @@ export type FilePerjadinReportResult =
  * A Perjadin with no transactions at all files cleanly. A trip that spent nothing is a real
  * trip, and the vacuous truth is the right answer rather than an edge case to refuse.
  *
- * **Uang Perjalanan must be set** (#437). A Perjadin may be planned without it, and every other write
- * on the trip works while it is empty — this is the one place that waits for it.
- *
- * Nothing else is gated. The deadline is not checked, because DITSAMA sets it for itself and
- * the tool is never stricter than the process it serves.
+ * Nothing else is gated. Not the Advance, which is no longer tracked (ADR-0051, #464). Not the
+ * deadline, because DITSAMA sets it for itself and the tool is never stricter than the process it
+ * serves.
  */
 export async function filePerjadinReport(
   caller: Person,
@@ -809,13 +779,12 @@ export async function filePerjadinReport(
     await requirePerjadinWriter(caller, perjadinId, tx);
 
     const [trip] = await tx
-      .select({ reportFiledAt: perjadin.reportFiledAt, advanceIdr: perjadin.advanceIdr })
+      .select({ reportFiledAt: perjadin.reportFiledAt })
       .from(perjadin)
       .where(eq(perjadin.id, perjadinId))
       .for("update");
     if (!trip) return { outcome: "no-such-perjadin" };
     if (trip.reportFiledAt) return { outcome: "already-filed", filedAt: trip.reportFiledAt };
-    if (trip.advanceIdr === null) return { outcome: "advance-missing" };
 
     const unevidenced = await tx
       .select({ id: transaction.id })
@@ -831,7 +800,7 @@ export async function filePerjadinReport(
     const filedAt = new Date();
     await tx.update(perjadin).set({ reportFiledAt: filedAt }).where(eq(perjadin.id, perjadinId));
 
-    // Every category, as the acquittal's totals count them — not only the float draw-down.
+    // Every category, as the acquittal's totals count them.
     const [lines] = await tx
       .select({
         transactionCount: count(),

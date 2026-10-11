@@ -17,7 +17,6 @@ import {
   setPerjadinPimpinan,
   setPerjadinStaff,
   togglePreparationItem,
-  updatePerjadinAdvance,
   updatePerjadinDates,
   type AddPerjadinSessionResult,
   type AddPerjadinTeacherResult,
@@ -31,7 +30,6 @@ import {
   type SetPerjadinPimpinanResult,
   type SetPerjadinStaffResult,
   type TogglePreparationItemResult,
-  type UpdatePerjadinAdvanceResult,
   type UpdatePerjadinDatesResult,
 } from "@sugt/db/queries";
 import { revalidatePath } from "next/cache";
@@ -257,31 +255,6 @@ export async function updatePerjadinDatesAction(
   if (result.outcome === "updated") {
     if (result.datesMoved) await renamePerjadinFolder(person, perjadinId);
     revalidatePath(`/perjadin/${perjadinId}`);
-  }
-  return result;
-}
-
-/**
- * **Fill in or correct a Perjadin's Advance (Uang Perjalanan)** — the one write that changes the
- * amount after planning (#192), including filling in one the trip was planned without (#437).
- * `null` is accepted only to be refused once a value is set (`advance-required`); the UI never sends
- * it. Money writes stay Staff-only (ADR-0026), so it goes through `staffSurface`.
- *
- * **This revalidates two routes.** The Advance shows on the trip page's Uang Perjalanan strip *and* on
- * `/perjadin/[id]/laporan` (the acquittal derives its remainder from it), so both are stale the
- * moment it is corrected — a deliberate exception to the one-route convention, the same shape
- * `togglePreparationItemAction` above documents.
- */
-export async function updatePerjadinAdvanceAction(
-  perjadinId: string,
-  advanceIdr: number | null,
-): Promise<UpdatePerjadinAdvanceResult> {
-  const person = await requirePerson();
-
-  const result = await staffSurface(() => updatePerjadinAdvance(person, perjadinId, advanceIdr));
-  if (result.outcome === "updated") {
-    revalidatePath(`/perjadin/${perjadinId}`);
-    revalidatePath(`/perjadin/${perjadinId}/laporan`);
   }
   return result;
 }

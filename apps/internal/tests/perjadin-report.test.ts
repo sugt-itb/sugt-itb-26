@@ -110,21 +110,21 @@ function receipts(count: number): NewEvidence[] {
 }
 
 /**
- * A trip with an Advance and its PIC. T3 (#153) made the Group Staff-only and Stream-less, so the
+ * A trip and its PIC. T3 (#153) made the Group Staff-only and Stream-less, so the
  * Group is now the PIC alone — no Teaching Team member rides on it any more.
  */
-async function aTrip(advanceIdr = 5_000_000) {
+async function aTrip() {
   const staff = await pic();
-  const trip = await addPerjadin({ advanceIdr, picPersonId: staff.id });
+  const trip = await addPerjadin({ picPersonId: staff.id });
   return { staff, trip };
 }
 
 describe("the acquittal payload", () => {
   beforeEach(resetDatabase);
 
-  it("derives the remainder from the Advance and the line items, and never stores it", async () => {
-    const { staff, trip } = await aTrip(5_000_000);
-    // Both draw down the float (ADR-0029), so spentIdr (full log) and the drawn-down remainder agree.
+  it("sums every line, all categories, as Uang Perjalanan Terpakai — reconciled against nothing", async () => {
+    const { staff, trip } = await aTrip();
+    // Konsumsi and Lainnya once drew a float down and Akomodasi did not (ADR-0029); all three count now.
     await addTransaction({
       perjadinId: trip.id,
       amountIdr: 1_250_000,
@@ -137,25 +137,27 @@ describe("the acquittal payload", () => {
       category: "Lainnya",
       createdByPersonId: staff.id,
     });
+    await addTransaction({
+      perjadinId: trip.id,
+      amountIdr: 300_000,
+      category: "Akomodasi",
+      createdByPersonId: staff.id,
+    });
 
     const acquittal = await perjadinAcquittal(staff, trip.id);
 
-    expect(acquittal).toMatchObject({
-      advanceIdr: 5_000_000,
-      spentIdr: 1_650_000,
-      remainderIdr: 3_350_000,
-    });
-    // The proof that it is derived: no column holds it. `perjadin` has the Advance and the
-    // returned figure, and nothing between them.
-    expect(Object.keys(schema.perjadin)).not.toContain("remainderIdr");
+    expect(acquittal).toMatchObject({ spentIdr: 1_950_000 });
+    // The Advance is not tracked (ADR-0051): nothing on the payload reads it or reconciles to it.
+    for (const gone of ["advanceIdr", "remainderIdr", "returnedToTreasurerIdr", "returnedAt"]) {
+      expect(acquittal).not.toHaveProperty(gone);
+    }
   });
 
   it("reads a trip that spent nothing as zero rather than as unknown", async () => {
-    const { staff, trip } = await aTrip(2_000_000);
+    const { staff, trip } = await aTrip();
 
     await expect(perjadinAcquittal(staff, trip.id)).resolves.toMatchObject({
       spentIdr: 0,
-      remainderIdr: 2_000_000,
       transactions: [],
     });
   });
@@ -168,7 +170,6 @@ describe("the acquittal payload", () => {
     const staff = await pic();
     const endsOn = "2026-09-03";
     const trip = await addPerjadin({
-      advanceIdr: 1_000_000,
       picPersonId: staff.id,
       startsOn: "2026-09-01",
       endsOn,
@@ -194,7 +195,6 @@ describe("the acquittal payload", () => {
     for (const offset of [5, 0, -2, -10]) {
       const endsOn = shiftDate(today, offset - REPORT_DEADLINE_DAYS_AFTER_RETURN);
       const trip = await addPerjadin({
-        advanceIdr: 1_000_000,
         picPersonId: staff.id,
         startsOn: shiftDate(endsOn, -2),
         endsOn,
@@ -211,7 +211,7 @@ describe("the acquittal payload", () => {
      * the result counts a line item once per receipt. Two receipts on one transaction must
      * still spend its amount once.
      */
-    const { staff, trip } = await aTrip(5_000_000);
+    const { staff, trip } = await aTrip();
     const line = await addTransaction({
       perjadinId: trip.id,
       amountIdr: 900_000,
@@ -295,7 +295,6 @@ describe("the acquittal payload", () => {
       role: "Pimpinan",
     });
     const trip = await addPerjadin({
-      advanceIdr: 1_000_000,
       picPersonId: staff.id,
       pimpinan: [fatimah.id, anton.id],
     });
@@ -304,7 +303,7 @@ describe("the acquittal payload", () => {
     // Ordered by name — "Anton …" sorts before "Fatimah …".
     expect(acquittal?.pimpinan).toEqual([anton.fullName, fatimah.fullName]);
 
-    const noneTrip = await addPerjadin({ advanceIdr: 1_000_000, picPersonId: staff.id });
+    const noneTrip = await addPerjadin({ picPersonId: staff.id });
     const none = await perjadinAcquittal(staff, noneTrip.id);
     expect(none?.pimpinan).toEqual([]);
   });
@@ -319,7 +318,7 @@ describe("the category", () => {
      * from `TRANSACTION_CATEGORIES`, so the two can drift silently. This drives every value
      * through the real constraint, which is the only thing that catches a typo in either.
      */
-    const { staff, trip } = await aTrip(500_000_000);
+    const { staff, trip } = await aTrip();
 
     for (const category of TRANSACTION_CATEGORIES) {
       const result = await recordTransaction(staff, {
@@ -572,7 +571,7 @@ describe("attaching evidence", () => {
       email: "andi@ditsama.itb.ac.id",
       role: "Staff",
     });
-    const otherTrip = await addPerjadin({ advanceIdr: 1_000_000, picPersonId: otherStaff.id });
+    const otherTrip = await addPerjadin({ picPersonId: otherStaff.id });
     const line = await addTransaction({
       perjadinId: otherTrip.id,
       amountIdr: 50_000,

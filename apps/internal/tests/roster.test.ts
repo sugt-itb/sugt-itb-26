@@ -223,7 +223,7 @@ describe("roster", () => {
     // Being a trip's PIC makes the Person a Group member — used by the group_member composite key.
     // The Teaching Team member this once used is gone: the Group is the PIC alone now, all Staff
     // and none carrying a Stream (T3, #153), so a trip's PIC is the fixture that locks a role.
-    await addPerjadin({ advanceIdr: 5_000_000, picPersonId: leader.id });
+    await addPerjadin({ picPersonId: leader.id });
 
     const list = await roster(staff);
     expect(byEmail(list, "ketua@gmail.com")?.used).toBe(true);

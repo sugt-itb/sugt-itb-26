@@ -37,7 +37,7 @@ async function aTripWithAPimpinan() {
     email: "fatimah@ditsama.itb.ac.id",
     role: "Pimpinan",
   });
-  const trip = await addPerjadin({ advanceIdr: 5_000_000, picPersonId: staff.id });
+  const trip = await addPerjadin({ picPersonId: staff.id });
   return { staff, pimpinan, trip };
 }
 
@@ -46,7 +46,6 @@ describe("a Pimpinan reads money", () => {
 
   it("reads a Perjadin's acquittal in full — the money read is open", async () => {
     const { staff, pimpinan, trip } = await aTripWithAPimpinan();
-    // Konsumsi draws the float down (ADR-0029), so the remainder is advance − 1.25M.
     await addTransaction({
       perjadinId: trip.id,
       amountIdr: 1_250_000,
@@ -57,11 +56,7 @@ describe("a Pimpinan reads money", () => {
     // Not null, and it does not throw: money reads are open to any signed-in Person (ADR-0026).
     const acquittal = await perjadinAcquittal(pimpinan, trip.id);
 
-    expect(acquittal).toMatchObject({
-      advanceIdr: 5_000_000,
-      spentIdr: 1_250_000,
-      remainderIdr: 3_750_000,
-    });
+    expect(acquittal).toMatchObject({ spentIdr: 1_250_000 });
     expect(acquittal?.transactions).toHaveLength(1);
   });
 });

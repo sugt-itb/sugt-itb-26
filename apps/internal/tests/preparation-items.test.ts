@@ -54,7 +54,6 @@ beforeEach(async () => {
 /** A trip in Cluster Satu, ending `endsIn` days from today (WIB). It has no Session at all. */
 async function tripEnding(endsIn: number, inSubCluster = subClusterId) {
   const row = await addPerjadin({
-    advanceIdr: 1_000_000,
     picPersonId: admin.id,
     subClusterId: inSubCluster,
     startsOn: wibDaysFromToday(endsIn - 2),
