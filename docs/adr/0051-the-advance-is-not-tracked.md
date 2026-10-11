@@ -41,10 +41,11 @@ and toward **Penyerapan Anggaran** on the Dashboard. Neither needs the Advance.
   `advance_changed` entries keep their labels, their Rincian and the `/log` **Uang Perjalanan** Aksi
   filter, and both values stay in `ACTIVITY_LOG_ACTIONS` and the Log's CHECK. Nothing writes them any
   more: `logActivity`'s type no longer accepts them.
-- **The columns stay for now.** `advance_idr`, `returned_to_treasurer_idr` and `returned_at`, with
-  their CHECKs, stay in the schema, unread and unwritten by app code. This ticket adds no migration;
-  [#465](https://github.com/sugt-itb/sugt-itb-26/issues/465) drops them once this has shipped, so a
-  deployed app never reads a column that is already gone. _(Done: migration 0050, #465.)_
+- **The columns go in a follow-up.** #464 added no migration: `advance_idr`,
+  `returned_to_treasurer_idr` and `returned_at`, with their CHECKs, stayed in the schema, unread and
+  unwritten by app code, until [#465](https://github.com/sugt-itb/sugt-itb-26/issues/465) dropped
+  them in migration 0050 once that had shipped — so a deployed app never reads a column that is
+  already gone.
 
 ## Consequences
 
