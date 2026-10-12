@@ -8,29 +8,39 @@ import type {
 } from "@sugt/db/queries";
 
 /**
- * **The `/feedback` scope's pure rules** (#466): what a School pick does to the Session, and what the
- * averages' titles say they cover. Plain functions, so they are tested without a DOM, the way
- * `preparation-derive.ts` sits beside its tab. Types only from `@sugt/db/queries`, as in
- * `feedback-view.tsx`.
+ * **The `/feedback` scope's pure rules** (#466): what a School pick does to the Session and the Tipe
+ * Peserta, and what the averages' titles say they cover. Plain functions, so they are tested without
+ * a DOM, the way `preparation-derive.ts` sits beside its tab. Types only from `@sugt/db/queries`, as
+ * in `feedback-view.tsx`.
  */
 
-/** Picking a School — or clearing it — **resets the Session** to Semua Sesi. */
-export function withSchool(schoolId: string | null): ParticipantFeedbackScope {
-  return { schoolId, sessionId: null };
+/**
+ * Picking a School — or clearing it — **resets the Session** to Semua Sesi. The Tipe Peserta (#487)
+ * is not the School's, so it stays.
+ */
+export function withSchool(
+  scope: ParticipantFeedbackScope,
+  schoolId: string | null,
+): ParticipantFeedbackScope {
+  return { ...scope, schoolId, sessionId: null };
 }
 
 /**
- * What the Peserta averages cover, for their titles: the School, then the Session — `SMAN 1 Bontang ·
- * Sesi 1 Luring` — or `null`, programme-wide, with neither picked.
+ * What the Peserta averages cover, for their titles: the School, then the Session, then the Tipe
+ * Peserta — `SMAN 1 Bontang · Sesi 1 Luring · GTK-MS` — or `null`, programme-wide, with none picked.
  */
 export function participantScopeLabel(
   schools: readonly FeedbackSchoolOption[],
   scope: ParticipantFeedbackScope,
 ): string | null {
   const school = schools.find((option) => option.id === scope.schoolId);
-  if (!school) return null;
-  const session = school.sessions.find((option) => option.id === scope.sessionId);
-  return session ? `${school.name} · ${sesiShortLabel(session)}` : school.name;
+  const session = school?.sessions.find((option) => option.id === scope.sessionId);
+  const parts = [
+    school?.name ?? null,
+    session ? sesiShortLabel(session) : null,
+    scope.participantType,
+  ].filter((part) => part !== null);
+  return parts.length === 0 ? null : parts.join(" · ");
 }
 
 /** What the Perjadin averages cover: the trip's name, then the Peran — or `null` with neither. */

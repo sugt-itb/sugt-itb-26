@@ -109,25 +109,53 @@ export const NO_FEEDBACK_FILTERS: FeedbackFilters = {
 };
 
 /**
- * **What the Peserta tab is narrowed to** (#466): one School, and within it one Session. `null` is
- * Semua. Unlike the score filters, the scope also narrows the four averages. An id that names
- * nothing — or is not an id at all — matches no row, so the tab reads empty rather than failing: each
- * is compared as text, so a malformed one never reaches a `uuid` cast.
+ * **The Peserta tab's Tipe Peserta** (#487): the two-way split of the Daftar Hadir Peserta sheets and
+ * `/keuangan`. `Siswa` is the Student Class; `GTK-MS` is the GTK and MS Classes together. A filter
+ * value, not a stored one — a Participant still picks GTK, MS or Siswa — so it lives beside the query
+ * rather than in `@sugt/domain`, whose sets are glossary terms or the values a column holds.
  */
-export type ParticipantFeedbackScope = { schoolId: string | null; sessionId: string | null };
+export type FeedbackParticipantType = "Siswa" | "GTK-MS";
 
-/** Every School, every Session — the tab's first paint. */
+/** Which stored Classes each Tipe Peserta keeps. */
+const PARTICIPANT_TYPE_CLASSES: Record<FeedbackParticipantType, ClassKind[]> = {
+  Siswa: ["Student"],
+  "GTK-MS": ["GTK", "MS"],
+};
+
+/**
+ * **What the Peserta tab is narrowed to** (#466): one School, and within it one Session, and a Tipe
+ * Peserta (#487). `null` is Semua. Unlike the score filters, the scope also narrows the four
+ * averages. An id that names nothing — or is not an id at all — matches no row, so the tab reads
+ * empty rather than failing: each is compared as text, so a malformed one never reaches a `uuid`
+ * cast. A Tipe Peserta that names nothing matches no row either.
+ */
+export type ParticipantFeedbackScope = {
+  schoolId: string | null;
+  sessionId: string | null;
+  participantType: FeedbackParticipantType | null;
+};
+
+/** Every School, every Session, every Tipe Peserta — the tab's first paint. */
 export const NO_PARTICIPANT_FEEDBACK_SCOPE: ParticipantFeedbackScope = {
   schoolId: null,
   sessionId: null,
+  participantType: null,
 };
 
-/** The scope's predicates over the joined `session`, or none for Semua. */
+/** The scope's predicates over the joined `session` and the row's Class, or none for Semua. */
 function participantScopeConditions(scope: ParticipantFeedbackScope): SQL[] {
   return [
     scope.schoolId === null ? null : sql`${session.schoolId}::text = ${scope.schoolId}`,
     scope.sessionId === null ? null : sql`${session.id}::text = ${scope.sessionId}`,
+    scope.participantType === null ? null : participantTypeCondition(scope.participantType),
   ].filter((condition): condition is SQL => condition !== null);
+}
+
+/** The Classes a Tipe Peserta keeps, or none when the value is not one — a Server Action's input. */
+function participantTypeCondition(participantType: FeedbackParticipantType): SQL {
+  return Object.hasOwn(PARTICIPANT_TYPE_CLASSES, participantType)
+    ? inArray(participantFeedback.classKind, PARTICIPANT_TYPE_CLASSES[participantType])
+    : sql`false`;
 }
 
 /**
@@ -345,8 +373,9 @@ export type ParticipantFeedbackAverages = {
 
 /**
  * **The four summary averages, over the tab's scope and never its score filters** (#466). With no
- * School or Session picked they are programme-wide, over the whole `participant_feedback` table; a
- * scope narrows them to its School or Session. The score filters are deliberately not an argument:
+ * School, Session or Tipe Peserta picked they are programme-wide, over the whole
+ * `participant_feedback` table; a scope narrows them to its School, Session or Tipe Peserta (#487),
+ * so under GTK-MS Hands-on RBL is `null`. The score filters are deliberately not an argument:
  * averaging only the rows at or below 7 would read as the standing and mislead.
  *
  * An empty table makes `avg()` return NULL; `coalesce(…, 0)` turns that into `0` for the three
