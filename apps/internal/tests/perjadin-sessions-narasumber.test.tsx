@@ -5,8 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 
 /**
  * **The Session list on /perjadin/[id] names its Narasumber one per line** (#491): under the
- * Session's date, time and School, in the order they come, never comma-joined — and a Session with
- * none has no list. The badge and the Ubah/Batalkan controls stay on the Session's own row.
+ * Session's date, time and School, never comma-joined — and a Session with none has no list. The
+ * badge and the Ubah/Batalkan controls stay on the Session's own row. The A–Z order is the query's
+ * (`perjadinDetail`); the fixture is deliberately not A–Z, to show the list keeps what it gets.
  */
 
 vi.mock("-/app/(app)/perjadin/[id]/actions", () => ({
@@ -93,10 +94,14 @@ describe("the Session list's Narasumber (#491)", () => {
     expect(html.match(/aria-label="Narasumber Sesi/g)).toHaveLength(1);
   });
 
-  it("lists the names for readers without the controls too", () => {
+  it("lists the names for readers without the controls too, the badge still on the row", () => {
     const html = renderSessions([session], false);
 
     expect(html).not.toContain(">Ubah<");
     expect(html).toContain("<li>Dr. Sari Wulandari</li><li>Prof. Adi Nugroho</li>");
+    expect(html.indexOf(">Terjadwal<")).toBeGreaterThan(html.indexOf(">SMAN 1 Bontang</a>"));
+    expect(html.indexOf('aria-label="Narasumber Sesi')).toBeGreaterThan(
+      html.indexOf(">Terjadwal<"),
+    );
   });
 });

@@ -144,7 +144,8 @@ function PerjadinSessions({
                   </span>
                 )}
               </div>
-              {/* One Narasumber per line, indented under the row the badge and controls stay on (#491). */}
+              {/* One Narasumber per line (#491), indented under the row, which keeps the badge and
+                  the controls. */}
               {session.taughtBy.length > 0 && (
                 <ul
                   aria-label={`Narasumber Sesi ${session.heldOn} ${session.schoolName}`}
