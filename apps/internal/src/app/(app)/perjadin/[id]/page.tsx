@@ -44,9 +44,8 @@ export async function generateMetadata({ params }: PageProps<"/perjadin/[id]">):
  * Perjadin Editor's or an Administrator's** (ADR-0048), enforced in each query rather than by what this page
  * renders, so a Pimpinan or a Staff member off the trip sees the figures but no edit.
  *
- * The Report deadline rides with the money because the Perjadin Report *is* the acquittal state on
- * the row. It is derived and never stored — two days after the Group gets back, so it cannot be
- * typed wrong and it moves by itself if the trip's dates are corrected.
+ * The Report has no deadline (ADR-0055, #489): it is neither filed nor due, so the strip shows
+ * none.
  */
 export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
   const person = await requirePerson();
@@ -112,14 +111,6 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
               </LinkButton>
             </div>
           </div>
-          {/*
-            The deadline rides with the money, because the Report *is* the acquittal. Nothing
-            is gated on it — DITSAMA sets that deadline itself, and the tool is never stricter
-            than the process it serves.
-          */}
-          <p className="mt-1 text-sm text-muted-foreground">
-            Laporan jatuh tempo <span className="tabular-nums">{acquittal.reportDueOn}</span>
-          </p>
           <dl className="mt-2.5 flex flex-wrap gap-x-8 gap-y-2 text-sm">
             <MoneyFigure
               label="Uang Perjalanan Terpakai"

@@ -71,6 +71,15 @@ every transaction on the trip, each with its evidence, summed as **Uang Perjalan
 by cohort, reconciled against nothing. The bet is unchanged in kind: an itemised, evidenced record
 assembled on a phone, exported in one click, beats a spreadsheet and a folder of photos.
 
+## Amendment (2026-10-13): the Report is neither filed nor due
+
+The acquittal is no longer filed, and no deadline is shown for it
+([ADR-0055](./0055-the-perjadin-report-is-neither-filed-nor-due.md),
+[#489](https://github.com/sugt-itb/sugt-itb-26/issues/489)). "On a deadline DITSAMA sets" above
+described a date the tool showed and gated nothing on; it is gone, and so is Laporkan, which froze
+nothing. The bet is unchanged: the acquittal is the trip's running record, and the export is taken
+whenever it is needed.
+
 ## Amendment (2026-10-08): SPPD is uploaded, not generated
 
 **SPPD** is no longer among the unconfirmed paperwork

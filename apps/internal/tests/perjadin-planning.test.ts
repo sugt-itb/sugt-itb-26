@@ -896,15 +896,6 @@ describe("the Perjadin list and detail", () => {
     expect(detail?.group).toHaveLength(1);
     expect(detail?.sessions).toHaveLength(2);
     expect(detail).not.toHaveProperty("spentIdr");
-    expect(detail).not.toHaveProperty("reportDueOn");
-  });
-
-  it("reports the Report deadline on the acquittal, where the money is", async () => {
-    const { pic, input } = await validPlan();
-    const planned = await planPerjadin(pic, input);
-    if (planned.outcome !== "planned") throw new Error("fixture failed to plan");
-
-    expect((await perjadinAcquittal(pic, planned.perjadinId))?.reportDueOn).toBe("2026-09-05");
   });
 
   it("counts Schools rather than Sessions, so a re-arranged School counts once", async () => {

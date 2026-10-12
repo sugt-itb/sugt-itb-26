@@ -84,12 +84,6 @@ export type PerjadinDetail = {
   endsOn: string;
   picPersonId: string;
   picFullName: string;
-  /**
-   * **The Report deadline is not here.** It is on `perjadinAcquittal`, because the Perjadin
-   * Report *is* the acquittal — `docs/data-model.md` says so in as many words — and this payload
-   * carries no money-side figure. That acquittal read is open to any signed-in Person since #180
-   * (ADR-0026), so the deadline rides with the money there rather than being duplicated here.
-   */
   group: GroupMemberEntry[];
   sessions: PerjadinSession[];
   /** The trip's Teaching Team as trip-scoped names (ADR-0020), for the per-name editor and the "Diajar oleh" pickers. */

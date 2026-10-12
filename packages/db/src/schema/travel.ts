@@ -41,11 +41,6 @@ import { cluster, school, subCluster } from "./reference";
  * Money is `bigint` in whole rupiah — `numeric(_, 2)` would imply a subunit nobody
  * uses. Every money column carries the `_idr` suffix so no reader has to guess.
  *
- * There is no `report_deadline`: the Report is due two days after the Group gets
- * back, so it is `ends_on + REPORT_DEADLINE_DAYS_AFTER_RETURN` and nothing stores
- * it. A derived deadline recomputes itself when a trip's dates are corrected; a
- * typed one goes stale.
- *
  * `picRole` is pinned to 'Staff' so the composite foreign key into
  * `person (id, role)` makes **the PIC is a Staff member** unbreakable, including
  * from the Supabase SQL editor.
@@ -74,7 +69,6 @@ export const perjadin = pgTable(
     picPersonId: uuid("pic_person_id").notNull(),
     picRole: text("pic_role").$type<"Staff">().notNull().default("Staff"),
 
-    reportFiledAt: timestamp("report_filed_at", { withTimezone: true }),
     // The Perjadin's folder in the company Google Drive (ADR-0040), set by compare-and-set the
     // first time a transaction on it is reconciled — never under a row lock held across a call
     // to Google. Null until then. An id, never a path, so a rename or move by hand breaks nothing.

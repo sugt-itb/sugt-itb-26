@@ -11,14 +11,13 @@ import { subCluster } from "../schema/reference";
 import { perjadin, perjadinPimpinan, transaction, transactionEvidence } from "../schema/travel";
 import { logActivity } from "./activity-log";
 import type { Person } from "./caller";
-import { perjadinReportDeadline, todayInDeadlineZone } from "./deadline";
 import { tripSchoolNames } from "./perjadin-naming";
 import { requirePerjadinWriter, requireStaff } from "./staff-only";
 
 /**
  * **Perjadin Report** — the acquittal of one Perjadin. Reading it is now open to any signed-in
  * Person (ADR-0026 reversed ADR-0004's money-read half, #180); only **writing** it — recording or
- * deleting a transaction, attaching or deleting a receipt, filing — is the trip's Group's,
+ * deleting a transaction, attaching or deleting a receipt — is the trip's Group's,
  * a Perjadin Editor's or an Administrator's (ADR-0048), each write query below opening with its own
  * `requireStaff` and running `requirePerjadinWriter`.
  *
@@ -27,11 +26,9 @@ import { requirePerjadinWriter, requireStaff } from "./staff-only";
  * **every transaction on the trip, each with its receipts, reconciled against nothing**: the
  * Advance is not tracked (ADR-0051, #464), so there is no remainder to account for.
  *
- * **Three things on this payload are derived and never stored** — Uang Perjalanan Terpakai, the
- * report deadline and the days left against it. Each follows from something already stored, so
- * none can be typed wrong and each moves by itself when the trip's lines or dates are corrected.
- * Nothing is gated on the deadline: DITSAMA sets it for itself, and the tool is never
- * stricter than the process it serves.
+ * **It is neither filed nor due** (ADR-0055, #489): the Report is the trip's running acquittal and
+ * nothing more. Uang Perjalanan Terpakai is derived and never stored, so it moves by itself when
+ * the trip's lines are corrected.
  */
 
 /** One uploaded receipt: `driveFileId` is its file in the company Google Drive (ADR-0040). */
@@ -89,27 +86,6 @@ export type PerjadinAcquittal = {
   siswaSpentIdr: number;
   /** Of `spentIdr`, the spend attributed to the GTK-MS cohort — every category, like `spentIdr`. */
   gtkMsSpentIdr: number;
-  /**
-   * **Derived, never stored.** Two days after the Group gets back, so it cannot be typed
-   * wrong and it moves by itself if the trip's dates are corrected.
-   */
-  reportDueOn: string;
-  /**
-   * Days left against that deadline, negative once it has passed.
-   *
-   * **"Today" is a zone, and this one is named rather than inherited.** `reportDueOn` needs
-   * no zone — it is date arithmetic on two calendar days. This does: it compares the deadline
-   * to the current day, and which day that is depends on where you stand. Left as bare
-   * `current_date` it would be whatever zone the database session happens to default to, and
-   * a Perjadin ending on the 3rd would read `terlambat 1 hari` in one session and `sisa 0
-   * hari` in another at the same instant.
-   *
-   * `Asia/Jakarta` is the zone because the deadline is DITSAMA's own, set for itself, and
-   * DITSAMA is in Bandung. It is not the School's zone — Indonesia spans three — and it is
-   * not meant to be: what is being counted is how long the PIC has left with their own
-   * office, not anything about where the trip went.
-   */
-  daysRemaining: number;
   transactions: AcquittalTransaction[];
   /**
    * The Pimpinan who joined this trip — record-only, now the names of real Pimpinan-Person rows
@@ -118,7 +94,6 @@ export type PerjadinAcquittal = {
    * rather than a delivery surface ([#142], ADR-0004). Empty when none joined.
    */
   pimpinan: string[];
-  reportFiledAt: Date | null;
 };
 
 /**
@@ -133,8 +108,8 @@ export type PerjadinAcquittal = {
  * `perjadin/[id]/laporan/actions.ts` that reaches Drive — opening upload sessions, recording a line,
  * attaching receipts — calls `requireStaff` explicitly, ahead of this read, because Google is reached
  * before any write query runs (ADR-0040; the same reason the Supabase-era mint and read-back gave,
- * #180). Every money-write query (`recordTransaction`, `attachTransactionEvidence`,
- * `filePerjadinReport`) keeps its own `requireStaff`.
+ * #180). Every money-write query (`recordTransaction`, `attachTransactionEvidence` and the two
+ * deletes) keeps its own `requireStaff`.
  *
  * Returns `null` when there is no such Perjadin. That is a genuinely reachable state — a
  * stale link to a deleted Perjadin.
@@ -154,17 +129,6 @@ export async function perjadinAcquittal(
       schoolNames: tripSchoolNames(perjadin.id),
       startsOn: perjadin.startsOn,
       endsOn: perjadin.endsOn,
-      // Computed in Postgres rather than in JavaScript, so the arithmetic happens in the
-      // same calendar the dates are stored in. A `Date` here would introduce a time zone the
-      // domain does not have — a Session is a calendar day, and so is a deadline.
-      reportDueOn: sql<string>`to_char(${perjadinReportDeadline}, 'YYYY-MM-DD')`,
-      // The deadline less today, both in the office's zone: `todayInDeadlineZone` is the shared
-      // `(now() at time zone …)::date` fragment (`./deadline.ts`), the calendar day in Bandung's
-      // zone rather than the session's default, which nothing in this repository sets.
-      daysRemaining: sql<number>`(${perjadinReportDeadline} - ${todayInDeadlineZone})`.mapWith(
-        Number,
-      ),
-      reportFiledAt: perjadin.reportFiledAt,
     })
     .from(perjadin)
     .innerJoin(subCluster, eq(subCluster.id, perjadin.subClusterId))
@@ -580,7 +544,6 @@ export type DeleteEvidenceResult =
  * receipt the only one left, and is refused. A line grandfathered with more than five may lose any of
  * them, down to one.
  *
- * Nothing about filing gates it: a filed Laporan's `report_filed` entry keeps the totals as filed.
  * The Log entry is a copy of what went, since the row is gone after.
  */
 export async function deleteTransactionEvidence(
@@ -686,7 +649,7 @@ export type DeleteTransactionResult =
  * The row is locked `for update` first — the lock `attachTransactionEvidence` counts under and a
  * reconcile's folder claim waits on — so what it held is read once nothing more can join it, and
  * answered for the action to trash whatever arrived after its own read. A line with no receipt, or
- * grandfathered with more than five, is deleted like any other; nothing about filing gates it.
+ * grandfathered with more than five, is deleted like any other.
  *
  * The Log entry is a copy of the line, since the row is gone after.
  */
@@ -739,80 +702,5 @@ export async function deleteTransaction(
       driveFolderId: line.driveFolderId,
       driveFileIds: receipts.map((receipt) => receipt.driveFileId),
     };
-  });
-}
-
-export type FilePerjadinReportResult =
-  | { outcome: "filed"; filedAt: Date }
-  | { outcome: "no-such-perjadin" }
-  /** Filed already. Re-filing would move the timestamp and lose when it actually happened. */
-  | { outcome: "already-filed"; filedAt: Date }
-  /**
-   * At least one line item has no receipt against it. The ids come back so the screen can
-   * point at the rows rather than say "something is missing".
-   */
-  | { outcome: "evidence-missing"; transactionIds: string[] };
-
-/**
- * File the Report.
- *
- * **"Every transaction has at least one piece of evidence" is checked here as a backstop.** Since
- * ADR-0039 `recordTransaction` refuses a line without a receipt, so no line written through the app
- * lacks one — but the shared database may already hold lines from before that rule, and no
- * migration touched them. Those are what this cross-row count, which no CHECK can express, still
- * catches: a PIC fixes one through its row's "Unggah bukti", then files.
- *
- * A Perjadin with no transactions at all files cleanly. A trip that spent nothing is a real
- * trip, and the vacuous truth is the right answer rather than an edge case to refuse.
- *
- * Nothing else is gated. Not the Advance, which is no longer tracked (ADR-0051, #464). Not the
- * deadline, because DITSAMA sets it for itself and the tool is never stricter than the process it
- * serves.
- */
-export async function filePerjadinReport(
-  caller: Person,
-  perjadinId: string,
-): Promise<FilePerjadinReportResult> {
-  requireStaff(caller);
-
-  return db.transaction(async (tx) => {
-    await requirePerjadinWriter(caller, perjadinId, tx);
-
-    const [trip] = await tx
-      .select({ reportFiledAt: perjadin.reportFiledAt })
-      .from(perjadin)
-      .where(eq(perjadin.id, perjadinId))
-      .for("update");
-    if (!trip) return { outcome: "no-such-perjadin" };
-    if (trip.reportFiledAt) return { outcome: "already-filed", filedAt: trip.reportFiledAt };
-
-    const unevidenced = await tx
-      .select({ id: transaction.id })
-      .from(transaction)
-      .leftJoin(transactionEvidence, eq(transactionEvidence.transactionId, transaction.id))
-      .where(and(eq(transaction.perjadinId, perjadinId), sql`${transactionEvidence.id} is null`))
-      .orderBy(asc(transaction.spentOn));
-
-    if (unevidenced.length > 0) {
-      return { outcome: "evidence-missing", transactionIds: unevidenced.map((line) => line.id) };
-    }
-
-    const filedAt = new Date();
-    await tx.update(perjadin).set({ reportFiledAt: filedAt }).where(eq(perjadin.id, perjadinId));
-
-    // Every category, as the acquittal's totals count them.
-    const [lines] = await tx
-      .select({
-        transactionCount: count(),
-        totalIdr: sql<number>`coalesce(sum(${transaction.amountIdr}), 0)`.mapWith(Number),
-      })
-      .from(transaction)
-      .where(eq(transaction.perjadinId, perjadinId));
-    await logActivity(tx, caller, perjadinId, {
-      action: "report_filed",
-      details: { transactionCount: lines?.transactionCount ?? 0, totalIdr: lines?.totalIdr ?? 0 },
-    });
-
-    return { outcome: "filed", filedAt };
   });
 }

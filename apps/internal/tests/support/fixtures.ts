@@ -819,7 +819,7 @@ export async function refusedBy(write: Promise<unknown>): Promise<string | null>
 
 /**
  * `offset` days from today **in WIB**, `YYYY-MM-DD` — the calendar every dated rule is reckoned in
- * (`todayInDeadlineZone`), so a fixture on a boundary lands exactly on it. `en-CA` renders ISO.
+ * (`todayInWib`), so a fixture on a boundary lands exactly on it. `en-CA` renders ISO.
  */
 export function wibDaysFromToday(offset: number): string {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());

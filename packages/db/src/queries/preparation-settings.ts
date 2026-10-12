@@ -5,7 +5,6 @@ import { db } from "../client";
 import { cluster, subCluster } from "../schema/reference";
 import { perjadin } from "../schema/travel";
 import type { Person } from "./caller";
-import { DEADLINE_TIME_ZONE } from "./deadline";
 import { tripSchoolNames } from "./perjadin-naming";
 import {
   loadChecklistCatalog,
@@ -17,6 +16,7 @@ import {
 } from "./preparation-checklist";
 import type { PreparationScope } from "./preparation-items";
 import { requireGrant } from "./staff-only";
+import { WIB_TIME_ZONE } from "./today";
 
 /**
  * **What Pengaturan Perjadin shows** (#422): the Preparation Checklist as it applies at one level,
@@ -76,11 +76,11 @@ type LevelView = {
 };
 
 /**
- * Today in WIB, as `YYYY-MM-DD` — the day every dated change is stamped with (`todayInDeadlineZone`
+ * Today in WIB, as `YYYY-MM-DD` — the day every dated change is stamped with (`todayInWib`
  * in SQL), worked out here as `arrange-online-session.ts` does rather than asked of the database.
  */
 function wibToday(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: DEADLINE_TIME_ZONE }).format(new Date());
+  return new Intl.DateTimeFormat("en-CA", { timeZone: WIB_TIME_ZONE }).format(new Date());
 }
 
 /**

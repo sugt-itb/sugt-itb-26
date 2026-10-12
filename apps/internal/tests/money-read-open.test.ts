@@ -1,6 +1,6 @@
 import {
   attachTransactionEvidence,
-  filePerjadinReport,
+  deleteTransaction,
   isNotStaffError,
   perjadinAcquittal,
   recordTransaction,
@@ -19,9 +19,9 @@ import { addPerjadin, addPerson, addTransaction, resetDatabase } from "./support
  * role (#179) — reads the whole Perjadin acquittal, and is refused by every query that would change
  * it.
  *
- * `perjadin-report.test.ts` drives the four money writes against a hand-built non-Staff caller to
- * prove the choke point still refuses one; this file proves the other side of the new boundary with
- * a *real* signed-in Pimpinan: the read now goes through, and the four writes still throw
+ * `perjadin-report.test.ts` drives the money writes against a hand-built non-Staff caller to prove
+ * the choke point still refuses one; this file proves the other side of the new boundary with a
+ * *real* signed-in Pimpinan: the read now goes through, and the writes still throw
  * `NotStaffError`. The two together are the whole of the read/write split — open to read, Staff to
  * write.
  */
@@ -95,10 +95,15 @@ describe("a Pimpinan cannot write money", () => {
     expect(isNotStaffError(refusal)).toBe(true);
   });
 
-  it("is refused by filePerjadinReport", async () => {
-    const { pimpinan, trip } = await aTripWithAPimpinan();
+  it("is refused by deleteTransaction", async () => {
+    const { staff, pimpinan, trip } = await aTripWithAPimpinan();
+    const line = await addTransaction({
+      perjadinId: trip.id,
+      amountIdr: 50_000,
+      createdByPersonId: staff.id,
+    });
 
-    const refusal = await filePerjadinReport(pimpinan, trip.id).catch((error: unknown) => error);
+    const refusal = await deleteTransaction(pimpinan, line.id).catch((error: unknown) => error);
 
     expect(isNotStaffError(refusal)).toBe(true);
   });
