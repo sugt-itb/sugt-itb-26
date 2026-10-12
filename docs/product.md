@@ -282,7 +282,8 @@ Narasumber (11)
   toggle is a full-width tap target, and a long School name wraps.
 
 This is how the trip is usually staffed, shown, not a rule: nothing about entering Narasumber or
-"Diajar oleh" changes, and `/perjadin/[id]` still names them per Session.
+"Diajar oleh" changes, and `/perjadin/[id]` still names them per Session (see
+[Perjadin](#perjadin)).
 
 **Each Session row of the timeline has its own buttons**: **Tandai** while it is still arranged,
 **Feedback**, and **Foto & Video** (#425) — in both sections, since footage is often uploaded after
@@ -516,6 +517,11 @@ leaving out this trip's own Sessions, which the screen already lists ("Belum ada
 Perjadin lain" when there are none). **The note is read-only and never blocks**: the cap of two
 offline Sessions per School is still not enforced, and a School with Sessions elsewhere can be
 planned like any other — only the same School at the same date and time is refused.
+
+**The trip's screen lists its Sessions, each with its Narasumber one per line** (#491): a row of
+date, time, School and status badge — plus Ubah and Batalkan, for whoever writes the trip, while the
+Session is still arranged — then that Session's "Diajar oleh" beneath it, indented, A–Z, one name to
+a line, on every viewport. A Session with no Narasumber has nothing under its row.
 
 Offline Sessions happen during a Perjadin. **Online Sessions have no Perjadin at all** —
 which is why counting trips never tells you how much teaching has happened, and why six

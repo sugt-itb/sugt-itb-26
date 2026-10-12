@@ -100,52 +100,61 @@ function PerjadinSessions({
           {sessions.map((session) => (
             <li
               key={session.sessionId}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+              className="text-sm"
             >
-              <Link
-                href={`/sesi/${session.sessionId}`}
-                className="tabular-nums hover:underline"
-              >
-                {session.heldOn}
-              </Link>
-              <span className="text-muted-foreground tabular-nums">
-                {formatSessionStartTimeWithWib(session.startsAt, session.timeZone)}
-              </span>
-              <Link
-                href={`/sekolah/${session.schoolSlug}`}
-                className="text-muted-foreground hover:underline"
-              >
-                {session.schoolName}
-              </Link>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Link
+                  href={`/sesi/${session.sessionId}`}
+                  className="tabular-nums hover:underline"
+                >
+                  {session.heldOn}
+                </Link>
+                <span className="text-muted-foreground tabular-nums">
+                  {formatSessionStartTimeWithWib(session.startsAt, session.timeZone)}
+                </span>
+                <Link
+                  href={`/sekolah/${session.schoolSlug}`}
+                  className="text-muted-foreground hover:underline"
+                >
+                  {session.schoolName}
+                </Link>
+                <SessionStatusBadge status={session.status} />
+                {canEdit && session.status === "arranged" && (
+                  <span className="flex gap-1">
+                    <SessionDialog
+                      perjadinId={perjadinId}
+                      session={session}
+                      eligibleSchools={eligibleSchools}
+                      teachers={teachers}
+                      startsOn={startsOn}
+                      endsOn={endsOn}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                        >
+                          Ubah
+                        </Button>
+                      }
+                    />
+                    <CancelDialog
+                      perjadinId={perjadinId}
+                      sessionId={session.sessionId}
+                    />
+                  </span>
+                )}
+              </div>
+              {/* One Narasumber per line (#491), indented under the row, which keeps the badge and
+                  the controls. */}
               {session.taughtBy.length > 0 && (
-                <span className="text-muted-foreground">
-                  · {session.taughtBy.map((teacher) => teacher.name).join(", ")}
-                </span>
-              )}
-              <SessionStatusBadge status={session.status} />
-              {canEdit && session.status === "arranged" && (
-                <span className="flex gap-1">
-                  <SessionDialog
-                    perjadinId={perjadinId}
-                    session={session}
-                    eligibleSchools={eligibleSchools}
-                    teachers={teachers}
-                    startsOn={startsOn}
-                    endsOn={endsOn}
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                      >
-                        Ubah
-                      </Button>
-                    }
-                  />
-                  <CancelDialog
-                    perjadinId={perjadinId}
-                    sessionId={session.sessionId}
-                  />
-                </span>
+                <ul
+                  aria-label={`Narasumber Sesi ${session.heldOn} ${session.schoolName}`}
+                  className="mt-1 grid gap-0.5 pl-4 text-muted-foreground"
+                >
+                  {session.taughtBy.map((teacher) => (
+                    <li key={teacher.id}>{teacher.name}</li>
+                  ))}
+                </ul>
               )}
             </li>
           ))}
