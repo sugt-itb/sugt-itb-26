@@ -105,12 +105,15 @@ const grantsHeld = sql<Grant[]>`coalesce(
 /**
  * The whole roster, revoked rows included, oldest name first.
  *
- * A read open to anyone signed in, so **no `requireStaff`** — the caller is taken because every
- * query does (convention 1), not to gate on it. Revoked rows are returned rather than filtered:
- * the screen keeps them behind a foot toggle, and `activeRosters` — which does filter them — is
- * for the pickers that must not offer a revoked Person, not for this screen.
+ * **Administrator only** (#488): `/orang` `forbidden()`s everyone else, and this checks again, as
+ * `activityLogPage` does for `/log`. Revoked rows are returned rather than filtered: the screen
+ * keeps them behind a foot toggle, and `activeRosters` — which does filter them, and is open to
+ * whoever plans a Perjadin — is for the pickers that must not offer a revoked Person, not for this
+ * screen.
  */
-export async function roster(_caller: Person): Promise<RosterEntry[]> {
+export async function roster(caller: Person): Promise<RosterEntry[]> {
+  requireGrant(caller, "Administrator");
+
   return db
     .select({
       id: person.id,

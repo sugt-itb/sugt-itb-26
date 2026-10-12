@@ -42,10 +42,10 @@ import { MultiSelectCombobox } from "./multi-select-combobox";
 /**
  * **Orang** — the roster and the invite list, a dense table scanned for a name.
  *
- * **Everything that writes here is an Administrator's** (`canAdminister`; #470, ADR-0028): the add
- * form, Nonaktifkan, and the **Akses** column's Grant picker. Hiding them is a courtesy;
- * `requireGrant("Administrator")` inside each write is the enforcement. Everyone signed in still
- * reads the roster, since a Group is assembled from it. Revoked rows sit behind a foot toggle — they
+ * **Only an Administrator reaches it** (#488): the page `forbidden()`s everyone else, so the add
+ * form, Nonaktifkan and the **Akses** column's Grant picker render unconditionally.
+ * `requireGrant("Administrator")` inside each write is still the enforcement (#470, ADR-0028),
+ * since a layout does not run before a Server Action. Revoked rows sit behind a foot toggle — they
  * exist because correcting a role is revoke-and-re-add, which leaves the old row beside the new one
  * sharing an email.
  *
@@ -55,12 +55,10 @@ import { MultiSelectCombobox } from "./multi-select-combobox";
 function OrangRoster({
   people,
   viewerId,
-  canAdminister,
 }: {
   people: RosterEntry[];
   /** The signed-in Person, whose own row offers no lockout. */
   viewerId: string;
-  canAdminister: boolean;
 }) {
   const [showRevoked, setShowRevoked] = useState(false);
   const [query, setQuery] = useState("");
@@ -95,7 +93,7 @@ function OrangRoster({
 
   return (
     <div className="flex min-h-full flex-col p-4 sm:p-7">
-      {canAdminister && <AddPersonForm />}
+      <AddPersonForm />
 
       {/* The roster search, distinct from the add-person form above — this one filters the table,
           it does not create anyone. */}
@@ -127,8 +125,8 @@ function OrangRoster({
                 <TableHead>Email</TableHead>
                 <TableHead>Peran</TableHead>
                 <TableHead>Status</TableHead>
-                {canAdminister && <TableHead>Akses</TableHead>}
-                {canAdminister && <TableHead className="text-right">Tindakan</TableHead>}
+                <TableHead>Akses</TableHead>
+                <TableHead className="text-right">Tindakan</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -137,7 +135,6 @@ function OrangRoster({
                   key={entry.id}
                   entry={entry}
                   isViewer={entry.id === viewerId}
-                  canAdminister={canAdminister}
                 />
               ))}
 
@@ -147,7 +144,6 @@ function OrangRoster({
                     key={entry.id}
                     entry={entry}
                     isViewer={entry.id === viewerId}
-                    canAdminister={canAdminister}
                   />
                 ))}
             </TableBody>
@@ -173,19 +169,10 @@ function OrangRoster({
 }
 
 /**
- * One row. `canAdminister` decides whether the Akses and actions columns exist at all, so every row
- * keeps the header's column count. Nonaktifkan shows only on an active row — a revoked one is
- * already off — and never on the viewer's own (`isViewer`).
+ * One row. Nonaktifkan shows only on an active row — a revoked one is already off — and never on
+ * the viewer's own (`isViewer`).
  */
-function PersonRow({
-  entry,
-  isViewer,
-  canAdminister,
-}: {
-  entry: RosterEntry;
-  isViewer: boolean;
-  canAdminister: boolean;
-}) {
+function PersonRow({ entry, isViewer }: { entry: RosterEntry; isViewer: boolean }) {
   return (
     <TableRow className={entry.active ? undefined : "text-muted-foreground"}>
       <TableCell className="font-medium">{entry.fullName}</TableCell>
@@ -217,31 +204,27 @@ function PersonRow({
       <TableCell>
         <StateBadge entry={entry} />
       </TableCell>
-      {canAdminister && (
-        <TableCell>
-          {/*
+      <TableCell>
+        {/*
             Grants are Staff-only, so only an active Staff row offers the picker; a Pimpinan or a
             revoked row shows a dash. The assign/revoke writes still enforce this server-side —
             `assignGrant` refuses a non-Staff target — so hiding the picker is the courtesy and the
             write is the gate, the same split the roster's other controls follow.
           */}
-          {entry.active && entry.role === "Staff" ? (
-            <GrantPicker
-              personId={entry.id}
-              personName={entry.fullName}
-              grants={entry.grants}
-              isViewer={isViewer}
-            />
-          ) : (
-            <span className="text-xs text-muted-foreground">—</span>
-          )}
-        </TableCell>
-      )}
-      {canAdminister && (
-        <TableCell className="text-right">
-          {entry.active && !isViewer && <RevokeButton personId={entry.id} />}
-        </TableCell>
-      )}
+        {entry.active && entry.role === "Staff" ? (
+          <GrantPicker
+            personId={entry.id}
+            personName={entry.fullName}
+            grants={entry.grants}
+            isViewer={isViewer}
+          />
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </TableCell>
+      <TableCell className="text-right">
+        {entry.active && !isViewer && <RevokeButton personId={entry.id} />}
+      </TableCell>
     </TableRow>
   );
 }
