@@ -387,6 +387,27 @@ describe("submitPerjadinEvaluationAction", () => {
     expect((await evaluationRows(trip.id)).length).toBe(1);
   });
 
+  it("takes Pendamping Support through a link issued before #481 — no new link needed (ADR-0049)", async () => {
+    const pic = await staff();
+    const trip = await aTrip(pic.id);
+    const day = 24 * 60 * 60 * 1000;
+    const token = await addPerjadinFeedbackToken({
+      perjadinId: trip.id,
+      issuedByPersonId: pic.id,
+      issuedAt: new Date(Date.now() - 30 * day),
+    });
+
+    const result = await submitPerjadinEvaluationAction(token.token, {
+      role: "Narasumber",
+      name: "Pak Andi",
+      ratings: { ...FINE, pendamping_support: 8 },
+      comments: NO_COMMENTS,
+    });
+
+    expect(result.outcome).toBe("filed");
+    expect((await evaluationRows(trip.id)).map((row) => row.pendampingSupport)).toEqual([8]);
+  });
+
   it("files through each of a trip's several links against that trip", async () => {
     const pic = await staff();
     const trip = await aTrip(pic.id);
@@ -668,6 +689,21 @@ describe("filePerjadinEvaluation — Pendamping Support", () => {
       comments: { ...NO_COMMENTS, pendamping_support: "Pendamping sulit dihubungi" },
     });
     expect(filed.outcome).toBe("filed");
+  });
+
+  it("refuses a forced request missing an Aspect every Role owes, rather than failing the insert", async () => {
+    const trip = await aTrip((await staff()).id);
+    const { transport: _missing, ...ratings } = FINE;
+
+    const result = await filePerjadinEvaluation(asToken(trip.id), {
+      role: "Narasumber",
+      name: "Pak Andi",
+      ratings: ratings as PerjadinEvaluationRatings,
+      comments: NO_COMMENTS,
+    });
+
+    expect(result).toEqual({ outcome: "ratings-mismatch" });
+    expect(await evaluationCount(trip.id)).toBe(0);
   });
 
   it("takes a submission from a form loaded before #481 only from a Pendamping", async () => {

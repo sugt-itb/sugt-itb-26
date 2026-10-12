@@ -940,7 +940,8 @@ function ParticipantCard({ row }: { row: ParticipantFeedbackRow }) {
  * links, because a trip has a home page a submission does not — the day the filer filed it
  * ("Diisi"), and the row average as the headline number.
  *
- * Below it, the four Aspects in a fixed order, each with its score and — when the filer left one —
+ * Below it, the four logistics Aspects in a fixed order (Pendamping Support, #481, is not shown
+ * here until #482), each with its score and — when the filer left one —
  * the comment about that Aspect. **The Penginapan row is omitted entirely when `lodging` is null**:
  * a day trip has no hotel to rate, and its average was already taken over the three present ratings.
  */

@@ -69,7 +69,7 @@ const PERJADIN_ASPECT_LABELS: Record<PerjadinAspect, string> = {
  * What the Rating control says where it is not the Aspect's name. Pendamping Support is asked as a
  * statement to agree with, worded with the product owner (#481) and shown exactly as written.
  */
-const RATING_LABELS: AspectAnswers<string> = {
+const RATING_LABELS: Partial<Record<PerjadinAspect, string>> = {
   pendamping_support: "Pendamping membantu selama keberjalanan kegiatan.",
 };
 

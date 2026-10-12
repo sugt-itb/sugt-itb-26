@@ -155,8 +155,8 @@ export type FilePerjadinEvaluationResult =
    */
   | { outcome: "prose-required" }
   /**
-   * The Ratings are not the Role's Aspects: a Narasumber or Pimpinan with no Pendamping Support, or
-   * a Pendamping with one (ADR-0054). The form never sends either; a forced request, or a form left
+   * The Ratings are not the Role's Aspects: a Narasumber or Pimpinan with no Pendamping Support, a
+   * Pendamping with one (ADR-0054), or any filer missing one the Role always owes. The form never sends either; a forced request, or a form left
    * open from before #481, gets this, and nothing is written.
    */
   | { outcome: "ratings-mismatch" };
@@ -189,11 +189,14 @@ export async function filePerjadinEvaluation(
   // hold a NULL from every Role. The `?? []` is for a forged `role` from the unauthenticated form,
   // which the types cannot rule out: it is asked nothing, so it is refused here rather than failing
   // the CHECK. The `?? null` is for a form loaded before #481, which sends no Pendamping Support.
+  // `lodging` is asked of everyone and may still be null — a day trip — so it is the one Aspect
+  // whose presence is not the Role's to decide.
   const asked = PERJADIN_ASPECTS_BY_ROLE[input.role] ?? [];
   const pendampingSupport = input.ratings.pendamping_support ?? null;
-  if (asked.length === 0 || (pendampingSupport !== null) !== asked.includes("pendamping_support")) {
-    return { outcome: "ratings-mismatch" };
-  }
+  const matches = PERJADIN_ASPECTS.every(
+    (aspect) => aspect === "lodging" || (input.ratings[aspect] != null) === asked.includes(aspect),
+  );
+  if (asked.length === 0 || !matches) return { outcome: "ratings-mismatch" };
 
   // Trim each Komentar blank → null once, and reuse it for both the gate and the insert so the
   // rule the client sees and the row that lands agree on what counts as "said".

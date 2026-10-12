@@ -377,7 +377,8 @@ export async function participantFeedbackAverages(
 
 /**
  * The five Perjadin filters, each independent and each ANDed with the others — the Peserta tab's
- * four plus one, because a Perjadin has four Aspects. `reviewType` gates on the **row average**
+ * four plus one, for the four logistics Aspects. **Pendamping Support (#481) is not on this tab yet**
+ * — no filter, no average, not in the row average; #482 adds it. `reviewType` gates on the **row average**
  * across the ratings that are present (see `perjadinRowAverageExpr`); the other four gate on their
  * own Aspect column. A screen sends all five every time; `all` on any of them contributes no
  * predicate.
@@ -465,8 +466,8 @@ export type PerjadinFeedbackRow = {
  * The raw, unrounded Perjadin row average — **over the ratings that are present**. A day trip with
  * no hotel has a null `lodging`, so it must not count as a zero and must not divide by four: the
  * numerator `coalesce`s the absent hotel to 0 and the denominator drops it, so the average is over
- * three ratings when `lodging` is null and over four when it is not. `reviewType` gates on this,
- * and the row carries it.
+ * three ratings when `lodging` is null and over four when it is not. Pendamping Support (#481) is not
+ * counted yet — #482 brings it in when present. `reviewType` gates on this, and the row carries it.
  */
 const perjadinRowAverageExpr = sql<number>`(${perjadinEvaluation.transport} + ${perjadinEvaluation.meals} + ${perjadinEvaluation.punctuality} + coalesce(${perjadinEvaluation.lodging}, 0)) / (3.0 + (case when ${perjadinEvaluation.lodging} is null then 0 else 1 end))`;
 
