@@ -292,7 +292,7 @@ describe("the Perjadin tab's Perjadin and Peran pengisi", () => {
 
   it("reads an unknown or malformed trip, or an unknown Peran, as empty — not an error", async () => {
     const { person } = await perjadinScene();
-    const empty = { lodging: 0, transport: 0, meals: 0, punctuality: 0 };
+    const empty = { lodging: 0, transport: 0, meals: 0, punctuality: 0, pendampingSupport: null };
 
     for (const scope of [
       { perjadinId: "bukan-id", role: null },

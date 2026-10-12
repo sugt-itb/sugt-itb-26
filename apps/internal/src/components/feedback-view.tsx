@@ -98,6 +98,7 @@ const ALL_PERJADIN_FILTERS: PerjadinFeedbackFilters = {
   transport: "all",
   meals: "all",
   punctuality: "all",
+  pendampingSupport: "all",
 };
 
 /**
@@ -161,29 +162,16 @@ const MATERIALS_OPTIONS = aspectOptions(PARTICIPANT_ASPECT_LABELS.materials);
 
 const RELEVANCE_OPTIONS = aspectOptions(PARTICIPANT_ASPECT_LABELS.relevance);
 
-const LODGING_OPTIONS: FilterOptions = {
-  all: "Semua: Penginapan",
-  le7: "Penginapan ≤ 7",
-  gt7: "Penginapan > 7",
-};
+const LODGING_OPTIONS = aspectOptions("Penginapan");
 
-const TRANSPORT_OPTIONS: FilterOptions = {
-  all: "Semua: Transportasi",
-  le7: "Transportasi ≤ 7",
-  gt7: "Transportasi > 7",
-};
+const TRANSPORT_OPTIONS = aspectOptions("Transportasi");
 
-const MEALS_OPTIONS: FilterOptions = {
-  all: "Semua: Konsumsi",
-  le7: "Konsumsi ≤ 7",
-  gt7: "Konsumsi > 7",
-};
+const MEALS_OPTIONS = aspectOptions("Konsumsi");
 
-const PUNCTUALITY_OPTIONS: FilterOptions = {
-  all: "Semua: Ketepatan Waktu",
-  le7: "Ketepatan Waktu ≤ 7",
-  gt7: "Ketepatan Waktu > 7",
-};
+const PUNCTUALITY_OPTIONS = aspectOptions("Ketepatan Waktu");
+
+/** Pendamping Support (#482): a row without one — a Pendamping's, or one filed before #481 — is in neither arm. */
+const PENDAMPING_SUPPORT_OPTIONS = aspectOptions("Bantuan Pendamping");
 
 function FeedbackView({
   participantInitialRows,
@@ -483,9 +471,9 @@ function ParticipantTab({
 }
 
 /**
- * The Perjadin tab: four summary cards, five server-side filters, two sort dropdowns, and an
- * OFFSET-paged card list. The shape is the Peserta tab's — the extra Aspect (`lodging`) is the only
- * difference — so the filter, sort and paging machinery is identical, just over `loadPerjadinFeedback`.
+ * The Perjadin tab: five summary cards, six server-side filters, two sort dropdowns, and an
+ * OFFSET-paged card list. The shape is the Peserta tab's — one Aspect more — so the filter, sort and
+ * paging machinery is identical, just over `loadPerjadinFeedback`.
  */
 function PerjadinTab({
   initialRows,
@@ -565,7 +553,7 @@ function PerjadinTab({
     <>
       {/* The standing over the picked trip and Peran — programme-wide with neither — and unmoved by
           the score filters below. */}
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <AverageCard
           label="Penginapan"
           covers={covers}
@@ -585,6 +573,12 @@ function PerjadinTab({
           label="Ketepatan Waktu"
           covers={covers}
           value={averages.values.punctuality}
+        />
+        {/* Over the rows that have one; "—" until any in scope does, and always under Pendamping. */}
+        <AverageCard
+          label="Bantuan Pendamping"
+          covers={covers}
+          value={averages.values.pendampingSupport}
         />
       </div>
 
@@ -635,8 +629,8 @@ function PerjadinTab({
         />
       </div>
 
-      {/* The five server-side filters. Each change refetches the first page and resets paging. */}
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      {/* The six server-side filters. Each change refetches the first page and resets paging. */}
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <FilterSelect
           ariaLabel="Jenis ulasan"
           options={REVIEW_TYPE_OPTIONS}
@@ -680,6 +674,15 @@ function PerjadinTab({
           disabled={pending}
           onChange={(value) => {
             changeFilter("punctuality", value);
+          }}
+        />
+        <FilterSelect
+          ariaLabel="Nilai Bantuan Pendamping"
+          options={PENDAMPING_SUPPORT_OPTIONS}
+          value={filters.pendampingSupport}
+          disabled={pending}
+          onChange={(value) => {
+            changeFilter("pendampingSupport", value);
           }}
         />
       </div>
@@ -940,10 +943,11 @@ function ParticipantCard({ row }: { row: ParticipantFeedbackRow }) {
  * links, because a trip has a home page a submission does not — the day the filer filed it
  * ("Diisi"), and the row average as the headline number.
  *
- * Below it, the four logistics Aspects in a fixed order (Pendamping Support, #481, is not shown
- * here until #482), each with its score and — when the filer left one —
+ * Below it, the five Aspects in a fixed order, each with its score and — when the filer left one —
  * the comment about that Aspect. **The Penginapan row is omitted entirely when `lodging` is null**:
- * a day trip has no hotel to rate, and its average was already taken over the three present ratings.
+ * a day trip has no hotel to rate. **So is Bantuan Pendamping when `pendampingSupport` is**: a
+ * Pendamping is not asked it, and an evaluation filed before #481 holds none (ADR-0054). Either way
+ * the row average was already taken over the ratings present, never counting a missing one as 0.
  */
 function PerjadinCard({ row }: { row: PerjadinFeedbackRow }) {
   return (
@@ -989,6 +993,13 @@ function PerjadinCard({ row }: { row: PerjadinFeedbackRow }) {
           score={row.punctuality}
           comment={row.punctualityComment}
         />
+        {row.pendampingSupport !== null && (
+          <AspectRow
+            label="Bantuan Pendamping"
+            score={row.pendampingSupport}
+            comment={row.pendampingSupportComment}
+          />
+        )}
       </CardContent>
     </Card>
   );

@@ -882,8 +882,16 @@ anyway would produce an invented one.
   trip's Schools beneath. Typing a School's or a Kelompok's name finds the trip.
 - **Peran pengisi** is Semua Peran, Narasumber, Pendamping or Pimpinan: the role the filer declared.
 - There is no School filter; the Perjadin picker finds a trip by its Schools.
-- As on the Peserta tab, both AND with the score filters, and the four averages follow them — never
+- As on the Peserta tab, both AND with the score filters, and the five averages follow them — never
   the score filters — with titles naming the trip and the Peran.
+
+**Bantuan Pendamping has its own average card and its own filter** on the Perjadin tab (#482), after
+Ketepatan Waktu. As with Hands-on RBL on the Peserta tab, its average is over the rows that have
+one. A Pendamping's evaluation and one filed before the Aspect existed never count as 0, and the
+card reads "—" while none in scope does, so with Peran pengisi on Pendamping it always reads "—".
+Such a row is in neither arm of its filter, and its card has no Bantuan Pendamping line, as a day
+trip's has no Penginapan line. A row's average is the mean of the Ratings it has: three, four or
+five.
 
 The form deliberately matches the Session Record's shape. Two evaluation forms that behaved
 differently would be two things to learn.

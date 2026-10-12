@@ -376,11 +376,10 @@ export async function participantFeedbackAverages(
 }
 
 /**
- * The five Perjadin filters, each independent and each ANDed with the others — the Peserta tab's
- * four plus one, for the four logistics Aspects. **Pendamping Support (#481) is not on this tab yet**
- * — no filter, no average, not in the row average; #482 adds it. `reviewType` gates on the **row average**
- * across the ratings that are present (see `perjadinRowAverageExpr`); the other four gate on their
- * own Aspect column. A screen sends all five every time; `all` on any of them contributes no
+ * The six Perjadin filters, each independent and each ANDed with the others — one per Aspect, the
+ * four logistics ones and Pendamping Support (#482), and `reviewType`, which gates on the **row
+ * average** across the ratings that are present (see `perjadinRowAverageExpr`); the other five gate
+ * on their own Aspect column. A screen sends all six every time; `all` on any of them contributes no
  * predicate.
  */
 export type PerjadinFeedbackFilters = {
@@ -390,6 +389,8 @@ export type PerjadinFeedbackFilters = {
   transport: FeedbackFilterValue;
   meals: FeedbackFilterValue;
   punctuality: FeedbackFilterValue;
+  /** Narasumber and Pimpinan only (ADR-0054): a row without one is in neither arm, as for `lodging`. */
+  pendampingSupport: FeedbackFilterValue;
 };
 
 /** All Perjadin filters off — the first page of everything, in the caller's chosen sort. */
@@ -399,6 +400,7 @@ export const NO_PERJADIN_FEEDBACK_FILTERS: PerjadinFeedbackFilters = {
   transport: "all",
   meals: "all",
   punctuality: "all",
+  pendampingSupport: "all",
 };
 
 /**
@@ -454,33 +456,40 @@ export type PerjadinFeedbackRow = {
   transport: number;
   meals: number;
   punctuality: number;
+  /**
+   * Nullable: a Pendamping is not asked it (ADR-0054), and an evaluation filed before #481 holds
+   * none. Like a null `lodging`, the card omits the row.
+   */
+  pendampingSupport: number | null;
   /** The present-ratings average, computed in SQL as numeric and mapped to Number. */
   rowAverage: number;
   lodgingComment: string | null;
   transportComment: string | null;
   mealsComment: string | null;
   punctualityComment: string | null;
+  pendampingSupportComment: string | null;
 };
 
 /**
- * The raw, unrounded Perjadin row average — **over the ratings that are present**. A day trip with
- * no hotel has a null `lodging`, so it must not count as a zero and must not divide by four: the
- * numerator `coalesce`s the absent hotel to 0 and the denominator drops it, so the average is over
- * three ratings when `lodging` is null and over four when it is not. Pendamping Support (#481) is not
- * counted yet — #482 brings it in when present. `reviewType` gates on this, and the row carries it.
+ * The raw, unrounded Perjadin row average — **over the ratings that are present**. Two Aspects may
+ * be null: `lodging` on a day trip with no hotel, and `pendamping_support` from a Pendamping or on
+ * an evaluation filed before #481 (ADR-0054). Neither may count as a zero or as a divisor: the
+ * numerator `coalesce`s each to 0 and the denominator counts only the present ones, so a row
+ * averages over three, four or five ratings. `reviewType` gates on this, and the row carries it.
  */
-const perjadinRowAverageExpr = sql<number>`(${perjadinEvaluation.transport} + ${perjadinEvaluation.meals} + ${perjadinEvaluation.punctuality} + coalesce(${perjadinEvaluation.lodging}, 0)) / (3.0 + (case when ${perjadinEvaluation.lodging} is null then 0 else 1 end))`;
+const perjadinRowAverageExpr = sql<number>`(${perjadinEvaluation.transport} + ${perjadinEvaluation.meals} + ${perjadinEvaluation.punctuality} + coalesce(${perjadinEvaluation.lodging}, 0) + coalesce(${perjadinEvaluation.pendampingSupport}, 0)) / (3.0 + (case when ${perjadinEvaluation.lodging} is null then 0 else 1 end) + (case when ${perjadinEvaluation.pendampingSupport} is null then 0 else 1 end))`;
 
 /**
  * One page of Perjadin Evaluations, filtered and sorted by the caller's `FeedbackSort`, OFFSET-paged
  * — the twin of `participantFeedbackPage`, over `perjadin_evaluation` joined to `perjadin` and its
  * `sub_cluster` for the trip's name (ADR-0044) and the link target.
  *
- * **The five filters AND together and only the active ones appear in the WHERE.** Each `all` drops
+ * **The six filters AND together and only the active ones appear in the WHERE.** Each `all` drops
  * out. `reviewType` gates on the present-ratings average so the cut matches the number the card
  * shows before rounding. **A null-`lodging` row is naturally excluded from both lodging arms**:
  * `lodging <= 7` and `lodging > 7` are each NULL for it, so a `lodging` filter never keeps a day
- * trip with no hotel — no explicit null guard is needed.
+ * trip with no hotel — no explicit null guard is needed. A null `pendamping_support` falls out of
+ * both of its arms the same way.
  *
  * **The sort is compound: row average primary, `created_at` secondary, `id` last (#184)** — the
  * caller's `sort.score` and `sort.date` set the first two directions, the fixed `id asc` makes the
@@ -507,6 +516,7 @@ export async function perjadinFeedbackPage(
     bound(filters.transport, perjadinEvaluation.transport),
     bound(filters.meals, perjadinEvaluation.meals),
     bound(filters.punctuality, perjadinEvaluation.punctuality),
+    bound(filters.pendampingSupport, perjadinEvaluation.pendampingSupport),
   ];
 
   const rows = await db
@@ -523,17 +533,20 @@ export async function perjadinFeedbackPage(
       createdOn: sql<string>`to_char(${perjadinEvaluation.createdAt}, 'YYYY-MM-DD')`.mapWith(
         String,
       ),
-      // The smallint columns already read back as `number` (or null for `lodging`); the row average
-      // is a numeric expression, so only it needs the explicit `.mapWith(Number)`.
+      // The smallint columns already read back as `number` (or null for `lodging` and
+      // `pendampingSupport`); the row average is a numeric expression, so only it needs the explicit
+      // `.mapWith(Number)`.
       lodging: perjadinEvaluation.lodging,
       transport: perjadinEvaluation.transport,
       meals: perjadinEvaluation.meals,
       punctuality: perjadinEvaluation.punctuality,
+      pendampingSupport: perjadinEvaluation.pendampingSupport,
       rowAverage: perjadinRowAverageExpr.mapWith(Number),
       lodgingComment: perjadinEvaluation.lodgingComment,
       transportComment: perjadinEvaluation.transportComment,
       mealsComment: perjadinEvaluation.mealsComment,
       punctualityComment: perjadinEvaluation.punctualityComment,
+      pendampingSupportComment: perjadinEvaluation.pendampingSupportComment,
     })
     .from(perjadinEvaluation)
     .innerJoin(perjadin, eq(perjadin.id, perjadinEvaluation.perjadinId))
@@ -556,22 +569,26 @@ export async function perjadinFeedbackPage(
   return { rows, nextCursor: null };
 }
 
-/** The Perjadin tab's four summary averages. */
+/** The Perjadin tab's five summary averages. Pendamping Support's is `null` while no row has one. */
 export type PerjadinFeedbackAverages = {
   lodging: number;
   transport: number;
   meals: number;
   punctuality: number;
+  pendampingSupport: number | null;
 };
 
 /**
- * **The four Perjadin summary averages, over the tab's scope and never its score filters** (#466),
+ * **The five Perjadin summary averages, over the tab's scope and never its score filters** (#466),
  * as the Peserta tab's are: programme-wide with no trip or Peran picked, narrowed to them once one
  * is. The score filters are not an argument, so the cards never average only the low rows.
  *
  * `avg(lodging)` ignores NULL naturally — a day trip with no hotel is not a zero in the hotel
- * average, it is simply not in it. `coalesce(…, 0)` turns the empty-table NULL into `0` so the
- * caller gets four numbers to format; "0.0" reads as "nothing yet" rather than a real low score.
+ * average, it is simply not in it. `coalesce(…, 0)` turns the empty-table NULL into `0` for the
+ * four logistics Aspects, so the caller gets numbers to format; "0.0" reads as "nothing yet" rather
+ * than a real low score. **Pendamping Support's average is over the rows that have one** (#482)
+ * and stays `null`, shown as "—", while none in scope does — as Hands-on RBL's is on the Peserta
+ * tab. Under Peran Pendamping it is always "—": a Pendamping is never asked it (ADR-0054).
  */
 export async function perjadinFeedbackAverages(
   _caller: Person,
@@ -583,11 +600,14 @@ export async function perjadinFeedbackAverages(
       transport: sql<number>`coalesce(avg(${perjadinEvaluation.transport}), 0)`.mapWith(Number),
       meals: sql<number>`coalesce(avg(${perjadinEvaluation.meals}), 0)`.mapWith(Number),
       punctuality: sql<number>`coalesce(avg(${perjadinEvaluation.punctuality}), 0)`.mapWith(Number),
+      pendampingSupport: sql<number | null>`avg(${perjadinEvaluation.pendampingSupport})`.mapWith(
+        (value) => (value === null ? null : Number(value)),
+      ),
     })
     .from(perjadinEvaluation)
     .where(and(...perjadinScopeConditions(scope)));
 
-  return row ?? { lodging: 0, transport: 0, meals: 0, punctuality: 0 };
+  return row ?? { lodging: 0, transport: 0, meals: 0, punctuality: 0, pendampingSupport: null };
 }
 
 /** One Session a Peserta response was filed against, as the Sesi picker offers it (#466). */
