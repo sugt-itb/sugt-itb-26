@@ -25,9 +25,7 @@ vi.mock("@sugt/ui/components/dialog", () => {
     Dialog: Pass,
     DialogBody: Pass,
     DialogContent: Pass,
-    DialogDescription: ({ children }: { children?: ReactNode }) => (
-      <p data-slot="dialog-description">{children}</p>
-    ),
+    DialogDescription: ({ children }: { children?: ReactNode }) => <p>{children}</p>,
     DialogFooter: Pass,
     DialogHeader: Pass,
     DialogTitle: Pass,
@@ -35,15 +33,17 @@ vi.mock("@sugt/ui/components/dialog", () => {
   };
 });
 
-/** The text of the first element whose opening tag matches `opening`, tags stripped. */
-function textOf(html: string, opening: RegExp): string {
-  const start = html.search(opening);
-  expect(start).toBeGreaterThanOrEqual(0);
-  const end = html.indexOf("</p>", start);
-  return html
-    .slice(start, end)
-    .replace(/<[^>]+>/g, "")
-    .replaceAll("&gt;", ">");
+/**
+ * The text of the paragraph that opens with "Beri nilai" — each form's instruction — tags stripped.
+ * Found by its words rather than its classes, so a restyle does not fail a test about copy.
+ */
+function instruction(html: string): string {
+  const paragraphs = [...html.matchAll(/<p[^>]*>(.*?)<\/p>/g)].map(([, inner = ""]) =>
+    inner.replace(/<[^>]+>/g, ""),
+  );
+  const found = paragraphs.find((text) => text.startsWith("Beri nilai"));
+  expect(found).toBeDefined();
+  return found ?? "";
 }
 
 describe("the Rating scale's direction (#480)", () => {
@@ -53,10 +53,8 @@ describe("the Rating scale's direction (#480)", () => {
 
   it("is in the Participant Feedback form's instruction, before the first Aspect", () => {
     const html = renderToStaticMarkup(<FeedbackForm token="t" />);
-    const instruction = textOf(html, /<p class="mt-1 text-sm/);
-
-    expect(instruction).toContain(RATING_SCALE_DIRECTION);
-    expect(instruction).toContain("Masukanmu membantu kami memperbaiki sesi berikutnya.");
+    expect(instruction(html)).toContain(RATING_SCALE_DIRECTION);
+    expect(instruction(html)).toContain("Masukanmu membantu kami memperbaiki sesi berikutnya.");
     expect(html.indexOf("Skala")).toBeLessThan(html.indexOf('role="radiogroup"'));
   });
 
@@ -68,17 +66,13 @@ describe("the Rating scale's direction (#480)", () => {
         schoolsLine="SMA Satu"
       />,
     );
-    const instruction = textOf(html, /<p class="mt-2 text-sm/);
-
-    expect(instruction).toContain(RATING_SCALE_DIRECTION);
-    expect(instruction).toContain("wajib disertai penjelasan pada Komentar aspek tersebut.");
+    expect(instruction(html)).toContain(RATING_SCALE_DIRECTION);
+    expect(instruction(html)).toContain("wajib disertai penjelasan pada Komentar aspek tersebut.");
   });
 
   it("is in the Session Record dialog's description, beside the low-Rating rule", () => {
     const html = renderToStaticMarkup(<SessionRecordDialog sessionId="s" />);
-    const description = textOf(html, /<p data-slot="dialog-description"/);
-
-    expect(description).toContain(RATING_SCALE_DIRECTION);
-    expect(description).toContain("wajib disertai penjelasan pada Kendala.");
+    expect(instruction(html)).toContain(RATING_SCALE_DIRECTION);
+    expect(instruction(html)).toContain("wajib disertai penjelasan pada Kendala.");
   });
 });
