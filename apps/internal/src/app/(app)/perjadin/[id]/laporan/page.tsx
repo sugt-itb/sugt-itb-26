@@ -34,10 +34,11 @@ export async function generateMetadata({
  *
  * **Readable by ANY signed-in Person now** (ADR-0004 reversed by [ADR-0026](../../../../../../../../docs/adr/0026-money-is-open-to-read-and-staff-only-to-write.md),
  * #180). `perjadinAcquittal` is an open money read, so a Pimpinan reaching this URL sees the whole
- * acquittal — money reads are open. Every **write** control on the page — Laporkan, Catat transaksi
- * and Unggah bukti — is the trip's Group's, an Editor's or an Administrator's (ADR-0048): absent for
- * anyone else, and refused server-side by each Server Action's query (or, for the receipt actions,
- * by `staffOnTrip` before Drive is asked anything). So a Pimpinan or a Staff member off the trip
+ * acquittal — money reads are open. Every **write** control on the page — Laporkan, Catat transaksi,
+ * Unggah bukti and each receipt's Hapus (#462) — is the trip's Group's, a Perjadin Editor's or an
+ * Administrator's (ADR-0048): absent for anyone else, and refused server-side by each Server
+ * Action's query (or, for the receipt actions, before Drive is asked anything — by `staffOnTrip`,
+ * and for Hapus by `receiptDeleteTarget`). So a Pimpinan or a Staff member off the trip
  * reads the report but writes nothing — the enforcement is in the actions, not in what this page
  * chooses to render. (The per-member receipts-handed-in checklist that used to sit
  * here was removed with `group_member.receipts_settled_at`, #183.)
@@ -48,8 +49,10 @@ export async function generateMetadata({
  * at `/laporan-perjadin` is gone, and with it the sidebar entry that pointed at it, because a
  * top-level link would have needed an index of trips that nothing asked for.
  *
- * **Three figures on it are derived and none is stored** — the remainder, the deadline and the days
- * left. Nothing is gated on the deadline: DITSAMA sets it for itself.
+ * **Three figures on it are derived and none is stored** — Uang Perjalanan Terpakai, the deadline
+ * and the days left. Nothing is gated on the deadline: DITSAMA sets it for itself. The Report is every
+ * transaction on the trip, each with its receipts, reconciled against nothing — the Advance is not
+ * tracked (ADR-0051, #464).
  */
 export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan">) {
   const person = await requirePerson();
@@ -59,8 +62,8 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
   if (!acquittal) notFound();
 
   const transactions = acquittal.transactions.map(withLinks);
-  // Who writes this trip (ADR-0048): its Group, an Editor or an Administrator. Everyone else reads
-  // the whole Laporan with Catat transaksi, Unggah bukti and Laporkan absent.
+  // Who writes this trip (ADR-0048): its Group, a Perjadin Editor or an Administrator. Everyone else reads
+  // the whole Laporan with Catat transaksi, Unggah bukti, Hapus and Laporkan absent.
   const canWrite = await canWritePerjadin(person, id);
   const gate = canWrite
     ? await uploadGate(person)
@@ -81,7 +84,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
       <div className="border-b border-border px-4 py-5 sm:px-7">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-heading text-sm font-medium">Uang Perjalanan</h2>
+            <h2 className="font-heading text-sm font-medium">Pengeluaran</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Jatuh tempo <span className="tabular-nums">{acquittal.reportDueOn}</span> ·{" "}
               <Deadline daysRemaining={acquittal.daysRemaining} />
@@ -109,16 +112,11 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
 
         <dl className="mt-2.5 flex flex-wrap gap-x-8 gap-y-2 text-sm">
           <MoneyFigure
-            label="Diterima"
-            amountIdr={acquittal.advanceIdr}
-            unsetLabel="Belum diisi"
-          />
-          <MoneyFigure
-            label="Terpakai"
+            label="Uang Perjalanan Terpakai"
             amountIdr={acquittal.spentIdr}
           />
           {/*
-            The same Terpakai total split by the cohort each transaction served — the two sum to
+            The same Uang Perjalanan Terpakai split by the cohort each transaction served — the two sum to
             `spentIdr`, since `participant_type` is required and has no third value.
           */}
           <MoneyFigure
@@ -128,15 +126,6 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
           <MoneyFigure
             label="Total GTK-MS"
             amountIdr={acquittal.gtkMsSpentIdr}
-          />
-          {/*
-            Derived and never stored: the Advance less the travel-float draw-down — only Konsumsi and
-            Lainnya draw down (ADR-0029), so this can differ from Diterima − Terpakai. Negative means
-            the Group overspent the float, which is a real state and not an error.
-          */}
-          <MoneyFigure
-            label="Sisa"
-            amountIdr={acquittal.remainderIdr}
           />
         </dl>
       </div>

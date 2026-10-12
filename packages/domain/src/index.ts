@@ -90,7 +90,8 @@ function bySesiRank(a: RankableSession, b: RankableSession): number {
  * **A Session's Sesi** — its per-School, per-mode date rank
  * (`docs/adr/0027-a-sessions-sesi-is-its-per-school-date-rank.md`), computed on the fly and never
  * stored. Each School's Sessions in Sesi order: index 0 is Sesi 1, index 1 is
- * Sesi 2. The one ranking, shared by the `/monitoring` matrix and the planning note (#409).
+ * Sesi 2. The one ranking, shared by the `/monitoring` matrix, the planning note (#409) and
+ * `/feedback`'s Sesi line (#466).
  *
  * The caller passes **one mode's live Sessions** — cancelled ones are left out, so the next Session
  * after a cancelled one takes its rank rather than one past it — and **all** of a School's, whichever
@@ -186,14 +187,18 @@ export function formatSessionStartTimeWithWib(time: string, zone: TimeZone): str
   return `${local} · ${minutesToHhMm(wibMinutes)} WIB`;
 }
 
+/** A Postgres `time` value the Indonesian way, with a dot: `"08.00"`. No zone. */
+export function formatDottedTime(time: string): string {
+  return formatWallClockTime(time).replace(":", ".");
+}
+
 /**
  * A wall-clock span in its zone, the Indonesian way — `"08.00–11.30 WITA"` — as a Perjadin
  * Document's Waktu Mulai and Waktu Selesai read (#397). Both are Postgres `time` values local to
  * the School.
  */
 export function formatTimeRange(startsAt: string, endsAt: string, zone: TimeZone): string {
-  const dotted = (time: string) => formatWallClockTime(time).replace(":", ".");
-  return `${dotted(startsAt)}–${dotted(endsAt)} ${zone}`;
+  return `${formatDottedTime(startsAt)}–${formatDottedTime(endsAt)} ${zone}`;
 }
 
 /**
@@ -211,7 +216,7 @@ export function timeZoneSuffix(zone: TimeZone | "" | null | undefined): string {
  * Group a Rupiah amount the way every screen shows it: `id-ID` locale, dot separators,
  * `formatIdr(1000000) === "1.000.000"`. Returns the grouped digits only, no `Rp` prefix —
  * this is exactly the `n.toLocaleString("id-ID")` the display sites used inline, named once
- * so the plan form's masked input and every read-back amount cannot drift apart. The amount
+ * so the masked amount inputs and every read-back amount cannot drift apart. The amount
  * inputs render this directly (the value carries digits only); displays wrap it in
  * {@link formatRupiah}, which is the single place the `Rp` prefix lives.
  */
@@ -222,8 +227,8 @@ export function formatIdr(n: number): string {
 /**
  * The one way money is displayed: `Rp` immediately followed by the grouped digits, with no
  * space — `formatRupiah(15000000000) === "Rp15.000.000.000"`. The `Rp` prefix lives here and
- * nowhere else, so no display site carries its own literal `"Rp "`. A negative amount — an
- * overspent travel float (ADR-0029) — carries its sign before the prefix: `"-Rp50.000"`.
+ * nowhere else, so no display site carries its own literal `"Rp "`. A negative amount carries
+ * its sign before the prefix: `"-Rp50.000"`.
  */
 export function formatRupiah(n: number): string {
   return n < 0 ? `-Rp${formatIdr(-n)}` : `Rp${formatIdr(n)}`;
@@ -289,22 +294,36 @@ export const PERJADIN_ROLE_LABELS: Record<Role, string> = {
  * `(id, role)` foreign keys, and being Staff-only they can never punch through "a Pimpinan writes
  * nothing" (ADR-0025). See `docs/adr/0028-grants-are-a-second-additive-access-axis.md`.
  *
- * Three named Grants:
+ * Six named Grants (ADR-0052, #469):
  * - **Administrator** — administers Grants (assign/revoke any Grant on any Staff Person, including
  *   making another Administrator) and **implies every other Grant**, so an Administrator satisfies
  *   any grant check without holding that grant's own row.
- * - **Editor** — may write Preparation Cards.
- * - **Dashboard Viewer** — may read the Dashboard, and nothing more; the read-only Dashboard
- *   capability for a Staff Person who is neither Administrator nor Editor. Administrator implies it
- *   like every Grant. A Pimpinan never holds it — Grants are Staff-only (ADR-0028); a Pimpinan's
- *   Dashboard access comes from their role, not this Grant.
+ * - **Keuangan** — reads every transaction across every Perjadin on `/keuangan`, and exports it (#472).
+ * - **Perjadin Editor** — plans a Perjadin and writes every Perjadin, not only those whose Group the
+ *   Person is in (ADR-0047, ADR-0048).
+ * - **Daring Editor** — `/pretest` and the online Sessions: recording, editing, deleting, Tandai
+ *   terlaksana and Batalkan Sesi on one.
+ * - **Dashboard Editor** — writes the Persiapan Program tab's Preparation Cards, and **implies
+ *   Dashboard Viewer** (`GRANT_IMPLIED_BY`, beside `hasGrant`).
+ * - **Dashboard Viewer** — may read the Dashboard, and nothing more. A Pimpinan never holds it —
+ *   Grants are Staff-only (ADR-0028); a Pimpinan's Dashboard access comes from their role.
+ *
+ * **No other Grant implies another**: Perjadin Editor, Daring Editor and Keuangan do not read the
+ * Dashboard.
  *
  * Unlike `TRANSACTION_CATEGORIES`, these **are** terms the Programme's language defines — `CONTEXT.md`
  * glosses them under **Access** — so they belong here beside `ROLES`. The list is mirrored by
  * `person_grant_grant_check` character for character (see `packages/db/src/schema/people.ts`); a
  * future Grant widens that CHECK the way `0018_widen_person_role_pimpinan.sql` widened the role one.
  */
-export const GRANTS = ["Administrator", "Editor", "Dashboard Viewer"] as const;
+export const GRANTS = [
+  "Administrator",
+  "Keuangan",
+  "Perjadin Editor",
+  "Daring Editor",
+  "Dashboard Editor",
+  "Dashboard Viewer",
+] as const;
 export type Grant = (typeof GRANTS)[number];
 
 /**
@@ -315,8 +334,24 @@ export type Grant = (typeof GRANTS)[number];
  */
 export const GRANT_LABELS: Record<Grant, string> = {
   Administrator: "Administrator",
-  Editor: "Editor",
+  Keuangan: "Keuangan",
+  "Perjadin Editor": "Perjadin Editor",
+  "Daring Editor": "Daring Editor",
+  "Dashboard Editor": "Dashboard Editor",
   "Dashboard Viewer": "Dashboard Viewer",
+};
+
+/**
+ * **What each Grant gates, in one line** — shown under its label in `/orang`'s Grant picker (#470).
+ * Beside `GRANT_LABELS` so a new Grant gets both at once; presentation only.
+ */
+export const GRANT_DESCRIPTIONS: Record<Grant, string> = {
+  Administrator: "semua akses",
+  Keuangan: "tabel dan ekspor semua transaksi",
+  "Perjadin Editor": "merencanakan dan menulis setiap Perjadin",
+  "Daring Editor": "Sesi daring dan Pretest",
+  "Dashboard Editor": "termasuk Dashboard Viewer",
+  "Dashboard Viewer": "membaca Dashboard",
 };
 
 /**
@@ -489,7 +524,7 @@ export const CONCERN_AT_OR_BELOW = 7;
 export const REPORT_DEADLINE_DAYS_AFTER_RETURN = 2;
 
 /**
- * What a transaction against an Advance was spent on. A closed set of twelve, and the
+ * What a transaction on a Perjadin was spent on. A closed set of twelve, and the
  * one fixed set here that was **read off a document rather than agreed in conversation**:
  * the first eleven are the line items the Programme's approved budget repeats across every
  * travel group, and `Lainnya` is the escape hatch.
@@ -523,45 +558,6 @@ export const TRANSACTION_CATEGORIES = [
   "Lainnya",
 ] as const;
 export type TransactionCategory = (typeof TRANSACTION_CATEGORIES)[number];
-
-/**
- * The transaction categories that **draw down a Perjadin's travel float** (ADR-0029). Only these
- * reduce the remaining float (`advanceIdr − drawn-down`); every other category is recorded against
- * the trip and shown in the acquittal, but is paid outside the float (pre-paid before departure or
- * handled by other Staff) and does **not** reduce what is left.
- *
- * This is the single source of truth for that split. It is deliberately a **narrower** subset of
- * `TRANSACTION_CATEGORIES` — the two values here are members of that list, character for character —
- * and it is intended to be extensible: widening the float later is one edit here. It does **not**
- * change `/monitoring`'s "Anggaran terpakai", which still sums **every** category (that figure is
- * programme spend, not float draw-down — the two are two different numbers by design).
- */
-export const ADVANCE_DRAWDOWN_CATEGORIES = [
-  "Konsumsi",
-  "Lainnya",
-] as const satisfies readonly TransactionCategory[];
-export type AdvanceDrawdownCategory = (typeof ADVANCE_DRAWDOWN_CATEGORIES)[number];
-
-/** Whether a category draws down the travel float. Widened to `string` so a DB-read row's `category` compares without a cast. */
-export function isAdvanceDrawdownCategory(category: string): boolean {
-  return (ADVANCE_DRAWDOWN_CATEGORIES as readonly string[]).includes(category);
-}
-
-/**
- * The **drawn-down total** of a list of transactions — the sum of only those whose category is an
- * `ADVANCE_DRAWDOWN_CATEGORIES` member. The one place the JS render/query sites compute float
- * consumption, so the rule lives here beside the constant rather than being re-expressed per site.
- * The two SQL sums (`my-perjadin`, `dashboard`) can't call this, so they carry a `category in (…)`
- * built from the same constant; a test pins all three equal.
- */
-export function sumAdvanceDrawdownIdr(
-  lines: readonly { category: string; amountIdr: number }[],
-): number {
-  return lines.reduce(
-    (total, line) => (isAdvanceDrawdownCategory(line.category) ? total + line.amountIdr : total),
-    0,
-  );
-}
 
 /**
  * Which cohort a transaction's spend served — an axis orthogonal to `category`. `category` is what
@@ -681,7 +677,13 @@ export type SessionFootageContentType = keyof typeof SESSION_FOOTAGE_CONTENT_TYP
  * The two `document_*` values went into the set with the rest, so the Dokumen uploads
  * ([#397](https://github.com/sugt-itb/sugt-itb-26/issues/397)) and Hapus
  * ([#398](https://github.com/sugt-itb/sugt-itb-26/issues/398)) needed no CHECK migration. The two
- * `footage_*` values (Session Footage, #424) came later and widened the CHECK in migration 0044.
+ * `footage_*` values (Session Footage, #424) came later and widened the CHECK in migration 0044, and
+ * `evidence_deleted` and `transaction_deleted` (Hapus bukti, #462, and Hapus transaksi, #463;
+ * ADR-0050) widened it again in migration 0049.
+ *
+ * `advance_set` and `advance_changed` are **history only** (ADR-0051, #464): the Advance is no
+ * longer tracked, so nothing writes them, but the entries already in the Log stay readable and
+ * searchable.
  */
 export const ACTIVITY_LOG_ACTIONS = [
   "advance_set",
@@ -693,6 +695,8 @@ export const ACTIVITY_LOG_ACTIONS = [
   "document_deleted",
   "footage_uploaded",
   "footage_deleted",
+  "evidence_deleted",
+  "transaction_deleted",
 ] as const;
 export type ActivityLogAction = (typeof ACTIVITY_LOG_ACTIONS)[number];
 
@@ -707,6 +711,8 @@ export const ACTIVITY_LOG_ACTION_LABELS: Record<ActivityLogAction, string> = {
   document_deleted: "Dokumen dihapus",
   footage_uploaded: "Foto/Video diunggah",
   footage_deleted: "Foto/Video dihapus",
+  evidence_deleted: "Bukti dihapus",
+  transaction_deleted: "Transaksi dihapus",
 };
 
 /**

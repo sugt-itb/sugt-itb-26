@@ -8,12 +8,12 @@ import { person, personGrant } from "../schema/people";
 import { story } from "../schema/stories";
 import { groupMember, perjadin } from "../schema/travel";
 import type { Person } from "./caller";
-import { requireStaff } from "./staff-only";
+import { requireGrant, requireStaff } from "./staff-only";
 
 /**
  * **Orang** — the roster, which is also the invite list. `person` is the invite list, so a row
- * is an invitation. Anyone signed in reads it, because a Group is assembled from it; **Staff add
- * and revoke** (ADR-0013, ADR-0004).
+ * is an invitation. Anyone signed in reads it, because a Group is assembled from it; **an
+ * Administrator adds and revokes** (#470, amending ADR-0003 and ADR-0013; ADR-0004).
  *
  * The read carries two derived facts per Person that no column holds:
  *
@@ -43,8 +43,8 @@ export type RosterEntry = {
   /** Referenced by one of the six composite foreign keys, so their `role` is now write-once. */
   used: boolean;
   /**
-   * The Grants this Person holds (ADR-0028), ordered, so the roster's Grant-management controls
-   * render each toggle's state without a per-row round trip. Empty for anyone with none — and always
+   * The Grants this Person holds (ADR-0028), ordered, so the roster's Grant picker shows each
+   * row's chips without a per-row round trip. Empty for anyone with none — and always
    * empty for a Pimpinan, who holds none by construction (Grants are Staff-only).
    */
   grants: Grant[];
@@ -149,9 +149,11 @@ export type AddPersonResult =
 /**
  * Add a Person — an invitation.
  *
- * Staff-only. The gate is the invite list alone (ADR-0003, amended by #115): a row's email is
- * simply whatever the person signs in with, and Staff no longer need any particular address —
- * the `@ditsama.itb.ac.id` domain rule that used to sit beside this write is gone.
+ * **An Administrator's** (#470): `requireStaff` first, so a Pimpinan is still refused as non-Staff,
+ * then `requireGrant(caller, "Administrator")`. The gate is the invite list alone (ADR-0003,
+ * amended by #115): a row's email is simply whatever the person signs in with, and Staff no longer
+ * need any particular address — the `@ditsama.itb.ac.id` domain rule that used to sit beside this
+ * write is gone.
  *
  * The duplicate-email refusal is caught outside the insert, as the record writes catch theirs.
  * The index is **partial** (`where active`), which is what lets revoke-and-re-add leave two rows
@@ -159,6 +161,7 @@ export type AddPersonResult =
  */
 export async function addPerson(caller: Person, input: NewPerson): Promise<AddPersonResult> {
   requireStaff(caller);
+  requireGrant(caller, "Administrator");
 
   const fullName = input.fullName.trim();
   const email = input.email.trim();
@@ -179,7 +182,12 @@ export async function addPerson(caller: Person, input: NewPerson): Promise<AddPe
 export type RevokePersonResult =
   | { outcome: "revoked" }
   /** No active Person has that id — already revoked, or a stale screen. */
-  | { outcome: "no-such-person" };
+  | { outcome: "no-such-person" }
+  /**
+   * The Administrator named themselves (#470). Refused, so no Administrator deactivates their own
+   * access; deactivating another Administrator is allowed. The UI never offers it.
+   */
+  | { outcome: "self" };
 
 /**
  * Revoke a Person — **one write, `active = false`**, and the whole mechanism (ADR-0013's
@@ -190,9 +198,14 @@ export type RevokePersonResult =
  *
  * The update is gated on `active = true`, so revoking a row that is already revoked reports
  * `no-such-person` rather than silently re-writing it.
+ *
+ * **An Administrator's, and never their own** (#470): `requireStaff`, then the Administrator Grant,
+ * then a refusal of the caller's own row as `self`.
  */
 export async function revokePerson(caller: Person, personId: string): Promise<RevokePersonResult> {
   requireStaff(caller);
+  requireGrant(caller, "Administrator");
+  if (personId === caller.id) return { outcome: "self" };
 
   const [row] = await db
     .update(person)

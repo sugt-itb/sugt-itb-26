@@ -1,5 +1,10 @@
 # The Advance is a travel float; only some categories draw it down
 
+> **Superseded by [ADR-0051](./0051-the-advance-is-not-tracked.md).** The Advance is no longer
+> tracked, so there is no float to draw down: `ADVANCE_DRAWDOWN_CATEGORIES`, its helpers and the
+> remainder are gone, and Uang Perjalanan Terpakai sums every category on every screen. The body is
+> kept as the point-in-time record.
+
 The Advance (`advanceIdr`, "uang muka") was modelled as a pot reconciled **in full**: a Perjadin's
 remaining money was `advance − sum(every transaction)`, and the acquittal existed to account for all
 of it. This changes what the Advance _is_: it is a **travel float** for direct on-trip purchases, and

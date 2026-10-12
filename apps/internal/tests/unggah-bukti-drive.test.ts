@@ -57,10 +57,8 @@ async function scene(
   options: {
     connection?: "connected" | "broken" | "none";
     held?: number;
-    advanceIdr?: number | null;
   } = {},
 ) {
-  const { advanceIdr = 5_000_000 } = options;
   const staff = await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" });
   const pimpinan = await addPerson({
     fullName: "Fatimah",
@@ -68,7 +66,6 @@ async function scene(
     role: "Pimpinan",
   });
   const trip = await addPerjadin({
-    advanceIdr,
     picPersonId: staff.id,
     subClusterName: "Kelompok 3",
     startsOn: "2026-10-12",
@@ -133,7 +130,7 @@ describe("no Drive call before the guard", () => {
 
   it("refuses a line on another Perjadin with zero Drive calls", async () => {
     const { staff, line } = await scene();
-    const other = await addPerjadin({ advanceIdr: 1_000_000, picPersonId: staff.id });
+    const other = await addPerjadin({ picPersonId: staff.id });
 
     await expect(openReceiptSessionsAction(other.id, oneFile, line.id)).resolves.toEqual({
       outcome: "no-such-transaction",
@@ -173,19 +170,6 @@ describe("five receipts per line, in total", () => {
       synced: true,
     });
     await expect(evidenceOf(line.id)).resolves.toHaveLength(5);
-  });
-
-  it("attaches a receipt while Uang Perjalanan is not filled in yet (#437)", async () => {
-    const { trip, line } = await scene({ held: 1, advanceIdr: null });
-    const ids = await upload(trip.id, [jpeg()], line.id);
-
-    await expect(finalizeReceiptsAction(trip.id, line.id, asReceipts(ids))).resolves.toEqual({
-      outcome: "attached",
-      attached: 1,
-      failed: 0,
-      synced: true,
-    });
-    await expect(evidenceOf(line.id)).resolves.toHaveLength(2);
   });
 
   it("refuses 3 to 6, and anything from 5, before Drive", async () => {
@@ -361,7 +345,7 @@ describe("a file that does not check out", () => {
 
   it("is reported as failed and not attached, while the rest attach", async () => {
     const { staff, trip, line } = await scene();
-    const other = await addPerjadin({ advanceIdr: 1_000_000, picPersonId: staff.id });
+    const other = await addPerjadin({ picPersonId: staff.id });
     const [good] = await upload(trip.id, [jpeg()], line.id);
     const [wrongBytes] = await upload(
       trip.id,

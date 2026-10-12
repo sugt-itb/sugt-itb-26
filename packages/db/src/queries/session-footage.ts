@@ -22,7 +22,7 @@ import { requirePerjadinWriter, requireStaff } from "./staff-only";
  * **Footage belongs to one offline Session that is not cancelled** at the moment it is added,
  * delivered or not. Online Sessions have none. Footage of a Session cancelled later stays.
  *
- * Writing is the Session's trip's Group's, an Editor's or an Administrator's (`requirePerjadinWriter`,
+ * Writing is the Session's trip's Group's, a Perjadin Editor's or an Administrator's (`requirePerjadinWriter`,
  * ADR-0048); reading is anyone signed in, a Pimpinan included.
  */
 
@@ -59,7 +59,7 @@ export async function footageSession(
   const [row] = tx === db ? await query : await query.for("share");
   if (!row) return { outcome: "no-such-session" };
   if (row.mode !== "offline" || !row.perjadinId) return { outcome: "session-online" };
-  // Its trip's Group, an Editor or an Administrator (ADR-0048) — before Google is asked anything.
+  // Its trip's Group, a Perjadin Editor or an Administrator (ADR-0048) — before Google is asked anything.
   await requirePerjadinWriter(caller, row.perjadinId, tx);
   if (row.status === "cancelled") return { outcome: "session-cancelled" };
   return { outcome: "ok", sessionId, perjadinId: row.perjadinId };

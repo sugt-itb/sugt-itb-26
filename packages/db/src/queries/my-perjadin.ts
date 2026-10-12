@@ -12,7 +12,6 @@ import {
   perjadinTeacher,
   transaction,
 } from "../schema/travel";
-import { advanceDrawdownCategoryList } from "./advance-drawdown";
 import type { Person } from "./caller";
 import { todayInDeadlineZone } from "./deadline";
 import { tripSchoolNames } from "./perjadin-naming";
@@ -33,8 +32,8 @@ import { requireGrant, requireStaff } from "./staff-only";
  * `perjadin_pimpinan` path: a Pimpinan is record-only (ADR-0025) and this is a working-member view.
  *
  * **Money rides on this payload**, unlike `./perjadin-detail.ts` which carries none. This is a
- * personal work list — "how much of my Advance is left" is the point of it — and money reads are
- * open now (ADR-0026), so `advanceIdr`/`drawnDownIdr` sit here directly rather than behind a second call.
+ * personal work list — what the trip has spent so far is part of the point of it — and money reads
+ * are open now (ADR-0026), so `spentIdr` sits here directly rather than behind a second call.
  */
 
 /** One Staff member of the trip's Group. `isPic` flags the one the reader looks for first. */
@@ -120,19 +119,12 @@ export type MyPerjadinTrip = {
   picPersonId: string;
   picFullName: string;
   /**
-   * Uang Perjalanan, or `null` while it is not filled in yet (#437) — never the same as Rp 0. The card
-   * reads "Uang Perjalanan belum diisi" then, with no Tersisa and no progress bar.
+   * **Uang Perjalanan Terpakai** (ADR-0051): the sum of every transaction on the trip, all
+   * categories, zero when none has been entered. The same figure as `perjadinAcquittal.spentIdr` — a
+   * test pins the two equal so the card and the trip's screens never show two answers. It is summed
+   * in SQL here because this list renders no line items.
    */
-  advanceIdr: number | null;
-  /**
-   * The **travel-float draw-down** for this trip: the sum of only the transactions whose category is
-   * an `ADVANCE_DRAWDOWN_CATEGORIES` member (ADR-0029), zero when none has been entered. The UI
-   * derives Tersisa as `advanceIdr - drawnDownIdr`, the same math `perjadinAcquittal.remainderIdr`
-   * uses — a test pins the two equal so the two screens never show two answers. It is summed in SQL
-   * here (this list renders no line items) with a `category in (…)` filter kept in step with the
-   * domain constant, where the acquittal reduces its loaded rows through `sumAdvanceDrawdownIdr`.
-   */
-  drawnDownIdr: number;
+  spentIdr: number;
   /** The trip's checklist, each item with its tick state — the pill's `x`/`N` and the dialog's boxes. */
   preparation: PreparationItem[];
   /**
@@ -181,8 +173,8 @@ export type PendampingPerjadinResult =
  * screenshot an Administrator needs to show someone how to use their own page.
  *
  * **Administrator only, held here rather than only in the page.** `requireStaff` first, so a
- * Pimpinan is refused as non-Staff; then `requireGrant(caller, "Administrator")` — Editor is not
- * enough — before any row is read. A `personId` that names no Staff Person (a Pimpinan, an unknown id,
+ * Pimpinan is refused as non-Staff; then `requireGrant(caller, "Administrator")` — no other Grant
+ * is enough — before any row is read. A `personId` that names no Staff Person (a Pimpinan, an unknown id,
  * a malformed one) is `no-such-pendamping`, a value the page says in a sentence. Viewing writes
  * nothing to the Activity Log.
  */
@@ -243,7 +235,6 @@ async function perjadinOf(personId: string): Promise<MyPerjadin> {
       endsOn: perjadin.endsOn,
       picPersonId: perjadin.picPersonId,
       picFullName: person.fullName,
-      advanceIdr: perjadin.advanceIdr,
       isCurrent,
     })
     .from(perjadin)
@@ -268,110 +259,96 @@ async function perjadinOf(personId: string): Promise<MyPerjadin> {
   const tripIds = rows.map((trip) => trip.id);
 
   // The seven hanging lists, gathered concurrently and each scoped to just these trips.
-  const [
-    drawnDownRows,
-    staffRows,
-    pengajarRows,
-    pimpinanRows,
-    sessionRows,
-    taughtRows,
-    checklists,
-  ] = await Promise.all([
-    // Travel-float draw-down per trip (ADR-0029): `sum(amount_idr) filter (where category in …)`
-    // over only `ADVANCE_DRAWDOWN_CATEGORIES`, grouped by `perjadin_id`. A trip with no drawdown
-    // spend (or none at all) is absent or sums to 0 and defaults to 0 below. The `in (…)` list is
-    // built from the domain constant so it cannot drift; the acquittal reduces its loaded rows
-    // through `sumAdvanceDrawdownIdr` for the identical rule, and a test pins the UI's
-    // `advanceIdr - drawnDownIdr` equal to the acquittal's `remainderIdr`.
-    db
-      .select({
-        perjadinId: transaction.perjadinId,
-        drawnDownIdr:
-          sql<number>`coalesce(sum(${transaction.amountIdr}) filter (where ${transaction.category} in (${advanceDrawdownCategoryList()})), 0)`.mapWith(
-            Number,
+  const [spentRows, staffRows, pengajarRows, pimpinanRows, sessionRows, taughtRows, checklists] =
+    await Promise.all([
+      // Uang Perjalanan Terpakai per trip (ADR-0051): every category, grouped by `perjadin_id`. A trip
+      // with no spend is absent and defaults to 0 below.
+      db
+        .select({
+          perjadinId: transaction.perjadinId,
+          spentIdr: sql<number>`coalesce(sum(${transaction.amountIdr}), 0)`.mapWith(Number),
+        })
+        .from(transaction)
+        .where(inArray(transaction.perjadinId, tripIds))
+        .groupBy(transaction.perjadinId),
+      // The Staff Group, joined to `person` for the name, in name order. `isPic` is derived per row
+      // below rather than joined, since the PIC id is already on each trip.
+      db
+        .select({
+          perjadinId: groupMember.perjadinId,
+          personId: groupMember.personId,
+          fullName: person.fullName,
+        })
+        .from(groupMember)
+        .innerJoin(person, eq(person.id, groupMember.personId))
+        .where(and(inArray(groupMember.perjadinId, tripIds), eq(groupMember.role, "Staff")))
+        .orderBy(asc(person.fullName)),
+      // The trip-scoped teacher names (ADR-0020), in name order.
+      db
+        .select({
+          perjadinId: perjadinTeacher.perjadinId,
+          id: perjadinTeacher.id,
+          name: perjadinTeacher.name,
+        })
+        .from(perjadinTeacher)
+        .where(inArray(perjadinTeacher.perjadinId, tripIds))
+        .orderBy(asc(perjadinTeacher.name)),
+      // The record-only Pimpinan (#181), joined to `person` for the display name, in name order.
+      db
+        .select({
+          perjadinId: perjadinPimpinan.perjadinId,
+          personId: perjadinPimpinan.personId,
+          name: person.fullName,
+        })
+        .from(perjadinPimpinan)
+        .innerJoin(person, eq(person.id, perjadinPimpinan.personId))
+        .where(inArray(perjadinPimpinan.perjadinId, tripIds))
+        .orderBy(asc(person.fullName)),
+      // Every offline Session on these trips, with its School and the School's Province zone.
+      // Cancelled ones are **included** — this is the trip's shape, the Schools it visited, not how
+      // much teaching it delivered. Ordered by School name, then within a School by (held_on,
+      // starts_at, id) for a total order.
+      db
+        .select({
+          perjadinId: session.perjadinId,
+          schoolId: session.schoolId,
+          schoolName: school.name,
+          kabupatenKota: school.kabupatenKota,
+          timeZone: province.timeZone,
+          sessionId: session.id,
+          heldOn: session.heldOn,
+          startsAt: session.startsAt,
+          status: session.status,
+        })
+        .from(session)
+        .innerJoin(school, eq(school.id, session.schoolId))
+        .innerJoin(province, eq(province.code, school.provinceCode))
+        .where(and(inArray(session.perjadinId, tripIds), eq(session.mode, "offline")))
+        .orderBy(asc(school.name), asc(session.heldOn), asc(session.startsAt), asc(session.id)),
+      // "Diajar oleh" on the trips' live offline Sessions (#447): which Narasumber taught at which
+      // School. A cancelled Session's team is left out, so whoever taught only there is unassigned.
+      db
+        .selectDistinct({
+          perjadinId: session.perjadinId,
+          schoolId: session.schoolId,
+          perjadinTeacherId: sessionTeachingTeam.perjadinTeacherId,
+        })
+        .from(sessionTeachingTeam)
+        .innerJoin(session, eq(session.id, sessionTeachingTeam.sessionId))
+        .where(
+          and(
+            inArray(session.perjadinId, tripIds),
+            eq(session.mode, "offline"),
+            ne(session.status, "cancelled"),
           ),
-      })
-      .from(transaction)
-      .where(inArray(transaction.perjadinId, tripIds))
-      .groupBy(transaction.perjadinId),
-    // The Staff Group, joined to `person` for the name, in name order. `isPic` is derived per row
-    // below rather than joined, since the PIC id is already on each trip.
-    db
-      .select({
-        perjadinId: groupMember.perjadinId,
-        personId: groupMember.personId,
-        fullName: person.fullName,
-      })
-      .from(groupMember)
-      .innerJoin(person, eq(person.id, groupMember.personId))
-      .where(and(inArray(groupMember.perjadinId, tripIds), eq(groupMember.role, "Staff")))
-      .orderBy(asc(person.fullName)),
-    // The trip-scoped teacher names (ADR-0020), in name order.
-    db
-      .select({
-        perjadinId: perjadinTeacher.perjadinId,
-        id: perjadinTeacher.id,
-        name: perjadinTeacher.name,
-      })
-      .from(perjadinTeacher)
-      .where(inArray(perjadinTeacher.perjadinId, tripIds))
-      .orderBy(asc(perjadinTeacher.name)),
-    // The record-only Pimpinan (#181), joined to `person` for the display name, in name order.
-    db
-      .select({
-        perjadinId: perjadinPimpinan.perjadinId,
-        personId: perjadinPimpinan.personId,
-        name: person.fullName,
-      })
-      .from(perjadinPimpinan)
-      .innerJoin(person, eq(person.id, perjadinPimpinan.personId))
-      .where(inArray(perjadinPimpinan.perjadinId, tripIds))
-      .orderBy(asc(person.fullName)),
-    // Every offline Session on these trips, with its School and the School's Province zone.
-    // Cancelled ones are **included** — this is the trip's shape, the Schools it visited, not how
-    // much teaching it delivered. Ordered by School name, then within a School by (held_on,
-    // starts_at, id) for a total order.
-    db
-      .select({
-        perjadinId: session.perjadinId,
-        schoolId: session.schoolId,
-        schoolName: school.name,
-        kabupatenKota: school.kabupatenKota,
-        timeZone: province.timeZone,
-        sessionId: session.id,
-        heldOn: session.heldOn,
-        startsAt: session.startsAt,
-        status: session.status,
-      })
-      .from(session)
-      .innerJoin(school, eq(school.id, session.schoolId))
-      .innerJoin(province, eq(province.code, school.provinceCode))
-      .where(and(inArray(session.perjadinId, tripIds), eq(session.mode, "offline")))
-      .orderBy(asc(school.name), asc(session.heldOn), asc(session.startsAt), asc(session.id)),
-    // "Diajar oleh" on the trips' live offline Sessions (#447): which Narasumber taught at which
-    // School. A cancelled Session's team is left out, so whoever taught only there is unassigned.
-    db
-      .selectDistinct({
-        perjadinId: session.perjadinId,
-        schoolId: session.schoolId,
-        perjadinTeacherId: sessionTeachingTeam.perjadinTeacherId,
-      })
-      .from(sessionTeachingTeam)
-      .innerJoin(session, eq(session.id, sessionTeachingTeam.sessionId))
-      .where(
-        and(
-          inArray(session.perjadinId, tripIds),
-          eq(session.mode, "offline"),
-          ne(session.status, "cancelled"),
         ),
-      ),
-    // Every trip's checklist in one batched read (ADR-0045): the card's Persiapan dialog toggles
-    // the boxes, so it needs each item whole, not a count.
-    preparationChecklists(tripIds),
-  ]);
+      // Every trip's checklist in one batched read (ADR-0045): the card's Persiapan dialog toggles
+      // the boxes, so it needs each item whole, not a count.
+      preparationChecklists(tripIds),
+    ]);
 
-  // Float draw-down keyed by trip; a trip absent from the grouped sum drew nothing down.
-  const drawnDownByTrip = new Map(drawnDownRows.map((row) => [row.perjadinId, row.drawnDownIdr]));
+  // Uang Perjalanan Terpakai keyed by trip; a trip absent from the grouped sum spent nothing.
+  const spentByTrip = new Map(spentRows.map((row) => [row.perjadinId, row.spentIdr]));
 
   const staffByTrip = new Map<string, MyPerjadinStaff[]>();
   const pengajarByTrip = new Map<string, MyPerjadinPengajar[]>();
@@ -442,7 +419,7 @@ async function perjadinOf(personId: string): Promise<MyPerjadin> {
     const schools = schoolsByTrip.get(trip.id) ?? [];
     const card: MyPerjadinTrip = {
       ...trip,
-      drawnDownIdr: drawnDownByTrip.get(trip.id) ?? 0,
+      spentIdr: spentByTrip.get(trip.id) ?? 0,
       preparation: checklists.get(trip.id) ?? [],
       anggota: {
         staff,

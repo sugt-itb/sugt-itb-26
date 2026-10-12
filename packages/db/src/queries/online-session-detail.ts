@@ -18,8 +18,8 @@ import { requireGrant, requireStaff } from "./staff-only";
  * A separate module from `./session-detail.ts` for convention 3's reason — one module per surface's
  * payload — and because this one is online-only: `/sesi/[id]` stays the offline detail surface and an
  * online id redirects here, so the two reads never overlap. The read is open to anyone signed in (a
- * Session carries no money, ADR-0004); **every write needs the Editor Grant** (ADR-0047), gated with
- * `requireStaff` then `requireGrant(caller, "Editor")` and surfaced only for an Editor (an
+ * Session carries no money, ADR-0004); **every write needs the Daring Editor Grant** (ADR-0047), gated with
+ * `requireStaff` then `requireGrant(caller, "Daring Editor")` and surfaced only for a Daring Editor (an
  * Administrator implies it).
  *
  * **An online Session is born `delivered` now (#318, ADR-0036)** — a third-party LMS runs delivery,
@@ -189,7 +189,7 @@ function wibToday(): string {
 
 /**
  * Edit an online Session's School, date, times and two Pengajar — the online counterpart of
- * `editPerjadinSession`, and the correction path for a born-`delivered` Session (#318). Editor-only
+ * `editPerjadinSession`, and the correction path for a born-`delivered` Session (#318). Daring Editor-only
  * (ADR-0047).
  * Offered on an `arranged` **or** `delivered` Session; a `cancelled` one is a dead row and refuses
  * the edit.
@@ -212,9 +212,9 @@ export async function updateOnlineSession(
   input: OnlineSessionInput,
 ): Promise<UpdateOnlineSessionResult> {
   requireStaff(caller);
-  // Writing an online Session needs the Editor Grant (ADR-0047).
+  // Writing an online Session needs the Daring Editor Grant (ADR-0047).
   // `requireStaff` stays first, so a Pimpinan is refused as non-Staff.
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Daring Editor");
 
   // The online-required fields the nullable columns cannot enforce, refused before the write exactly
   // as `arrangeOnlineSession` does. The dialog guards them, so these catch a hand-edited request.
@@ -271,7 +271,7 @@ export type DeleteOnlineSessionResult =
   | { outcome: "no-such-session" };
 
 /**
- * **Hard-delete an online Session** (#318). Editor-only (ADR-0047), the correction for a mis-recorded Session that
+ * **Hard-delete an online Session** (#318). Daring Editor-only (ADR-0047), the correction for a mis-recorded Session that
  * replaced the arrange→cancel flow for born-`delivered` rows — a cancelled Session lingered as a dead
  * row, but a recorded-in-error one is simply removed.
  *
@@ -287,9 +287,9 @@ export async function deleteOnlineSession(
   sessionId: string,
 ): Promise<DeleteOnlineSessionResult> {
   requireStaff(caller);
-  // Writing an online Session needs the Editor Grant (ADR-0047).
+  // Writing an online Session needs the Daring Editor Grant (ADR-0047).
   // `requireStaff` stays first, so a Pimpinan is refused as non-Staff.
-  requireGrant(caller, "Editor");
+  requireGrant(caller, "Daring Editor");
 
   const [deleted] = await db
     .delete(session)

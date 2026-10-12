@@ -7,6 +7,8 @@ import type {
   ViewableTransaction,
 } from "-/app/(app)/perjadin/[id]/laporan/action-types";
 import {
+  deleteReceiptAction,
+  deleteTransactionAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
   recordTransactionAction,
@@ -18,6 +20,12 @@ import {
   type ParticipantFilter,
   type SortDirection,
 } from "-/components/laporan-perjadin/acquittal-transactions-sort";
+import {
+  ONLY_RECEIPT,
+  RECEIPT_DELETE_CONFIRM,
+  receiptDeleteRefusalText,
+} from "-/components/laporan-perjadin/receipt-delete-messages";
+import { TRANSACTION_DELETE_CONFIRM } from "-/components/laporan-perjadin/transaction-delete-messages";
 import { RequiredLegend, RequiredMark } from "-/components/required-mark";
 import { UnsyncedMarker } from "-/components/unsynced-marker";
 import {
@@ -37,7 +45,11 @@ import {
   type PreparedReceipt,
 } from "-/lib/drive/receipt-upload";
 import type { UploadGate } from "-/lib/drive/upload-gate";
-import { driveRefusalText, STALE_PAGE } from "-/lib/drive/upload-messages";
+import {
+  driveRefusalText,
+  RECEIPTS_UNSYNCED_TOOLTIP,
+  STALE_PAGE,
+} from "-/lib/drive/upload-messages";
 import {
   formatIdr,
   formatRupiah,
@@ -73,8 +85,8 @@ import {
 import { type ReactElement, useId, useMemo, useRef, useState, useTransition } from "react";
 
 /**
- * **The line items, and the two things a PIC does to them**: enter one with its receipts, and add
- * receipts to one already entered.
+ * **The line items, and what a PIC does to them**: enter one with its receipts, add receipts to one
+ * already entered, take a mistaken receipt off one (#462), and delete a mistaken one whole (#463).
  *
  * **A line is entered with its evidence or not at all** (ADR-0039, superseding ADR-0030's optional
  * upload). The entry form stages one to five files; Catat uploads every one of them **first** —
@@ -91,7 +103,7 @@ import { type ReactElement, useId, useMemo, useRef, useState, useTransition } fr
  * still appear — a grandfathered line — and is marked, and the filing check still refuses it.
  *
  * **While Drive cannot take an upload** — not connected, broken, or its folders unresolved — Catat
- * and every row's Unggah bukti render disabled, and the reason is said once beside Catat. The
+ * and every row's Unggah bukti and Hapus render disabled, and the reason is said once beside Catat. The
  * Server Actions refuse the same states themselves.
  */
 function AcquittalTransactions({
@@ -104,7 +116,7 @@ function AcquittalTransactions({
   transactions: ViewableTransaction[];
   uploadGate: UploadGate;
   /**
-   * Whether the viewer writes this trip — its Group, an Editor or an Administrator (ADR-0048). Catat
+   * Whether the viewer writes this trip — its Group, a Perjadin Editor or an Administrator (ADR-0048). Catat
    * transaksi and every Unggah bukti are absent for anyone else, who reads the lines and their
    * receipts; the queries refuse them again.
    */
@@ -155,7 +167,7 @@ function AcquittalTransactions({
 
       {transactions.length === 0 ? (
         <p className="mt-2.5 text-sm text-muted-foreground">
-          Belum ada transaksi terhadap Uang Perjalanan ini.
+          Belum ada transaksi pada Perjadin ini.
         </p>
       ) : (
         <>
@@ -240,7 +252,7 @@ function TransactionCard({
           <span className="text-muted-foreground">·</span>
           <span className="text-muted-foreground">{line.category}</span>
           <Badge variant="secondary">{line.participantType}</Badge>
-          {line.unsynced && <UnsyncedMarker explanation={UNSYNCED_TOOLTIP} />}
+          {line.unsynced && <UnsyncedMarker explanation={RECEIPTS_UNSYNCED_TOOLTIP} />}
           {/* Wraps under the line on a phone rather than pushing the card sideways (#418). */}
           <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2">
             <span className="tabular-nums">{formatRupiah(line.amountIdr)}</span>
@@ -250,6 +262,13 @@ function TransactionCard({
               uploadGate={uploadGate}
               canWrite={canWrite}
             />
+            {canWrite && (
+              <DeleteTransaction
+                transactionId={line.id}
+                label={`${line.spentOn} · ${line.description}`}
+                uploadGate={uploadGate}
+              />
+            )}
           </div>
         </div>
       </CardHeader>
@@ -257,9 +276,35 @@ function TransactionCard({
   );
 }
 
-/** What the "belum tersinkron" marker says, in full, on hover or focus. */
-const UNSYNCED_TOOLTIP =
-  "Bukti belum tersinkron ke Google Drive — Administrator dapat menyelesaikannya lewat Periksa koneksi.";
+/**
+ * **Hapus** on one line, behind a confirmation (#463, ADR-0050). Its folder and receipts go to the
+ * Drive trash first, then the line, and the page revalidates.
+ */
+function DeleteTransaction({
+  transactionId,
+  label,
+  uploadGate,
+}: {
+  transactionId: string;
+  /** Which line, for a screen reader: every row's Hapus would otherwise read the same. */
+  label: string;
+  uploadGate: UploadGate;
+}) {
+  return (
+    <ConfirmHapus
+      ariaLabel={`Hapus transaksi ${label}`}
+      size="sm"
+      title="Hapus transaksi"
+      description={TRANSACTION_DELETE_CONFIRM}
+      uploadGate={uploadGate}
+      run={async () => {
+        const result = await deleteTransactionAction(transactionId);
+        if (result.outcome === "deleted" || result.outcome === "no-such-transaction") return null;
+        return driveRefusalText(result);
+      }}
+    />
+  );
+}
 
 /** The label maps for the four controls. Sort keys are the direction; each filter carries "Semua". */
 const AMOUNT_SORT_OPTIONS = { desc: "Termahal", asc: "Termurah" } satisfies Record<
@@ -343,8 +388,8 @@ function ControlSelect<T extends string>({
  * the line already stands — and moves them into the line's folder.
  *
  * A line holds at most `MAX_RECEIPTS_PER_TRANSACTION` in total, so a pick is cut to the slots left
- * and the button is disabled once there are none. There is no receipt deletion, so a mistaken
- * upload uses a slot.
+ * and the button is disabled once there are none. A mistaken upload is taken off with the **Hapus**
+ * beside its link (#462, ADR-0050), which frees its slot — but never the line's only receipt.
  */
 function Receipts({
   perjadinId,
@@ -438,15 +483,27 @@ function Receipts({
       ) : (
         <span className="flex flex-wrap items-center gap-2">
           {line.evidence.map((file, index) => (
-            <a
+            <span
               key={file.id}
-              href={file.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:no-underline"
+              className="flex items-center gap-0.5"
             >
-              Bukti {index + 1}
-            </a>
+              <a
+                href={file.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:no-underline"
+              >
+                Bukti {index + 1}
+              </a>
+              {canWrite && (
+                <DeleteReceipt
+                  evidenceId={file.id}
+                  label={`Bukti ${index + 1}`}
+                  onlyReceipt={line.evidence.length <= 1}
+                  uploadGate={uploadGate}
+                />
+              )}
+            </span>
           ))}
         </span>
       )}
@@ -496,6 +553,127 @@ function Receipts({
       )}
       {note !== null && <span className="text-destructive">{note}</span>}
     </div>
+  );
+}
+
+/**
+ * **Hapus** beside one receipt, behind a confirmation (#462, ADR-0050). The file goes to the Drive
+ * trash first, then the row, and the page revalidates. On a line's only receipt the dialog says why
+ * it cannot go instead of asking — the server refuses it too.
+ */
+function DeleteReceipt({
+  evidenceId,
+  label,
+  onlyReceipt,
+  uploadGate,
+}: {
+  evidenceId: string;
+  label: string;
+  /** The line's only receipt: the dialog says why it cannot go instead of asking. */
+  onlyReceipt: boolean;
+  uploadGate: UploadGate;
+}) {
+  return (
+    <ConfirmHapus
+      ariaLabel={`Hapus ${label}`}
+      size="xs"
+      title="Hapus bukti"
+      description={onlyReceipt ? ONLY_RECEIPT : RECEIPT_DELETE_CONFIRM}
+      refused={onlyReceipt}
+      uploadGate={uploadGate}
+      run={async () => {
+        const result = await deleteReceiptAction(evidenceId);
+        if (result.outcome === "deleted" || result.outcome === "no-such-receipt") return null;
+        return receiptDeleteRefusalText(result);
+      }}
+    />
+  );
+}
+
+/**
+ * The confirmation both Hapus on the Laporan open. Disabled with the gate's reason while Drive
+ * cannot take it, as Unggah bukti is. `run` answers what to say when the server refuses, or `null`
+ * to close — deleted, or already gone. `refused` is a delete known to be refused before it is
+ * asked: the dialog only explains, with no Hapus to press.
+ */
+function ConfirmHapus({
+  ariaLabel,
+  size,
+  title,
+  description,
+  refused = false,
+  uploadGate,
+  run,
+}: {
+  ariaLabel: string;
+  size: "xs" | "sm";
+  title: string;
+  description: string;
+  refused?: boolean;
+  uploadGate: UploadGate;
+  run: () => Promise<string | null>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [deleting, startDeleting] = useTransition();
+
+  function submit() {
+    startDeleting(async () => {
+      setRefusal(null);
+      const said = await run();
+      if (said === null) setOpen(false);
+      else setRefusal(said);
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setRefusal(null);
+      }}
+    >
+      <DialogTrigger
+        disabled={!uploadGate.open}
+        title={uploadGate.open ? undefined : uploadGate.reason}
+        render={
+          <Button
+            variant="ghost"
+            size={size}
+            aria-label={ariaLabel}
+          >
+            Hapus
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        {refusal !== null && <p className="text-sm text-destructive">{refusal}</p>}
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            {refused ? "Tutup" : "Batal"}
+          </Button>
+          {!refused && (
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={submit}
+            >
+              {deleting ? "Menghapus…" : "Hapus"}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -649,7 +827,7 @@ function RecordTransaction({
         <DialogHeader>
           <DialogTitle>Catat transaksi</DialogTitle>
           <DialogDescription>
-            Satu pengeluaran terhadap Uang Perjalanan, beserta buktinya.
+            Satu pengeluaran pada Perjadin ini, beserta buktinya.
           </DialogDescription>
           <RequiredLegend />
         </DialogHeader>
@@ -719,10 +897,9 @@ function RecordTransaction({
               </Label>
               {/*
                 A masked text input, not `type="number"`: it groups the thousands as they type so a
-                large amount's magnitude is legible at the point of entry — the same pattern the plan
-                form's Uang Perjalanan uses. `amount` stays a plain digit string in state; every non-digit
-                is stripped back out on change, so submit's `Number(...)` and the `complete` guard are
-                unchanged.
+                large amount's magnitude is legible at the point of entry. `amount` stays a plain digit
+                string in state; every non-digit is stripped back out on change, so submit's
+                `Number(...)` and the `complete` guard are unchanged.
               */}
               <Input
                 id={`${fields}-amount`}
@@ -1024,4 +1201,4 @@ function refusalFor(result: Exclude<RecordTransactionActionResult, { outcome: "r
   }
 }
 
-export { AcquittalTransactions, RecordTransaction, UNSYNCED_TOOLTIP };
+export { AcquittalTransactions, RecordTransaction };

@@ -19,7 +19,7 @@ import { requirePerjadinWriter, requireStaff } from "./staff-only";
  *
  * Every write is **Staff-only**, by the surface list — arranging and administering a trip is Staff's
  * ([#12](https://github.com/mafiefa02/sugt/issues/12), and see `./staff-only.ts`) — and, inside
- * that, the trip's Group's, an Editor's or an Administrator's (`requirePerjadinWriter`, ADR-0048).
+ * that, the trip's Group's, a Perjadin Editor's or an Administrator's (`requirePerjadinWriter`, ADR-0048).
  * Each refusal that a person could reach honestly comes back as a value; `NotStaffError` and
  * `NotOnPerjadinError` are the opposite case and still throw.
  *

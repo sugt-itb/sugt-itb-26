@@ -19,19 +19,11 @@ import { useState, useTransition } from "react";
  * touched. The refusal counts those lines — the list below marks each — and each is fixed through
  * its own "Unggah bukti".
  *
- * **Uang Perjalanan must be filled in** (#437). A Perjadin may be planned without it, and nothing
- * else on the trip waits for it — filing the Laporan, which accounts for it, is the one thing that does.
- *
- * **Nothing else is gated**, the deadline included. DITSAMA sets that deadline for itself, and the
+ * **Nothing else is gated** — not the Advance, which is no longer tracked (ADR-0051), and not the
+ * deadline. DITSAMA sets that deadline for itself, and the
  * tool is never stricter than the process it serves — invented friction has the same escape route
  * as duplicated work.
  */
-/** Laporkan's answer while Uang Perjalanan is not filled in yet (#437). */
-const ADVANCE_MISSING_REFUSAL = {
-  title: "Laporan belum bisa dikirim.",
-  body: "Isi Uang Perjalanan sebelum melaporkan.",
-};
-
 function FilePerjadinReport({
   perjadinId,
   filedAt,
@@ -72,9 +64,6 @@ function FilePerjadinReport({
             body: `${result.transactionIds.length} transaksi belum punya bukti. Lampirkan bukti pada setiap transaksi terlebih dahulu.`,
           });
           return;
-        case "advance-missing":
-          setRefusal(ADVANCE_MISSING_REFUSAL);
-          return;
         case "already-filed":
           setRefusal({
             title: "Laporan ini sudah dikirim.",
@@ -109,4 +98,4 @@ function FilePerjadinReport({
   );
 }
 
-export { ADVANCE_MISSING_REFUSAL, FilePerjadinReport };
+export { FilePerjadinReport };

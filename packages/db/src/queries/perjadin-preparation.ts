@@ -13,7 +13,7 @@ import { requirePerjadinWriter, requireStaff } from "./staff-only";
  * hand-ticked and nothing ever ticks one automatically. Which items a Perjadin has is resolved at
  * read time (`./preparation-checklist.ts`, ADR-0045); this write stores only the ticks.
  *
- * **The trip's Group, an Editor or an Administrator toggles its boxes** (ADR-0048). It opens with
+ * **The trip's Group, a Perjadin Editor or an Administrator toggles its boxes** (ADR-0048). It opens with
  * the Staff-only choke point and then `requirePerjadinWriter`, because a Server Action is a public
  * endpoint and a layout does not run before one — the same reason every other write here does,
  * though this one carries no money (convention 4: arranging is Staff-only by the surface list).

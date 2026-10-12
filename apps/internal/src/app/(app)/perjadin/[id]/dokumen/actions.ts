@@ -196,7 +196,7 @@ export async function deleteDocumentAction(
   const target = await staffSurface(async () => {
     requireStaff(person);
     const found = await documentReconcileTarget(person, documentId);
-    // The trip's Group, an Editor or an Administrator (ADR-0048), before the file is trashed.
+    // The trip's Group, a Perjadin Editor or an Administrator (ADR-0048), before the file is trashed.
     if (found) await requirePerjadinWriter(person, found.perjadin.id);
     return found;
   });

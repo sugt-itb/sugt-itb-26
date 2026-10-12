@@ -26,7 +26,7 @@ export async function generateMetadata({
 /**
  * **Detail Sesi daring** — one online Session, and every field the record form set, editable (#152,
  * #318). The online counterpart of `/perjadin/[id]`: the header, then the Session's fields (School,
- * date, times and the two cohort-named Pengajar) with an Edit dialog, and — for an Editor (ADR-0047) — a hard Delete.
+ * date, times and the two cohort-named Pengajar) with an Edit dialog, and — for a Daring Editor (ADR-0047) — a hard Delete.
  * A born-`delivered` Session shows **Edit + Delete**; a legacy `arranged` one also shows Tandai
  * terlaksana and Batalkan Sesi.
  *
@@ -35,7 +35,7 @@ export async function generateMetadata({
  * thing to arrive with, since a pasted link outlives its row.
  *
  * One `requirePerson()`, one query, one payload. **No role check on the read** — a Session carries no
- * money and ADR-0004 opens delivery data to everyone signed in. The edits need the **Editor Grant**
+ * money and ADR-0004 opens delivery data to everyone signed in. The edits need the **Daring Editor Grant**
  * (ADR-0047), and they are **absent rather than disabled** without it: `canEdit` hides the
  * affordances, and the guard inside each write is what actually closes the path, since a layout does
  * not run before a Server Action.
@@ -50,7 +50,7 @@ export default async function Page({ params }: PageProps<"/sesi-daring/[id]">) {
   if (lookup.outcome === "offline") redirect(`/sesi/${id}`);
 
   const session = lookup.session;
-  const canEdit = hasGrant(person, "Editor");
+  const canEdit = hasGrant(person, "Daring Editor");
 
   return (
     <div className="flex min-h-full flex-col">

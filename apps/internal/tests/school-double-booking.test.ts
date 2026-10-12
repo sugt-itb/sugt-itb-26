@@ -21,7 +21,7 @@ import {
   addProvince,
   addSchool,
   addSubCluster,
-  asEditor,
+  withGrant,
   refusedBy,
   resetDatabase,
 } from "./support/fixtures";
@@ -66,9 +66,10 @@ vi.mock("../../../packages/db/src/queries/school-slot", async (importOriginal) =
  * the 12th to the 14th, empty.
  */
 async function scene() {
-  // An Editor: planning needs the Grant (ADR-0047).
-  const pic = await asEditor(
+  // A Perjadin Editor: planning needs the Grant (ADR-0047, ADR-0052).
+  const pic = await withGrant(
     await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" }),
+    "Perjadin Editor",
   );
   await addProvince("KT", "Kalimantan Timur", "WITA");
   const cluster = await addCluster({ slug: "kaltim", name: "Cluster Kaltim" });
@@ -95,7 +96,6 @@ async function scene() {
     addPerjadin({
       subClusterId: subCluster.id,
       picPersonId: pic.id,
-      advanceIdr: 1_000_000,
       startsOn,
       endsOn,
     });
@@ -151,7 +151,6 @@ describe("the same School at the same moment on another trip", () => {
     const { pic, subCluster, bontang, a } = await scene();
     const input: PlanPerjadinInput = {
       subClusterId: subCluster.id,
-      advanceIdr: 1_000_000,
       picPersonId: pic.id,
       teacherNames: [],
       pimpinan: [],
@@ -171,7 +170,6 @@ describe("the same School at the same moment on another trip", () => {
     await expect(
       planPerjadin(pic, {
         subClusterId: subCluster.id,
-        advanceIdr: 1_000_000,
         picPersonId: pic.id,
         teacherNames: [],
         pimpinan: [],
@@ -323,7 +321,6 @@ describe("the database holds it on its own", () => {
     await expect(
       planPerjadin(pic, {
         subClusterId: subCluster.id,
-        advanceIdr: 1_000_000,
         picPersonId: pic.id,
         teacherNames: [],
         pimpinan: [],

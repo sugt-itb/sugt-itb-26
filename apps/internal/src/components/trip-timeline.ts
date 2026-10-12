@@ -1,9 +1,9 @@
 import type { MyPerjadinSchool, MyPerjadinSession, MyPerjadinTrip } from "@sugt/db/queries";
 
 /**
- * **A `/pendamping` trip card's timeline and money bar** (#349). The ordering, the done/pending state
- * and the spent ratio are plain functions so each rule is testable without React; the card renders
- * what they return, deciding only which controls a Session row offers.
+ * **A `/pendamping` trip card's timeline** (#349). The ordering and the done/pending state are plain
+ * functions so each rule is testable without React; the card renders what they return, deciding only
+ * which controls a Session row offers.
  *
  * The timeline is the trip's live Sessions and nothing else: a Perjadin carries no departure or
  * return leg (ADR-0041), so there is no journey to draw around them.
@@ -45,15 +45,4 @@ export function tripTimeline(trip: TimelineTrip): TimelineNode[] {
         done: session.status === "delivered",
       }))
   );
-}
-
-/**
- * How much of the travel float is spent, as the bar's 0–100 fill: `drawnDownIdr / advanceIdr`,
- * clamped, so an overspend fills the bar rather than overflowing it. No advance means nothing to
- * fill — a zero one, and an unset one (`null`, #437), checked by name rather than through
- * `null <= 0`. The Tersisa figure beside it is shown unclamped — only the bar clamps.
- */
-export function spentPercent(advanceIdr: number | null, drawnDownIdr: number): number {
-  if (advanceIdr === null || advanceIdr <= 0) return 0;
-  return Math.min(100, Math.max(0, (drawnDownIdr / advanceIdr) * 100));
 }

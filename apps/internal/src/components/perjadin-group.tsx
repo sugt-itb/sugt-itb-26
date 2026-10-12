@@ -26,7 +26,7 @@ import { useId, useState, useTransition } from "react";
  * The Teaching Team have left the Group entirely; a Group is Staff and only Staff now, so editing it
  * is choosing the PIC and the extra Staff. Both are granular writes: the PIC is reassigned through
  * `changePerjadinPic`, which keeps the deferred membership foreign key valid, and the extra Staff are
- * set whole through `setPerjadinStaff`. The Perjadin keeps its id, so its Sessions, Advance and
+ * set whole through `setPerjadinStaff`. The Perjadin keeps its id, so its Sessions and
  * transactions are untouched.
  */
 function PerjadinGroup({
@@ -146,8 +146,7 @@ function EditGroup({
         <DialogHeader>
           <DialogTitle>Ubah Group</DialogTitle>
           <DialogDescription>
-            PIC dan Pendamping tambahan. Sesi, Uang Perjalanan dan transaksi Perjadin ini tidak ikut
-            berubah.
+            PIC dan Pendamping tambahan. Sesi dan transaksi Perjadin ini tidak ikut berubah.
           </DialogDescription>
         </DialogHeader>
 

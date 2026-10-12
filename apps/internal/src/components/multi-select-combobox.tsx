@@ -14,8 +14,11 @@ import {
 } from "@sugt/ui/components/combobox";
 import { useMemo } from "react";
 
-/** One option a `MultiSelectCombobox` offers: a stable `value` and the `label` shown for it. */
-type ComboboxOption = { value: string; label: string };
+/**
+ * One option a `MultiSelectCombobox` offers: a stable `value`, the `label` shown for it, and an
+ * optional `description` — a muted second line in the list, never on the chip.
+ */
+type ComboboxOption = { value: string; label: string; description?: string };
 
 /**
  * A searchable multi-select over a fixed list of options: type to filter, and each choice becomes a
@@ -31,6 +34,9 @@ type ComboboxOption = { value: string; label: string };
  * derived from `value` against `options` on every render, so the two never drift and referential
  * identity is not something a caller has to preserve. Equality is by `value`, so rebuilding the
  * option objects each render is harmless.
+ *
+ * **`locked` values stay chosen**: their chips carry no remove button, and a change that would drop
+ * one — a Backspace, a click on its row — keeps it, so the caller never sees it leave.
  */
 function MultiSelectCombobox({
   options,
@@ -38,6 +44,7 @@ function MultiSelectCombobox({
   onValueChange,
   placeholder,
   emptyLabel = "Tidak ada pilihan.",
+  locked = [],
   id,
   "aria-label": ariaLabel,
 }: {
@@ -47,6 +54,8 @@ function MultiSelectCombobox({
   placeholder?: string;
   /** Shown in the popup when the filter matches nothing. */
   emptyLabel?: string;
+  /** Chosen values that cannot be removed. */
+  locked?: string[];
   id?: string;
   "aria-label"?: string;
 }) {
@@ -65,7 +74,13 @@ function MultiSelectCombobox({
       multiple
       value={selected}
       onValueChange={(next: ComboboxOption[]) => {
-        onValueChange(next.map((option) => option.value));
+        onValueChange(
+          keepLocked(
+            next.map((option) => option.value),
+            value,
+            locked,
+          ),
+        );
       }}
       isItemEqualToValue={(a: ComboboxOption, b: ComboboxOption) => a.value === b.value}
     >
@@ -77,6 +92,7 @@ function MultiSelectCombobox({
                 <ComboboxChip
                   key={option.value}
                   aria-label={option.label}
+                  showRemove={!locked.includes(option.value)}
                 >
                   {option.label}
                 </ComboboxChip>
@@ -98,7 +114,14 @@ function MultiSelectCombobox({
               key={option.value}
               value={option}
             >
-              {option.label}
+              {option.description === undefined ? (
+                option.label
+              ) : (
+                <span className="flex min-w-0 flex-col">
+                  <span>{option.label}</span>
+                  <span className="text-xs text-muted-foreground">{option.description}</span>
+                </span>
+              )}
             </ComboboxItem>
           )}
         </ComboboxList>
@@ -107,4 +130,13 @@ function MultiSelectCombobox({
   );
 }
 
-export { MultiSelectCombobox, type ComboboxOption };
+/**
+ * A change with every `locked` value that was chosen put back — what a Backspace or a click on a
+ * locked row would otherwise drop. Pure, so the rule is tested without a DOM.
+ */
+function keepLocked(next: string[], previous: string[], locked: string[]): string[] {
+  const dropped = locked.filter((held) => previous.includes(held) && !next.includes(held));
+  return [...next, ...dropped];
+}
+
+export { keepLocked, MultiSelectCombobox, type ComboboxOption };

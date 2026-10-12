@@ -18,7 +18,7 @@ import { perjadinWriterSql } from "./staff-only";
  * detail are two surfaces that happen to be about the same noun.
  *
  * No money here and no role check, for the reason `./perjadin-detail.ts` gives at length:
- * the Advance is `./perjadin-report.ts`'s, behind the Staff-only choke point.
+ * money is `./perjadin-report.ts`'s `perjadinAcquittal`.
  */
 
 /** One trip, as the list shows it. */
@@ -68,7 +68,7 @@ export type DirectoryPerjadin = {
    */
   schoolNames: string[];
   /**
-   * **May the caller write this trip?** (ADR-0048) Its Group, an Editor or an Administrator — so
+   * **May the caller write this trip?** (ADR-0048) Its Group, a Perjadin Editor or an Administrator — so
    * the Persiapan pill opens its dialog on this row and stays a static count on every other one. A
    * courtesy: `togglePreparationItem` refuses anyone else again.
    */
@@ -136,7 +136,7 @@ export async function perjadinDirectory(caller: Person): Promise<DirectoryPerjad
       pengajarNames,
       groupMemberNames,
       schoolNames: tripSchoolNames(perjadin.id),
-      // Who writes each row (ADR-0048): the trip's Group, an Editor or an Administrator.
+      // Who writes each row (ADR-0048): the trip's Group, a Perjadin Editor or an Administrator.
       canWrite: perjadinWriterSql(caller),
     })
     .from(perjadin)

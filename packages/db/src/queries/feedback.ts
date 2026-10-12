@@ -1,5 +1,22 @@
-import type { ClassKind, PerjadinEvaluationRole, SessionMode, TimeZone } from "@sugt/domain";
-import { and, asc, desc, eq, sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import {
+  type ClassKind,
+  type PerjadinEvaluationRole,
+  rankBySchool,
+  type SessionMode,
+  type TimeZone,
+} from "@sugt/domain";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  inArray,
+  ne,
+  sql,
+  type SQL,
+  type SQLWrapper,
+} from "drizzle-orm";
 
 import { db } from "../client";
 import { session } from "../schema/delivery";
@@ -7,6 +24,7 @@ import { participantFeedback, perjadinEvaluation } from "../schema/evaluations";
 import { province, school, subCluster } from "../schema/reference";
 import { perjadin } from "../schema/travel";
 import type { Person } from "./caller";
+import { tripSchoolNames } from "./perjadin-naming";
 
 /**
  * **The Feedback screen's Peserta tab** — every Participant's submission, lowest-average-first by
@@ -18,8 +36,9 @@ import type { Person } from "./caller";
  * **Why a page and not a one-round-trip whole set.** A submission is not rare: every Participant
  * of every delivered Session leaves one, so the set grows without bound and both the filters and
  * the paging live in the query rather than in memory on the screen. The four summary averages
- * are the exception (`participantFeedbackAverages` below): they are dataset-wide and unfiltered,
- * so they are one scalar read the page filters never touch.
+ * are the exception (`participantFeedbackAverages` below): they follow the tab's **scope** — the
+ * School and Session it is narrowed to (#466) — but never its score filters, so they are one scalar
+ * read the score filters never touch.
  *
  * Open to anyone signed in, by ADR-0004 — feedback carries no money — so no `requireStaff`. The
  * `caller` is still first by convention 1 even though nothing here gates on it; it is named
@@ -90,6 +109,62 @@ export const NO_FEEDBACK_FILTERS: FeedbackFilters = {
 };
 
 /**
+ * **What the Peserta tab is narrowed to** (#466): one School, and within it one Session. `null` is
+ * Semua. Unlike the score filters, the scope also narrows the four averages. An id that names
+ * nothing — or is not an id at all — matches no row, so the tab reads empty rather than failing: each
+ * is compared as text, so a malformed one never reaches a `uuid` cast.
+ */
+export type ParticipantFeedbackScope = { schoolId: string | null; sessionId: string | null };
+
+/** Every School, every Session — the tab's first paint. */
+export const NO_PARTICIPANT_FEEDBACK_SCOPE: ParticipantFeedbackScope = {
+  schoolId: null,
+  sessionId: null,
+};
+
+/** The scope's predicates over the joined `session`, or none for Semua. */
+function participantScopeConditions(scope: ParticipantFeedbackScope): SQL[] {
+  return [
+    scope.schoolId === null ? null : sql`${session.schoolId}::text = ${scope.schoolId}`,
+    scope.sessionId === null ? null : sql`${session.id}::text = ${scope.sessionId}`,
+  ].filter((condition): condition is SQL => condition !== null);
+}
+
+/**
+ * A Session's zone as the screen shows it: an **online** Session is always WIB (CONTEXT.md, Session;
+ * #283), an offline one is in its School's Province's zone. Reads `session` and `province`, so the
+ * enclosing query joins both.
+ */
+const sessionTimeZoneExpr = sql<TimeZone>`case when ${session.mode} = 'online' then 'WIB' else ${province.timeZone} end`;
+
+/**
+ * **Each of `schoolIds`' live Sessions' Sesi** (ADR-0027), by Session id: the School's date rank
+ * within its mode, over **all** its live Sessions of that mode, by `rankBySchool` — the one ranking,
+ * so a Session carries the number the `/monitoring` matrix and the planning note give it. A cancelled
+ * Session has none.
+ */
+async function sesiNumbers(schoolIds: string[]): Promise<Map<string, number>> {
+  const numbers = new Map<string, number>();
+  if (schoolIds.length === 0) return numbers;
+  const live = await db
+    .select({
+      id: session.id,
+      schoolId: session.schoolId,
+      mode: session.mode,
+      heldOn: session.heldOn,
+      startsAt: session.startsAt,
+    })
+    .from(session)
+    .where(and(inArray(session.schoolId, schoolIds), ne(session.status, "cancelled")));
+  for (const mode of ["offline", "online"] as const) {
+    for (const ranked of rankBySchool(live.filter((row) => row.mode === mode)).values()) {
+      ranked.forEach((row, index) => numbers.set(row.id, index + 1));
+    }
+  }
+  return numbers;
+}
+
+/**
  * How many rows a page has already loaded — the OFFSET the next page skips. A number, not a
  * keyset (#184): the global sort makes the row average the primary key, so a compound keyset over
  * `{average, date, id}` across four sort combinations is a bug magnet; OFFSET over a total order
@@ -104,15 +179,19 @@ export type ParticipantFeedbackRow = {
   /** The Participant's own typed name — referenced by nothing, exactly as stored. */
   name: string;
   classKind: ClassKind;
+  /** The School the Session was at — what the Sekolah filter narrows on (#466). */
+  schoolId: string;
   schoolName: string;
   /** The Session the feedback was filed against — the origin the card links through to (#194). */
   sessionId: string;
   sessionMode: SessionMode;
+  /** The Session's Sesi (ADR-0027, `rankBySchool`); `null` once it is cancelled. */
+  sesi: number | null;
   /** The Session's date as `YYYY-MM-DD`; a `date` column, so already a string. */
   heldOn: string;
-  /** The Session's wall-clock start time (`HH:MM:SS`), local to the School, for `formatSessionStartTime`. */
+  /** The Session's wall-clock start time (`HH:MM:SS`), for `formatSessionStartTime`. */
   startsAt: string;
-  /** The School's Province's Time Zone, the zone `startsAt` is rendered in. */
+  /** The zone `startsAt` is in: WIB for an online Session, else the School's Province's. */
   timeZone: TimeZone;
   /** The Student Class's alone (#446); null on GTK, MS and Siswa rows filed before it existed. */
   handsOnRbl: number | null;
@@ -178,13 +257,19 @@ function bound(value: FeedbackFilterValue, expr: SQLWrapper): SQL | null {
  */
 export async function participantFeedbackPage(
   _caller: Person,
-  args: { filters: FeedbackFilters; cursor: FeedbackCursor | null; sort: FeedbackSort },
+  args: {
+    filters: FeedbackFilters;
+    scope: ParticipantFeedbackScope;
+    cursor: FeedbackCursor | null;
+    sort: FeedbackSort;
+  },
 ): Promise<{ rows: ParticipantFeedbackRow[]; nextCursor: FeedbackCursor | null }> {
-  const { filters, cursor, sort } = args;
+  const { filters, scope, cursor, sort } = args;
 
   // Each `all` filter yields `null` and is filtered out below; the active ones are conjoined by a
-  // single `!= null` at the `where`.
+  // single `!= null` at the `where`, with the scope's (#466).
   const conditions: (SQL | null | undefined)[] = [
+    ...participantScopeConditions(scope),
     bound(filters.reviewType, rowAverageExpr),
     bound(filters.handsOnRbl, participantFeedback.handsOnRbl),
     bound(filters.instructor, participantFeedback.instructor),
@@ -197,6 +282,7 @@ export async function participantFeedbackPage(
       id: participantFeedback.id,
       name: participantFeedback.name,
       classKind: participantFeedback.classKind,
+      schoolId: school.id,
       schoolName: school.name,
       // The Session this feedback was filed against, so the card can link through to it (#194). The
       // `session` table is already inner-joined below, so this is just another selected column.
@@ -204,7 +290,7 @@ export async function participantFeedbackPage(
       sessionMode: session.mode,
       heldOn: session.heldOn,
       startsAt: session.startsAt,
-      timeZone: province.timeZone,
+      timeZone: sessionTimeZoneExpr,
       // The smallint columns already read back as `number` (or null for `handsOnRbl`); the row
       // average is a numeric expression, so only it needs the explicit `.mapWith(Number)`.
       handsOnRbl: participantFeedback.handsOnRbl,
@@ -226,8 +312,8 @@ export async function participantFeedbackPage(
     .from(participantFeedback)
     .innerJoin(session, eq(session.id, participantFeedback.sessionId))
     .innerJoin(school, eq(school.id, session.schoolId))
-    // The School's Province carries the Time Zone `startsAt` is rendered in. NOT NULL both ways,
-    // so an inner join.
+    // The School's Province carries an offline Session's Time Zone. NOT NULL both ways, so an inner
+    // join.
     .innerJoin(province, eq(province.code, school.provinceCode))
     .where(and(...conditions.filter((c): c is SQL => c != null)))
     // Average primary, filed date secondary, id last for a total order OFFSET can page safely.
@@ -241,10 +327,12 @@ export async function participantFeedbackPage(
 
   // The (BATCH + 1)th row is the proof a next page exists, never a row to show. Drop it and advance
   // the cursor by one batch; short of a full-plus-one batch there is no next page.
-  if (rows.length > BATCH) {
-    return { rows: rows.slice(0, BATCH), nextCursor: (cursor ?? 0) + BATCH };
-  }
-  return { rows, nextCursor: null };
+  const page = rows.slice(0, BATCH);
+  const sesi = await sesiNumbers([...new Set(page.map((row) => row.schoolId))]);
+  return {
+    rows: page.map((row) => ({ ...row, sesi: sesi.get(row.sessionId) ?? null })),
+    nextCursor: rows.length > BATCH ? (cursor ?? 0) + BATCH : null,
+  };
 }
 
 /** The Peserta tab's four summary averages. Hands-on RBL's is `null` until any row has one. */
@@ -256,9 +344,10 @@ export type ParticipantFeedbackAverages = {
 };
 
 /**
- * **The four summary averages, dataset-wide and unfiltered.** The `avg()` runs over the whole
- * `participant_feedback` table and takes no filter argument on purpose: the summary cards are the
- * overall standing, so they must not move when the page's filters narrow the list below them.
+ * **The four summary averages, over the tab's scope and never its score filters** (#466). With no
+ * School or Session picked they are programme-wide, over the whole `participant_feedback` table; a
+ * scope narrows them to its School or Session. The score filters are deliberately not an argument:
+ * averaging only the rows at or below 7 would read as the standing and mislead.
  *
  * An empty table makes `avg()` return NULL; `coalesce(…, 0)` turns that into `0` for the three
  * every row has, so the caller gets numbers to format rather than a null to guard. Zero is outside
@@ -268,6 +357,7 @@ export type ParticipantFeedbackAverages = {
  */
 export async function participantFeedbackAverages(
   _caller: Person,
+  scope: ParticipantFeedbackScope,
 ): Promise<ParticipantFeedbackAverages> {
   const [row] = await db
     .select({
@@ -278,7 +368,9 @@ export async function participantFeedbackAverages(
       materials: sql<number>`coalesce(avg(${participantFeedback.materials}), 0)`.mapWith(Number),
       relevance: sql<number>`coalesce(avg(${participantFeedback.relevance}), 0)`.mapWith(Number),
     })
-    .from(participantFeedback);
+    .from(participantFeedback)
+    .innerJoin(session, eq(session.id, participantFeedback.sessionId))
+    .where(and(...participantScopeConditions(scope)));
 
   return row ?? { handsOnRbl: null, instructor: 0, materials: 0, relevance: 0 };
 }
@@ -307,6 +399,30 @@ export const NO_PERJADIN_FEEDBACK_FILTERS: PerjadinFeedbackFilters = {
   meals: "all",
   punctuality: "all",
 };
+
+/**
+ * **What the Perjadin tab is narrowed to** (#466): one trip, and one self-declared `filed_by_role`.
+ * `null` is Semua. There is no School: an evaluation is about a whole trip, often over several
+ * Schools, and the Perjadin picker already finds a trip by its Schools. Like the Peserta scope it
+ * narrows the averages too, and a value that names nothing — compared as text — matches no row.
+ */
+export type PerjadinFeedbackScope = {
+  perjadinId: string | null;
+  role: PerjadinEvaluationRole | null;
+};
+
+/** Every trip, every Peran — the tab's first paint. */
+export const NO_PERJADIN_FEEDBACK_SCOPE: PerjadinFeedbackScope = { perjadinId: null, role: null };
+
+/** The scope's predicates over `perjadin_evaluation`, or none for Semua. */
+function perjadinScopeConditions(scope: PerjadinFeedbackScope): SQL[] {
+  return [
+    scope.perjadinId === null
+      ? null
+      : sql`${perjadinEvaluation.perjadinId}::text = ${scope.perjadinId}`,
+    scope.role === null ? null : sql`${perjadinEvaluation.filedByRole} = ${scope.role}`,
+  ].filter((condition): condition is SQL => condition !== null);
+}
 
 /**
  * How many Perjadin rows a page has already loaded — the OFFSET the next page skips, the twin of
@@ -376,13 +492,15 @@ export async function perjadinFeedbackPage(
   _caller: Person,
   args: {
     filters: PerjadinFeedbackFilters;
+    scope: PerjadinFeedbackScope;
     cursor: PerjadinFeedbackCursor | null;
     sort: FeedbackSort;
   },
 ): Promise<{ rows: PerjadinFeedbackRow[]; nextCursor: PerjadinFeedbackCursor | null }> {
-  const { filters, cursor, sort } = args;
+  const { filters, scope, cursor, sort } = args;
 
   const conditions: (SQL | null | undefined)[] = [
+    ...perjadinScopeConditions(scope),
     bound(filters.reviewType, perjadinRowAverageExpr),
     bound(filters.lodging, perjadinEvaluation.lodging),
     bound(filters.transport, perjadinEvaluation.transport),
@@ -437,10 +555,18 @@ export async function perjadinFeedbackPage(
   return { rows, nextCursor: null };
 }
 
+/** The Perjadin tab's four summary averages. */
+export type PerjadinFeedbackAverages = {
+  lodging: number;
+  transport: number;
+  meals: number;
+  punctuality: number;
+};
+
 /**
- * **The four Perjadin summary averages, dataset-wide and unfiltered.** The `avg()` runs over the
- * whole `perjadin_evaluation` table and takes no filter argument, so the summary cards read the
- * overall standing and never move when the page's filters narrow the list below them.
+ * **The four Perjadin summary averages, over the tab's scope and never its score filters** (#466),
+ * as the Peserta tab's are: programme-wide with no trip or Peran picked, narrowed to them once one
+ * is. The score filters are not an argument, so the cards never average only the low rows.
  *
  * `avg(lodging)` ignores NULL naturally — a day trip with no hotel is not a zero in the hotel
  * average, it is simply not in it. `coalesce(…, 0)` turns the empty-table NULL into `0` so the
@@ -448,7 +574,8 @@ export async function perjadinFeedbackPage(
  */
 export async function perjadinFeedbackAverages(
   _caller: Person,
-): Promise<{ lodging: number; transport: number; meals: number; punctuality: number }> {
+  scope: PerjadinFeedbackScope,
+): Promise<PerjadinFeedbackAverages> {
   const [row] = await db
     .select({
       lodging: sql<number>`coalesce(avg(${perjadinEvaluation.lodging}), 0)`.mapWith(Number),
@@ -456,7 +583,107 @@ export async function perjadinFeedbackAverages(
       meals: sql<number>`coalesce(avg(${perjadinEvaluation.meals}), 0)`.mapWith(Number),
       punctuality: sql<number>`coalesce(avg(${perjadinEvaluation.punctuality}), 0)`.mapWith(Number),
     })
-    .from(perjadinEvaluation);
+    .from(perjadinEvaluation)
+    .where(and(...perjadinScopeConditions(scope)));
 
   return row ?? { lodging: 0, transport: 0, meals: 0, punctuality: 0 };
+}
+
+/** One Session a Peserta response was filed against, as the Sesi picker offers it (#466). */
+export type FeedbackSessionOption = {
+  id: string;
+  mode: SessionMode;
+  /** Its Sesi (ADR-0027), the number on the response cards; `null` once it is cancelled. */
+  sesi: number | null;
+  heldOn: string;
+  startsAt: string;
+  /** WIB for an online Session, else the School's Province's zone, as on the cards. */
+  timeZone: TimeZone;
+};
+
+/** One School with Peserta responses, and the Sessions it has them for, in date order. */
+export type FeedbackSchoolOption = {
+  id: string;
+  name: string;
+  /** Searched beside the name, as every School picker does. */
+  kabupatenKota: string;
+  sessions: FeedbackSessionOption[];
+};
+
+/**
+ * **The Peserta tab's Sekolah and Sesi pickers** (#466): every School with at least one response,
+ * by name, each with the Sessions — offline and online alike, by date — it has responses for. Only
+ * those, so a pick never reads empty. One read for both pickers: picking a School then needs no
+ * round trip to list its Sessions.
+ */
+export async function participantFeedbackSchools(_caller: Person): Promise<FeedbackSchoolOption[]> {
+  const rows = await db
+    .selectDistinct({
+      schoolId: school.id,
+      schoolName: school.name,
+      kabupatenKota: school.kabupatenKota,
+      id: session.id,
+      mode: session.mode,
+      heldOn: session.heldOn,
+      startsAt: session.startsAt,
+      timeZone: sessionTimeZoneExpr,
+    })
+    .from(participantFeedback)
+    .innerJoin(session, eq(session.id, participantFeedback.sessionId))
+    .innerJoin(school, eq(school.id, session.schoolId))
+    .innerJoin(province, eq(province.code, school.provinceCode))
+    .orderBy(
+      asc(school.name),
+      asc(school.id),
+      asc(session.heldOn),
+      asc(session.startsAt),
+      asc(session.id),
+    );
+
+  const sesi = await sesiNumbers([...new Set(rows.map((row) => row.schoolId))]);
+  const schools: FeedbackSchoolOption[] = [];
+  for (const { schoolId, schoolName, kabupatenKota, ...option } of rows) {
+    const sessionOption = { ...option, sesi: sesi.get(option.id) ?? null };
+    const last = schools.at(-1);
+    if (last?.id === schoolId) last.sessions.push(sessionOption);
+    else schools.push({ id: schoolId, name: schoolName, kabupatenKota, sessions: [sessionOption] });
+  }
+  return schools;
+}
+
+/** One trip with Perjadin Evaluations, as the Perjadin picker offers it (#466). */
+export type FeedbackPerjadinOption = {
+  id: string;
+  /** The trip is named `{subClusterName} · {dates}` (ADR-0044). */
+  subClusterName: string;
+  startsOn: string;
+  endsOn: string;
+  /** The trip's Schools (`tripSchoolNames`): the picker's second line, and searched. */
+  schoolNames: string[];
+};
+
+/**
+ * **The Perjadin tab's Perjadin picker** (#466): every trip with at least one evaluation, earliest
+ * first, with what its name (ADR-0044) and its School line are built from.
+ */
+export async function perjadinFeedbackTrips(_caller: Person): Promise<FeedbackPerjadinOption[]> {
+  return db
+    .select({
+      id: perjadin.id,
+      subClusterName: subCluster.name,
+      startsOn: perjadin.startsOn,
+      endsOn: perjadin.endsOn,
+      schoolNames: tripSchoolNames(perjadin.id),
+    })
+    .from(perjadin)
+    .innerJoin(subCluster, eq(subCluster.id, perjadin.subClusterId))
+    .where(
+      exists(
+        db
+          .select({ id: perjadinEvaluation.id })
+          .from(perjadinEvaluation)
+          .where(eq(perjadinEvaluation.perjadinId, perjadin.id)),
+      ),
+    )
+    .orderBy(asc(perjadin.startsOn), asc(perjadin.id));
 }

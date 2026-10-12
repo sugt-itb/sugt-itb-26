@@ -71,16 +71,9 @@ export const perjadin = pgTable(
     startsOn: date("starts_on").notNull(),
     endsOn: date("ends_on").notNull(),
 
-    // Uang Perjalanan. Null means "not filled in yet" — never the same as Rp 0, which stays a real
-    // amount. A Perjadin is often planned before anyone knows it, so it may be set later; once set it
-    // can be changed but not cleared, and the Laporan cannot be filed while it is null (#437).
-    advanceIdr: bigint("advance_idr", { mode: "number" }),
-
     picPersonId: uuid("pic_person_id").notNull(),
     picRole: text("pic_role").$type<"Staff">().notNull().default("Staff"),
 
-    returnedToTreasurerIdr: bigint("returned_to_treasurer_idr", { mode: "number" }),
-    returnedAt: timestamp("returned_at", { withTimezone: true }),
     reportFiledAt: timestamp("report_filed_at", { withTimezone: true }),
     // The Perjadin's folder in the company Google Drive (ADR-0040), set by compare-and-set the
     // first time a transaction on it is reconciled — never under a row lock held across a call
@@ -95,13 +88,8 @@ export const perjadin = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    check("perjadin_advance_check", sql`${t.advanceIdr} >= 0`),
     check("perjadin_pic_role_check", sql`${t.picRole} = 'Staff'`),
     check("perjadin_dates_check", sql`${t.endsOn} >= ${t.startsOn}`),
-    check(
-      "perjadin_returned_check",
-      sql`(${t.returnedAt} is null) = (${t.returnedToTreasurerIdr} is null)`,
-    ),
     foreignKey({
       name: "perjadin_pic_is_staff",
       columns: [t.picPersonId, t.picRole],
@@ -114,7 +102,7 @@ export const perjadin = pgTable(
  * The Group. **Replaced wholesale, never edited** — there is no "remove one member"
  * operation. Substituting a professor submits an entire replacement Group, and one
  * transaction deletes every member row and inserts the new set, so the Perjadin
- * keeps its id and its Sessions, Advance and transactions are untouched.
+ * keeps its id and its Sessions and transactions are untouched.
  *
  * `role` is denormalised from `person`, but it cannot drift: the composite foreign
  * key means a row can only exist if the pair is true there.
@@ -226,8 +214,8 @@ export const perjadinPimpinan = pgTable(
 );
 
 /**
- * The acquittal's line items. **The Advance is one pot and the acquittal reconciles the
- * pot** — a transaction consumes the Advance, not a person's share of it.
+ * The acquittal's line items: every transaction on the trip, a line for the trip as a whole rather
+ * than a person's share of it. Their sum is Uang Perjalanan Terpakai (ADR-0051).
  *
  * **Two orthogonal axes describe each line.** `category` is *what kind of spend* it was — a
  * closed set read off DITSAMA's own approved budget. `participantType` is *which cohort* it
@@ -533,7 +521,7 @@ export const activityLog = pgTable(
   (t) => [
     check(
       "activity_log_action_check",
-      sql`${t.action} in ('advance_set', 'advance_changed', 'transaction_recorded', 'evidence_uploaded', 'report_filed', 'document_uploaded', 'document_deleted', 'footage_uploaded', 'footage_deleted')`,
+      sql`${t.action} in ('advance_set', 'advance_changed', 'transaction_recorded', 'evidence_uploaded', 'report_filed', 'document_uploaded', 'document_deleted', 'footage_uploaded', 'footage_deleted', 'evidence_deleted', 'transaction_deleted')`,
     ),
     // `/log` reads newest first, 50 at a time; this serves that order without a sort.
     index("activity_log_occurred_at_id_idx").on(t.occurredAt.desc(), t.id.desc()),

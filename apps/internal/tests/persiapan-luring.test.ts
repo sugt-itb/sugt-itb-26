@@ -102,7 +102,6 @@ async function tripStarting(startsOn: string, inSubCluster = subClusterId) {
   const end = new Date(`${startsOn}T00:00:00Z`);
   end.setUTCDate(end.getUTCDate() + 2);
   const row = await addPerjadin({
-    advanceIdr: 1,
     picPersonId: admin.id,
     subClusterId: inSubCluster,
     startsOn,
@@ -315,14 +314,16 @@ describe("the Dashboard's tabs", () => {
     expect(html).not.toContain("Persiapan Luring 8–13 Mar 2027");
   });
 
-  it("opens on Persiapan Luring for a URL naming a week, read-only even for an Editor", async () => {
+  it("opens on Persiapan Luring for a URL naming a week, read-only even for a Dashboard Editor", async () => {
     const staff = await addPerson({ fullName: "Ed", email: "ed@itb.ac.id", role: "Staff" });
-    await addGrant(staff.id, "Editor");
-    vi.mocked(requirePerson).mockResolvedValue({ ...staff, grants: ["Editor"] } as Person);
+    await addGrant(staff.id, "Dashboard Editor");
+    vi.mocked(requirePerson).mockResolvedValue({
+      ...staff,
+      grants: ["Dashboard Editor"],
+    } as Person);
     const cluster = (await addCluster({ slug: "c", name: "Cluster" })).id;
     const sub = (await addSubCluster({ slug: "k", name: "Kelompok 7", clusterId: cluster })).id;
     await addPerjadin({
-      advanceIdr: 1,
       picPersonId: staff.id,
       subClusterId: sub,
       startsOn: "2027-03-09",

@@ -38,7 +38,7 @@ async function staff(email = "rina@ditsama.itb.ac.id") {
 
 /** A trip to file against. `addPerjadin` builds a PIC-only Group; the filer needs no membership now. */
 async function aTrip(picPersonId: string) {
-  return addPerjadin({ advanceIdr: 5_000_000, picPersonId });
+  return addPerjadin({ picPersonId });
 }
 
 /** The resolved-token caller a public submit is checked against — what the app produces, never a Person. */
@@ -278,7 +278,6 @@ describe("resolvePerjadinFeedbackToken", () => {
   it("resolves a live token to a perjadin caller and the trip's display info", async () => {
     const pic = await staff();
     const trip = await addPerjadin({
-      advanceIdr: 5_000_000,
       picPersonId: pic.id,
       subClusterName: "Kelompok 3",
       startsOn: "2026-09-01",

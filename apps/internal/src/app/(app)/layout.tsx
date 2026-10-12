@@ -53,7 +53,8 @@ export default async function SignedInLayout({
     <AppShell
       role={person.role}
       personName={person.fullName}
-      canEditMonitoring={hasGrant(person, "Editor")}
+      canEditDaring={hasGrant(person, "Daring Editor")}
+      canViewKeuangan={hasGrant(person, "Keuangan")}
       canViewDashboard={canViewDashboard(person)}
       canAdminister={canAdminister}
       driveNeedsAttention={driveNeedsAttention}

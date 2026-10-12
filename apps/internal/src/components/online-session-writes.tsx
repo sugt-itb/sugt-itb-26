@@ -31,7 +31,7 @@ import { useId, useState, useTransition } from "react";
  *
  * Each rule is also held by the write function, which is why each dialog has a branch for a refusal
  * it believes it cannot provoke — a page opened before somebody else acted on the same Session is
- * what those branches are for. Rendered only for an Editor (ADR-0047): Delete re-checks the Grant in its
+ * what those branches are for. Rendered only for a Daring Editor (ADR-0047): Delete re-checks the Grant in its
  * query, the two legacy status writes in their online-only actions (their queries are shared with
  * offline Sessions).
  */

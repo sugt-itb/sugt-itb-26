@@ -18,7 +18,7 @@ import {
   addProvince,
   addSchool,
   addSession,
-  asEditor,
+  withGrant,
   resetDatabase,
 } from "./support/fixtures";
 
@@ -32,8 +32,8 @@ import {
 
 /** A Staff Person. */
 async function staff(email = "rina@ditsama.itb.ac.id", fullName = "Rina Nurhayati") {
-  // Editing and deleting an online Session need the Editor Grant (ADR-0047).
-  return asEditor(await addPerson({ fullName, email, role: "Staff" }));
+  // Editing and deleting an online Session need the Daring Editor Grant (ADR-0047, ADR-0052).
+  return withGrant(await addPerson({ fullName, email, role: "Staff" }), "Daring Editor");
 }
 
 /**
@@ -160,7 +160,6 @@ describe("Detail Sesi daring — read", () => {
     const { first } = await twoSchools();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-01-01",
       endsOn: "2026-01-03",
     });
@@ -368,7 +367,6 @@ describe("Detail Sesi daring — hard delete", () => {
     const { first } = await twoSchools();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-01-01",
       endsOn: "2026-01-03",
     });

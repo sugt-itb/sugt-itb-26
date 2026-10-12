@@ -78,7 +78,7 @@ describe("the Detail Sekolah payload", () => {
     // Offline Sessions need a Perjadin: an offline Session has one and an online
     // Session has none, in both directions, by CHECK. `heldOn` sits inside the Perjadin's
     // dates, which is the application's rule rather than the schema's.
-    const perjadin = await addPerjadin({ advanceIdr: 5_000_000, picPersonId });
+    const perjadin = await addPerjadin({ picPersonId });
     const onSite = await addOfflineSession({
       schoolId: school.id,
       heldOn: "2026-09-02",

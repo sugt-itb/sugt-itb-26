@@ -23,7 +23,7 @@ import { requireSessionWriter, requireStaff } from "./staff-only";
  * The read is open to anyone signed in, because a Session carries no money and ADR-0004
  * opens delivery data to both roles. **Every write here is Staff-only**, by the surface
  * list rather than by ADR-0004 — the same one guard for the second of its two reasons,
- * as `./staff-only.ts` sets out. On an offline Session each is also its trip's Group's, an Editor's
+ * as `./staff-only.ts` sets out. On an offline Session each is also its trip's Group's, a Perjadin Editor's
  * or an Administrator's (`requireSessionWriter`, ADR-0048).
  *
  * Settled on [#17](https://github.com/mafiefa02/sugt/issues/17): marking delivered is offered

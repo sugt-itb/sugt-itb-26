@@ -1,6 +1,5 @@
 import { checkDriveConnectionAction } from "-/app/(app)/pengaturan/actions";
 import LaporanPage from "-/app/(app)/perjadin/[id]/laporan/page";
-import { UNSYNCED_TOOLTIP } from "-/components/laporan-perjadin/acquittal-transactions";
 import {
   RENAME_LIMIT,
   reassertPerjadinFolderNames,
@@ -13,6 +12,7 @@ import { FakeDrive, MY_DRIVE } from "-/lib/drive/fake-drive";
 import type { ReadyFolders } from "-/lib/drive/fixed-folders";
 import { DRIVE_FILE_SCOPE, openDrive } from "-/lib/drive/google";
 import { uploadGate } from "-/lib/drive/upload-gate";
+import { RECEIPTS_UNSYNCED_TOOLTIP } from "-/lib/drive/upload-messages";
 import { requirePerson } from "-/lib/person";
 import { db, schema } from "@sugt/db";
 import type { Person } from "@sugt/db/queries";
@@ -72,7 +72,6 @@ async function scene() {
   const staff = await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" });
   const pimpinan = await addPerson({ fullName: "Pim", email: "pim@itb.ac.id", role: "Pimpinan" });
   const trip = await addPerjadin({
-    advanceIdr: 5_000_000,
     picPersonId: staff.id,
     subClusterName: "Kelompok 3",
     startsOn: "2026-10-12",
@@ -415,7 +414,6 @@ describe("the folder names (#407)", () => {
   /** A second trip, in another Kelompok, a week later. */
   async function anotherTrip(staffId: string) {
     return addPerjadin({
-      advanceIdr: 1_000_000,
       picPersonId: staffId,
       subClusterName: "Kelompok 4",
       startsOn: "2026-10-19",
@@ -551,7 +549,7 @@ describe("the belum tersinkron marker", () => {
 
     const cards = html.split('data-slot="card"').slice(1);
     const marked = cards
-      .filter((card) => card.includes(UNSYNCED_TOOLTIP))
+      .filter((card) => card.includes(RECEIPTS_UNSYNCED_TOOLTIP))
       .map((card) => /(Belum|Sudah|Kosong)/.exec(card)?.[1]);
     expect(marked).toEqual(["Belum"]);
   });

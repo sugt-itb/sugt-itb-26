@@ -210,6 +210,8 @@ export interface DriveClient {
   ): Promise<void>;
   /** Move to the Drive trash — the loser of a folder compare-and-set throws its folder away. */
   trashFile(id: string): Promise<void>;
+  /** Take back out of the Drive trash — a Hapus bukti the database refused after its trash (#462). */
+  untrashFile(id: string): Promise<void>;
   /** Bytes `start` to `end` inclusive, for sniffing a file's type from its first bytes. */
   readRange(id: string, start: number, end: number): Promise<Uint8Array>;
   createPermission(id: string, permission: { type: "anyone"; role: "reader" }): Promise<void>;
@@ -379,6 +381,18 @@ export function openDrive(accessToken: string): DriveClient {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ trashed: true }),
       });
+    },
+
+    async untrashFile(id) {
+      await call(
+        "files.update(untrash)",
+        `${DRIVE_API}/files/${encodeURIComponent(id)}?fields=id`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ trashed: false }),
+        },
+      );
     },
 
     async readRange(id, start, end) {

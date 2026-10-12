@@ -344,6 +344,27 @@
       "when": 1791441267556,
       "tag": "0048_feedback_links_never_expire",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1791735449627,
+      "tag": "0049_hapus_bukti_and_transaksi",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791744517202,
+      "tag": "0050_drop_advance_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791749531275,
+      "tag": "0051_split_editor_grant",
+      "breakpoints": true
     }
   ]
 }

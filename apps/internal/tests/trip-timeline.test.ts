@@ -1,4 +1,4 @@
-import { spentPercent, tripTimeline, type TimelineTrip } from "-/components/trip-timeline";
+import { tripTimeline, type TimelineTrip } from "-/components/trip-timeline";
 import type { MyPerjadinSchool, MyPerjadinSession } from "@sugt/db/queries";
 import { describe, expect, it } from "vitest";
 
@@ -81,28 +81,5 @@ describe("tripTimeline", () => {
   it("is empty when there are no live Sessions", () => {
     const t = trip([school("a", [session("gone", "2026-09-16", "09:00:00", "cancelled")])]);
     expect(tripTimeline(t)).toEqual([]);
-  });
-});
-
-describe("spentPercent", () => {
-  it("is the draw-down over the advance, as a percentage", () => {
-    expect(spentPercent(1_000_000, 250_000)).toBe(25);
-  });
-
-  it("clamps an overspend to 100", () => {
-    expect(spentPercent(1_000_000, 1_050_000)).toBe(100);
-  });
-
-  it("is 0 when there is no advance to fill", () => {
-    expect(spentPercent(0, 0)).toBe(0);
-    expect(spentPercent(0, 50_000)).toBe(0);
-  });
-
-  it("is 0 when the advance is not filled in yet (#437)", () => {
-    expect(spentPercent(null, 50_000)).toBe(0);
-  });
-
-  it("never falls below 0", () => {
-    expect(spentPercent(1_000_000, -10_000)).toBe(0);
   });
 });

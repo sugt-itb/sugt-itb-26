@@ -1,4 +1,10 @@
-import type { SessionMode, SessionStatus } from "@sugt/domain";
+import { formatTripDates } from "-/lib/perjadin-name";
+import {
+  formatDottedTime,
+  type SessionMode,
+  type SessionStatus,
+  type TimeZone,
+} from "@sugt/domain";
 import { Badge } from "@sugt/ui/components/badge";
 
 /**
@@ -39,4 +45,37 @@ function SessionStatusBadge({ status }: { status: SessionStatus }) {
   );
 }
 
-export { MODE_LABELS, SessionStatusBadge, STATUS_LABELS };
+/** What a Session's one-line label reads: its Sesi (ADR-0027), mode, date and start time. */
+type SesiParts = {
+  /** `null` for a cancelled Session, which has no Sesi. */
+  sesi: number | null;
+  mode: SessionMode;
+  heldOn: string;
+  startsAt: string;
+  /** WIB for an online Session, else the School's zone. */
+  timeZone: TimeZone;
+};
+
+/**
+ * **A Session in one line** (#466): `Sesi 1 · Luring · 12 Okt 2026 · 09.00 WITA`. The `/feedback`
+ * Sesi picker and its response cards both print it, so the two agree. A cancelled Session has no
+ * Sesi, and reads "Dibatalkan" in its place.
+ */
+function sesiLabel({ sesi, mode, heldOn, startsAt, timeZone }: SesiParts): string {
+  const time = `${formatDottedTime(startsAt)} ${timeZone}`;
+  return [
+    sesi === null ? "Dibatalkan" : `Sesi ${sesi}`,
+    MODE_LABELS[mode],
+    formatTripDates(heldOn, heldOn),
+    time,
+  ].join(" · ");
+}
+
+/** The same Session, short — `Sesi 1 Luring` — for naming what an average covers. */
+function sesiShortLabel({ sesi, mode, heldOn }: SesiParts): string {
+  return sesi === null
+    ? `${MODE_LABELS[mode]} ${formatTripDates(heldOn, heldOn)} (dibatalkan)`
+    : `Sesi ${sesi} ${MODE_LABELS[mode]}`;
+}
+
+export { MODE_LABELS, sesiLabel, sesiShortLabel, SessionStatusBadge, STATUS_LABELS };

@@ -34,7 +34,7 @@ import { useMemo, useState } from "react";
  *
  * Sorting defaults to Mulai, newest first; the sort state is `useState`, not the URL. A row
  * opens the trip on click, and its title is a real link besides. **Persiapan** is the checklist
- * dialog's trigger on a row the viewer writes (`trip.canWrite`: its Group, an Editor or an
+ * dialog's trigger on a row the viewer writes (`trip.canWrite`: its Group, a Perjadin Editor or an
  * Administrator — ADR-0048) and a static pill on every other row.
  */
 function PerjadinDirectoryList({ trips }: { trips: DirectoryPerjadin[] }) {

@@ -13,7 +13,6 @@ import { session, sessionTeachingTeam } from "../schema/delivery";
 import { person } from "../schema/people";
 import { province, school, subCluster } from "../schema/reference";
 import { groupMember, perjadin, perjadinPimpinan, perjadinTeacher } from "../schema/travel";
-import { logActivity } from "./activity-log";
 import type { Person } from "./caller";
 import { type CoveredSession, offlineSessionsElsewhere } from "./covered-sessions";
 import { duplicatedStaff } from "./group-rules";
@@ -27,12 +26,12 @@ import { requirePerjadinWriter, requireStaff } from "./staff-only";
  * money at all; the writes Staff-only.
  *
  * The no-money part is a **shape** rather than a rendering rule: this payload never carries the
- * Advance, the transactions or the Report. Money is `./perjadin-report.ts`'s `perjadinAcquittal`, a
+ * transactions or the Report. Money is `./perjadin-report.ts`'s `perjadinAcquittal`, a
  * separate read — and since #180 (ADR-0026) that read is open to any signed-in Person, so the trip
  * page fetches it alongside this one and shows the money strip to a Pimpinan too. This query still
  * carries none of it, and needs no role check because there is nothing here to refuse; every
- * **write** below opens with `requireStaff` and runs `requirePerjadinWriter` — the trip's Group, an
- * Editor or an Administrator (ADR-0048) — and reading money stays a job for `perjadinAcquittal`.
+ * **write** below opens with `requireStaff` and runs `requirePerjadinWriter` — the trip's Group, a
+ * Perjadin Editor or an Administrator (ADR-0048) — and reading money stays a job for `perjadinAcquittal`.
  */
 
 /** One member of the Group. Staff-only now (ADR-0020), so `stream` is always null. */
@@ -547,84 +546,5 @@ export async function updatePerjadinDates(
       outcome: "updated",
       datesMoved: trip.startsOn !== input.startsOn || trip.endsOn !== input.endsOn,
     };
-  });
-}
-
-export type UpdatePerjadinAdvanceResult =
-  | { outcome: "updated" }
-  /**
-   * A negative Advance. The DB `perjadin_advance_check` (`advance_idr >= 0`) is the floor;
-   * returning a value lets the edit surface point at the field rather than surfacing a raw
-   * constraint violation. **Zero is allowed** — an unfunded trip is a real state.
-   */
-  | { outcome: "negative-advance" }
-  /**
-   * An attempt to clear a set Advance back to empty (#437). Once Uang Perjalanan is filled in it can
-   * be changed to any amount, zero included, but never unset — the UI never offers it; this refuses a
-   * hand-made request.
-   */
-  | { outcome: "advance-required" }
-  /** The id names no Perjadin — a stale link, which is reachable. */
-  | { outcome: "no-such-perjadin" };
-
-/**
- * **Fill in or correct a Perjadin's Advance after planning.** Staff-only (money writes stay
- * Staff-only, ADR-0026); reading it is open, so this write is the only place the figure changes after
- * `planPerjadin`.
- *
- * **Filling it in for the first time logs `advance_set`** (#437): a Perjadin may be planned without
- * one, and its first figure is a setting, not a change. A later change logs `advance_changed`.
- * `null` is accepted only as a no-op on a trip that has none yet; **clearing a set value is refused**
- * (`advance-required`).
- *
- * **No lifecycle gate.** The correction is allowed at any time, *including after the Perjadin
- * Report is filed* — it is a correction affordance, and the acquittal derives the remainder live
- * (`remainderIdr = advance − drawn-down`, only `ADVANCE_DRAWDOWN_CATEGORIES` spend — ADR-0029), so a
- * fixed Advance fixes the remainder for free.
- *
- * **The only validation is the DB floor** (`advance_idr >= 0`). It is deliberately *not* coupled
- * to what has already been spent: setting the Advance below current spend yields a negative
- * remainder (an overspend), which is a real, representable state and not an error.
- */
-export async function updatePerjadinAdvance(
-  caller: Person,
-  perjadinId: string,
-  advanceIdr: number | null,
-): Promise<UpdatePerjadinAdvanceResult> {
-  requireStaff(caller);
-
-  // The DB CHECK is the floor; reject a negative value up front so the surface can point at the
-  // field rather than showing a raw constraint violation. Not coupled to spend on purpose.
-  if (advanceIdr !== null && advanceIdr < 0) return { outcome: "negative-advance" };
-
-  return db.transaction(async (tx) => {
-    await requirePerjadinWriter(caller, perjadinId, tx);
-
-    // The old value is read under the row lock, so the Activity Log's from→to (#395) is the value
-    // this write replaced, not one a concurrent correction already moved.
-    const [trip] = await tx
-      .select({ advanceIdr: perjadin.advanceIdr })
-      .from(perjadin)
-      .where(eq(perjadin.id, perjadinId))
-      .for("update");
-    if (!trip) return { outcome: "no-such-perjadin" };
-
-    // Saving the figure it already holds is not a change, and logs nothing — empty to empty included.
-    if (trip.advanceIdr === advanceIdr) return { outcome: "updated" };
-
-    // Once set, it can be changed but never cleared (#437).
-    if (advanceIdr === null) return { outcome: "advance-required" };
-
-    await tx.update(perjadin).set({ advanceIdr }).where(eq(perjadin.id, perjadinId));
-    await logActivity(
-      tx,
-      caller,
-      perjadinId,
-      trip.advanceIdr === null
-        ? { action: "advance_set", details: { amountIdr: advanceIdr } }
-        : { action: "advance_changed", details: { fromIdr: trip.advanceIdr, toIdr: advanceIdr } },
-    );
-
-    return { outcome: "updated" };
   });
 }

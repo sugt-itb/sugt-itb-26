@@ -53,21 +53,15 @@ describe("PerjadinPlanForm's required markers", () => {
     expect(required).toEqual(["Kelompok Sekolah", "PIC", "Tanggal mulai", "Tanggal selesai"]);
   });
 
-  /**
-   * Uang Perjalanan is the one optional field the form names as such (#437): a trip is often planned
-   * before anyone knows it, and the product owner asked for the word on that label. Everything else
-   * optional stays simply unmarked.
-   */
-  it("leaves Pendamping tambahan, Pimpinan and Uang Perjalanan unmarked, and says opsional only on Uang Perjalanan", () => {
+  /** Optional fields stay simply unmarked. Uang Perjalanan is gone from the form (ADR-0051). */
+  it("leaves Pendamping tambahan and Pimpinan unmarked, and asks for no Uang Perjalanan", () => {
     const html = render();
     const all = labels(html);
 
     expect(all.find((label) => label.text === "Pendamping tambahan")?.required).toBe(false);
     expect(all.find((label) => label.text === "Pimpinan")?.required).toBe(false);
-    expect(all.find((label) => label.text === "Uang Perjalanan (Rp) — opsional")?.required).toBe(
-      false,
-    );
-    expect(html.match(/opsional/g)).toHaveLength(1);
+    expect(html).not.toContain("Uang Perjalanan");
+    expect(html).not.toContain("opsional");
   });
 
   it("flags the control behind each marked label, and no other, for a screen reader", () => {

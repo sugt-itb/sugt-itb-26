@@ -55,7 +55,7 @@ async function world() {
   });
   const session = await addSession({ schoolId: school.id, heldOn: "2026-09-10" });
   const otherSession = await addSession({ schoolId: school.id, heldOn: "2026-09-11" });
-  const trip = await addPerjadin({ advanceIdr: 5_000_000, picPersonId: operator.id });
+  const trip = await addPerjadin({ picPersonId: operator.id });
   return { operator, school, session, otherSession, trip };
 }
 

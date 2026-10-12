@@ -1,4 +1,8 @@
-import { preparationPercent, preparationWarnings } from "-/app/(app)/preparation-derive";
+import {
+  preparationPercent,
+  preparationWarnings,
+  sortPreparationCards,
+} from "-/app/(app)/preparation-derive";
 import type { PreparationCard } from "@sugt/db/queries";
 import { describe, expect, it } from "vitest";
 
@@ -102,5 +106,46 @@ describe("preparationWarnings", () => {
     expect(
       preparationWarnings([card({ startsOn: "2026-10-12", endsOn: "2026-12-31" })], TODAY),
     ).toHaveLength(1);
+  });
+});
+
+describe("sortPreparationCards (#466)", () => {
+  /** A Card holding `ticked` of `total` items checked; `total` 0 is an empty checklist, 0%. */
+  const at = (id: string, startsOn: string, ticked: number, total: number): PreparationCard =>
+    card({
+      id,
+      startsOn,
+      items: Array.from({ length: total }, (_, index) => ({
+        id: `${id}-${index}`,
+        label: "Langkah",
+        jenis: "Teknis",
+        position: index,
+        checked: index < ticked,
+      })),
+    });
+
+  // As the read hands them over: start date, then creation time, then id. `e` was made before `b`,
+  // so a tie between them keeps that order — not the ids' — in both orders below.
+  const read = [
+    at("a", "2026-10-01", 1, 1), // 100%
+    at("e", "2026-10-05", 2, 4), // 50%, made first
+    at("c", "2026-10-05", 0, 0), // empty: 0%
+    at("d", "2026-10-05", 1, 4), // 25%
+    at("b", "2026-10-05", 2, 4), // 50%, made after e
+    at("f", "2026-10-09", 0, 3), // 0%
+  ];
+  const ids = (cards: PreparationCard[]) => cards.map((c) => c.id);
+
+  it("Tanggal: Terdekat — start date, then lowest progress, then creation time", () => {
+    expect(ids(sortPreparationCards(read, "tanggal"))).toEqual(["a", "c", "d", "e", "b", "f"]);
+  });
+
+  it("Persiapan: Terendah — lowest progress, then start date, then creation time", () => {
+    expect(ids(sortPreparationCards(read, "persiapan"))).toEqual(["c", "f", "d", "e", "b", "a"]);
+  });
+
+  it("leaves the read untouched", () => {
+    sortPreparationCards(read, "persiapan");
+    expect(ids(read)).toEqual(["a", "e", "c", "d", "b", "f"]);
   });
 });

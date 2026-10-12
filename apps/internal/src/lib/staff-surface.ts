@@ -42,7 +42,7 @@ import { forbidden } from "next/navigation";
  * here, and everything else still passes through untouched.
  *
  * And the Perjadin-writer refusal: `NotOnPerjadinError` (ADR-0048), a Staff Person writing a trip
- * whose Group they are not in, without the Editor Grant. The same 403, for the same reasons.
+ * whose Group they are not in, without the Perjadin Editor Grant. The same 403, for the same reasons.
  */
 export async function staffSurface<T>(call: () => Promise<T>): Promise<T> {
   try {

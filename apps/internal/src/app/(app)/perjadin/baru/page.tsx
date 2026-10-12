@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Rencanakan Perjadin" };
  * Group and a row per School is a page with a backdrop.
  *
  * **Reached from the nav**, not from a selection made elsewhere — the form begins by picking a
- * Sub-Cluster and revealing its Schools. **Editor-only (ADR-0047), so the read is too:** without
+ * Sub-Cluster and revealing its Schools. **Perjadin Editor-only (ADR-0047), so the read is too:** without
  * `staffSurface` on the read, a Staff member without the Grant reaching this URL directly would be
  * shown the whole form and refused only on submit; with it they get a 403.
  *

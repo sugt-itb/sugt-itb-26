@@ -100,3 +100,10 @@ Two of the [Consequences](#consequences) above go with it. The plugin no longer 
 **`session.cookieCache` stops being load-bearing for revocation.** The reasoning changes, not the setting. `person` is our table rather than Better Auth's, so resolving it is a fresh read whatever the session cache holds, and revocation is immediate by construction. Leaving the cookie cache off remains the default and remains fine — it is simply no longer the thing holding the property up, and turning it on would no longer reopen the hole.
 
 **A revoked Person's session row survives until it expires.** Nothing deletes it, and nothing needs to: the next request re-reads `person.active` and is refused.
+
+## Amendment (2026-10-12): People are added and revoked by an Administrator
+
+"People are added in the tool" still holds, but by an **Administrator**, not any Staff member
+([#470](https://github.com/sugt-itb/sugt-itb-26/issues/470)). Revoking is still one write,
+`active = false`, and now refuses the Administrator's own row (`self`); deactivating another
+Administrator is allowed. The role stays write-once.

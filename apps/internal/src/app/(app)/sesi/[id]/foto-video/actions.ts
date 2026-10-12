@@ -47,7 +47,7 @@ import type {
  * **Foto & Video's Server Actions** (#424, ADR-0046): a Session's footage, opening an upload,
  * recording it once it landed, and deleting it. The upload runs Dokumen's order — check, verify,
  * commit, reconcile — and Hapus runs guard, trash, delete (ADR-0042), every check before Google is
- * asked anything. The trip's Group, an Editor or an Administrator uploads and deletes (ADR-0048);
+ * asked anything. The trip's Group, a Perjadin Editor or an Administrator uploads and deletes (ADR-0048);
  * anyone signed in lists.
  *
  * **The bytes never pass through Next.** The browser sends the file straight to Drive's resumable
@@ -218,7 +218,7 @@ export async function deleteFootageAction(footageId: string): Promise<DeleteFoot
   const target = await staffSurface(async () => {
     requireStaff(person);
     const found = await footageReconcileTarget(person, footageId);
-    // The trip's Group, an Editor or an Administrator (ADR-0048), before the file is trashed.
+    // The trip's Group, a Perjadin Editor or an Administrator (ADR-0048), before the file is trashed.
     if (found) await requirePerjadinWriter(person, found.perjadin.id);
     return found;
   });

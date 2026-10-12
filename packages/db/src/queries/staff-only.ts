@@ -15,18 +15,21 @@ import type { Executor } from "./preparation-checklist";
  *
  * **What passes through here is writes, not money reads.** Money READS are now open to any
  * signed-in Person — a Pimpinan reads all money (the acquittal, the CSV export, the trip money
- * strip, the `/monitoring` budget card), so `perjadinAcquittal` no longer opens with this guard.
- * What this choke point guards is money **WRITES** — recording, attaching, settling and filing a
- * transaction, plus the treasurer return — and delivery-*arranging* writes: Jadwalkan Sesi daring
+ * strip, the `/monitoring` budget card), so `perjadinAcquittal` no longer opens with this guard. The
+ * one money read gated again is `/keuangan`'s programme-wide table (ADR-0053), and by a Grant through
+ * `requireGrant` below, not by this Staff line.
+ * What this choke point guards is money **WRITES** — recording, attaching, deleting and filing a
+ * transaction — and delivery-*arranging* writes: Jadwalkan Sesi daring
  * and Rencanakan Perjadin are Staff-only because [#9](https://github.com/mafiefa02/sugt/issues/9)
- * says so (and since ADR-0047 also need the Editor Grant, through `requireGrant` below), and ADR-0004 is silent on it (that ADR opens delivery data to both roles for **reading**
+ * says so (and since ADR-0047 also need a Grant — Daring Editor or Perjadin Editor, ADR-0052 — through
+ * `requireGrant` below), and ADR-0004 is silent on it (that ADR opens delivery data to both roles for **reading**
  * and leaves writes with "the record's owner", which a Session nobody has arranged yet does not
  * have). So the guard is one guard and the reasons are two, and neither of them is "this function
  * reads money".
  *
  * **Inside the Staff line, a Perjadin is its Group's** (ADR-0048): every write on a trip and its
- * offline Sessions also runs `requirePerjadinWriter` below, which passes the trip's Group, an Editor
- * and an Administrator and refuses every other Staff member with `NotOnPerjadinError`.
+ * offline Sessions also runs `requirePerjadinWriter` below, which passes the trip's Group, a Perjadin
+ * Editor and an Administrator and refuses every other Staff member with `NotOnPerjadinError`.
  *
  * That rule is application code rather than RLS, because Better Auth means there is
  * no `auth.uid()` in Postgres and a policy would need `SET LOCAL` on every
@@ -43,7 +46,7 @@ const NOT_STAFF_ERROR_CODE = "sugt/not-staff";
  *
  * **Reaching this is a bug or an attack, never a user state.**
  * [#9](https://github.com/mafiefa02/sugt/issues/9) specifies the money-free Perjadin
- * variant as having the Advance strip, transactions and Report **absent rather than
+ * variant as having the money strip, transactions and Report **absent rather than
  * disabled**, so the UI decides by role and never offers the surface to a Teaching
  * Team member.
  *
@@ -162,6 +165,14 @@ export function isNotGrantedError(error: unknown): error is NotGrantedError {
 }
 
 /**
+ * **Which other Grants satisfy a Grant check** (ADR-0052), besides Administrator, which satisfies
+ * every one. Only one Grant is implied by another: Dashboard Editor reads the Dashboard it writes.
+ */
+const GRANT_IMPLIED_BY: Partial<Record<Grant, readonly Grant[]>> = {
+  "Dashboard Viewer": ["Dashboard Editor"],
+};
+
+/**
  * Does this Person hold this Grant? **Staff-only first, then the grant**, and it is synchronous
  * because the caller carries its `grants` (threaded at resolution, like `role`).
  *
@@ -172,10 +183,17 @@ export function isNotGrantedError(error: unknown): error is NotGrantedError {
  *    (ADR-0025).
  * 2. **Administrator implies every Grant.** An Administrator satisfies any grant check without
  *    holding that grant's own row — the one privilege that makes it the administering Grant.
+ * 3. **Otherwise only `GRANT_IMPLIED_BY`** (ADR-0052): Dashboard Editor satisfies Dashboard Viewer,
+ *    and no other Grant satisfies another.
  */
 export function hasGrant(person: Person, grant: Grant): boolean {
   if (person.role !== "Staff") return false;
-  return person.grants.includes("Administrator") || person.grants.includes(grant);
+  const satisfiedBy: readonly Grant[] = [
+    "Administrator",
+    grant,
+    ...(GRANT_IMPLIED_BY[grant] ?? []),
+  ];
+  return person.grants.some((held) => satisfiedBy.includes(held));
 }
 
 /**
@@ -197,9 +215,9 @@ export function requireGrant(person: Person, grant: Grant): void {
  * - **A `Pimpinan` reads it by Role**, not by a Grant. Grants stay Staff-only (ADR-0028) — a
  *   Pimpinan holds none — so their access is the role branch, and the Dashboard is their home
  *   (ADR-0025).
- * - **A `Staff` reads it by holding a Grant**: `Editor` or `Dashboard Viewer`. `hasGrant` already
- *   folds in that an `Administrator` implies every Grant, so those two calls cover all of
- *   `{Administrator, Editor, Dashboard Viewer}`.
+ * - **A `Staff` reads it by holding `Dashboard Viewer`**. `hasGrant` folds in that Administrator
+ *   and Dashboard Editor both satisfy it (ADR-0052), so this one call covers all three. Perjadin
+ *   Editor, Daring Editor and Keuangan do not.
  *
  * A grant-less Staff Person falls through to `false` and is redirected to `/pendamping` — the mirror
  * of the `/pendamping → /` redirect a Pimpinan gets. This is the documented exception to "reading is
@@ -208,14 +226,14 @@ export function requireGrant(person: Person, grant: Grant): void {
  */
 export function canViewDashboard(person: Person): boolean {
   if (person.role === "Pimpinan") return true;
-  return hasGrant(person, "Editor") || hasGrant(person, "Dashboard Viewer");
+  return hasGrant(person, "Dashboard Viewer");
 }
 
 const NOT_ON_PERJADIN_ERROR_CODE = "sugt/not-on-perjadin";
 
 /**
- * A Staff caller reached a write on a Perjadin whose Group they are not in, without the Editor Grant
- * (ADR-0048).
+ * A Staff caller reached a write on a Perjadin whose Group they are not in, without the Perjadin
+ * Editor Grant (ADR-0048, ADR-0052).
  *
  * The third sibling at this choke point, after `NotStaffError` and `NotGrantedError`, and the same
  * kind of refusal: the UI hides every write on a trip from a Person who may not make it, so reaching
@@ -232,7 +250,7 @@ export class NotOnPerjadinError extends Error {
     super(
       `A write on Perjadin ${perjadinId} was handed Staff caller ${person.id}, who is not in its ` +
         `Group and holds [${person.grants.join(", ") || "no grants"}]. A Perjadin is written by its ` +
-        `Group, Editors and Administrators (ADR-0048); the UI offers its writes to no one else, so ` +
+        `Group, Perjadin Editors and Administrators (ADR-0048); the UI offers its writes to no one else, so ` +
         `this is a bug or a stale screen, not a state a user can reach.`,
     );
   }
@@ -250,15 +268,15 @@ export function isNotOnPerjadinError(error: unknown): error is NotOnPerjadinErro
 
 /**
  * **The Perjadin-writer rule as one SQL boolean** (ADR-0048), correlated to the `perjadin` row of
- * the query it sits in: Staff only, then the Editor Grant (an Administrator implies it) writes every
- * Perjadin, then anyone else only a trip whose Group — a `group_member` row, the PIC included —
+ * the query it sits in: Staff only, then the Perjadin Editor Grant (an Administrator implies it)
+ * writes every Perjadin, then anyone else only a trip whose Group — a `group_member` row, the PIC included —
  * they are in. A Pimpinan recorded on a trip is not in its Group (ADR-0020). The one statement of
  * the rule: `requirePerjadinWriter`, `canWritePerjadin` and the `/perjadin` directory's per-row
  * answer all read it. Not exported from the package.
  */
 export function perjadinWriterSql(person: Person): SQL<boolean> {
   if (person.role !== "Staff") return sql<boolean>`false`;
-  if (hasGrant(person, "Editor")) return sql<boolean>`true`;
+  if (hasGrant(person, "Perjadin Editor")) return sql<boolean>`true`;
   return sql<boolean>`exists (
     select 1 from ${groupMember} gm
     where gm.perjadin_id = ${perjadin.id} and gm.person_id::text = ${person.id}
@@ -295,7 +313,7 @@ export async function canWritePerjadin(person: Person, perjadinId: string): Prom
  *
  * 1. `requireStaff` first, so a Pimpinan is still refused as `NotStaffError` — a Pimpinan writes
  *    nothing (ADR-0025), Group or not.
- * 2. The Editor Grant writes every Perjadin; an Administrator implies it.
+ * 2. The Perjadin Editor Grant writes every Perjadin; an Administrator implies it.
  * 3. Anyone else writes only a Perjadin whose Group they are in, and is otherwise refused with
  *    `NotOnPerjadinError`.
  *
@@ -322,7 +340,7 @@ export async function requirePerjadinWriter(
  * **`requirePerjadinWriter` for a write that names a Session rather than its trip.** An offline
  * Session is written by its Perjadin's Group (ADR-0048), so this resolves the Session's
  * `perjadin_id` and runs the Perjadin guard on it. An online Session has no Perjadin and no Group —
- * who writes one is ADR-0047's Editor Grant, checked by its own surface — and no such Session is the
+ * who writes one is the Daring Editor Grant (ADR-0047, ADR-0052), checked by its own surface — and no such Session is the
  * write's own refusal to give, so both pass with only `requireStaff` here.
  */
 export async function requireSessionWriter(

@@ -36,7 +36,7 @@ import {
 /**
  * **`/pendamping`'s "Anda" and "Pendamping Lain" tabs, for Administrators** (#440) — the ticket's T4
  * table on its own people:
- * - the two queries open with the Administrator Grant (Editor is not enough), a Pimpinan refused as
+ * - the two queries open with the Administrator Grant (no other Grant is enough), a Pimpinan refused as
  *   non-Staff first;
  * - anyone but an Administrator gets their own page, the URL's `tab` and `pendamping` never read;
  * - an Administrator sees both tabs, picks another Pendamping and sees that Person's two sections as
@@ -83,7 +83,7 @@ async function people() {
     andi: await staffWith([], "Andi Wijaya"),
     fajar: await staffWith([], "Fajar Pratama"),
     dewi: await staffWith(["Dashboard Viewer"], "Dewi Lestari"),
-    budi: await staffWith(["Editor"], "Budi Santoso"),
+    budi: await staffWith(["Perjadin Editor"], "Budi Santoso"),
     sari: await staffWith(["Administrator"], "Sari Utami"),
     hadi: (await addPerson({
       fullName: "Pak Hadi",
@@ -114,7 +114,6 @@ async function perjadinA(who: People) {
   const trip = await addPerjadin({
     subClusterId: subCluster.id,
     picPersonId: who.rina.id,
-    advanceIdr: 5_000_000,
     startsOn: "2026-10-12",
     endsOn: "2026-10-13",
   });
@@ -159,7 +158,7 @@ async function render(viewer: Person, params: Record<string, string> = {}) {
 }
 
 describe("the two queries are an Administrator's", () => {
-  it("refuse a Staff member with no Grant, with Dashboard Viewer and with Editor, and a Pimpinan as non-Staff", async () => {
+  it("refuse a Staff member with no Grant, with Dashboard Viewer and with Perjadin Editor, and a Pimpinan as non-Staff", async () => {
     const who = await people();
 
     for (const caller of [who.rina, who.dewi, who.budi]) {
