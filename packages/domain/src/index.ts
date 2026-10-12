@@ -474,9 +474,17 @@ export const PARTICIPANT_FEEDBACK_ASPECTS_BY_CLASS: Record<
 };
 
 /**
- * What a Perjadin Evaluation Rates — the logistics of the trip, not the teaching.
+ * What a Perjadin Evaluation Rates — the logistics of the trip, not the teaching — and, last,
+ * **Pendamping Support**: whether the accompanying DITSAMA Staff helped while the activity was
+ * under way (#481). Not every filer is asked every one: `PERJADIN_ASPECTS_BY_ROLE` below.
  */
-export const PERJADIN_ASPECTS = ["lodging", "transport", "meals", "punctuality"] as const;
+export const PERJADIN_ASPECTS = [
+  "lodging",
+  "transport",
+  "meals",
+  "punctuality",
+  "pendamping_support",
+] as const;
 export type PerjadinAspect = (typeof PERJADIN_ASPECTS)[number];
 
 /**
@@ -494,6 +502,24 @@ export type PerjadinAspect = (typeof PERJADIN_ASPECTS)[number];
  */
 export const PERJADIN_EVALUATION_ROLES = ["Narasumber", "Pendamping", "Pimpinan"] as const;
 export type PerjadinEvaluationRole = (typeof PERJADIN_EVALUATION_ROLES)[number];
+
+/**
+ * The Aspects each self-declared Role is asked, in the form's order. **A Pendamping is not asked
+ * Pendamping Support** — they would be Rating themselves, the reason a Participant is not asked
+ * their own readiness
+ * (`docs/adr/0054-pendamping-support-is-rated-only-by-narasumber-and-pimpinan.md`).
+ * `lodging` is asked of everyone and may still be skipped on a day trip; that is a choice on the
+ * form, not a Role's.
+ *
+ * `filePerjadinEvaluation` holds both directions of this; `perjadin_evaluation_pendamping_support_rater_check`
+ * holds only the Pendamping half, because evaluations filed before #481 carry no Pendamping Support
+ * from Narasumber and Pimpinan alike.
+ */
+export const PERJADIN_ASPECTS_BY_ROLE: Record<PerjadinEvaluationRole, readonly PerjadinAspect[]> = {
+  Narasumber: PERJADIN_ASPECTS,
+  Pendamping: ["lodging", "transport", "meals", "punctuality"],
+  Pimpinan: PERJADIN_ASPECTS,
+};
 
 /**
  * The bounds of a Rating: the score one person gives one Aspect. Ratings are the only

@@ -850,6 +850,14 @@ They are separate because they fail independently — a good car an hour late is
 complaint from a bad car that was prompt, and one is the vendor's fault while the other is
 the plan's.
 
+A fifth, last on the form, once the filer picks Peran **Narasumber** or **Pimpinan**: **Pendamping
+Support**, asked as _"Pendamping membantu selama keberjalanan kegiatan."_ with a Rating and an
+optional Komentar like the others, and required (#481). A **Pendamping** is not shown it — they would
+be Rating themselves — and switching Peran to Pendamping clears a Rating and Komentar already given,
+as _Tidak menginap_ clears lodging. Nothing shows it before a Peran is picked. Its short name
+elsewhere is **Bantuan Pendamping**
+([ADR-0054](./adr/0054-pendamping-support-is-rated-only-by-narasumber-and-pimpinan.md)).
+
 Then **Problems** and **Suggestions**. There is no Covered field; nothing was taught on a
 journey.
 

@@ -725,12 +725,12 @@ open to any signed-in Person; the one write (tick/un-tick) opens with `requireGr
 A Session is judged from three vantage points, and a Perjadin from a fourth. Each has its own
 rubric, because each asks a question only that person can answer.
 
-| Table                  | Filed by      | One per               | Aspects                                                                          |
-| ---------------------- | ------------- | --------------------- | -------------------------------------------------------------------------------- |
-| `class_record`         | Teaching Team | Class, per professor  | Comprehension, Participation, Readiness, Materials, Delivery, Facilities, Timing |
-| `session_record`       | PIC / Staff   | Session               | Facilities, Turnout, School support, Timing, Coordination                        |
-| `participant_feedback` | Participants  | Class, per respondent | Materials, Instructor, Relevance; Hands-on RBL for the Student Class only        |
-| `perjadin_evaluation`  | Token link    | Perjadin (no dedup)   | Lodging, Transport, Meals, Punctuality                                           |
+| Table                  | Filed by      | One per               | Aspects                                                                                      |
+| ---------------------- | ------------- | --------------------- | -------------------------------------------------------------------------------------------- |
+| `class_record`         | Teaching Team | Class, per professor  | Comprehension, Participation, Readiness, Materials, Delivery, Facilities, Timing             |
+| `session_record`       | PIC / Staff   | Session               | Facilities, Turnout, School support, Timing, Coordination                                    |
+| `participant_feedback` | Participants  | Class, per respondent | Materials, Instructor, Relevance; Hands-on RBL for the Student Class only                    |
+| `perjadin_evaluation`  | Token link    | Perjadin (no dedup)   | Lodging, Transport, Meals, Punctuality; Pendamping Support from Narasumber and Pimpinan only |
 
 They share a scale (1–10), a threshold (`CONCERN_AT_OR_BELOW`, 7), and one rule — **a Rating at
 or below the threshold cannot be filed without saying what went wrong** — so all four feed one
@@ -1012,32 +1012,44 @@ create table perjadin_evaluation (
   filed_by_role  text not null check (filed_by_role in ('Narasumber', 'Pendamping', 'Pimpinan')),
   filed_by_name  text not null,
 
-  lodging      smallint          check (lodging     between 1 and 10),   -- nullable; see below
-  transport    smallint not null check (transport   between 1 and 10),
-  meals        smallint not null check (meals       between 1 and 10),
-  punctuality  smallint not null check (punctuality between 1 and 10),
+  lodging             smallint          check (lodging            between 1 and 10),  -- nullable; see below
+  transport           smallint not null check (transport          between 1 and 10),
+  meals               smallint not null check (meals              between 1 and 10),
+  punctuality         smallint not null check (punctuality        between 1 and 10),
+  pendamping_support  smallint          check (pendamping_support between 1 and 10),  -- nullable; see below
 
-  lodging_comment      text,
-  transport_comment    text,
-  meals_comment        text,
-  punctuality_comment  text,
+  lodging_comment             text,
+  transport_comment           text,
+  meals_comment               text,
+  punctuality_comment         text,
+  pendamping_support_comment  text,
 
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
 
+  -- A Pendamping filer is not asked Pendamping Support (ADR-0054), so their row carries neither the
+  -- Rating nor its comment. The other half — Narasumber and Pimpinan must give it — is not here.
+  constraint perjadin_evaluation_pendamping_support_rater_check check (
+    filed_by_role <> 'Pendamping'
+    or (pendamping_support is null and pendamping_support_comment is null)
+  ),
+
   -- Per-Aspect elaboration (ADR-0023): each Aspect is not-low or carries its OWN comment, and all
-  -- four must hold. `lodging` is guarded by `is null` first, so a skipped hotel owes no comment.
+  -- five must hold. `lodging` and `pendamping_support` are guarded by `is null` first, so a skipped
+  -- hotel or an unasked Pendamping Support owes no comment.
   check (
     (lodging is null or lodging > 7 or btrim(coalesce(lodging_comment, '')) <> '')
     and (transport   > 7 or btrim(coalesce(transport_comment, ''))   <> '')
     and (meals       > 7 or btrim(coalesce(meals_comment, ''))       <> '')
     and (punctuality > 7 or btrim(coalesce(punctuality_comment, '')) <> '')
+    and (pendamping_support is null or pendamping_support > 7
+         or btrim(coalesce(pendamping_support_comment, '')) <> '')
   )
 );
 
 create index perjadin_evaluation_concerns_idx
-  on perjadin_evaluation (least(lodging, transport, meals, punctuality))
-  where least(lodging, transport, meals, punctuality) <= 7;
+  on perjadin_evaluation (least(lodging, transport, meals, punctuality, pendamping_support))
+  where least(lodging, transport, meals, punctuality, pendamping_support) <= 7;
 ```
 
 **`perjadin_feedback_token` mirrors `session_feedback_token`.** Keyed on the token, with
@@ -1055,7 +1067,7 @@ nothing — exactly as `participant_feedback.name` is. The one-per-filer `unique
 sign-in: with no account behind a submission there is nothing to dedup on, and duplicates are
 allowed, the accepted cost of the token pattern ([ADR-0012](./adr/0012-participants-write-through-a-short-lived-session-token.md), [ADR-0024](./adr/0024-perjadin-evaluation-is-filed-through-an-unauthenticated-token-link.md)).
 
-Close to a Session Record's shape — four Ratings, the same 1–10 scale and threshold — but the
+Close to a Session Record's shape — four or five Ratings, the same 1–10 scale and threshold — but the
 prose is no longer a shared `problems`/`suggestions` pair. Each Aspect now
 carries its **own** optional comment, and the elaboration rule is retargeted per-Aspect: a low
 Aspect owes _its own_ comment, not one shared box (#163, [ADR-0023](adr/0023-perjadin-evaluation-has-a-comment-per-aspect.md)).
@@ -1065,8 +1077,8 @@ box is retired outright — advice with no per-Aspect home now lives inside the 
 nowhere. This mirrors the #102 reversal on `participant_feedback`, plus the per-Aspect CHECK that
 Participant Feedback (which owes no prose) never needed.
 
-**`lodging` is nullable, because a day-trip has no hotel** — one of two nullable Ratings, with
-`participant_feedback.hands_on_rbl` (#446). Not every Perjadin involves a night away — the
+**`lodging` is nullable, because a day-trip has no hotel** — one of three nullable Ratings, with
+`pendamping_support` below and `participant_feedback.hands_on_rbl` (#446). Not every Perjadin involves a night away — the
 programme budget carries at least one group visiting two Schools and returning the same day, with
 accommodation, flights and airport transfer all at zero. A `not null` column would require those
 travellers to rate a hotel they never saw, and inventing a Rating to satisfy a constraint is worse
@@ -1082,6 +1094,17 @@ argument is one. So `least(null, 8, 9, 9)` is `8` — the CHECK still fires on a
 Rating, the partial index below still selects the right rows, and `null <= 7` is never true, so
 a skipped Aspect cannot reach the concerns list. That behaviour is load-bearing and belongs on
 the invariant suite beside the other 54, not in a comment.
+
+**`pendamping_support` is nullable, because not every filer is asked it** (#481,
+[ADR-0054](./adr/0054-pendamping-support-is-rated-only-by-narasumber-and-pimpinan.md)). It asks
+whether the Pendamping helped while the activity was under way, so a filer who declares themselves
+Pendamping would be Rating themselves: they are not shown it, and
+`perjadin_evaluation_pendamping_support_rater_check` keeps both its Rating and its comment null on
+their row. A Narasumber or a Pimpinan must give it — but **that half is the write's alone**
+(`filePerjadinEvaluation`, `ratings-mismatch`), because every evaluation filed before migration
+`0052` was filed through a form that never asked, and holds a NULL from every Role. Nothing was
+backfilled: a NULL is "not asked", and an invented Rating would reach the averages and the concerns
+list. It drops out of `least()` exactly as a skipped `lodging` does.
 
 `transport` covers the ground transport generally rather than the shuttle specifically, and
 `punctuality` is whether the schedule held. They are separate Aspects because they fail
@@ -1163,11 +1186,12 @@ select 'Perjadin Evaluation',
   from perjadin_evaluation e
   join perjadin pj on pj.id = e.perjadin_id
   join sub_cluster sc on sc.id = pj.sub_cluster_id
-  cross join lateral (values ('lodging',     e.lodging,     e.lodging_comment),
-                             ('transport',   e.transport,   e.transport_comment),
-                             ('meals',       e.meals,       e.meals_comment),
-                             ('punctuality', e.punctuality, e.punctuality_comment))
-                     as r(aspect, rating, said)
+  cross join lateral (values ('lodging',            e.lodging,            e.lodging_comment),
+                             ('transport',          e.transport,          e.transport_comment),
+                             ('meals',              e.meals,              e.meals_comment),
+                             ('punctuality',        e.punctuality,        e.punctuality_comment),
+                             ('pendamping_support', e.pendamping_support, e.pendamping_support_comment))
+                     as r(aspect, rating, said)   -- a null lodging or pendamping_support drops out
  where r.rating <= 7
 
  order by when_ desc;
@@ -2449,6 +2473,14 @@ Class Records are deferred for both modes: teachers are free-text names now, on 
 cannot sign in and file, so no Record can be filed and none is expected. The `class_record` table
 stands unused; how name-taught teaching is evaluated is a later decision (the `CONTEXT.md` open
 question). See [who still owes what](#who-still-owes-what).
+
+**That a Narasumber or Pimpinan Rated Pendamping Support.** The write requires it of them
+(`filePerjadinEvaluation` returns `ratings-mismatch` without it), but no CHECK can: every evaluation
+filed before migration `0052` holds a NULL from every Role, and a constraint cannot tell those rows
+from a new one that skipped the Aspect. The database holds only the other half — a Pendamping's row
+carries neither the Rating nor its comment
+([ADR-0054](./adr/0054-pendamping-support-is-rated-only-by-narasumber-and-pimpinan.md)). The same
+split as Hands-on RBL, which is required of the Student Class by the write alone.
 
 **Who filed a Perjadin Evaluation.** There is no `filed_by_person_id` at all: the Evaluation is
 filed through an unauthenticated token link now, and the filer self-declares a Role and a Name that
