@@ -282,7 +282,10 @@ Narasumber (11)
   toggle is a full-width tap target, and a long School name wraps.
 
 This is how the trip is usually staffed, shown, not a rule: nothing about entering Narasumber or
-"Diajar oleh" changes, and `/perjadin/[id]` still names them per Session.
+"Diajar oleh" changes, and `/perjadin/[id]` still names them per Session — **one Narasumber per
+line**, A–Z, indented under that Session's date, time and School on every viewport (#491). The
+status badge and Ubah/Batalkan stay on the Session's own row, and a Session with no Narasumber has
+no list under it.
 
 **Each Session row of the timeline has its own buttons**: **Tandai** while it is still arranged,
 **Feedback**, and **Foto & Video** (#425) — in both sections, since footage is often uploaded after
