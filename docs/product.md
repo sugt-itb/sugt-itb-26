@@ -858,6 +858,12 @@ as _Tidak menginap_ clears lodging. Nothing shows it before a Peran is picked. I
 elsewhere is **Bantuan Pendamping**
 ([ADR-0054](./adr/0054-pendamping-support-is-rated-only-by-narasumber-and-pimpinan.md)).
 
+Each Aspect reads top to bottom, at every width, as the Participant Feedback form's questions do
+(#486): the question, then its 1–10 selector on a row of its own and as wide as it, then its
+**Komentar (opsional)**. Lodging's _Tidak menginap (perjalanan pulang-hari)_ box sits between its
+selector and its Komentar. At 360px the selector's cells shrink to fit, and nothing scrolls
+sideways.
+
 Then **Problems** and **Suggestions**. There is no Covered field; nothing was taught on a
 journey.
 

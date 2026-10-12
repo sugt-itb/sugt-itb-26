@@ -14,7 +14,8 @@ import { describe, expect, it, vi } from "vitest";
  * **What the Perjadin Evaluation form asks, keeps and sends** (#481, ADR-0054). Pendamping Support
  * is hidden until a Role is picked, asked — last, and required — of a Narasumber or a Pimpinan, and
  * never of a Pendamping, whose switch drops one already given. The pure functions are tested
- * directly; the form is rendered once to show the question is not there before a Role is.
+ * directly; the form is rendered to show the question is not there before a Role is, and that
+ * each selector sits below its question (#486).
  */
 
 vi.mock("-/app/ep/[token]/actions", () => ({ submitPerjadinEvaluationAction: vi.fn() }));
@@ -174,5 +175,42 @@ describe("the /ep form", () => {
     expect(html).toContain("Ketepatan waktu");
     expect(html).not.toContain(STATEMENT);
     expect(html).not.toContain("Bantuan Pendamping");
+  });
+
+  // #486: the question above, its 1–10 selector on a row of its own beneath it, as the Participant
+  // Feedback form lays its questions out. A flex row would set them side by side.
+  it.each(["Penginapan", "Transportasi", "Konsumsi", "Ketepatan waktu"])(
+    "puts %s's selector below its question, labelled by it",
+    (label) => {
+      const html = renderToStaticMarkup(
+        <EpForm
+          token="t"
+          tripName="Sub-Cluster · 1–2 Okt"
+          schoolsLine="SMA Satu"
+        />,
+      );
+
+      const field = new RegExp(
+        `<div class="grid gap-2"><label[^>]*id="([^"]+)"[^>]*>${label}</label><div[^>]*data-slot="rating-input"[^>]*aria-labelledby="\\1"`,
+      );
+      expect(html).toMatch(field);
+    },
+  );
+
+  it("sets lodging's day-trip box between its selector and its Komentar", () => {
+    const html = renderToStaticMarkup(
+      <EpForm
+        token="t"
+        tripName="Sub-Cluster · 1–2 Okt"
+        schoolsLine="SMA Satu"
+      />,
+    );
+
+    const selector = html.indexOf('data-slot="rating-input"');
+    const dayTrip = html.indexOf("Tidak menginap (perjalanan pulang-hari)");
+    const komentar = html.indexOf("Komentar Penginapan");
+    expect(selector).toBeGreaterThan(-1);
+    expect(selector).toBeLessThan(dayTrip);
+    expect(dayTrip).toBeLessThan(komentar);
   });
 });

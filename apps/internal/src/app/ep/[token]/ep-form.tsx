@@ -313,6 +313,9 @@ function EpForm({
  * One Aspect's label and its 1–10 control. A sibling of `record-forms.tsx`'s, carrying one extra
  * prop: `lodging` disables its control when the Group did not stay anywhere. The `name` is
  * namespaced so two controls on one page do not fuse into a single radio group.
+ *
+ * The control sits **below** its question on every viewport (#486), as on the Participant Feedback
+ * form: on a row of its own it is as wide as that row, and its cells shrink to fit a 360px phone.
  */
 function RatingField({
   namePrefix,
@@ -332,7 +335,7 @@ function RatingField({
   const labelId = useId();
 
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="grid gap-2">
       <Label id={labelId}>{label}</Label>
       <RatingInput
         name={`${namePrefix}-${aspect}`}
