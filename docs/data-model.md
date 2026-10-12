@@ -1104,7 +1104,8 @@ their row. A Narasumber or a Pimpinan must give it — but **that half is the wr
 (`filePerjadinEvaluation`, `ratings-mismatch`), because every evaluation filed before migration
 `0052` was filed through a form that never asked, and holds a NULL from every Role. Nothing was
 backfilled: a NULL is "not asked", and an invented Rating would reach the averages and the concerns
-list. It drops out of `least()` exactly as a skipped `lodging` does.
+list. It drops out of `least()` exactly as a skipped `lodging` does, and out of the `/feedback`
+row average and Aspect averages the same way: they are over the Ratings present (#482).
 
 `transport` covers the ground transport generally rather than the shuttle specifically, and
 `punctuality` is whether the schedule held. They are separate Aspects because they fail

@@ -77,7 +77,13 @@ function render(rows: ParticipantFeedbackRow[]) {
       participantSchools={schools}
       perjadinInitialRows={[]}
       perjadinInitialCursor={null}
-      perjadinAverages={{ lodging: 0, transport: 0, meals: 0, punctuality: 0 }}
+      perjadinAverages={{
+        lodging: 0,
+        transport: 0,
+        meals: 0,
+        punctuality: 0,
+        pendampingSupport: null,
+      }}
       perjadinTrips={[]}
     />,
   );
