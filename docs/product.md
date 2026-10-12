@@ -1010,9 +1010,8 @@ people and deactivates them.
   gets a 403, and nothing is written.
 - **An Administrator cannot Nonaktifkan themselves**: their own row has no button, and the write
   refuses it. Deactivating another Administrator is allowed.
-- **Akses** is a column of Grants. Each active Staff row has a searchable
-  multi-select of the six Grants, held ones as chips; adding or removing a chip assigns or revokes
-  at once. Each option carries a line saying what it gates — Administrator "semua akses", Keuangan
+- **Akses** is a column of Grants. Each active Staff row has a searchable multi-select of the six
+  Grants, held ones as chips; adding or removing a chip assigns or revokes at once. Each option carries a line saying what it gates — Administrator "semua akses", Keuangan
   "tabel dan ekspor semua transaksi", Perjadin Editor "merencanakan dan menulis setiap Perjadin", Daring Editor "Sesi
   daring dan Pretest", Dashboard Editor "termasuk Dashboard Viewer", Dashboard Viewer "membaca
   Dashboard". Only Grants actually held are chips: choosing Dashboard Editor shows Dashboard Editor

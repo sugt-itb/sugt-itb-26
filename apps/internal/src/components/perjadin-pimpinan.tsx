@@ -11,8 +11,8 @@ import { useId, useState, useTransition } from "react";
  * Preparation Checklist, so this is a plain checkbox editor and nothing more.
  *
  * Staff toggle the set by Person id; each toggle writes the whole set. A professor sees the recorded
- * names read-only. The roster is empty until Pimpinan are added on `/orang`, so the editor shows a
- * muted hint rather than an empty list in that case.
+ * names read-only. The roster is empty until an Administrator adds Pimpinan on `/orang` (#488), so
+ * the editor shows a muted hint, naming who can, rather than an empty list in that case.
  */
 function PerjadinPimpinan({
   perjadinId,
@@ -56,7 +56,7 @@ function PerjadinPimpinan({
       {canEdit ? (
         roster.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">
-            Belum ada Pimpinan di roster — tambahkan lewat /orang.
+            Belum ada Pimpinan di roster — minta Administrator menambahkannya lewat /orang.
           </p>
         ) : (
           <ul className="mt-3 grid gap-2">

@@ -12,8 +12,8 @@ import { requireGrant, requireStaff } from "./staff-only";
 
 /**
  * **Orang** — the roster, which is also the invite list. `person` is the invite list, so a row
- * is an invitation. Anyone signed in reads it, because a Group is assembled from it; **an
- * Administrator adds and revokes** (#470, amending ADR-0003 and ADR-0013; ADR-0004).
+ * is an invitation. **Only an Administrator reads it** (#488), **adds and revokes** (#470;
+ * amending ADR-0003 and ADR-0013). The pickers a Group is assembled from read `activeRosters`.
  *
  * The read carries two derived facts per Person that no column holds:
  *

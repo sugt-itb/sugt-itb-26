@@ -206,11 +206,11 @@ function PersonRow({ entry, isViewer }: { entry: RosterEntry; isViewer: boolean 
       </TableCell>
       <TableCell>
         {/*
-            Grants are Staff-only, so only an active Staff row offers the picker; a Pimpinan or a
-            revoked row shows a dash. The assign/revoke writes still enforce this server-side —
-            `assignGrant` refuses a non-Staff target — so hiding the picker is the courtesy and the
-            write is the gate, the same split the roster's other controls follow.
-          */}
+          Grants are Staff-only, so only an active Staff row offers the picker; a Pimpinan or a
+          revoked row shows a dash. The assign/revoke writes still enforce this server-side —
+          `assignGrant` refuses a non-Staff target — so hiding the picker is the courtesy and the
+          write is the gate, the same split the roster's other controls follow.
+        */}
         {entry.active && entry.role === "Staff" ? (
           <GrantPicker
             personId={entry.id}

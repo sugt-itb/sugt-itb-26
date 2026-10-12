@@ -59,7 +59,7 @@ They are not two different states. `active = false` does not mean "off the Progr
 > brings no columns, and the cookie-cache bullet keeps its advice while losing its reason. See
 > [Amendment: revocation is one write, checked on every request](#amendment-revocation-is-one-write-checked-on-every-request).
 
-- One more screen in the internal tool, Staff-only for writes. Reads follow [ADR-0004](./0004-delivery-data-is-open-internally-money-is-not.md)'s open-delivery rule: anyone signed in can see the roster, because a Group is assembled from it.
+- One more screen in the internal tool, Staff-only for writes. Reads follow [ADR-0004](./0004-delivery-data-is-open-internally-money-is-not.md)'s open-delivery rule: anyone signed in can see the roster, because a Group is assembled from it. _Amended 2026-10-13: `/orang` is Administrator-only, to read as well as to write ([#470](https://github.com/sugt-itb/sugt-itb-26/issues/470), [#488](https://github.com/sugt-itb/sugt-itb-26/issues/488)); the pickers a Group is assembled from read their own active-roster query, open to whoever plans a Perjadin._
 - A migration to make `person_email_key` partial.
 - The founding-Staff seed is a real artefact someone has to write and keep out of the reference-data seed, which is about fixed facts and re-run freely.
 - Better Auth's admin plugin joins the stack. Revocation is now two writes in one operation instead of one.

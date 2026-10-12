@@ -102,7 +102,8 @@ export type PerjadinDetail = {
   pimpinan: { personId: string; name: string }[];
   /**
    * The Pimpinan roster the editor picks from — every active Person of role Pimpinan (#181). Mirrors
-   * `staff` below; empty until Pimpinan are added on `/orang`. Revoked People are not offered.
+   * `staff` below; empty until an Administrator adds Pimpinan on `/orang`. Revoked People are not
+   * offered.
    */
   pimpinanRoster: { id: string; fullName: string }[];
   /**
