@@ -13,6 +13,7 @@ import {
   perjadinFeedbackPage,
   perjadinFeedbackTrips,
   type FeedbackFilters,
+  type FeedbackParticipantType,
   type ParticipantFeedbackScope,
   type PerjadinFeedbackFilters,
   type PerjadinFeedbackScope,
@@ -99,6 +100,107 @@ const page = (
   filters: FeedbackFilters = NO_FEEDBACK_FILTERS,
 ) => participantFeedbackPage(person, { scope, filters, cursor: null, sort: DEFAULT_FEEDBACK_SORT });
 
+/**
+ * One Session at SMAN 1 Bontang and one at SMAN 2 Samarinda, each answered by every Class. Siswa rows
+ * carry Hands-on RBL; GTK and MS rows have none. Instructor ratings: Bontang Siswa 9, GTK 6, MS 8;
+ * Samarinda Siswa 4, GTK 10, MS 2.
+ */
+async function participantTypeScene() {
+  const person = await signedIn();
+  await addProvince("KT", "Kalimantan Timur", "WITA");
+  const cluster = await addCluster({ slug: "kaltim", name: "Cluster Kaltim" });
+  const school = (name: string) =>
+    addSchool({ slug: randomUUID(), name, clusterId: cluster.id, provinceCode: "KT" });
+  const bontang = await school("SMAN 1 Bontang");
+  const samarinda = await school("SMAN 2 Samarinda");
+  const bontangSession = await addSession({ schoolId: bontang.id, heldOn: "2026-10-12" });
+  const samarindaSession = await addSession({ schoolId: samarinda.id, heldOn: "2026-10-13" });
+  for (const [sessionId, siswa, gtk, ms] of [
+    [bontangSession.id, 9, 6, 8],
+    [samarindaSession.id, 4, 10, 2],
+  ] as const) {
+    await addParticipantFeedback({
+      sessionId,
+      classKind: "Student",
+      name: "Siswa",
+      ratings: { instructor: siswa, handsOnRbl: siswa },
+    });
+    await addParticipantFeedback({
+      sessionId,
+      classKind: "GTK",
+      name: "Guru",
+      ratings: { instructor: gtk },
+    });
+    await addParticipantFeedback({
+      sessionId,
+      classKind: "MS",
+      name: "Kepala",
+      ratings: { instructor: ms },
+    });
+  }
+  return { person, bontang, bontangSession };
+}
+
+describe("the Peserta tab's Tipe Peserta (#487)", () => {
+  const typed = (participantType: FeedbackParticipantType | null): ParticipantFeedbackScope => ({
+    ...NO_PARTICIPANT_FEEDBACK_SCOPE,
+    participantType,
+  });
+
+  it("keeps the Student Class under Siswa, GTK and MS together under GTK-MS, and all under Semua", async () => {
+    const { person } = await participantTypeScene();
+
+    const classes = async (participantType: FeedbackParticipantType | null) =>
+      (await page(person, typed(participantType))).rows.map((row) => row.classKind).toSorted();
+
+    expect(await classes(null)).toEqual(["GTK", "GTK", "MS", "MS", "Student", "Student"]);
+    expect(await classes("Siswa")).toEqual(["Student", "Student"]);
+    expect(await classes("GTK-MS")).toEqual(["GTK", "GTK", "MS", "MS"]);
+  });
+
+  it("narrows the four averages, and leaves Hands-on RBL unrated under GTK-MS", async () => {
+    const { person } = await participantTypeScene();
+
+    const semua = await participantFeedbackAverages(person, typed(null));
+    const siswa = await participantFeedbackAverages(person, typed("Siswa"));
+    const gtkMs = await participantFeedbackAverages(person, typed("GTK-MS"));
+
+    expect(semua.instructor).toBeCloseTo((9 + 6 + 8 + 4 + 10 + 2) / 6, 5);
+    expect(semua.handsOnRbl).toBeCloseTo((9 + 4) / 2, 5);
+    expect(siswa.instructor).toBeCloseTo((9 + 4) / 2, 5);
+    expect(siswa.handsOnRbl).toBeCloseTo((9 + 4) / 2, 5);
+    expect(gtkMs.instructor).toBeCloseTo((6 + 8 + 10 + 2) / 4, 5);
+    expect(gtkMs.handsOnRbl).toBeNull();
+  });
+
+  it("ANDs with the School, the Session and the score filters, lowest average first", async () => {
+    const { person, bontang, bontangSession } = await participantTypeScene();
+
+    const atBontang = await page(person, { ...typed("GTK-MS"), schoolId: bontang.id });
+    expect(atBontang.rows.map((row) => [row.classKind, row.instructor])).toEqual([
+      ["GTK", 6],
+      ["MS", 8],
+    ]);
+    expect(
+      (await participantFeedbackAverages(person, { ...typed("GTK-MS"), schoolId: bontang.id }))
+        .instructor,
+    ).toBeCloseTo(7, 5);
+
+    const atSesi = await page(person, {
+      schoolId: bontang.id,
+      sessionId: bontangSession.id,
+      participantType: "Siswa",
+    });
+    expect(atSesi.rows.map((row) => [row.classKind, row.instructor])).toEqual([["Student", 9]]);
+
+    const low = await page(person, typed("GTK-MS"), { ...NO_FEEDBACK_FILTERS, instructor: "le7" });
+    expect(low.rows.map((row) => [row.classKind, row.instructor])).toEqual([
+      ["MS", 2],
+      ["GTK", 6],
+    ]);
+  });
+});
+
 describe("the Peserta tab's Sekolah and Sesi", () => {
   it("offers only Schools with responses, by name, each with its responded Sessions by date", async () => {
     const { person, bontang, samarinda, sessions } = await participantScene();
@@ -151,7 +253,7 @@ describe("the Peserta tab's Sekolah and Sesi", () => {
   it("narrows the list to a School, then to one of its Sessions, each row carrying its Sesi", async () => {
     const { person, bontang, sessions } = await participantScene();
 
-    const school = await page(person, { schoolId: bontang.id, sessionId: null });
+    const school = await page(person, { ...NO_PARTICIPANT_FEEDBACK_SCOPE, schoolId: bontang.id });
     expect(school.rows).toHaveLength(5);
     expect(new Set(school.rows.map((row) => row.schoolName))).toEqual(new Set(["SMAN 1 Bontang"]));
     expect(
@@ -163,7 +265,11 @@ describe("the Peserta tab's Sekolah and Sesi", () => {
       [sessions.daring.id]: [1, "WIB"],
     });
 
-    const sesi1 = await page(person, { schoolId: bontang.id, sessionId: sessions.sesi1.id });
+    const sesi1 = await page(person, {
+      ...NO_PARTICIPANT_FEEDBACK_SCOPE,
+      schoolId: bontang.id,
+      sessionId: sessions.sesi1.id,
+    });
     expect(sesi1.rows.map((row) => row.name).toSorted()).toEqual(["Ayu", "Budi"]);
   });
 
@@ -172,7 +278,7 @@ describe("the Peserta tab's Sekolah and Sesi", () => {
 
     const low = await page(
       person,
-      { schoolId: bontang.id, sessionId: null },
+      { ...NO_PARTICIPANT_FEEDBACK_SCOPE, schoolId: bontang.id },
       { ...NO_FEEDBACK_FILTERS, instructor: "le7" },
     );
 
@@ -184,10 +290,11 @@ describe("the Peserta tab's Sekolah and Sesi", () => {
 
     const everywhere = await participantFeedbackAverages(person, NO_PARTICIPANT_FEEDBACK_SCOPE);
     const school = await participantFeedbackAverages(person, {
+      ...NO_PARTICIPANT_FEEDBACK_SCOPE,
       schoolId: bontang.id,
-      sessionId: null,
     });
     const sesi1 = await participantFeedbackAverages(person, {
+      ...NO_PARTICIPANT_FEEDBACK_SCOPE,
       schoolId: bontang.id,
       sessionId: sessions.sesi1.id,
     });
@@ -202,10 +309,12 @@ describe("the Peserta tab's Sekolah and Sesi", () => {
     const empty = { handsOnRbl: null, instructor: 0, materials: 0, relevance: 0 };
 
     for (const scope of [
-      { schoolId: "bukan-id", sessionId: null },
-      { schoolId: randomUUID(), sessionId: null },
-      { schoolId: bontang.id, sessionId: "bukan-id" },
-      { schoolId: bontang.id, sessionId: sessions.samarinda.id },
+      { ...NO_PARTICIPANT_FEEDBACK_SCOPE, schoolId: "bukan-id" },
+      { ...NO_PARTICIPANT_FEEDBACK_SCOPE, schoolId: randomUUID() },
+      { ...NO_PARTICIPANT_FEEDBACK_SCOPE, schoolId: bontang.id, sessionId: "bukan-id" },
+      { ...NO_PARTICIPANT_FEEDBACK_SCOPE, schoolId: bontang.id, sessionId: sessions.samarinda.id },
+      // A Tipe Peserta that names nothing, as a forged Server Action call could send (#487).
+      { ...NO_PARTICIPANT_FEEDBACK_SCOPE, participantType: "Guru" as FeedbackParticipantType },
     ]) {
       await expect(page(person, scope)).resolves.toEqual({ rows: [], nextCursor: null });
       await expect(participantFeedbackAverages(person, scope)).resolves.toEqual(empty);

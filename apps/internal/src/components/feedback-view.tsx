@@ -19,6 +19,7 @@ import type {
   FeedbackCursor,
   FeedbackFilters,
   FeedbackFilterValue,
+  FeedbackParticipantType,
   FeedbackPerjadinOption,
   FeedbackSchoolOption,
   FeedbackSort,
@@ -121,13 +122,17 @@ const DATE_SORT_OPTIONS: Record<FeedbackSort["date"], string> = {
   asc: "Terlama",
 };
 
-/** Every School, every Session — the Peserta tab's starting scope, mirroring the server's. */
-const ALL_PARTICIPANT_SCOPE: ParticipantFeedbackScope = { schoolId: null, sessionId: null };
+/** Every School, Session and Tipe Peserta — the Peserta tab's starting scope, as the server's. */
+const ALL_PARTICIPANT_SCOPE: ParticipantFeedbackScope = {
+  schoolId: null,
+  sessionId: null,
+  participantType: null,
+};
 
 /** Every trip, every Peran — the Perjadin tab's starting scope, mirroring the server's. */
 const ALL_PERJADIN_SCOPE: PerjadinFeedbackScope = { perjadinId: null, role: null };
 
-/** The Sesi and Peran selects' "everything" option — a plain `Select` needs a value for it. */
+/** The Sesi, Tipe Peserta and Peran selects' "everything" option — a plain `Select` needs one. */
 const ALL = "semua" as const;
 
 /** The Peran pengisi select: Semua Peran, then the three self-declared roles as stored. */
@@ -137,6 +142,16 @@ const ROLE_OPTIONS: Record<PerjadinEvaluationRole | typeof ALL, string> = {
     PerjadinEvaluationRole,
     string
   >),
+};
+
+/**
+ * The Tipe Peserta select (#487): Semua Tipe Peserta, then the two-way split as the server names it —
+ * Siswa is the Student Class, GTK-MS the GTK and MS Classes together.
+ */
+const PARTICIPANT_TYPE_OPTIONS: Record<FeedbackParticipantType | typeof ALL, string> = {
+  [ALL]: "Semua Tipe Peserta",
+  Siswa: "Siswa",
+  "GTK-MS": "GTK-MS",
 };
 
 /** One filter's three options, in Indonesian. `label` prefixes name the column the filter gates. */
@@ -233,8 +248,8 @@ function FeedbackView({
 }
 
 /**
- * The Peserta tab: four summary cards, the Sekolah and Sesi pickers, five server-side filters, two
- * sort dropdowns, and an OFFSET-paged card list.
+ * The Peserta tab: four summary cards, the Sekolah, Sesi and Tipe Peserta pickers, five server-side
+ * filters, two sort dropdowns, and an OFFSET-paged card list.
  *
  * A scope, filter or sort change refetches the first page (cursor `null`) and REPLACES the list; a
  * scope change refetches the averages with it. "Load more" carries the current scope, filters, sort
@@ -325,8 +340,8 @@ function ParticipantTab({
 
   return (
     <>
-      {/* The standing over the picked School or Session — programme-wide with neither — and unmoved
-          by the score filters below. */}
+      {/* The standing over the picked School, Session and Tipe Peserta — programme-wide with none —
+          and unmoved by the score filters below. */}
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <AverageCard
           label={PARTICIPANT_ASPECT_LABELS.instructor}
@@ -343,7 +358,7 @@ function ParticipantTab({
           covers={covers}
           value={averages.values.relevance}
         />
-        {/* Over the rows that have one; "—" until any does (#446). */}
+        {/* Over the rows that have one; "—" until any does (#446), and always under GTK-MS (#487). */}
         <AverageCard
           label={PARTICIPANT_ASPECT_LABELS.hands_on_rbl}
           covers={covers}
@@ -351,8 +366,9 @@ function ParticipantTab({
         />
       </div>
 
-      {/* The scope (#466): a School, then one of its Sessions. Changing the School resets the Sesi. */}
-      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* The scope (#466): a School, then one of its Sessions, and a Tipe Peserta (#487). Changing the
+          School resets the Sesi. */}
+      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SingleSelectCombobox
           aria-label="Sekolah"
           placeholder="Semua Sekolah"
@@ -361,7 +377,7 @@ function ParticipantTab({
           value={scope.schoolId}
           disabled={pending}
           onValueChange={(schoolId) => {
-            changeScope(withSchool(schoolId));
+            changeScope(withSchool(scope, schoolId));
           }}
         />
         <OptionSelect
@@ -371,6 +387,18 @@ function ParticipantTab({
           disabled={pending || school === null}
           onChange={(sessionId) => {
             changeScope({ ...scope, sessionId: sessionId === ALL ? null : sessionId });
+          }}
+        />
+        <OptionSelect
+          ariaLabel="Tipe Peserta"
+          options={PARTICIPANT_TYPE_OPTIONS}
+          value={scope.participantType ?? ALL}
+          disabled={pending}
+          onChange={(participantType) => {
+            changeScope({
+              ...scope,
+              participantType: participantType === ALL ? null : participantType,
+            });
           }}
         />
       </div>

@@ -802,7 +802,7 @@ of the Ratings it has. Each card shows the two written answers under **"Peningka
 pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengkapnya" /
 "sembunyikan"); an empty one shows no heading.
 
-**The Peserta tab narrows by School, then by Session** (#466):
+**The Peserta tab narrows by School, then by Session, and by Tipe Peserta** (#466, #487):
 
 - **Sekolah** is a searchable picker, "Semua Sekolah" until one is chosen. It lists only the Schools
   with at least one response, by name, so a pick never reads empty.
@@ -811,11 +811,17 @@ pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengka
   `Sesi 1 · Luring · 12 Okt 2026 · 09.00 WITA`. The number is the Session's Sesi
   ([ADR-0027](./adr/0027-a-sessions-sesi-is-its-per-school-date-rank.md)), the number the Dashboard
   matrix and the planning note give it. An online Session's time is in WIB. Picking another School resets it to "Semua Sesi".
+- **Tipe Peserta** reads "Semua Tipe Peserta", then **Siswa** or **GTK-MS**: Siswa keeps the
+  Student Class's responses, GTK-MS the GTK and MS Classes' together — the same split as the Daftar
+  Hadir Peserta sheets and `/keuangan`. A Participant still picks GTK, MS or Siswa on the form.
+  Picking a School leaves it as it is.
 - **Each response card carries the same line**, linking to the Session.
-- Both AND with the score filters, and sorting and "Tampilkan lebih banyak" work as before.
-- **The four averages follow the School and Session, never the score filters**, and their titles say
-  what they cover: `Nilai rata-rata · Narasumber · SMAN 1 Bontang`, or
-  `… · SMAN 1 Bontang · Sesi 1 Luring`. With neither picked they are programme-wide.
+- All three AND with each other and with the score filters, each change goes back to the first
+  page, and sorting and "Tampilkan lebih banyak" work as before.
+- **The four averages follow the School, Session and Tipe Peserta, never the score filters**, and
+  their titles say what they cover: `Nilai rata-rata · Narasumber · SMAN 1 Bontang`, or
+  `… · SMAN 1 Bontang · Sesi 1 Luring · GTK-MS`. With none picked they are programme-wide. Under
+  GTK-MS the Hands-on RBL card reads "—", since only Siswa are asked it.
 - The choice lives in the browser, not the URL, like the other filters; switching tabs resets it.
 
 **Nothing asks them to rate themselves.** Comprehension, Participation and Readiness sit on the
