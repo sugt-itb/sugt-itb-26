@@ -137,7 +137,7 @@ describe("the export link", () => {
     expect(
       parseParticipantExportParams({
         sekolah: "not-a-uuid",
-        sesi: "'; drop table",
+        sesi: SESSION,
         tipe: "Guru",
         ulasan: "lt3",
         rbl: ["gt7", "le7"],

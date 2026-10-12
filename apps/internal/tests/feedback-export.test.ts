@@ -116,13 +116,13 @@ async function perjadinEvaluations() {
       perjadinId: trips[index % 2]!.id,
       role,
       name: `Pengisi ${index}`,
-      lodging: index % 2 === 1 ? null : score(index, 1),
-      ratings: {
-        transport: score(index, 2),
-        meals: score(index, 3),
-        punctuality: score(index, 4),
-      },
-      pendampingSupport: role === "Pendamping" ? null : score(index, 5),
+      // Every fourth averages exactly 6 whatever it omits, so ties fall to the date tiebreak.
+      lodging: index % 2 === 1 ? null : index % 4 === 0 ? 6 : score(index, 1),
+      ratings:
+        index % 4 === 0
+          ? { transport: 6, meals: 6, punctuality: 6 }
+          : { transport: score(index, 2), meals: score(index, 3), punctuality: score(index, 4) },
+      pendampingSupport: role === "Pendamping" ? null : index % 4 === 0 ? 6 : score(index, 5),
       createdAt: new Date(Date.UTC(2026, 8, 20, index)),
     });
   }
@@ -217,6 +217,12 @@ describe("the export holds what every page holds, in the screen's order", () => 
         filters: { ...NO_PERJADIN_FEEDBACK_FILTERS, lodging: "le7" as const },
         sort: { score: "desc" as const, date: "desc" as const },
       },
+      // Oldest first among the tied 6.0s, so the date tiebreak's direction decides their order.
+      {
+        scope: NO_PERJADIN_FEEDBACK_SCOPE,
+        filters: NO_PERJADIN_FEEDBACK_FILTERS,
+        sort: { score: "asc" as const, date: "asc" as const },
+      },
       {
         scope: { perjadinId: null, role: "Pimpinan" as const },
         filters: { ...NO_PERJADIN_FEEDBACK_FILTERS, pendampingSupport: "gt7" as const },
@@ -230,8 +236,8 @@ describe("the export holds what every page holds, in the screen's order", () => 
       expect(exported.map((row) => row.id)).toEqual(await allPerjadinPages(view));
       sizes.push(exported.length);
     }
-    expect(sizes[0]).toBe(23);
-    expect(sizes.slice(1).every((size) => size > 0 && size < 23)).toBe(true);
+    expect([sizes[0], sizes[2]]).toEqual([23, 23]);
+    expect([sizes[1], sizes[3]].every((size) => size! > 0 && size! < 23)).toBe(true);
   });
 });
 
@@ -239,7 +245,7 @@ describe("the routes", () => {
   it("download the Peserta tab's choices as its CSV, named for them", async () => {
     const { schools } = await participantFeedback();
     const view = {
-      scope: { schoolId: schools[1]!.id, sessionId: null, participantType: null },
+      scope: { schoolId: schools[0]!.id, sessionId: null, participantType: "Siswa" as const },
       filters: { ...NO_FEEDBACK_FILTERS, reviewType: "le7" as const },
       sort: { score: "desc" as const, date: "asc" as const },
     };
@@ -250,14 +256,28 @@ describe("the routes", () => {
 
     expect(response.headers.get("content-type")).toBe("text/csv; charset=utf-8");
     expect(response.headers.get("content-disposition")).toBe(
-      `attachment; filename="feedback-peserta-sman-2-bandung-tersaring-${formatWibDate(new Date())}.csv"`,
+      `attachment; filename="feedback-peserta-sman-1-bandung-siswa-tersaring-${formatWibDate(new Date())}.csv"`,
     );
     const [header, ...lines] = parseCsv(await body(response));
     expect(header![4]).toBe("Nama");
     const expected = await participantFeedbackExport(viewer, view);
     expect(expected.length).toBeGreaterThan(0);
+    // Fewer than the School's every response, so the Tipe Peserta and the filter reached the file.
+    const school = await participantFeedbackExport(viewer, {
+      ...view,
+      scope: { ...view.scope, participantType: null },
+      filters: NO_FEEDBACK_FILTERS,
+    });
+    expect(expected.length).toBeLessThan(school.length);
     expect(lines.map((line) => line[4])).toEqual(expected.map((row) => row.name));
-    expect(lines.every((line) => line[1] === "SMAN 2 Bandung")).toBe(true);
+    expect(
+      lines.every(
+        (line) => line[1] === "SMAN 1 Bandung" && line[3] === "Siswa" && Number(line[15]) <= 7,
+      ),
+    ).toBe(true);
+    // In the asked sort, highest average first.
+    const averages = lines.map((line) => Number(line[15]));
+    expect(averages).toEqual(averages.toSorted((a, b) => b - a));
   });
 
   it("download the Perjadin tab's choices as its CSV, and everything with no query", async () => {
@@ -277,18 +297,30 @@ describe("the routes", () => {
     expect(lines.some((line) => line[4] === "")).toBe(true);
     expect(lines.some((line) => line[4] === "0")).toBe(false);
 
+    const view = {
+      scope: { perjadinId: null, role: "Pendamping" as const },
+      filters: { ...NO_PERJADIN_FEEDBACK_FILTERS, transport: "gt7" as const },
+      sort: { score: "desc" as const, date: "asc" as const },
+    };
     const filtered = await exportPerjadin(
-      new Request(
-        `http://localhost${perjadinExportHref({
-          scope: { perjadinId: null, role: "Pendamping" },
-          filters: NO_PERJADIN_FEEDBACK_FILTERS,
-          sort: DEFAULT_FEEDBACK_SORT,
-        })}`,
-      ),
+      new Request(`http://localhost${perjadinExportHref(view)}`),
     );
     const [, ...pendamping] = parseCsv(await body(filtered));
-    expect(pendamping.length).toBeGreaterThan(0);
-    expect(pendamping.every((line) => line[2] === "Pendamping" && line[12] === "")).toBe(true);
+    const expected = await perjadinFeedbackExport(viewer, view);
+    const everyPendamping = await perjadinFeedbackExport(viewer, {
+      ...view,
+      filters: NO_PERJADIN_FEEDBACK_FILTERS,
+    });
+    expect(expected.length).toBeGreaterThan(0);
+    expect(expected.length).toBeLessThan(everyPendamping.length);
+    expect(pendamping.map((line) => line[3])).toEqual(expected.map((row) => row.filedByName));
+    expect(
+      pendamping.every(
+        (line) => line[2] === "Pendamping" && line[12] === "" && Number(line[6]) > 7,
+      ),
+    ).toBe(true);
+    const sorted = pendamping.map((line) => Number(line[14]));
+    expect(sorted).toEqual(sorted.toSorted((a, b) => b - a));
   });
 
   it("send whoever is not signed in to sign in, as the page does, and read nothing", async () => {

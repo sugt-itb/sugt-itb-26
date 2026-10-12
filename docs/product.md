@@ -910,6 +910,9 @@ Such a row is in neither arm of its filter, and its card has no Bantuan Pendampi
 trip's has no Penginapan line. A row's average is the mean of the Ratings it has: three, four or
 five.
 
+The form deliberately matches the Session Record's shape. Two evaluation forms that behaved
+differently would be two things to learn.
+
 **Each `/feedback` tab has an Ekspor CSV button** (#490), above its list, for anyone who can read
 the page. It downloads that tab's own file:
 
@@ -929,9 +932,6 @@ the page. It downloads that tab's own file:
   scope covers, then `tersaring` when a score filter is on, or `semua` with neither.
 - The screen keeps its choices in the browser, so the button's link carries them as query
   parameters; a bad or missing one falls back to the default.
-
-The form deliberately matches the Session Record's shape. Two evaluation forms that behaved
-differently would be two things to learn.
 
 ### Publishing
 

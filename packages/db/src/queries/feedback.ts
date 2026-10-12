@@ -261,6 +261,7 @@ function bound(value: FeedbackFilterValue, expr: SQLWrapper): SQL | null {
 
 /**
  * One page of Participant Feedback, filtered and sorted by the caller's `FeedbackSort`, OFFSET-paged.
+ * The WHERE and ORDER BY below live in `participantFeedbackRows`, which the export shares (#490).
  *
  * **The filters AND together and only the active ones appear in the WHERE.** Each `all` filter
  * drops out; what remains is conjoined. `reviewType` gates on the raw (unrounded) row average so
@@ -330,7 +331,7 @@ async function withSesi(
 async function participantFeedbackRows(
   args: { filters: FeedbackFilters; scope: ParticipantFeedbackScope; sort: FeedbackSort },
   window: { limit: number; offset: number } | null,
-) {
+): Promise<Omit<ParticipantFeedbackRow, "sesi">[]> {
   const { filters, scope, sort } = args;
 
   // Each `all` filter yields `null` and is filtered out below; the active ones are conjoined by a
@@ -541,6 +542,7 @@ const perjadinRowAverageExpr = sql<number>`(${perjadinEvaluation.transport} + ${
 
 /**
  * One page of Perjadin Evaluations, filtered and sorted by the caller's `FeedbackSort`, OFFSET-paged
+ * (its WHERE and ORDER BY in `perjadinFeedbackRows`, which the export shares, #490)
  * — the twin of `participantFeedbackPage`, over `perjadin_evaluation` joined to `perjadin` and its
  * `sub_cluster` for the trip's name (ADR-0044) and the link target.
  *

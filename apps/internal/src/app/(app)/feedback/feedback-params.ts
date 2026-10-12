@@ -53,7 +53,11 @@ const PERJADIN_FILTER_PARAMS: Record<keyof PerjadinFeedbackFilters, string> = {
   pendampingSupport: "pendamping",
 };
 
-const PARTICIPANT_TYPES: readonly FeedbackParticipantType[] = ["Siswa", "GTK-MS"];
+/** Every Tipe Peserta, as a `Record`: a value added to the type fails the build until listed. */
+const PARTICIPANT_TYPES: Record<FeedbackParticipantType, true> = { Siswa: true, "GTK-MS": true };
+
+const isParticipantType = (value: string | undefined): value is FeedbackParticipantType =>
+  value !== undefined && Object.hasOwn(PARTICIPANT_TYPES, value);
 
 /** A filter value, or `all` — the filter off — for anything else. */
 function filterValue(value: string | undefined): FeedbackFilterValue {
@@ -84,11 +88,13 @@ export function parseParticipantExportParams(
   params: FeedbackSearchParams,
 ): FeedbackExportView<ParticipantFeedbackScope, FeedbackFilters> {
   const tipe = first(params.tipe);
+  const schoolId = uuidOrNull(first(params.sekolah));
   return {
     scope: {
-      schoolId: uuidOrNull(first(params.sekolah)),
-      sessionId: uuidOrNull(first(params.sesi)),
-      participantType: PARTICIPANT_TYPES.find((type) => type === tipe) ?? null,
+      schoolId,
+      // A Session is picked within a School (`withSchool`), so one without a School is dropped.
+      sessionId: schoolId === null ? null : uuidOrNull(first(params.sesi)),
+      participantType: isParticipantType(tipe) ? tipe : null,
     },
     filters: parseFilters<FeedbackFilters>(params, PARTICIPANT_FILTER_PARAMS),
     sort: parseSort(params),
