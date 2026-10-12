@@ -543,13 +543,6 @@ export const RATING_MAX = 10;
 export const CONCERN_AT_OR_BELOW = 7;
 
 /**
- * A Perjadin Report is due this many days after the Group gets back, so the deadline is
- * derived from the Perjadin's end date and never stored. Nothing is gated on it — it is
- * shown as days remaining and that is all.
- */
-export const REPORT_DEADLINE_DAYS_AFTER_RETURN = 2;
-
-/**
  * What a transaction on a Perjadin was spent on. A closed set of twelve, and the
  * one fixed set here that was **read off a document rather than agreed in conversation**:
  * the first eleven are the line items the Programme's approved budget repeats across every
@@ -709,7 +702,8 @@ export type SessionFootageContentType = keyof typeof SESSION_FOOTAGE_CONTENT_TYP
  *
  * `advance_set` and `advance_changed` are **history only** (ADR-0051, #464): the Advance is no
  * longer tracked, so nothing writes them, but the entries already in the Log stay readable and
- * searchable.
+ * searchable. `report_filed` is history only the same way (ADR-0055, #489): the Laporan is no
+ * longer filed.
  */
 export const ACTIVITY_LOG_ACTIONS = [
   "advance_set",

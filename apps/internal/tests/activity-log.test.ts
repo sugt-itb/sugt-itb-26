@@ -6,7 +6,6 @@ import {
   activityLogPage,
   activityLogRincian,
   attachTransactionEvidence,
-  filePerjadinReport,
   isNotGrantedError,
   isNotStaffError,
   planPerjadin,
@@ -38,7 +37,7 @@ import {
 } from "./support/fixtures";
 
 /**
- * **The Activity Log** (#395). Each of the five money writes inserts one entry in its own database
+ * **The Activity Log** (#395). Each money write inserts one entry in its own database
  * transaction — the right actor, Perjadin, action and details — and a refused write inserts none.
  * `/log`'s read pages newest first, searches in SQL and filters by Aksi group and WIB date range.
  */
@@ -144,16 +143,22 @@ describe("each money write logs one entry with the change", () => {
     await expect(entries()).resolves.toEqual([]);
   });
 
-  it("cannot be handed advance_set or advance_changed — they are history only (ADR-0051)", () => {
+  it("cannot be handed advance_set, advance_changed or report_filed — they are history only (ADR-0051, ADR-0055)", () => {
     // Never called: the assertion is the typecheck gate, which fails on an unused `@ts-expect-error`
     // the day `logActivity` accepts the action again.
     const set = { action: "advance_set", details: { amountIdr: 1 } } as const;
     const changed = { action: "advance_changed", details: { fromIdr: 1, toIdr: 2 } } as const;
+    const filed = {
+      action: "report_filed",
+      details: { transactionCount: 1, totalIdr: 1 },
+    } as const;
     const neverRun = (tx: Parameters<typeof logActivity>[0], actor: Person) => [
       // @ts-expect-error -- advance_set is no longer written
       logActivity(tx, actor, randomUUID(), set),
       // @ts-expect-error -- advance_changed is no longer written
       logActivity(tx, actor, randomUUID(), changed),
+      // @ts-expect-error -- report_filed is no longer written (#489)
+      logActivity(tx, actor, randomUUID(), filed),
     ];
     expect(neverRun).toBeTypeOf("function");
   });
@@ -262,59 +267,18 @@ describe("each money write logs one entry with the change", () => {
     await expect(entries()).resolves.toEqual([]);
   });
 
-  it("filePerjadinReport logs report_filed with every category's lines and total", async () => {
-    const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id });
-    // Every category counts, as the acquittal's totals do.
-    for (const [category, amountIdr] of [
-      ["Konsumsi", 1_250_000],
-      ["Akomodasi", 3_400_000],
-    ] as const) {
-      const line = await addTransaction({
-        perjadinId: trip.id,
-        amountIdr,
-        category,
-        createdByPersonId: pic.id,
-      });
-      await addTransactionEvidence({ transactionId: line.id, uploadedByPersonId: pic.id });
-    }
-
-    const result = await filePerjadinReport(pic, trip.id);
-    expect(result.outcome).toBe("filed");
-
-    const logged = await entries();
-    expect(logged).toHaveLength(1);
-    expect(logged[0]).toMatchObject({
-      actorPersonId: pic.id,
-      perjadinId: trip.id,
-      action: "report_filed",
-      details: { transactionCount: 2, totalIdr: 4_650_000 },
-      searchText: "laporan dikirim · 2 transaksi · total rp4.650.000",
-    });
-  });
-
-  it("filePerjadinReport logs nothing when a line has no receipt, or when filed already", async () => {
-    const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id });
-    await addTransaction({ perjadinId: trip.id, amountIdr: 1_250_000, createdByPersonId: pic.id });
-
-    const refused = await filePerjadinReport(pic, trip.id);
-    expect(refused.outcome).toBe("evidence-missing");
-    await expect(entries()).resolves.toEqual([]);
-
-    const empty = await addPerjadin({ picPersonId: pic.id });
-    expect((await filePerjadinReport(pic, empty.id)).outcome).toBe("filed");
-    expect((await filePerjadinReport(pic, empty.id)).outcome).toBe("already-filed");
-    const logged = await entries();
-    expect(logged.map((entry) => [entry.perjadinId, entry.details])).toEqual([
-      [empty.id, { transactionCount: 0, totalIdr: 0 }],
-    ]);
-  });
-
   it("keeps the email the actor had at the time, after it changes", async () => {
     const pic = await staff();
     const trip = await addPerjadin({ picPersonId: pic.id });
-    await filePerjadinReport(pic, trip.id);
+    await recordTransaction(pic, {
+      perjadinId: trip.id,
+      spentOn: "2026-10-12",
+      description: "Makan siang",
+      amountIdr: 1_250_000,
+      category: "Konsumsi",
+      participantType: "Siswa",
+      evidence: receipts(1),
+    });
 
     await db
       .update(schema.person)

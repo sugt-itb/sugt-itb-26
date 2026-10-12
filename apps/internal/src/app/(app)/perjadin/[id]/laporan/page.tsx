@@ -1,5 +1,4 @@
 import { AcquittalTransactions } from "-/components/laporan-perjadin/acquittal-transactions";
-import { FilePerjadinReport } from "-/components/laporan-perjadin/file-perjadin-report";
 import { MoneyFigure } from "-/components/money-figure";
 import { driveFileUrl, driveFolderUrl } from "-/lib/drive/receipt-files";
 import { uploadGate, type UploadGate } from "-/lib/drive/upload-gate";
@@ -34,8 +33,8 @@ export async function generateMetadata({
  *
  * **Readable by ANY signed-in Person now** (ADR-0004 reversed by [ADR-0026](../../../../../../../../docs/adr/0026-money-is-open-to-read-and-staff-only-to-write.md),
  * #180). `perjadinAcquittal` is an open money read, so a Pimpinan reaching this URL sees the whole
- * acquittal — money reads are open. Every **write** control on the page — Laporkan, Catat transaksi,
- * Unggah bukti and each receipt's Hapus (#462) — is the trip's Group's, a Perjadin Editor's or an
+ * acquittal — money reads are open. Every **write** control on the page — Catat transaksi, Unggah
+ * bukti and each receipt's Hapus (#462) — is the trip's Group's, a Perjadin Editor's or an
  * Administrator's (ADR-0048): absent for anyone else, and refused server-side by each Server
  * Action's query (or, for the receipt actions, before Drive is asked anything — by `staffOnTrip`,
  * and for Hapus by `receiptDeleteTarget`). So a Pimpinan or a Staff member off the trip
@@ -49,10 +48,9 @@ export async function generateMetadata({
  * at `/laporan-perjadin` is gone, and with it the sidebar entry that pointed at it, because a
  * top-level link would have needed an index of trips that nothing asked for.
  *
- * **Three figures on it are derived and none is stored** — Uang Perjalanan Terpakai, the deadline
- * and the days left. Nothing is gated on the deadline: DITSAMA sets it for itself. The Report is every
+ * **It is neither filed nor due** (ADR-0055, #489): no Laporkan, no deadline. The Report is every
  * transaction on the trip, each with its receipts, reconciled against nothing — the Advance is not
- * tracked (ADR-0051, #464).
+ * tracked (ADR-0051, #464) — and Uang Perjalanan Terpakai is derived, never stored.
  */
 export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan">) {
   const person = await requirePerson();
@@ -63,7 +61,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
 
   const transactions = acquittal.transactions.map(withLinks);
   // Who writes this trip (ADR-0048): its Group, a Perjadin Editor or an Administrator. Everyone else reads
-  // the whole Laporan with Catat transaksi, Unggah bukti, Hapus and Laporkan absent.
+  // the whole Laporan with Catat transaksi, Unggah bukti and Hapus absent.
   const canWrite = await canWritePerjadin(person, id);
   const gate = canWrite
     ? await uploadGate(person)
@@ -83,13 +81,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
 
       <div className="border-b border-border px-4 py-5 sm:px-7">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="font-heading text-sm font-medium">Pengeluaran</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Jatuh tempo <span className="tabular-nums">{acquittal.reportDueOn}</span> ·{" "}
-              <Deadline daysRemaining={acquittal.daysRemaining} />
-            </p>
-          </div>
+          <h2 className="font-heading text-sm font-medium">Pengeluaran</h2>
           <div className="flex flex-wrap items-center gap-2">
             {/*
               A Route Handler rather than a Server Action: the response is a file with its own
@@ -102,11 +94,6 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
             >
               Ekspor rincian
             </LinkButton>
-            <FilePerjadinReport
-              perjadinId={id}
-              filedAt={acquittal.reportFiledAt}
-              canWrite={canWrite}
-            />
           </div>
         </div>
 
@@ -172,16 +159,4 @@ function withLinks(line: AcquittalTransaction): ViewableTransaction {
     // Unsynced: never finished, and holding a receipt — an empty line never is.
     unsynced: driveSyncedAt === null && line.evidence.length > 0,
   };
-}
-
-/**
- * Days left against the deadline. **Nothing is gated on it** — DITSAMA sets that deadline itself,
- * and the tool is never stricter than the process it serves — so a passed deadline is stated and
- * not enforced.
- */
-function Deadline({ daysRemaining }: { daysRemaining: number }) {
-  if (daysRemaining < 0) {
-    return <span className="text-destructive">terlambat {Math.abs(daysRemaining)} hari</span>;
-  }
-  return <span className="tabular-nums">sisa {daysRemaining} hari</span>;
 }

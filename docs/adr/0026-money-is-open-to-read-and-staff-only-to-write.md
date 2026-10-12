@@ -45,6 +45,8 @@ Make the choke point guard **writes, not money reads**.
 - **Every money write keeps its `requireStaff`.** `recordTransaction`, `attachTransactionEvidence`,
   `markReceiptsSettled` and `filePerjadinReport` are unchanged — each still refuses a non-Staff
   caller server-side, so a Pimpinan reading the Laporan is refused the moment they try to change it.
+  _Amended 2026-10-13: `filePerjadinReport` is gone, the Laporan being neither filed nor due
+  ([ADR-0055](./0055-the-perjadin-report-is-neither-filed-nor-due.md))._
 - **Two writes that had leaned on the read's guard now stand on their own.**
   `mintReceiptUploadsAction` and `finalizeReceiptsAction` had no `requireStaff` of their own — a
   Staff-checked read of the acquittal was the whole of their guard, protecting an upload credential

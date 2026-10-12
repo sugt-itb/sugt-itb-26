@@ -29,7 +29,8 @@ and toward **Penyerapan Anggaran** on the Dashboard. Neither needs the Advance.
 - **The remainder goes**, and with it ADR-0029's draw-down categories: `ADVANCE_DRAWDOWN_CATEGORIES`,
   its two helpers and the SQL list built from it. Nothing would use them.
 - **Laporkan no longer waits for it.** The `advance-missing` refusal (#437) is gone. Laporkan's other
-  rules stand: every line needs a receipt, and a Laporan is filed once.
+  rules stand: every line needs a receipt, and a Laporan is filed once. _Amended 2026-10-13:
+  Laporkan itself is gone ([ADR-0055](./0055-the-perjadin-report-is-neither-filed-nor-due.md))._
 - **Uang Perjalanan Terpakai is all spend.** The sum of every transaction on the Perjadin, all
   categories, and the same number on every screen: the trip page, the Laporan, the CSV, and the
   `/pendamping` card, which until now showed only the draw-down share under the old "Terpakai" label.

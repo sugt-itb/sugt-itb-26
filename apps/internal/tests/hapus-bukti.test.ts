@@ -1,6 +1,5 @@
 import {
   deleteReceiptAction,
-  filePerjadinReportAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
   recordTransactionAction,
@@ -334,14 +333,6 @@ describe("Hapus bukti", () => {
     await expect(deletions()).resolves.toHaveLength(1);
     // A stale screen: the Laporan on it is revalidated, so the receipt drops off.
     expect(revalidatePath).toHaveBeenLastCalledWith("/perjadin/[id]/laporan", "page");
-  });
-
-  it("still works after the Laporan has been filed", async () => {
-    const { trip, transactionId, receipts } = await scene();
-    await expect(filePerjadinReportAction(trip.id)).resolves.toMatchObject({ outcome: "filed" });
-
-    await expect(deleteReceiptAction(receipts[0]!.id)).resolves.toEqual({ outcome: "deleted" });
-    await expect(evidenceOf(transactionId)).resolves.toHaveLength(1);
   });
 
   it("frees a slot that Unggah bukti can fill, the cap still five", async () => {

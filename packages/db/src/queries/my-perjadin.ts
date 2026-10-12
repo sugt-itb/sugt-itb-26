@@ -13,10 +13,10 @@ import {
   transaction,
 } from "../schema/travel";
 import type { Person } from "./caller";
-import { todayInDeadlineZone } from "./deadline";
 import { tripSchoolNames } from "./perjadin-naming";
 import { preparationChecklists, type PreparationItem } from "./preparation-checklist";
 import { requireGrant, requireStaff } from "./staff-only";
+import { todayInWib } from "./today";
 
 /**
  * **The caller's own trips**, for `/pendamping` (#197, #396): Perjalanan Dinas Anda — the trips not
@@ -219,9 +219,8 @@ export async function pendampingOptions(caller: Person): Promise<PendampingOptio
  */
 async function perjadinOf(personId: string): Promise<MyPerjadin> {
   // Not yet over: `ends_on` on or after today, reckoned in the office's zone via the shared
-  // `todayInDeadlineZone` fragment (`./deadline.ts`) — the same calendar the acquittal's
-  // `daysRemaining` counts in, not the database session's default zone.
-  const isCurrent = sql<boolean>`${perjadin.endsOn} >= ${todayInDeadlineZone}`;
+  // `todayInWib` fragment (`./today.ts`), not the database session's default zone.
+  const isCurrent = sql<boolean>`${perjadin.endsOn} >= ${todayInWib}`;
 
   // The base rows: every trip the caller is a `group_member` of. The `group_member` inner join both
   // filters (only the caller's trips) and cannot fan out — its primary key is

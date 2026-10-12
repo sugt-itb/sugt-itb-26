@@ -468,10 +468,11 @@ read-only.
 
 **The form asks for no money.** The tool does not track how much Uang Perjalanan a trip received
 ([ADR-0051](./adr/0051-the-advance-is-not-tracked.md), #464): the figure is usually unknown unless
-someone asks the trip's members. The trip's screen carries a **Pengeluaran** strip — when the Laporan
-is due, a link to it, and one figure, **Uang Perjalanan Terpakai**: the sum of every transaction on
-the trip, all categories. The Laporan, its export and the `/pendamping` card show that same number.
-Nothing shows an amount received, a remainder or a progress bar.
+someone asks the trip's members. The trip's screen carries a **Pengeluaran** strip — a link to the
+Laporan and one figure, **Uang Perjalanan Terpakai**: the sum of every transaction on the trip, all
+categories. It shows no due date: the Laporan is neither filed nor due (ADR-0055, #489). The
+Laporan, its export and the `/pendamping` card show that same number. Nothing shows an amount
+received, a remainder or a progress bar.
 
 **A trip goes to one Sub-Cluster.** A Sub-Cluster is a set of Schools near enough that any of
 them can share a journey. Choosing it is what decides which Schools may appear on the trip at
@@ -596,7 +597,7 @@ Administrator** ([ADR-0048](./adr/0048-a-perjadin-is-written-by-its-group.md), #
 in reads every trip. On `/perjadin/[id]`, `/perjadin/[id]/laporan` and `/sesi/[id]`, anyone else sees
 everything with every write control absent — Ubah tanggal, Ubah Group, the
 Pimpinan and Narasumber edits, Tambah/Ubah/Batalkan Sesi, Tandai, the Persiapan boxes, Catat
-transaksi, Unggah bukti, Laporkan, Foto & Video's upload and Hapus — and a forced request answers 403.
+transaksi, Unggah bukti, Foto & Video's upload and Hapus — and a forced request answers 403.
 Only **Evaluasi Perjadin**'s link stays open to everyone signed in. A Staff member added to a Group
 writes that trip from then on; one who leaves it stops at once. `/pendamping` lists only a person's own
 trips, so every control on its cards stays theirs.
@@ -631,16 +632,15 @@ as failed, and the rest are kept.
   slot for Unggah bukti. **A line's only receipt cannot be deleted**: its Hapus says _"Satu-satunya
   bukti tidak bisa dihapus. Unggah bukti yang benar dulu, atau hapus transaksinya."_ — so a single
   wrong receipt is replaced by uploading the right one first. Hapus is the trip writer's alone, like
-  Unggah bukti, is disabled with the reason while Drive is not connected or broken, and still works
-  after the Laporan is filed. Each one is a **Bukti dihapus** entry on `/log`, under the Unggah
-  bukti filter.
+  Unggah bukti, and is disabled with the reason while Drive is not connected or broken. Each one is
+  a **Bukti dihapus** entry on `/log`, under the Unggah bukti filter.
 - Each line carries its own **Hapus** (#463), for a line entered by mistake — against the wrong
   trip, or twice. It asks _"Hapus transaksi ini? Folder buktinya akan dipindahkan ke Sampah Google
   Drive."_, then moves the line's folder and receipts to the Drive trash and takes the line off the
   Laporan. The totals, the Siswa and GTK-MS subtotals and the export no longer count it. Any line can be deleted, with or without receipts. Like Hapus bukti, it is the trip writer's
-  alone, is disabled with the reason while Drive is not connected or broken, and still works after
-  filing. Each one is a **Transaksi dihapus** entry on `/log`, under the Catat transaksi filter; the
-  line's earlier entries stay, without their Buka folder link.
+  alone, and is disabled with the reason while Drive is not connected or broken. Each one is a
+  **Transaksi dihapus** entry on `/log`, under the Catat transaksi filter; the line's earlier entries
+  stay, without their Buka folder link.
 
 What both controls take:
 
@@ -679,14 +679,13 @@ with the receipt in hand either way. Both are first-class paths. There is no off
 support; capture needs connectivity, and where it fails the PIC enters it later, losing
 convenience but never data. Offline is worth adding eventually, not worth blocking on.
 
-**The Report is due two days after the Group gets back**, and the screen shows days
-remaining. Nothing enters that date — it follows from the Perjadin's end date, so it
-cannot be typed wrong and it moves by itself if the trip's dates are corrected.
-
-**Nothing is gated on the deadline.** DITSAMA sets that deadline itself, and the tool is never
-stricter than the process it serves — invented friction has the same escape route as duplicated
-work. Laporkan does not wait for Uang Perjalanan either, which the tool no longer tracks (ADR-0051).
-It refuses only a line without a receipt, and a Laporan that is already filed.
+**The Laporan is neither filed nor due**
+([ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md), #489). There is no
+Laporkan, no "Dilaporkan" line and no deadline, on the Laporan or on the trip's screen: it is the
+trip's running acquittal, the same before, during and after the trip, and the export is whatever it
+holds when it is taken. Filing froze nothing and the deadline gated nothing, so both were noise —
+the tool is never stricter than the process it serves. Past filings stay on `/log` as **Laporan
+dikirim**, with their totals.
 
 This screen is load-bearing in a way the others are not. Nothing structurally compels a
 PIC to use this tool: the paperwork is accepted in any format. So it has to be plainly better
@@ -1154,7 +1153,8 @@ A table, newest first, 50 rows a page:
   dihapus. Entries derived from data recorded
   before the Log existed read "(dari data lama)" after it. The two Uang Perjalanan actions are
   history only: nothing writes them since the Advance stopped being tracked (ADR-0051), and past
-  entries still read as they did.
+  entries still read as they did. Laporan dikirim is history only the same way: nothing writes it
+  since the Laporan stopped being filed (ADR-0055).
 - **Rincian** says what changed. A transaction's row links to its folder in Drive, when it has one.
 
 **Above the table**, a search box, an Aksi filter and a Rentang tanggal:
@@ -1162,7 +1162,7 @@ A table, newest first, 50 rows a page:
 - the search matches, ignoring case, the email, the trip's Kelompok (its Sub-Cluster's name), its
   Schools, its PIC's name, and the Aksi and Rincian text;
 - Aksi is Semua, Uang Perjalanan, Catat transaksi, Unggah bukti, Dokumen, Foto & Video or Laporan
-  dikirim; Uang Perjalanan now finds history only;
+  dikirim; Uang Perjalanan and Laporan dikirim now find history only;
 - Rentang tanggal is two WIB dates, dari and sampai, both included.
 
 They combine, and **all of them are in the URL**, with the page number, so a view can be bookmarked.

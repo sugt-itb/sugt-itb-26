@@ -67,7 +67,7 @@ list below exists so nobody later "completes" the schema by adding the rest.
 | Project Team, Final Project                                  | Not stored at all. [ADR-0009](./adr/0009-the-tool-tracks-delivery-not-outcomes.md) is explicit; they reach the public as curated pieces, never as records. |
 | Advance                                                      | Not stored (ADR-0051). Its column was dropped in migration 0050 (#465).                                                                                    |
 | Uang Perjalanan Terpakai                                     | Not a column. The sum of a Perjadin's transactions, all categories, derived on every read.                                                                 |
-| Report deadline                                              | Not a column. Two days after the Group returns, derived from `perjadin.ends_on` and a constant.                                                            |
+| Report deadline                                              | None. The Report is neither filed nor due (ADR-0055, #489), so no deadline is stored or derived.                                                           |
 | Aspect                                                       | Not a table and not a value. Every Aspect on all four evaluations is a **column**; `@sugt/domain` names each rubric.                                       |
 | Rating                                                       | Not a table. A Rating is one Aspect column on one row of an evaluation.                                                                                    |
 | Transaction category                                         | Not a table. A `text` column on `transaction`, CHECKed against a closed set — see [Money](#money).                                                         |
@@ -1244,7 +1244,6 @@ create table perjadin (
   pic_person_id               uuid not null,
   pic_role                    text not null default 'Staff' check (pic_role = 'Staff'),
 
-  report_filed_at             timestamptz,
   drive_folder_id             text,
   created_at                  timestamptz not null default now(),
 
@@ -1291,11 +1290,11 @@ alter table perjadin
 Any amounts they held went with them; the Activity Log's `advance_set` / `advance_changed` entries
 keep the history.
 
-**There is no `report_deadline` column.** The Report is due two days after the Group gets back,
-always, so the deadline is `ends_on + REPORT_DEADLINE_DAYS_AFTER_RETURN` and nothing stores it.
-Storing it would let it be entered wrong, and would leave it stale when a trip's dates are
-corrected — a derived deadline recomputes itself and a typed one does not. Nothing is gated on
-it either way; it is shown as days remaining.
+**The Report is neither filed nor due** ([ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md),
+[#489](https://github.com/sugt-itb/sugt-itb-26/issues/489)). There is no `report_deadline` column
+and nothing derives one, and migration `0053` dropped `report_filed_at`, the timestamp Laporkan used
+to set: filing gated nothing, so nothing replaces it. The Activity Log's `report_filed` entries keep
+the filings already made.
 
 **Money is `bigint` in whole rupiah.** `numeric(_, 2)` would imply a subunit nobody uses. The
 `_idr` suffix is on every money column so no reader has to guess the unit.
@@ -1681,8 +1680,8 @@ Offline`, named as its other two; `session.drive_footage_folder_id` is the Sessi
 ## Money
 
 **There is no `perjadin_report` table.** A Perjadin yields exactly one Report, always, so the
-acquittal is the state already on `perjadin` — `report_filed_at` — plus the trip's transactions and
-their evidence: every transaction on the trip, reconciled against nothing (ADR-0051).
+acquittal is the trip's transactions and their evidence: every transaction on the trip, reconciled
+against nothing (ADR-0051), never filed and never due (ADR-0055).
 
 ```sql
 create table transaction (
@@ -1780,8 +1779,7 @@ the row with its `evidence_deleted` Log entry in one transaction. The count is c
 the trash, so a line's only receipt is refused with nothing trashed, and under the lock, so two
 concurrent Hapus on a two-receipt line cannot leave it with none. The loser of that race takes its
 file back out of the Drive trash, since its row stands. A grandfathered line with more than five may
-lose any of them, down to one. The freed slot counts toward the five again. Nothing about filing
-gates it.
+lose any of them, down to one. The freed slot counts toward the five again.
 
 **A line may be deleted whole** (#463, ADR-0050), with however many receipts it holds. Hapus
 transaksi trashes the line's Drive folder, and with it the receipts inside, then any receipt file
@@ -1896,7 +1894,7 @@ or failed write logs nothing. The money writes log as below, each through `logAc
 | `attachTransactionEvidence` | `evidence_uploaded`    | `{ transactionId, category, amountIdr, spentOn, added, total }`                    |
 | `deleteTransactionEvidence` | `evidence_deleted`     | `{ transactionId, evidenceId, category, amountIdr, spentOn, left }`, a copy (#462) |
 | `deleteTransaction`         | `transaction_deleted`  | as `transaction_recorded`, plus `description`; a copy (#463)                       |
-| `filePerjadinReport`        | `report_filed`         | `{ transactionCount, totalIdr }`, every category, as the acquittal totals          |
+| nothing, since ADR-0055     | `report_filed`         | `{ transactionCount, totalIdr }`; history only — Laporkan is gone (#489)           |
 
 **`actor_email` is a copy**, taken when the act happens, so the row stays true if the Person's email
 later changes. **`search_text`** is the Aksi and Rincian text `/log` shows, lower-cased once at
@@ -2071,9 +2069,9 @@ is complete has to make its own case rather than cite this one.
 Recording a transaction now requires its receipts
 ([ADR-0039](./adr/0039-every-transaction-is-recorded-with-its-evidence.md)), and **that is the
 other kind of rule: a field a form insists on before it will submit**. The receipts are part of
-the line being written, not a separate record the action waits on. Filing gains no new
-condition: `filePerjadinReport`'s evidence check is unchanged, and now only ever fires on a line
-recorded before the rule.
+the line being written, not a separate record the action waits on. (Filing, whose evidence check
+was the backstop for lines recorded before that rule, is gone: the Report is neither filed nor due,
+[ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md).)
 
 A Story's photographs are public by intent, which is the whole difference from a receipt — see
 [Object storage](#object-storage).
@@ -2409,8 +2407,10 @@ cancellation while a Session is `arranged` and never after, and offers no way ba
 
 **"Every transaction has at least one piece of evidence."** Also a cross-row count. Held at
 entry since [ADR-0039](./adr/0039-every-transaction-is-recorded-with-its-evidence.md), in the one
-write path: `recordTransaction` records a line with one to five receipts or refuses it. Filing
-still checks it, as the backstop for lines entered before that rule, which no migration touched.
+write path: `recordTransaction` records a line with one to five receipts or refuses it. A line
+entered before that rule may still have none; nothing catches it now that filing is gone
+([ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md)), and the Laporan marks it
+for its writer to Unggah bukti.
 
 **The four-offline-six-online cap.** Deliberately unenforced. Ten is the denominator for
 progress, not a limit on what may be recorded, and a cancelled Session counts for nothing
