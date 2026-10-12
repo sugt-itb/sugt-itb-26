@@ -1,6 +1,7 @@
 "use client";
 
 import { fileSessionRecordAction } from "-/app/(app)/sesi/[id]/actions";
+import { RATING_SCALE_DIRECTION } from "-/lib/rating-copy";
 import {
   CONCERN_AT_OR_BELOW,
   RATING_MAX,
@@ -58,7 +59,7 @@ const SESSION_ASPECT_LABELS: Record<SessionRecordAspect, string> = {
 // The scale and the threshold come from `@sugt/domain` rather than the sentence, so the copy
 // cannot drift from the rule it describes — the same reason `perjadin-report.ts` names its one
 // zone as a constant. The threshold reads `7` today, and this reads whatever it becomes.
-const INSTRUCTION = `Beri nilai ${RATING_MIN}–${RATING_MAX} untuk tiap aspek. Nilai ${CONCERN_AT_OR_BELOW} ke bawah wajib disertai penjelasan pada Kendala.`;
+const INSTRUCTION = `Beri nilai ${RATING_MIN}–${RATING_MAX} untuk tiap aspek. ${RATING_SCALE_DIRECTION} Nilai ${CONCERN_AT_OR_BELOW} ke bawah wajib disertai penjelasan pada Kendala.`;
 
 /** The message the Kendala field carries when a low Rating owes prose. Shared by both dialogs. */
 const PROSE_REQUIRED = `Nilai ${CONCERN_AT_OR_BELOW} ke bawah wajib disertai penjelasan.`;
