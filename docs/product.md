@@ -999,18 +999,19 @@ An Administrator adds and revokes People here (#470). This is the invite list fr
 [ADR-0003](./adr/0003-google-sign-in-with-an-invite-list.md): a `person` row **is** an
 invitation, and nobody whose email has no row can sign in at all.
 
-**Every write is an Administrator's**; reads follow the open-delivery rule, since a Group is
-assembled from the roster. Schools, Clusters and Topics have no admin screen because they are fixed
-reference data — People are not, so they do. The header says only an Administrator adds and
-deactivates people.
+**Only an Administrator sees Orang** (#488), in the sidebar and at `/orang`, to read as well as to
+write. Anyone else, Pimpinan included, gets the 403, as on Log and Pengaturan. Nothing else links
+here: the Perjadin form's Pimpinan picker reads its own list, so whoever plans a Perjadin still
+picks from it. Schools, Clusters and Topics have no admin screen because they are fixed reference
+data — People are not, so they do. The header says only an Administrator reads the roster, adds
+people and deactivates them.
 
-- **Tambah orang** and each row's **Nonaktifkan** are shown only to an Administrator. Anyone else
-  calling either write gets a 403, and nothing is written.
+- **Tambah orang** and each row's **Nonaktifkan**: anyone but an Administrator calling either write
+  gets a 403, and nothing is written.
 - **An Administrator cannot Nonaktifkan themselves**: their own row has no button, and the write
   refuses it. Deactivating another Administrator is allowed.
-- **Akses** is a column only an Administrator sees. Each active Staff row has a searchable
-  multi-select of the six Grants, held ones as chips; adding or removing a chip assigns or revokes
-  at once. Each option carries a line saying what it gates — Administrator "semua akses", Keuangan
+- **Akses** is a column of Grants. Each active Staff row has a searchable multi-select of the six
+  Grants, held ones as chips; adding or removing a chip assigns or revokes at once. Each option carries a line saying what it gates — Administrator "semua akses", Keuangan
   "tabel dan ekspor semua transaksi", Perjadin Editor "merencanakan dan menulis setiap Perjadin", Daring Editor "Sesi
   daring dan Pretest", Dashboard Editor "termasuk Dashboard Viewer", Dashboard Viewer "membaca
   Dashboard". Only Grants actually held are chips: choosing Dashboard Editor shows Dashboard Editor

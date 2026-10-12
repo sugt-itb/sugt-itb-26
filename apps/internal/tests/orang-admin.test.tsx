@@ -4,7 +4,7 @@ import { keepLocked } from "-/components/multi-select-combobox";
 import { GRANT_OPTIONS } from "-/components/orang-roster";
 import { requirePerson } from "-/lib/person";
 import { db, schema } from "@sugt/db";
-import type { Person } from "@sugt/db/queries";
+import { perjadinPlan, type Person } from "@sugt/db/queries";
 import type { Grant, Role } from "@sugt/domain";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,10 +12,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { addGrant, addPerson, resetDatabase } from "./support/fixtures";
 
 /**
- * **`/orang` is an Administrator's to manage** (#470). Anyone signed in reads the roster; only an
- * Administrator sees Tambah, Nonaktifkan and the Akses picker, and a Staff member without the Grant
- * calling either write gets a 403 with nothing written. An Administrator's own row offers no
- * Nonaktifkan, and their own Administrator chip carries no remove button.
+ * **`/orang` is an Administrator's, to read and to manage** (#470, #488). Anyone else, a Pimpinan
+ * included, gets the 403 at the page, and a Staff member without the Grant calling either write
+ * gets a 403 with nothing written. The Perjadin form's Pimpinan picker reads its own roster, so a
+ * Perjadin Editor still picks from it. An Administrator's own row offers no Nonaktifkan, and their
+ * own Administrator chip carries no remove button.
  */
 
 vi.mock("-/lib/person", () => ({ requirePerson: vi.fn() }));
@@ -61,21 +62,32 @@ async function digestOf(call: Promise<unknown>) {
 }
 
 describe("reading /orang", () => {
-  it("shows everyone signed in the roster, and only an Administrator its controls", async () => {
+  it("forbids everyone but an Administrator: plain Staff, a Grant holder and a Pimpinan", async () => {
     const who = await people();
+    const editor = await person("Ed", "ed@itb.ac.id", "Staff", ["Perjadin Editor", "Keuangan"]);
 
-    for (const [viewer, administers] of [
-      [who.budi, false],
-      [who.hadi, false],
-      [who.sari, true],
-    ] as const) {
-      const html = await render(viewer);
-      for (const name of ["Sari", "Rina", "Budi", "Pak Hadi"]) expect(html).toContain(name);
-      expect(html.includes(">Tambah<"), viewer.email).toBe(administers);
-      expect(html.includes(">Nonaktifkan<"), viewer.email).toBe(administers);
-      expect(html.includes(">Akses<"), viewer.email).toBe(administers);
+    for (const viewer of [who.budi, editor, who.hadi]) {
+      expect(await digestOf(render(viewer)), viewer.email).toBe(FORBIDDEN);
     }
-    expect(await render(who.sari)).toContain("hanya Administrator yang menambah dan menonaktifkan");
+  });
+
+  it("shows an Administrator the roster and its controls", async () => {
+    const who = await people();
+    const html = await render(who.sari);
+
+    for (const name of ["Sari", "Rina", "Budi", "Pak Hadi"]) expect(html).toContain(name);
+    for (const control of [">Tambah<", ">Nonaktifkan<", ">Akses<"]) expect(html).toContain(control);
+    expect(html).toContain("Hanya Administrator yang membaca roster ini");
+  });
+
+  it("leaves the Perjadin form's Pimpinan picker to a Perjadin Editor the page refuses", async () => {
+    const who = await people();
+    const editor = await person("Ed", "ed@itb.ac.id", "Staff", ["Perjadin Editor"]);
+
+    expect(await digestOf(render(editor))).toBe(FORBIDDEN);
+    expect((await perjadinPlan(editor)).pimpinan).toEqual([
+      expect.objectContaining({ id: who.hadi.id }),
+    ]);
   });
 
   it("offers an Administrator no lockout on their own row: no Nonaktifkan, a locked Administrator chip", async () => {

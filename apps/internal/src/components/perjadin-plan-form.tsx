@@ -382,7 +382,7 @@ function PerjadinPlanForm({
             </p>
             {pimpinanRoster.length === 0 ? (
               <p className="mt-1 text-sm text-muted-foreground">
-                Belum ada Pimpinan di roster — tambahkan lewat /orang.
+                Belum ada Pimpinan di roster — minta Administrator menambahkannya lewat /orang.
               </p>
             ) : (
               <ul className="mt-1 grid gap-2">

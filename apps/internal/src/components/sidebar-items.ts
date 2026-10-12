@@ -82,7 +82,8 @@ export type VisibleNavItem = NavItem & { badge: boolean };
  *
  * `administratorOnly` is a fifth (#372): **Pengaturan** is shown only to an Administrator, because
  * its page `forbidden()`s everyone else — the same "worse than no link" rule once more. **Log**,
- * the Activity Log (#395), carries it for the same reason.
+ * the Activity Log (#395), carries it for the same reason, and so does **Orang** (#488), whose
+ * roster only an Administrator reads.
  *
  * **Pengaturan carries a badge while Drive needs an Administrator** (#375) — not connected, broken,
  * or its folders unresolved: the states in which nobody can upload a receipt. Only Administrators
@@ -106,7 +107,7 @@ const NAV: NavItem[] = [
   { href: "/cerita", label: "Cerita", icon: Newspaper, staffOnly: true },
   { href: "/sekolah", label: "Direktori Sekolah", icon: School, staffOnly: false },
   { href: "/kelompok-sekolah", label: "Kelompok Sekolah", icon: Boxes, staffOnly: false },
-  { href: "/orang", label: "Orang", icon: Users, staffOnly: false },
+  { href: "/orang", label: "Orang", icon: Users, staffOnly: true, administratorOnly: true },
   { href: "/log", label: "Log", icon: ScrollText, staffOnly: true, administratorOnly: true },
   {
     href: "/pengaturan",
