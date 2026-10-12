@@ -913,6 +913,26 @@ five.
 The form deliberately matches the Session Record's shape. Two evaluation forms that behaved
 differently would be two things to learn.
 
+**Each `/feedback` tab has an Ekspor CSV button** (#490), above its list, for anyone who can read
+the page. It downloads that tab's own file:
+
+- **Every row the tab's choices match**, across all pages, not just those loaded: the scope (Sekolah,
+  Sesi and Tipe Peserta; Perjadin and Peran pengisi) and every score filter. Rows come **in the
+  tab's current sort**, lowest average first by default, so the file reads as the screen does —
+  unlike `/keuangan`, which always exports oldest first.
+- **Peserta:** Tanggal (the day it was filed), Sekolah, Sesi (the card's line), Tipe Peserta (GTK, MS
+  or Siswa), Nama, then Materi, Narasumber, Relevansi and Hands-on RBL each with its Komentar, the two
+  written answers, and Rata-rata. **Perjadin:** Tanggal, Perjadin (its name), Peran, Nama, then
+  Penginapan, Transportasi, Konsumsi, Ketepatan Waktu and Bantuan Pendamping each with its Komentar,
+  and Rata-rata.
+- **A Rating that was not given is an empty cell, never 0**; Rata-rata is the row's average over the
+  Ratings present, to one decimal, as on its card. The file is written as `/keuangan`'s is — a BOM,
+  every field quoted — so comments with commas, quotes or line breaks open intact in Excel.
+- Named `feedback-peserta-<filter>-<today>.csv` or `feedback-perjadin-<filter>-<today>.csv`: what the
+  scope covers, then `tersaring` when a score filter is on, or `semua` with neither.
+- The screen keeps its choices in the browser, so the button's link carries them as query
+  parameters; a bad or missing one falls back to the default.
+
 ### Publishing
 
 Staff write **Stories** here — prose and photographs about **exactly one School** — and the

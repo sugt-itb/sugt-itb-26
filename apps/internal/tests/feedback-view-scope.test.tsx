@@ -156,6 +156,15 @@ describe("the Peserta tab's scope", () => {
   });
 });
 
+describe("Ekspor CSV (#490)", () => {
+  it("links the Peserta tab to its export, carrying the default choices as no query at all", () => {
+    const html = render([row({})]);
+
+    expect(html).toContain('href="/feedback/ekspor/peserta"');
+    expect(html).toContain(">Ekspor CSV<");
+  });
+});
+
 describe("the scope's rules", () => {
   it("resets the Session whenever the School changes or is cleared, and keeps the Tipe Peserta", () => {
     const scope = { schoolId: "bontang", sessionId: "sesi-1", participantType: "GTK-MS" } as const;
