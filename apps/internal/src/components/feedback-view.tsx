@@ -162,29 +162,13 @@ const MATERIALS_OPTIONS = aspectOptions(PARTICIPANT_ASPECT_LABELS.materials);
 
 const RELEVANCE_OPTIONS = aspectOptions(PARTICIPANT_ASPECT_LABELS.relevance);
 
-const LODGING_OPTIONS: FilterOptions = {
-  all: "Semua: Penginapan",
-  le7: "Penginapan ≤ 7",
-  gt7: "Penginapan > 7",
-};
+const LODGING_OPTIONS = aspectOptions("Penginapan");
 
-const TRANSPORT_OPTIONS: FilterOptions = {
-  all: "Semua: Transportasi",
-  le7: "Transportasi ≤ 7",
-  gt7: "Transportasi > 7",
-};
+const TRANSPORT_OPTIONS = aspectOptions("Transportasi");
 
-const MEALS_OPTIONS: FilterOptions = {
-  all: "Semua: Konsumsi",
-  le7: "Konsumsi ≤ 7",
-  gt7: "Konsumsi > 7",
-};
+const MEALS_OPTIONS = aspectOptions("Konsumsi");
 
-const PUNCTUALITY_OPTIONS: FilterOptions = {
-  all: "Semua: Ketepatan Waktu",
-  le7: "Ketepatan Waktu ≤ 7",
-  gt7: "Ketepatan Waktu > 7",
-};
+const PUNCTUALITY_OPTIONS = aspectOptions("Ketepatan Waktu");
 
 /** Pendamping Support (#482): a row without one — a Pendamping's, or one filed before #481 — is in neither arm. */
 const PENDAMPING_SUPPORT_OPTIONS = aspectOptions("Bantuan Pendamping");

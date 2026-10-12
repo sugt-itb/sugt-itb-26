@@ -584,11 +584,11 @@ export type PerjadinFeedbackAverages = {
  * is. The score filters are not an argument, so the cards never average only the low rows.
  *
  * `avg(lodging)` ignores NULL naturally — a day trip with no hotel is not a zero in the hotel
- * average, it is simply not in it. `coalesce(…, 0)` turns the empty-table NULL into `0` so the
- * caller gets four numbers to format; "0.0" reads as "nothing yet" rather than a real low score.
- * **Pendamping Support's average is over the rows that have one** (#482) and stays `null`, shown as
- * "—", while none in scope does — as Hands-on RBL's is on the Peserta tab. Under Peran Pendamping
- * it is always "—": a Pendamping is never asked it (ADR-0054).
+ * average, it is simply not in it. `coalesce(…, 0)` turns the empty-table NULL into `0` for the
+ * four logistics Aspects, so the caller gets numbers to format; "0.0" reads as "nothing yet" rather
+ * than a real low score. **Pendamping Support's average is over the rows that have one** (#482)
+ * and stays `null`, shown as "—", while none in scope does — as Hands-on RBL's is on the Peserta
+ * tab. Under Peran Pendamping it is always "—": a Pendamping is never asked it (ADR-0054).
  */
 export async function perjadinFeedbackAverages(
   _caller: Person,
