@@ -535,8 +535,9 @@ a line, on every viewport. A Session with no Narasumber has nothing under its ro
 Schools and days is often at only some of them. Under each Session's Narasumber its Pimpinan follow,
 one per line, as "Pimpinan: {name}". The Tambah/Ubah Sesi dialog has a **Pimpinan** multi-select
 right after "Diajar oleh", offering the Pimpinan roster — with a hint naming /orang while it is
-empty — and moving a Session to another School or date keeps them. Like the rest of a Session, they
-can be changed only while it is arranged.
+empty — and moving a Session to another School or date keeps them. A delivered Session, whose
+School, date and time are settled, has **Ubah Pimpinan** on its row instead, for the same people:
+who attended is often written down after the trip. A cancelled Session has neither.
 
 **The trip's Pimpinan section is read-only**: everyone recorded on at least one of its Sessions that
 was not cancelled, each followed by the Schools they were recorded at — "Prof. X — SMAN 1, SMAN 3" —
@@ -616,9 +617,9 @@ member without the Perjadin Editor Grant, who still runs any trip they are on bu
 Administrator** ([ADR-0048](./adr/0048-a-perjadin-is-written-by-its-group.md), #439). Everyone signed
 in reads every trip. On `/perjadin/[id]`, `/perjadin/[id]/laporan` and `/sesi/[id]`, anyone else sees
 everything with every write control absent — Ubah tanggal, Ubah Group, the
-Narasumber edits, Tambah/Ubah/Batalkan Sesi (a Session's Pimpinan with it), Tandai, the Persiapan
-boxes, Catat transaksi, Unggah bukti, Foto & Video's upload and Hapus — and a forced request
-answers 403.
+Narasumber edits, Tambah/Ubah/Batalkan Sesi (a Session's Pimpinan with it), Ubah Pimpinan, Tandai,
+the Persiapan boxes, Catat transaksi, Unggah bukti, Foto & Video's upload and Hapus — and a forced
+request answers 403.
 Only **Evaluasi Perjadin**'s link stays open to everyone signed in. A Staff member added to a Group
 writes that trip from then on; one who leaves it stops at once. `/pendamping` lists only a person's own
 trips, so every control on its cards stays theirs.

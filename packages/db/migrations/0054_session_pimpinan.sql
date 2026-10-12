@@ -14,7 +14,8 @@ ALTER TABLE "session_pimpinan" ADD CONSTRAINT "session_pimpinan_is_pimpinan" FOR
 -- Every trip Pimpinan is copied onto every non-cancelled Session of that trip, which keeps today's
 -- meaning ("came on the trip"); writers then remove them from the Sessions they missed. A trip with
 -- no live Session copies onto all its Sessions instead, so nothing is lost. A trip with no Session
--- at all has nowhere to keep its Pimpinan — the migration test counts those rows (expected: none).
+-- at all has nowhere to keep its Pimpinan; the migration test shows the query that counts those
+-- rows, which is expected to find none on the live data.
 INSERT INTO "session_pimpinan" ("session_id", "person_id", "role")
 SELECT "session"."id", "perjadin_pimpinan"."person_id", 'Pimpinan'
 FROM "perjadin_pimpinan"

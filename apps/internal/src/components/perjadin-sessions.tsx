@@ -4,6 +4,7 @@ import {
   addPerjadinSessionAction,
   cancelPerjadinSessionAction,
   editPerjadinSessionAction,
+  setSessionPimpinanAction,
 } from "-/app/(app)/perjadin/[id]/actions";
 import { CoveredSessionsNote } from "-/components/covered-sessions-note";
 import { MultiSelectCombobox } from "-/components/multi-select-combobox";
@@ -149,6 +150,14 @@ function PerjadinSessions({
                     />
                   </span>
                 )}
+                {/* A delivered Session's place and time are settled; its Pimpinan are not. */}
+                {canEdit && session.status === "delivered" && (
+                  <PimpinanDialog
+                    perjadinId={perjadinId}
+                    session={session}
+                    pimpinanRoster={pimpinanRoster}
+                  />
+                )}
               </div>
               {/* One Narasumber per line (#491), indented under the row, which keeps the badge and
                   the controls. */}
@@ -221,14 +230,7 @@ function SessionDialog({
   const idPrefix = useId();
 
   const teacherOptions = teachers.map((teacher) => ({ value: teacher.id, label: teacher.name }));
-  // The roster, plus anyone already on this Session who has since left it (a revoked Pimpinan), so
-  // their chip still shows and can be removed. The write keeps an already-recorded Pimpinan.
-  const pimpinanOptions = [
-    ...pimpinanRoster.map((person) => ({ value: person.id, label: person.fullName })),
-    ...(session?.pimpinan ?? [])
-      .filter((entry) => !pimpinanRoster.some((person) => person.id === entry.personId))
-      .map((entry) => ({ value: entry.personId, label: entry.name })),
-  ];
+  const pimpinanOptions = sessionPimpinanOptions(pimpinanRoster, session);
   const incomplete = schoolId === "" || date === "" || time === "";
 
   // The picked School's Time Zone, for the Jam Mulai label. In add mode it appears and flips as the
@@ -413,6 +415,114 @@ function SessionDialog({
   );
 }
 
+/**
+ * Change a delivered Session's Pimpinan alone (#492, ADR-0056) — who attended is often recorded
+ * after the trip, and the migration put every trip Pimpinan on each of its live Sessions to be
+ * narrowed. The same picker as the Session dialog, offering the same options.
+ */
+function PimpinanDialog({
+  perjadinId,
+  session,
+  pimpinanRoster,
+}: {
+  perjadinId: string;
+  session: PerjadinSession;
+  pimpinanRoster: RosterPimpinan[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [pimpinan, setPimpinan] = useState<string[]>(() =>
+    session.pimpinan.map((entry) => entry.personId),
+  );
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [saving, startSaving] = useTransition();
+  const pickerId = useId();
+  const options = sessionPimpinanOptions(pimpinanRoster, session);
+
+  function submit() {
+    startSaving(async () => {
+      const result = await setSessionPimpinanAction(perjadinId, session.sessionId, pimpinan);
+      if (result.outcome === "set") {
+        setOpen(false);
+        return;
+      }
+      setRefusal(
+        result.outcome === "cancelled"
+          ? "Sesi ini sudah dibatalkan. Muat ulang halaman."
+          : "Ada Pimpinan yang sudah tidak ada di roster. Muat ulang halaman.",
+      );
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={setOpen}
+    >
+      <DialogTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+          >
+            Ubah Pimpinan
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Pimpinan Sesi</DialogTitle>
+          <DialogDescription>Pimpinan yang hadir di Sesi ini.</DialogDescription>
+        </DialogHeader>
+
+        {refusal !== null && (
+          <Alert variant="destructive">
+            <AlertTitle>Pimpinan belum tersimpan.</AlertTitle>
+            <AlertDescription>{refusal}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid gap-1.5">
+          <Label htmlFor={pickerId}>Pimpinan</Label>
+          <MultiSelectCombobox
+            id={pickerId}
+            aria-label="Pimpinan"
+            placeholder={options.length === 0 ? "Belum ada Pimpinan" : "Pilih Pimpinan…"}
+            emptyLabel="Tidak ada Pimpinan."
+            options={options}
+            value={pimpinan}
+            onValueChange={(next) => {
+              setPimpinan(next);
+              setRefusal(null);
+            }}
+          />
+          {pimpinanRoster.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Belum ada Pimpinan di roster — minta Administrator menambahkannya lewat /orang.
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            Batal
+          </Button>
+          <Button
+            disabled={saving}
+            onClick={submit}
+          >
+            {saving ? "Menyimpan…" : "Simpan"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /** Cancel a Session, which is how it is removed — a reason is required, and it stays visible. */
 function CancelDialog({ perjadinId, sessionId }: { perjadinId: string; sessionId: string }) {
   const [open, setOpen] = useState(false);
@@ -501,6 +611,23 @@ function CancelDialog({ perjadinId, sessionId }: { perjadinId: string; sessionId
   );
 }
 
+/**
+ * What a Session's Pimpinan picker offers: the roster, plus anyone already on this Session who has
+ * since left it (a revoked Pimpinan), so their chip still shows and can be removed. The write keeps
+ * an already-recorded Pimpinan, so offering them is offering what is there.
+ */
+function sessionPimpinanOptions(
+  roster: RosterPimpinan[],
+  session?: PerjadinSession,
+): { value: string; label: string }[] {
+  return [
+    ...roster.map((person) => ({ value: person.id, label: person.fullName })),
+    ...(session?.pimpinan ?? [])
+      .filter((entry) => !roster.some((person) => person.id === entry.personId))
+      .map((entry) => ({ value: entry.personId, label: entry.name })),
+  ];
+}
+
 /** What each add/edit refusal says. Field-level messages; nothing was written. */
 function sessionRefusalMessage(
   result: AddPerjadinSessionResult | EditPerjadinSessionResult,
@@ -531,4 +658,4 @@ function sessionRefusalMessage(
   }
 }
 
-export { PerjadinSessions };
+export { PerjadinSessions, sessionPimpinanOptions };

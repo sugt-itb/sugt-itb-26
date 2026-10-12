@@ -14,6 +14,7 @@ vi.mock("-/app/(app)/perjadin/[id]/actions", () => ({
   addPerjadinSessionAction: vi.fn(),
   cancelPerjadinSessionAction: vi.fn(),
   editPerjadinSessionAction: vi.fn(),
+  setSessionPimpinanAction: vi.fn(),
 }));
 
 const session: PerjadinSession = {

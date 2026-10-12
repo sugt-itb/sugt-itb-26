@@ -126,31 +126,13 @@ async function checkPlacement(
     if (unknown.length > 0) return { outcome: "unknown-teacher", teacherIds: unknown };
   }
 
-  // A Pimpinan must be on the roster — an active Person of role Pimpinan, as planning requires — or
-  // be recorded on this Session already: a Pimpinan revoked since stays on the Sessions they
-  // attended, and re-saving the Session must not refuse them. The composite
-  // `session_pimpinan_is_pimpinan` FK refuses a non-Pimpinan at the database regardless.
-  const pimpinan = [...new Set(input.pimpinanPersonIds)];
-  const notOnRoster = await unknownPimpinanIds(pimpinan);
-  if (notOnRoster.length > 0) {
-    const kept = new Set(
-      excludeSessionId === undefined
-        ? []
-        : (
-            await tx
-              .select({ personId: sessionPimpinan.personId })
-              .from(sessionPimpinan)
-              .where(
-                and(
-                  eq(sessionPimpinan.sessionId, excludeSessionId),
-                  inArray(sessionPimpinan.personId, notOnRoster),
-                ),
-              )
-          ).map((row) => row.personId),
-    );
-    const unknown = notOnRoster.filter((id) => !kept.has(id));
-    if (unknown.length > 0) return { outcome: "unknown-pimpinan", personIds: unknown };
-  }
+  const unknownPimpinan = await unknownSessionPimpinan(
+    tx,
+    input.pimpinanPersonIds,
+    excludeSessionId,
+  );
+  if (unknownPimpinan.length > 0)
+    return { outcome: "unknown-pimpinan", personIds: unknownPimpinan };
 
   // The trip's other live offline Sessions — cancelled ones count for nothing, and the edited
   // Session is excluded so it never clashes with, or caps out against, itself.
@@ -205,6 +187,37 @@ async function replaceTeachingTeam(tx: Tx, sessionId: string, teacherIds: string
       .insert(sessionTeachingTeam)
       .values(wanted.map((perjadinTeacherId) => ({ sessionId, perjadinTeacherId })));
   }
+}
+
+/**
+ * The Pimpinan ids a Session may not record. A Pimpinan must be on the roster — an active Person of
+ * role Pimpinan, as planning requires — or be recorded on this Session already: a Pimpinan revoked
+ * since stays on the Sessions they attended, and re-saving the Session must not refuse them. The
+ * composite `session_pimpinan_is_pimpinan` FK refuses a non-Pimpinan at the database regardless.
+ * `sessionId` is absent for a Session not yet written, which has nobody recorded.
+ */
+async function unknownSessionPimpinan(
+  tx: Tx,
+  personIds: string[],
+  sessionId: string | undefined,
+): Promise<string[]> {
+  const notOnRoster = await unknownPimpinanIds([...new Set(personIds)], tx);
+  if (notOnRoster.length === 0 || sessionId === undefined) return notOnRoster;
+
+  const kept = new Set(
+    (
+      await tx
+        .select({ personId: sessionPimpinan.personId })
+        .from(sessionPimpinan)
+        .where(
+          and(
+            eq(sessionPimpinan.sessionId, sessionId),
+            inArray(sessionPimpinan.personId, notOnRoster),
+          ),
+        )
+    ).map((row) => row.personId),
+  );
+  return notOnRoster.filter((id) => !kept.has(id));
 }
 
 /** Replace a Session's `session_pimpinan` rows with the (deduped) set named. */
@@ -306,8 +319,8 @@ export type EditPerjadinSessionResult =
 /**
  * Edit one offline Session's School, date, time, "Diajar oleh" and Pimpinan. Staff-only, and
  * offered only while the Session is `arranged` — a delivered Session records something that
- * happened, so its fields are fixed. The same placement rules apply, checked against the trip's other Sessions with
- * this one excluded so it does not clash with, or count against, itself.
+ * happened, so its fields are fixed. The same placement rules apply, checked against the trip's
+ * other Sessions with this one excluded so it does not clash with, or count against, itself.
  *
  * A missing Session **throws** rather than returning a value: Detail Perjadin 404s on an unknown id
  * before it offers any write, and nothing deletes a Session, so an id that names nothing arrived by a
@@ -381,4 +394,56 @@ export async function editPerjadinSession(
       })) ?? { outcome: "duplicate-session" }
     );
   }
+}
+
+export type SetSessionPimpinanResult =
+  | { outcome: "set" }
+  /** A cancelled Session: nobody came on the trip through it, so its Pimpinan stay as they were. */
+  | { outcome: "cancelled" }
+  /** An id that is neither an active Pimpinan nor already recorded on the Session. */
+  | { outcome: "unknown-pimpinan"; personIds: string[] };
+
+/**
+ * **Set a delivered Session's Pimpinan** (#492, ADR-0056). Staff-only, and the same writers as
+ * every other Session write (`requireSessionWriter`, ADR-0048).
+ *
+ * The Session dialog edits an arranged Session's Pimpinan with the rest of it, and a delivered
+ * Session's School, date and time are settled. Its Pimpinan are not: who attended is often recorded
+ * after the trip, and migration `0054` copied each trip's Pimpinan onto all of its live Sessions
+ * for writers to narrow. So this write changes the Pimpinan alone, whatever the Session's status,
+ * except a cancelled Session's, which no longer counts towards the trip. The roster rule is the
+ * dialog's.
+ *
+ * A missing or online Session **throws**, as `editPerjadinSession` does: the trip page offers this
+ * only on its own offline Sessions.
+ */
+export async function setSessionPimpinan(
+  caller: Person,
+  sessionId: string,
+  personIds: string[],
+): Promise<SetSessionPimpinanResult> {
+  requireStaff(caller);
+
+  return db.transaction(async (tx) => {
+    await requireSessionWriter(caller, sessionId, tx);
+
+    const [row] = await tx
+      .select({ status: session.status, perjadinId: session.perjadinId })
+      .from(session)
+      .where(eq(session.id, sessionId))
+      .for("update");
+    if (!row || row.perjadinId === null) {
+      throw new Error(
+        `No offline Session has id ${sessionId}. Detail Perjadin offers this only on its own ` +
+          "Sessions, so this is a bug or a hand-edited request.",
+      );
+    }
+    if (row.status === "cancelled") return { outcome: "cancelled" };
+
+    const unknown = await unknownSessionPimpinan(tx, personIds, sessionId);
+    if (unknown.length > 0) return { outcome: "unknown-pimpinan", personIds: unknown };
+
+    await replaceSessionPimpinan(tx, sessionId, personIds);
+    return { outcome: "set" };
+  });
 }

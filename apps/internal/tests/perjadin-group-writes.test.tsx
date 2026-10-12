@@ -10,6 +10,7 @@ import {
   removePerjadinTeacherAction,
   renamePerjadinTeacherAction,
   setPerjadinStaffAction,
+  setSessionPimpinanAction,
   togglePreparationItemAction,
   updatePerjadinDatesAction,
 } from "-/app/(app)/perjadin/[id]/actions";
@@ -69,6 +70,7 @@ import {
   removePerjadinTeacher,
   renamePerjadinTeacher,
   setPerjadinStaff,
+  setSessionPimpinan,
   togglePreparationItem,
   transactionDeleteTarget,
   updatePerjadinDates,
@@ -317,6 +319,11 @@ const WRITES: [
   ["Group Staff", (c, a, who) => setPerjadinStaff(c, a.id, [who.andi.id]), "set"],
   ["Change PIC", (c, a, who) => changePerjadinPic(c, a.id, who.andi.id), "changed"],
   [
+    "delivered Session Pimpinan",
+    (c, a, who) => setSessionPimpinan(c, a.deliveredId, [who.hadi.id]),
+    "set",
+  ],
+  [
     "Session Pimpinan",
     (c, a, who, where) =>
       editPerjadinSession(c, a.arrangedId, {
@@ -529,6 +536,10 @@ describe("the actions answer a non-member with a 403", () => {
     const calls: [string, () => Promise<unknown>][] = [
       ["Group Staff", () => setPerjadinStaffAction(a.id, [])],
       ["Change PIC", () => changePerjadinPicAction(a.id, who.andi.id)],
+      [
+        "delivered Session Pimpinan",
+        () => setSessionPimpinanAction(a.id, a.deliveredId, [who.hadi.id]),
+      ],
       [
         "Session Pimpinan",
         () =>

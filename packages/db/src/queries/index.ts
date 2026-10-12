@@ -189,10 +189,12 @@ export {
 export {
   addPerjadinSession,
   editPerjadinSession,
+  setSessionPimpinan,
   type AddPerjadinSessionResult,
   type EditPerjadinSessionResult,
   type PerjadinSessionInput,
   type SessionPlacementRefusal,
+  type SetSessionPimpinanResult,
 } from "./perjadin-sessions";
 export { type TripPimpinan } from "./trip-pimpinan";
 export { type SchoolBookedOnAnotherPerjadin } from "./school-slot";

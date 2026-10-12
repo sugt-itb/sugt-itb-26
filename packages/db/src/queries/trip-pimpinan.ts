@@ -19,8 +19,7 @@ import { school } from "../schema/reference";
 export type TripPimpinan = {
   personId: string;
   name: string;
-  /** School names, deduped and in name order. Never empty: the Pimpinan is on the trip through one.
-   * */
+  /** School names, deduped, in name order. Never empty: the Pimpinan is on the trip through one. */
   schools: string[];
 };
 

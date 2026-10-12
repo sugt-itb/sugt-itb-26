@@ -12,6 +12,7 @@ import {
   removePerjadinTeacher,
   renamePerjadinTeacher,
   setPerjadinStaff,
+  setSessionPimpinan,
 } from "@sugt/db/queries";
 import type { Role } from "@sugt/domain";
 import { eq } from "drizzle-orm";
@@ -918,6 +919,60 @@ describe("a Session's Pimpinan", () => {
     expect(refusal).toBe("session_pimpinan_is_pimpinan");
   });
 
+  /**
+   * A delivered Session's School, date and time are settled, but who attended is often recorded after
+   * the trip — and the migration left every trip Pimpinan on each live Session to be narrowed — so
+   * its Pimpinan alone stay writable. A cancelled Session no longer counts, and is left alone.
+   */
+  it("sets a delivered Session's Pimpinan alone, but not a cancelled one's", async () => {
+    const a = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
+    const b = await pimpinan("Anton Timur Jaelani", "anton@ditsama.itb.ac.id");
+    const { pic, perjadinId, schools } = await trip();
+    const delivered = await addOfflineSession({
+      schoolId: schools[0].id,
+      heldOn: "2026-09-01",
+      perjadinId,
+      status: "delivered",
+    });
+    const cancelled = await addOfflineSession({
+      schoolId: schools[1].id,
+      heldOn: "2026-09-02",
+      perjadinId,
+      status: "cancelled",
+    });
+
+    expect(await setSessionPimpinan(pic, delivered.id, [a.id, b.id, a.id])).toEqual({
+      outcome: "set",
+    });
+    expect(await pimpinanOf(delivered.id)).toEqual([a.fullName, b.fullName].sort());
+    expect(await setSessionPimpinan(pic, delivered.id, [b.id])).toEqual({ outcome: "set" });
+    expect(await pimpinanOf(delivered.id)).toEqual([b.fullName]);
+
+    // The same roster rule as the dialog: a Staff id is refused, nothing changes.
+    expect(await setSessionPimpinan(pic, delivered.id, [pic.id])).toEqual({
+      outcome: "unknown-pimpinan",
+      personIds: [pic.id],
+    });
+    expect(await pimpinanOf(delivered.id)).toEqual([b.fullName]);
+
+    expect(await setSessionPimpinan(pic, cancelled.id, [a.id])).toEqual({ outcome: "cancelled" });
+    expect(await pimpinanOf(cancelled.id)).toEqual([]);
+  });
+
+  it("refuses a non-Staff caller on a delivered Session's Pimpinan", async () => {
+    const { perjadinId, schools } = await trip();
+    const delivered = await addOfflineSession({
+      schoolId: schools[0].id,
+      heldOn: "2026-09-01",
+      perjadinId,
+      status: "delivered",
+    });
+
+    await expect(setSessionPimpinan(nonStaff(), delivered.id, [])).rejects.toSatisfy(
+      isNotStaffError,
+    );
+  });
+
   it("goes with its Session — the rows cascade when the Session is deleted", async () => {
     const a = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
     const { added } = await sessionWith([a.id]);
@@ -995,7 +1050,7 @@ describe("perjadinDetail's new payload", () => {
     // Fatimah at both Schools (twice at SMAN 2), Anton at SMAN 2 only, Sinta only at a Session
     // that is then cancelled.
     await add(schools[0].id, "2026-09-01", [fatimah.id]);
-    await add(schools[1].id, "2026-09-02", [fatimah.id, anton.id]);
+    const both = await add(schools[1].id, "2026-09-02", [fatimah.id, anton.id]);
     await add(schools[1].id, "2026-09-03", [fatimah.id]);
     const called = await add(schools[0].id, "2026-09-03", [sinta.id], "13:00");
     expect(await cancelSession(pic, called, "Sekolah libur")).toMatchObject({
@@ -1011,6 +1066,11 @@ describe("perjadinDetail's new payload", () => {
         name: fatimah.fullName,
         schools: ["SMAN 1 Bandung", "SMAN 2 Bandung"],
       },
+    ]);
+    // A Session's own list is in name order too, whatever order it was picked in.
+    expect(detail?.sessions.find((row) => row.sessionId === both)?.pimpinan).toEqual([
+      { personId: anton.id, name: anton.fullName },
+      { personId: fatimah.id, name: fatimah.fullName },
     ]);
     // The cancelled Session still lists Sinta on its own row.
     const cancelled = detail?.sessions.find((row) => row.sessionId === called);

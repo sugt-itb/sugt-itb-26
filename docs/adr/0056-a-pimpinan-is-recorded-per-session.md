@@ -46,6 +46,11 @@ visits they were not at.
 - **Set in the Session dialog and the Rencanakan form**, by the same people who edit a Session
   today (ADR-0048; Rencanakan stays a Perjadin Editor's, ADR-0047). The trip page's Pimpinan
   section becomes a read-only list, each name followed by the Schools they were recorded at.
+- **A delivered Session's Pimpinan stay writable.** Its School, date and time are settled, so the
+  Session dialog is offered only while it is arranged; but who attended is often recorded after the
+  trip, and the backfill below leaves Pimpinan on Sessions they missed. So a delivered Session has
+  its own **Ubah Pimpinan**, which changes the Pimpinan alone, for the same writers. A cancelled
+  Session's are left as they were: it no longer counts.
 - **A new pick must be on the roster; a recorded one may stay.** Every id is checked against the
   active Pimpinan roster, as before, except one already on that Session: a Pimpinan revoked since
   still attended, and re-saving the Session must not refuse them.
@@ -61,8 +66,8 @@ visits they were not at.
 - **The build and `0054` go live together.** The build before this one reads `perjadin_pimpinan` and
   this one reads `session_pimpinan`, so between the two the trip, Laporan and `/pendamping` pages
   fail. Apply `0054` straight after this build is live.
-- **A delivered Session's Pimpinan are fixed**, like the rest of it: the Session dialog is offered
-  only while a Session is arranged. After the migration, a past trip's Pimpinan sit on all its
-  delivered Sessions and cannot be narrowed in the tool.
+- **Past trips need narrowing by hand.** After the migration, a past trip's Pimpinan sit on every
+  one of its delivered Sessions until someone removes them, Session by Session, through Ubah
+  Pimpinan.
 - **The Perjadin Evaluation is unaffected.** A Pimpinan who files one still self-declares the Role on
   the token link (ADR-0024); that string is unrelated to this record.

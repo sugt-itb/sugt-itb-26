@@ -5,6 +5,8 @@ import { db } from "../client";
 import { person } from "../schema/people";
 import { province, school } from "../schema/reference";
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 /**
  * The two lists every planning form picks from, and the Schools a Coverage selection names.
  *
@@ -116,13 +118,18 @@ export async function activeRosters(): Promise<{
  *
  * Takes the ids to check (the caller dedupes for its own insert) and returns those with no matching
  * active-Pimpinan row, in input order. An empty input is a query with no answer, so it is skipped.
+ * A write that checks inside its transaction passes its `tx` as `reader`, so the check reads what
+ * the transaction sees.
  */
-export async function unknownPimpinanIds(ids: string[]): Promise<string[]> {
+export async function unknownPimpinanIds(
+  ids: string[],
+  reader: Tx | typeof db = db,
+): Promise<string[]> {
   if (ids.length === 0) return [];
 
   const valid = new Set(
     (
-      await db
+      await reader
         .select({ id: person.id })
         .from(person)
         .where(and(inArray(person.id, ids), eq(person.active, true), eq(person.role, "Pimpinan")))

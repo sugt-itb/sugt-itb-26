@@ -1,5 +1,5 @@
 import { PerjadinPimpinan } from "-/components/perjadin-pimpinan";
-import { PerjadinSessions } from "-/components/perjadin-sessions";
+import { PerjadinSessions, sessionPimpinanOptions } from "-/components/perjadin-sessions";
 import type { PerjadinSession } from "@sugt/db/queries";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -16,6 +16,7 @@ vi.mock("-/app/(app)/perjadin/[id]/actions", () => ({
   addPerjadinSessionAction: vi.fn(),
   cancelPerjadinSessionAction: vi.fn(),
   editPerjadinSessionAction: vi.fn(),
+  setSessionPimpinanAction: vi.fn(),
 }));
 
 const session: PerjadinSession = {
@@ -66,11 +67,39 @@ describe("a Session row's Pimpinan", () => {
     }
   });
 
+  it("offers Ubah Pimpinan on a delivered Session to whoever writes the trip, and only there", () => {
+    const delivered = { ...session, status: "delivered" as const };
+
+    expect(renderSessions([delivered])).toContain(">Ubah Pimpinan<");
+    // An arranged Session's Pimpinan are in its Ubah dialog with the rest of it.
+    expect(renderSessions([session])).not.toContain(">Ubah Pimpinan<");
+    expect(renderSessions([{ ...session, status: "cancelled" as const }])).not.toContain(
+      ">Ubah Pimpinan<",
+    );
+    expect(renderSessions([delivered], false)).not.toContain(">Ubah Pimpinan<");
+  });
+
   it("renders no list for a Session with no Pimpinan", () => {
     const html = renderSessions([{ ...session, pimpinan: [] }]);
 
     expect(html).not.toContain('aria-label="Pimpinan Sesi');
     expect(html).not.toContain("Pimpinan:");
+  });
+});
+
+describe("a Session's Pimpinan picker", () => {
+  it("offers the roster, plus a recorded Pimpinan who has since left it", () => {
+    const roster = [{ id: "p-2", fullName: "Fatimah Arofiati Noor" }];
+
+    // Adding a Session: the roster alone.
+    expect(sessionPimpinanOptions(roster)).toEqual([
+      { value: "p-2", label: "Fatimah Arofiati Noor" },
+    ]);
+    // Editing one whose Anton was revoked since: still offered, so the chip shows and can go.
+    expect(sessionPimpinanOptions(roster, session)).toEqual([
+      { value: "p-2", label: "Fatimah Arofiati Noor" },
+      { value: "p-1", label: "Anton Timur Jaelani" },
+    ]);
   });
 });
 

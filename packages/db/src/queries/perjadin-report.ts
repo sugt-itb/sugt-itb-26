@@ -90,9 +90,9 @@ export type PerjadinAcquittal = {
   /**
    * The Pimpinan who joined this trip — record-only, the names of real Pimpinan-Person rows (#181)
    * derived from the trip's non-cancelled Sessions (#492, ADR-0056), ordered so the Report and its
-   * CSV read the same on every load. A
-   * printed trip report names who travelled; these carry no money, so they belong on the Laporan
-   * rather than a delivery surface ([#142], ADR-0004). Empty when none joined.
+   * CSV read the same on every load. A printed trip report names who travelled; these carry no
+   * money, so they belong on the Laporan rather than a delivery surface ([#142], ADR-0004). Empty
+   * when none joined.
    */
   pimpinan: string[];
 };
