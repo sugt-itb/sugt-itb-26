@@ -214,7 +214,7 @@ What a Teaching Team member says about one **Class** they taught at one Session.
 _Avoid_: Session Record (that is the PIC's, and covers the visit), part (the old six-part structure is gone), class evaluation
 
 **Aspect**:
-One of the named things an evaluation scores. Each of the four evaluations has its own list, because each asks a question only that filer can answer — the PIC never saw comprehension, a Participant cannot grade their own readiness, and nobody but the Group slept in the hotel. Participant Feedback's list also depends on the Class: the Student Class is asked one Aspect the others are not.
+One of the named things an evaluation scores. Each of the four evaluations has its own list, because each asks a question only that filer can answer — the PIC never saw comprehension, a Participant cannot grade their own readiness, and nobody but the Group slept in the hotel. Two lists also depend on who is filing: Participant Feedback's on the Class (the Student Class is asked one Aspect the others are not), and a Perjadin Evaluation's on the self-declared Role (a Pendamping is not asked **Pendamping Support**).
 _Avoid_: category, criterion, dimension, metric, section
 
 **Rating**:
@@ -222,7 +222,7 @@ The score one person gives one Aspect, from 1 to 10. Ratings are the only thing 
 _Avoid_: grade, mark, health, RAG, status
 
 **Perjadin Evaluation**:
-How the trip went, as against how the teaching went: a Rating for each of **Lodging**, **Transport**, **Meals** and **Punctuality**, each carrying an optional comment, required only when that Aspect's own Rating is low (#163, ADR-0023). Filed **without signing in**, through a token link shared from the trip's page — one that never expires and is never replaced ([ADR-0049](./docs/adr/0049-feedback-links-never-expire-and-are-never-replaced.md)) — by a filer who self-declares a Role (**Narasumber**, **Pendamping** or **Pimpinan**) and a Name — the same untrusted-identity pattern as **Participant Feedback** (ADR-0012, ADR-0024). No dedup: anyone with the link may file, as many times as they like. Any signed-in Person may issue the link — it carries no money.
+How the trip went, as against how the teaching went: a Rating for each of **Lodging**, **Transport**, **Meals** and **Punctuality**, and — from a filer who declares themselves **Narasumber** or **Pimpinan** only — **Pendamping Support** (_Bantuan Pendamping_): whether the **Pendamping** helped while the activity was under way. A Pendamping is not asked it, because they would be Rating themselves; evaluations filed before it existed hold none either ([ADR-0054](./docs/adr/0054-pendamping-support-is-rated-only-by-narasumber-and-pimpinan.md)). Each Aspect carries an optional comment, required only when that Aspect's own Rating is low (#163, ADR-0023). Filed **without signing in**, through a token link shared from the trip's page — one that never expires and is never replaced ([ADR-0049](./docs/adr/0049-feedback-links-never-expire-and-are-never-replaced.md)) — by a filer who self-declares a Role (**Narasumber**, **Pendamping** or **Pimpinan**) and a Name — the same untrusted-identity pattern as **Participant Feedback** (ADR-0012, ADR-0024). No dedup: anyone with the link may file, as many times as they like. Any signed-in Person may issue the link — it carries no money.
 _Avoid_: travel evaluation ("travel" is reserved against **Perjadin**), trip report, Perjadin Report (that is the acquittal — any signed-in Person may **read** it since #180/ADR-0026, and only **writing** it is Staff-only)
 
 **Participant**:

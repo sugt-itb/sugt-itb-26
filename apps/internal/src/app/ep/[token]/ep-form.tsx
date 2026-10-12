@@ -1,10 +1,8 @@
 "use client";
 
 import { RATING_INSTRUCTION } from "-/lib/rating-copy";
-import type { PerjadinEvaluationRatings } from "@sugt/db/queries";
 import {
   CONCERN_AT_OR_BELOW,
-  PERJADIN_ASPECTS,
   PERJADIN_EVALUATION_ROLES,
   RATING_MAX,
   RATING_MIN,
@@ -27,15 +25,28 @@ import { Textarea } from "@sugt/ui/components/textarea";
 import { useId, useState, useTransition } from "react";
 
 import { submitPerjadinEvaluationAction } from "./actions";
+import {
+  answersForRole,
+  askedAspects,
+  evaluationSubmission,
+  proseGaps,
+  ratingsComplete,
+  type AspectAnswers,
+} from "./evaluation-answers";
 import { GoneNotice } from "./gone-notice";
 
 /**
  * **The public Perjadin Evaluation form** — filled after opening the `/ep/{token}` link, with no
  * sign-in (ADR-0024). It carries the rating/prose UX of the retired authenticated
- * `perjadin-evaluation-form.tsx` — the four Aspects, the "Tidak menginap" day-trip path for
+ * `perjadin-evaluation-form.tsx` — the logistics Aspects, the "Tidak menginap" day-trip path for
  * lodging, one optional Komentar per Aspect, and the per-Aspect prose check — and wraps it in the
  * token form's shell: a header naming the trip, a self-declared Role and Name, and a swap to a
  * thank-you on submit, the same shape as `f/[token]/feedback-form.tsx`.
+ *
+ * **The Role decides the last Aspect** (#481, ADR-0054): Pendamping Support appears once a
+ * Narasumber or a Pimpinan is picked, and is then required; a Pendamping is not asked it, and
+ * switching to Pendamping drops one already given. What is asked, kept and sent lives in
+ * `./evaluation-answers.ts`, tested without mounting this.
  *
  * Client-side because it holds a rubric's worth of state and swaps itself for a thank-you or a
  * dead-link notice. The token is the only credential it carries; the submit re-resolves it.
@@ -43,24 +54,24 @@ import { GoneNotice } from "./gone-notice";
 
 /**
  * The Aspect names in Indonesian — the form copy around the English domain terms, the same edge
- * translation `record-forms.tsx` makes and `CONTEXT.md` § *Language* asks for.
+ * translation `record-forms.tsx` makes and `CONTEXT.md` § *Language* asks for. Each heads its
+ * Komentar too; Pendamping Support's short name is *Bantuan Pendamping*.
  */
 const PERJADIN_ASPECT_LABELS: Record<PerjadinAspect, string> = {
   lodging: "Penginapan",
   transport: "Transportasi",
   meals: "Konsumsi",
   punctuality: "Ketepatan waktu",
+  pendamping_support: "Bantuan Pendamping",
 };
 
 /**
- * The Aspects that are always rated — `PERJADIN_ASPECTS` without `lodging`, which is handled on
- * its own because it is nullable. Derived from the domain list rather than restated, so a new
- * Aspect there reaches the form without a second edit.
+ * What the Rating control says where it is not the Aspect's name. Pendamping Support is asked as a
+ * statement to agree with, worded with the product owner (#481) and shown exactly as written.
  */
-type AlwaysRated = Exclude<PerjadinAspect, "lodging">;
-const ALWAYS_RATED = PERJADIN_ASPECTS.filter(
-  (aspect): aspect is AlwaysRated => aspect !== "lodging",
-);
+const RATING_LABELS: AspectAnswers<string> = {
+  pendamping_support: "Pendamping membantu selama keberjalanan kegiatan.",
+};
 
 const INSTRUCTION = `${RATING_INSTRUCTION} Nilai ${CONCERN_AT_OR_BELOW} ke bawah wajib disertai penjelasan pada Komentar aspek tersebut.`;
 
@@ -81,14 +92,15 @@ function EpForm({
   const [role, setRole] = useState<PerjadinEvaluationRole | undefined>(undefined);
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState(false);
-  const [lodging, setLodging] = useState<number | undefined>(undefined);
+  const [ratings, setRatings] = useState<AspectAnswers<number>>({});
   const [noLodging, setNoLodging] = useState(false);
-  const [others, setOthers] = useState<Partial<Record<AlwaysRated, number>>>({});
   // One optional Komentar per Aspect, so a comment belongs to the Rating it explains (#163).
-  const [comments, setComments] = useState<Partial<Record<PerjadinAspect, string>>>({});
+  const [comments, setComments] = useState<AspectAnswers<string>>({});
   // Which Aspects are lit as owing prose — a set, not one flag, because the requirement is
   // per-Aspect: a low `transport` highlights only Transportasi's Komentar.
-  const [proseNeeded, setProseNeeded] = useState<Partial<Record<PerjadinAspect, boolean>>>({});
+  const [proseNeeded, setProseNeeded] = useState<AspectAnswers<boolean>>({});
+  // The write found the Ratings were not the Role's — only a forced request gets here.
+  const [incomplete, setIncomplete] = useState(false);
   const [done, setDone] = useState(false);
   const [gone, setGone] = useState(false);
   const [saving, startSaving] = useTransition();
@@ -97,39 +109,23 @@ function EpForm({
   const roleId = useId();
   const noLodgingId = useId();
 
-  const othersRated = ALWAYS_RATED.every((aspect) => others[aspect] !== undefined);
-  const lodgingSettled = noLodging || lodging !== undefined;
-  const canSubmit = role !== undefined && name.trim() !== "" && othersRated && lodgingSettled;
+  // Lodging has its own block, with the day-trip box; every other asked Aspect is a row below it.
+  const rowAspects = askedAspects(role).filter((aspect) => aspect !== "lodging");
+  const canSubmit =
+    role !== undefined && name.trim() !== "" && ratingsComplete({ role, ratings, noLodging });
 
   /** Clear one Aspect's prose warning — its Komentar was typed, or its Rating was raised. */
   function clearProse(aspect: PerjadinAspect) {
     setProseNeeded((previous) => ({ ...previous, [aspect]: false }));
   }
 
-  /**
-   * Which low Aspects still owe their own Komentar. Per-Aspect: prose on a different Aspect does
-   * not satisfy a low one (#163). A null `lodging` is not low — it drops out exactly as Postgres
-   * `least()` leaves a NULL out of the minimum — so it never appears here.
-   */
-  function proseGaps(ratings: PerjadinEvaluationRatings): Partial<Record<PerjadinAspect, boolean>> {
-    const byAspect: Record<PerjadinAspect, number | null> = {
-      lodging: ratings.lodging,
-      transport: ratings.transport,
-      meals: ratings.meals,
-      punctuality: ratings.punctuality,
-    };
-    const gaps: Partial<Record<PerjadinAspect, boolean>> = {};
-    for (const aspect of PERJADIN_ASPECTS) {
-      const rating = byAspect[aspect];
-      if (
-        rating !== null &&
-        rating <= CONCERN_AT_OR_BELOW &&
-        (comments[aspect]?.trim() ?? "") === ""
-      ) {
-        gaps[aspect] = true;
-      }
-    }
-    return gaps;
+  /** Pick a Role, dropping whatever was given for an Aspect it is not asked. */
+  function pickRole(next: PerjadinEvaluationRole) {
+    setRole(next);
+    setRatings((previous) => answersForRole(next, previous));
+    setComments((previous) => answersForRole(next, previous));
+    setProseNeeded((previous) => answersForRole(next, previous));
+    setIncomplete(false);
   }
 
   function submit() {
@@ -137,41 +133,26 @@ function EpForm({
       setNameError(true);
       return;
     }
-    if (!canSubmit) return;
     // A null lodging must be a choice — *Tidak menginap* — never an unrated control degrading into
     // one. The column is nullable by design, so the write cannot catch a mistake here.
-    if (!noLodging && lodging === undefined) return;
+    if (!canSubmit) return;
 
-    const ratings: PerjadinEvaluationRatings = {
-      lodging: noLodging ? null : lodging!,
-      transport: others.transport!,
-      meals: others.meals!,
-      punctuality: others.punctuality!,
-    };
+    const submission = evaluationSubmission({ role, name, ratings, noLodging, comments });
 
     // Checked here so each message lands on its own Aspect's Komentar, and again in the write
     // function so it is a rule rather than a convenience.
-    const gaps = proseGaps(ratings);
+    const gaps = proseGaps(submission);
     if (Object.keys(gaps).length > 0) {
       setProseNeeded(gaps);
       return;
     }
 
     startSaving(async () => {
-      const result = await submitPerjadinEvaluationAction(token, {
-        role: role!,
-        name: name.trim(),
-        ratings,
-        comments: {
-          lodging: blankToNull(comments.lodging ?? ""),
-          transport: blankToNull(comments.transport ?? ""),
-          meals: blankToNull(comments.meals ?? ""),
-          punctuality: blankToNull(comments.punctuality ?? ""),
-        },
-      });
+      const result = await submitPerjadinEvaluationAction(token, submission);
       if (result.outcome === "filed") setDone(true);
       else if (result.outcome === "name-required") setNameError(true);
-      else if (result.outcome === "prose-required") setProseNeeded(proseGaps(ratings));
+      else if (result.outcome === "prose-required") setProseNeeded(proseGaps(submission));
+      else if (result.outcome === "ratings-mismatch") setIncomplete(true);
       else setGone(true);
     });
   }
@@ -206,7 +187,7 @@ function EpForm({
             items={Object.fromEntries(PERJADIN_EVALUATION_ROLES.map((r) => [r, r]))}
             value={role ?? null}
             onValueChange={(value) => {
-              if (value !== null) setRole(value as PerjadinEvaluationRole);
+              if (value !== null) pickRole(value as PerjadinEvaluationRole);
             }}
           >
             <SelectTrigger
@@ -247,10 +228,10 @@ function EpForm({
             namePrefix={namePrefix}
             aspect="lodging"
             label={PERJADIN_ASPECT_LABELS.lodging}
-            value={lodging}
+            value={ratings.lodging}
             disabled={noLodging}
             onValueChange={(value) => {
-              setLodging(value);
+              setRatings((previous) => ({ ...previous, lodging: value }));
               clearProse("lodging");
             }}
           />
@@ -261,9 +242,9 @@ function EpForm({
               onCheckedChange={(checked) => {
                 setNoLodging(checked === true);
                 if (checked === true) {
-                  setLodging(undefined);
-                  // A skipped hotel has no Komentar and owes none — clear both so a stale one
-                  // cannot travel or light up. Skipping only lowers obligations, never raises.
+                  // A skipped hotel has no Rating and no Komentar, and owes none — clear both so a
+                  // stale one cannot travel or light up. Skipping only lowers obligations.
+                  setRatings(({ lodging: _skipped, ...rest }) => rest);
                   setComments((previous) => ({ ...previous, lodging: "" }));
                 }
                 clearProse("lodging");
@@ -286,7 +267,7 @@ function EpForm({
           )}
         </div>
 
-        {ALWAYS_RATED.map((aspect) => (
+        {rowAspects.map((aspect) => (
           <div
             key={aspect}
             className="grid gap-2"
@@ -294,10 +275,10 @@ function EpForm({
             <RatingField
               namePrefix={namePrefix}
               aspect={aspect}
-              label={PERJADIN_ASPECT_LABELS[aspect]}
-              value={others[aspect]}
+              label={RATING_LABELS[aspect] ?? PERJADIN_ASPECT_LABELS[aspect]}
+              value={ratings[aspect]}
               onValueChange={(value) => {
-                setOthers((previous) => ({ ...previous, [aspect]: value }));
+                setRatings((previous) => ({ ...previous, [aspect]: value }));
                 clearProse(aspect);
               }}
             />
@@ -314,6 +295,9 @@ function EpForm({
           </div>
         ))}
 
+        {incomplete && (
+          <p className="text-sm text-destructive">Beri nilai untuk tiap aspek, lalu kirim lagi.</p>
+        )}
         <Button
           disabled={saving || !canSubmit}
           onClick={submit}
@@ -399,12 +383,6 @@ function ProseField({
       {message !== undefined && <p className="text-sm text-destructive">{message}</p>}
     </div>
   );
-}
-
-/** A blank or whitespace-only field travels as nothing, matching the write's own `prose`. */
-function blankToNull(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed === "" ? null : trimmed;
 }
 
 export { EpForm };

@@ -44,8 +44,20 @@ async function aTrip(picPersonId: string) {
 /** The resolved-token caller a public submit is checked against — what the app produces, never a Person. */
 const asToken = (perjadinId: string): PerjadinToken => ({ kind: "perjadin", perjadinId });
 
-/** Every Rating comfortably above the threshold — an overnight trip that went well. */
-const FINE: PerjadinEvaluationRatings = { lodging: 9, transport: 9, meals: 9, punctuality: 9 };
+/**
+ * Every Rating comfortably above the threshold — an overnight trip that went well, as a Narasumber
+ * or a Pimpinan files it: Pendamping Support included.
+ */
+const FINE: PerjadinEvaluationRatings = {
+  lodging: 9,
+  transport: 9,
+  meals: 9,
+  punctuality: 9,
+  pendamping_support: 9,
+};
+
+/** The same trip as a Pendamping files it: not asked Pendamping Support (ADR-0054). */
+const FINE_FROM_PENDAMPING: PerjadinEvaluationRatings = { ...FINE, pendamping_support: null };
 
 /** No Komentar on any Aspect — the common case when nothing was Rated low. */
 const NO_COMMENTS: PerjadinEvaluationComments = {
@@ -53,6 +65,7 @@ const NO_COMMENTS: PerjadinEvaluationComments = {
   transport: null,
   meals: null,
   punctuality: null,
+  pendamping_support: null,
 };
 
 /** How many Perjadin Evaluations landed against a trip. */
@@ -112,7 +125,7 @@ describe("filePerjadinEvaluation", () => {
     const result = await filePerjadinEvaluation(asToken(trip.id), {
       role: "Pendamping",
       name: "Dewi",
-      ratings: { ...FINE, lodging: null },
+      ratings: { ...FINE_FROM_PENDAMPING, lodging: null },
       comments: NO_COMMENTS,
     });
 
@@ -126,7 +139,7 @@ describe("filePerjadinEvaluation", () => {
     const result = await filePerjadinEvaluation(asToken(trip.id), {
       role: "Pendamping",
       name: "   ",
-      ratings: FINE,
+      ratings: FINE_FROM_PENDAMPING,
       comments: NO_COMMENTS,
     });
 
@@ -172,7 +185,7 @@ describe("filePerjadinEvaluation", () => {
     const refused = await filePerjadinEvaluation(asToken(trip.id), {
       role: "Pendamping",
       name: "Dewi",
-      ratings: { ...FINE, transport: 4 },
+      ratings: { ...FINE_FROM_PENDAMPING, transport: 4 },
       comments: { ...NO_COMMENTS, meals: "Makan siang enak" },
     });
 
@@ -183,7 +196,7 @@ describe("filePerjadinEvaluation", () => {
     const filed = await filePerjadinEvaluation(asToken(trip.id), {
       role: "Pendamping",
       name: "Dewi",
-      ratings: { ...FINE, transport: 4 },
+      ratings: { ...FINE_FROM_PENDAMPING, transport: 4 },
       comments: { ...NO_COMMENTS, transport: "Mobil sewaan telat dua jam" },
     });
 
@@ -366,7 +379,7 @@ describe("submitPerjadinEvaluationAction", () => {
     const result = await submitPerjadinEvaluationAction(token.token, {
       role: "Pendamping",
       name: "Dewi",
-      ratings: FINE,
+      ratings: FINE_FROM_PENDAMPING,
       comments: NO_COMMENTS,
     });
 
@@ -547,5 +560,222 @@ describe("the nullable lodging invariant", () => {
     );
 
     expect(refusal).toBe("perjadin_evaluation_filed_by_role_check");
+  });
+});
+
+/**
+ * **Pendamping Support** (#481, ADR-0054) — the fifth Aspect, Rated by a Narasumber or a Pimpinan
+ * and never by a Pendamping, who would be Rating themselves. The write holds both directions; the
+ * low-Rating rule applies to it exactly as to the other four.
+ */
+describe("filePerjadinEvaluation — Pendamping Support", () => {
+  beforeEach(resetDatabase);
+
+  /** What landed for Pendamping Support on the trip's one evaluation. */
+  async function stored(perjadinId: string) {
+    const [row] = await db
+      .select({
+        rating: schema.perjadinEvaluation.pendampingSupport,
+        comment: schema.perjadinEvaluation.pendampingSupportComment,
+      })
+      .from(schema.perjadinEvaluation)
+      .where(eq(schema.perjadinEvaluation.perjadinId, perjadinId));
+    return row;
+  }
+
+  it.each(["Narasumber", "Pimpinan"] as const)(
+    "files a %s's Rating and its Komentar",
+    async (role) => {
+      const trip = await aTrip((await staff()).id);
+
+      const result = await filePerjadinEvaluation(asToken(trip.id), {
+        role,
+        name: "Pak Andi",
+        ratings: { ...FINE, pendamping_support: 10 },
+        comments: { ...NO_COMMENTS, pendamping_support: "  Sigap mengurus semuanya  " },
+      });
+
+      expect(result.outcome).toBe("filed");
+      await expect(stored(trip.id)).resolves.toEqual({
+        rating: 10,
+        comment: "Sigap mengurus semuanya",
+      });
+    },
+  );
+
+  it.each(["Narasumber", "Pimpinan"] as const)(
+    "refuses a %s who left it unrated, and writes nothing",
+    async (role) => {
+      const trip = await aTrip((await staff()).id);
+
+      const result = await filePerjadinEvaluation(asToken(trip.id), {
+        role,
+        name: "Pak Andi",
+        ratings: FINE_FROM_PENDAMPING,
+        comments: NO_COMMENTS,
+      });
+
+      expect(result).toEqual({ outcome: "ratings-mismatch" });
+      expect(await evaluationCount(trip.id)).toBe(0);
+    },
+  );
+
+  it("refuses a Pendamping Rating Pendamping Support, and writes nothing", async () => {
+    const trip = await aTrip((await staff()).id);
+
+    const result = await filePerjadinEvaluation(asToken(trip.id), {
+      role: "Pendamping",
+      name: "Dewi",
+      ratings: FINE,
+      comments: NO_COMMENTS,
+    });
+
+    expect(result).toEqual({ outcome: "ratings-mismatch" });
+    expect(await evaluationCount(trip.id)).toBe(0);
+  });
+
+  it("stores a Pendamping's evaluation with neither the Rating nor a Komentar sent for it", async () => {
+    const trip = await aTrip((await staff()).id);
+
+    const result = await filePerjadinEvaluation(asToken(trip.id), {
+      role: "Pendamping",
+      name: "Dewi",
+      ratings: FINE_FROM_PENDAMPING,
+      comments: { ...NO_COMMENTS, pendamping_support: "Tertinggal dari pilihan peran sebelumnya" },
+    });
+
+    expect(result.outcome).toBe("filed");
+    await expect(stored(trip.id)).resolves.toEqual({ rating: null, comment: null });
+  });
+
+  it("refuses a low Pendamping Support without its OWN Komentar — prose on another Aspect does not count", async () => {
+    const trip = await aTrip((await staff()).id);
+    const low = { ...FINE, pendamping_support: CONCERN_AT_OR_BELOW };
+
+    const refused = await filePerjadinEvaluation(asToken(trip.id), {
+      role: "Pimpinan",
+      name: "Bu Sri",
+      ratings: low,
+      comments: { ...NO_COMMENTS, punctuality: "Jadwal molor" },
+    });
+    expect(refused).toEqual({ outcome: "prose-required" });
+    expect(await evaluationCount(trip.id)).toBe(0);
+
+    const filed = await filePerjadinEvaluation(asToken(trip.id), {
+      role: "Pimpinan",
+      name: "Bu Sri",
+      ratings: low,
+      comments: { ...NO_COMMENTS, pendamping_support: "Pendamping sulit dihubungi" },
+    });
+    expect(filed.outcome).toBe("filed");
+  });
+
+  it("takes a submission from a form loaded before #481 only from a Pendamping", async () => {
+    const trip = await aTrip((await staff()).id);
+    // What a page left open from before the Aspect existed sends: four Ratings, four Komentar.
+    const before481 = (role: "Narasumber" | "Pendamping") =>
+      ({
+        role,
+        name: "Dewi",
+        ratings: { lodging: 9, transport: 9, meals: 9, punctuality: 9 },
+        comments: { lodging: null, transport: null, meals: null, punctuality: null },
+      }) as unknown as Parameters<typeof filePerjadinEvaluation>[1];
+
+    await expect(
+      filePerjadinEvaluation(asToken(trip.id), before481("Pendamping")),
+    ).resolves.toMatchObject({ outcome: "filed" });
+    await expect(
+      filePerjadinEvaluation(asToken(trip.id), before481("Narasumber")),
+    ).resolves.toEqual({ outcome: "ratings-mismatch" });
+  });
+});
+
+/**
+ * The database's half of Pendamping Support (ADR-0054): the bounds, the elaboration rule, a
+ * Pendamping filer carrying none, and the concerns index over five Ratings. Asserted against the
+ * database directly, behind the write. **Not** that a Narasumber or Pimpinan must give it — rows filed
+ * before #481 hold a NULL from them, so that half is the write's alone.
+ */
+describe("the Pendamping Support invariants", () => {
+  let tripId = "";
+  beforeEach(async () => {
+    await resetDatabase();
+    tripId = (await aTrip((await staff()).id)).id;
+  });
+
+  /** A row on the test's trip as the write would insert it, every Rating high and no Komentar. */
+  function row(values: Partial<typeof schema.perjadinEvaluation.$inferInsert> = {}) {
+    return {
+      perjadinId: tripId,
+      filedByRole: "Narasumber" as const,
+      filedByName: "Pak Andi",
+      lodging: 9,
+      transport: 9,
+      meals: 9,
+      punctuality: 9,
+      pendampingSupport: 9,
+      ...values,
+    };
+  }
+
+  it("accepts a Narasumber with no Pendamping Support — the shape of every row filed before #481", async () => {
+    const values = row({ pendampingSupport: null });
+
+    await expect(refusedBy(db.insert(schema.perjadinEvaluation).values(values))).resolves.toBe(
+      null,
+    );
+  });
+
+  it("refuses a Pendamping filer carrying a Pendamping Support Rating, or a Komentar for it", async () => {
+    const rated = row({ filedByRole: "Pendamping" });
+    const commented = row({
+      filedByRole: "Pendamping",
+      pendampingSupport: null,
+      pendampingSupportComment: "Saya sendiri",
+    });
+
+    await expect(refusedBy(db.insert(schema.perjadinEvaluation).values(rated))).resolves.toBe(
+      "perjadin_evaluation_pendamping_support_rater_check",
+    );
+    await expect(refusedBy(db.insert(schema.perjadinEvaluation).values(commented))).resolves.toBe(
+      "perjadin_evaluation_pendamping_support_rater_check",
+    );
+  });
+
+  it("refuses a Rating outside 1–10", async () => {
+    const values = row({ pendampingSupport: 11 });
+
+    await expect(refusedBy(db.insert(schema.perjadinEvaluation).values(values))).resolves.toBe(
+      "perjadin_evaluation_pendamping_support_check",
+    );
+  });
+
+  it("refuses a low Pendamping Support whose own Komentar is blank, whatever another Aspect says", async () => {
+    const values = row({
+      pendampingSupport: CONCERN_AT_OR_BELOW,
+      pendampingSupportComment: "   ",
+      punctualityComment: "Jadwal molor",
+    });
+
+    await expect(refusedBy(db.insert(schema.perjadinEvaluation).values(values))).resolves.toBe(
+      "perjadin_evaluation_low_rating_needs_prose",
+    );
+  });
+
+  it("indexes a low Pendamping Support as a concern, and never a null one", async () => {
+    const low = row({ pendampingSupport: 3, pendampingSupportComment: "Tidak ada di lokasi" });
+    const unasked = row({ filedByRole: "Pendamping", pendampingSupport: null });
+    await db.insert(schema.perjadinEvaluation).values([low, unasked]);
+
+    // The index's own predicate, read from the catalogue rather than restated, run against each row.
+    const [index] = await db.execute<{ predicate: string }>(sql`
+      select pg_get_expr(indpred, indrelid) as predicate
+        from pg_index
+       where indexrelid = 'perjadin_evaluation_concerns_idx'::regclass`);
+    expect(index?.predicate).toContain("pendamping_support");
+    const concerns = await db.execute<{ filed_by_role: string }>(sql`
+      select filed_by_role from perjadin_evaluation where ${sql.raw(index!.predicate)}`);
+
+    expect(concerns.map((concern) => concern.filed_by_role)).toEqual(["Narasumber"]);
   });
 });

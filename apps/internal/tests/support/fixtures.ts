@@ -405,6 +405,11 @@ export type PerjadinEvaluationFixture = {
   lodging?: number | null;
   ratings?: Partial<Record<"transport" | "meals" | "punctuality", number>>;
   /**
+   * Nullable, and null by default: the default filer is a Pendamping, who is not asked it, and every
+   * evaluation filed before #481 holds a null too (ADR-0054). Give one with a Narasumber or Pimpinan.
+   */
+  pendampingSupport?: number | null;
+  /**
    * Optional Komentar per Aspect, as the form is (#163). A low Aspect with none supplied gets
    * `WENT_WRONG` on its OWN comment so `perjadin_evaluation_low_rating_needs_prose` is satisfied —
    * so a caller passing FINE Ratings needs no comments at all.
@@ -418,13 +423,21 @@ export type PerjadinEvaluationFixture = {
   createdAt?: Date;
 };
 
-/** How the trip went. Four Aspects, `lodging` nullable, the elaboration rule now per-Aspect. */
+/**
+ * How the trip went. Five Aspects, `lodging` and `pendamping_support` nullable, the elaboration rule
+ * per-Aspect.
+ */
 export async function addPerjadinEvaluation(fixture: PerjadinEvaluationFixture) {
   const ratings = { transport: FINE, meals: FINE, punctuality: FINE, ...fixture.ratings };
   const lodging = fixture.lodging === undefined ? FINE : fixture.lodging;
-  const ratingByAspect: Record<PerjadinAspect, number | null> = { lodging, ...ratings };
+  const pendampingSupport = fixture.pendampingSupport ?? null;
+  const ratingByAspect: Record<PerjadinAspect, number | null> = {
+    lodging,
+    ...ratings,
+    pendamping_support: pendampingSupport,
+  };
   // A low Aspect owes ITS OWN Komentar (#163) — fill it with WENT_WRONG unless the test supplied
-  // one; a null (skipped) lodging is never low and needs none.
+  // one; a null (skipped or unasked) Rating is never low and needs none.
   const commentFor = (aspect: PerjadinAspect): string | null => {
     const supplied = fixture.comments?.[aspect];
     if (supplied !== undefined) return supplied;
@@ -439,10 +452,12 @@ export async function addPerjadinEvaluation(fixture: PerjadinEvaluationFixture) 
       filedByName: fixture.name ?? "Dewi Lestari",
       lodging,
       ...ratings,
+      pendampingSupport,
       lodgingComment: commentFor("lodging"),
       transportComment: commentFor("transport"),
       mealsComment: commentFor("meals"),
       punctualityComment: commentFor("punctuality"),
+      pendampingSupportComment: commentFor("pendamping_support"),
       ...(fixture.createdAt ? { createdAt: fixture.createdAt } : {}),
     })
     .returning();
