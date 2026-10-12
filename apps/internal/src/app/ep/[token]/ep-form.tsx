@@ -1,5 +1,6 @@
 "use client";
 
+import { RATING_INSTRUCTION } from "-/lib/rating-copy";
 import type { PerjadinEvaluationRatings } from "@sugt/db/queries";
 import {
   CONCERN_AT_OR_BELOW,
@@ -61,7 +62,7 @@ const ALWAYS_RATED = PERJADIN_ASPECTS.filter(
   (aspect): aspect is AlwaysRated => aspect !== "lodging",
 );
 
-const INSTRUCTION = `Beri nilai ${RATING_MIN}–${RATING_MAX} untuk tiap aspek. Nilai ${CONCERN_AT_OR_BELOW} ke bawah wajib disertai penjelasan pada Komentar aspek tersebut.`;
+const INSTRUCTION = `${RATING_INSTRUCTION} Nilai ${CONCERN_AT_OR_BELOW} ke bawah wajib disertai penjelasan pada Komentar aspek tersebut.`;
 
 /** The message an Aspect's Komentar carries when its own low Rating owes prose. */
 const PROSE_REQUIRED = `Nilai ${CONCERN_AT_OR_BELOW} ke bawah wajib disertai penjelasan pada Komentar aspek ini.`;

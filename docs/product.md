@@ -788,6 +788,11 @@ say which Class they sat in, type their name, then answer, in this order (#446):
   on the concerns list.
 - The descriptions are on the form only. Everywhere else the Aspects keep their short names —
   Hands-on RBL, Materi, Narasumber, Relevansi.
+- The instruction above the first Aspect says which end of the scale is good: _"Skala 1–10: 1 =
+  paling rendah, 10 = paling tinggi."_ (#480). A Participant may otherwise read 1 as "best". The
+  Perjadin Evaluation form and the Session Record dialog carry the same sentence in their own
+  instruction. It is said once, not as captions at the two ends of every control: those repeat on
+  every row and are cramped on a phone.
 
 **On `/feedback`'s Peserta tab**, Hands-on RBL has its own average card and its own filter beside
 Narasumber, Materi and Relevansi. Its average is over the rows that have one — GTK, MS and Siswa
