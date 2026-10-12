@@ -37,8 +37,8 @@ import { tripSchoolNames } from "./perjadin-naming";
  * of every delivered Session leaves one, so the set grows without bound and both the filters and
  * the paging live in the query rather than in memory on the screen. The four summary averages
  * are the exception (`participantFeedbackAverages` below): they follow the tab's **scope** — the
- * School and Session it is narrowed to (#466) — but never its score filters, so they are one scalar
- * read the score filters never touch.
+ * School, Session and Tipe Peserta it is narrowed to (#466, #487) — but never its score filters, so
+ * they are one scalar read the score filters never touch.
  *
  * Open to anyone signed in, by ADR-0004 — feedback carries no money — so no `requireStaff`. The
  * `caller` is still first by convention 1 even though nothing here gates on it; it is named

@@ -340,8 +340,8 @@ function ParticipantTab({
 
   return (
     <>
-      {/* The standing over the picked School or Session — programme-wide with neither — and unmoved
-          by the score filters below. */}
+      {/* The standing over the picked School, Session and Tipe Peserta — programme-wide with none —
+          and unmoved by the score filters below. */}
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <AverageCard
           label={PARTICIPANT_ASPECT_LABELS.instructor}
@@ -358,7 +358,7 @@ function ParticipantTab({
           covers={covers}
           value={averages.values.relevance}
         />
-        {/* Over the rows that have one; "—" until any does (#446). */}
+        {/* Over the rows that have one; "—" until any does (#446), and always under GTK-MS (#487). */}
         <AverageCard
           label={PARTICIPANT_ASPECT_LABELS.hands_on_rbl}
           covers={covers}

@@ -138,7 +138,7 @@ async function participantTypeScene() {
       ratings: { instructor: ms },
     });
   }
-  return { person, bontang };
+  return { person, bontang, bontangSession };
 }
 
 describe("the Peserta tab's Tipe Peserta (#487)", () => {
@@ -173,8 +173,8 @@ describe("the Peserta tab's Tipe Peserta (#487)", () => {
     expect(gtkMs.handsOnRbl).toBeNull();
   });
 
-  it("ANDs with the School and with the score filters, lowest average first", async () => {
-    const { person, bontang } = await participantTypeScene();
+  it("ANDs with the School, the Session and the score filters, lowest average first", async () => {
+    const { person, bontang, bontangSession } = await participantTypeScene();
 
     const atBontang = await page(person, { ...typed("GTK-MS"), schoolId: bontang.id });
     expect(atBontang.rows.map((row) => [row.classKind, row.instructor])).toEqual([
@@ -185,6 +185,13 @@ describe("the Peserta tab's Tipe Peserta (#487)", () => {
       (await participantFeedbackAverages(person, { ...typed("GTK-MS"), schoolId: bontang.id }))
         .instructor,
     ).toBeCloseTo(7, 5);
+
+    const atSesi = await page(person, {
+      schoolId: bontang.id,
+      sessionId: bontangSession.id,
+      participantType: "Siswa",
+    });
+    expect(atSesi.rows.map((row) => [row.classKind, row.instructor])).toEqual([["Student", 9]]);
 
     const low = await page(person, typed("GTK-MS"), { ...NO_FEEDBACK_FILTERS, instructor: "le7" });
     expect(low.rows.map((row) => [row.classKind, row.instructor])).toEqual([
