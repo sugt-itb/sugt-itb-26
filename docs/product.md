@@ -1153,7 +1153,8 @@ A table, newest first, 50 rows a page:
   dihapus. Entries derived from data recorded
   before the Log existed read "(dari data lama)" after it. The two Uang Perjalanan actions are
   history only: nothing writes them since the Advance stopped being tracked (ADR-0051), and past
-  entries still read as they did.
+  entries still read as they did. Laporan dikirim is history only the same way: nothing writes it
+  since the Laporan stopped being filed (ADR-0055).
 - **Rincian** says what changed. A transaction's row links to its folder in Drive, when it has one.
 
 **Above the table**, a search box, an Aksi filter and a Rentang tanggal:
@@ -1161,7 +1162,7 @@ A table, newest first, 50 rows a page:
 - the search matches, ignoring case, the email, the trip's Kelompok (its Sub-Cluster's name), its
   Schools, its PIC's name, and the Aksi and Rincian text;
 - Aksi is Semua, Uang Perjalanan, Catat transaksi, Unggah bukti, Dokumen, Foto & Video or Laporan
-  dikirim; Uang Perjalanan now finds history only;
+  dikirim; Uang Perjalanan and Laporan dikirim now find history only;
 - Rentang tanggal is two WIB dates, dari and sampai, both included.
 
 They combine, and **all of them are in the URL**, with the page number, so a view can be bookmarked.

@@ -2407,8 +2407,10 @@ cancellation while a Session is `arranged` and never after, and offers no way ba
 
 **"Every transaction has at least one piece of evidence."** Also a cross-row count. Held at
 entry since [ADR-0039](./adr/0039-every-transaction-is-recorded-with-its-evidence.md), in the one
-write path: `recordTransaction` records a line with one to five receipts or refuses it. Filing
-still checks it, as the backstop for lines entered before that rule, which no migration touched.
+write path: `recordTransaction` records a line with one to five receipts or refuses it. A line
+entered before that rule may still have none; nothing catches it now that filing is gone
+([ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md)), and the Laporan marks it
+for its writer to Unggah bukti.
 
 **The four-offline-six-online cap.** Deliberately unenforced. Ten is the denominator for
 progress, not a limit on what may be recorded, and a cancelled Session counts for nothing

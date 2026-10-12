@@ -97,7 +97,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
             <h2 className="font-heading text-sm font-medium">Pengeluaran</h2>
             <div className="flex flex-wrap items-center gap-2">
               {/*
-                The Report is the acquittal state on this row, so it is a child of this page
+                The Report is this trip's acquittal, so it is a child of this page
                 rather than a surface of its own. Reading it is open to any signed-in Person now
                 (ADR-0026, #180), like the strip it sits in; writing money there is the trip's
                 writers' (ADR-0048).

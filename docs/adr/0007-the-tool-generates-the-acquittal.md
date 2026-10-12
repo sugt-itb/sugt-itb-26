@@ -6,7 +6,7 @@ A PIC enters a Perjadin's transactions once, in this tool, and exports a filled 
 
 The obligation is concrete regardless of what we build. The Advance is fixed at planning, transferred to the PIC before departure, the leftover is returned to the Treasurer, and every transaction that consumed it has to be evidenced. Someone assembles that record either way. The only question is where.
 
-This decision originally rested on the tool sitting upstream of a compulsory institutional process. That argument is void: the acquittal is DITSAMA's own, on a deadline DITSAMA sets, nothing is gated, and the Treasurer accepts any format. **No structural force pushes a PIC into this tool.**
+This decision originally rested on the tool sitting upstream of a compulsory institutional process. That argument is void: the acquittal is DITSAMA's own, on a deadline DITSAMA sets, nothing is gated, and the Treasurer accepts any format. **No structural force pushes a PIC into this tool.** _The deadline is overtaken by the 2026-10-13 amendment below: the tool keeps none._
 
 So it has to be plainly better than the alternative — receipts photographed and uploaded from a phone at the airport, running reconciliation against the Advance, one click to the finished document. That beats a spreadsheet, a calculator and a folder of WhatsApp photos. People do adopt tools that are obviously faster without being made to.
 

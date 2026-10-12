@@ -7,6 +7,15 @@ Perjalanan Terpakai**. The Laporkan button, its write and the "Dilaporkan" line 
 "Jatuh tempo … · sisa N hari / terlambat N hari" line on the Laporan and "Laporan jatuh tempo" on
 `/perjadin/[id]`. Settled with the product owner when the ticket was written, on 2026-10-12.
 
+This amends [ADR-0007](./0007-the-tool-generates-the-acquittal.md) and
+[ADR-0041](./0041-a-perjadin-carries-no-travel-legs-and-its-dates-are-typed.md) (the deadline),
+[ADR-0026](./0026-money-is-open-to-read-and-staff-only-to-write.md) and
+[ADR-0048](./0048-a-perjadin-is-written-by-its-group.md) (Laporkan among the writes),
+[ADR-0039](./0039-every-transaction-is-recorded-with-its-evidence.md) (filing's evidence backstop),
+[ADR-0050](./0050-transactions-and-receipts-may-be-deleted-and-the-log-keeps-the-copy.md) ("still
+allowed after Laporkan") and [ADR-0051](./0051-the-advance-is-not-tracked.md) (Laporkan's other
+rules).
+
 ## Why
 
 **Filing gated nothing.** A filed Laporan froze nothing: lines and receipts could still be recorded,
@@ -33,13 +42,19 @@ never closed, is noise on the two screens a PIC opens most.
 - **The column is dropped, not left unused.** Migration `0053` drops `perjadin.report_filed_at`. A
   column nothing reads or writes is a question every future reader has to answer, and nothing
   replaces it, since filing never controlled anything.
+- **The app ships before the migration is applied.** Unlike ADR-0051, which split the code (#464)
+  and the drop (#465) into two tickets, both land in #489. Migrations are applied by hand, apart from
+  a deploy, and the build before this one still selects `report_filed_at` on every Laporan and trip
+  page. So `0053` is applied only once this build is live and no older one serves the database;
+  applied earlier, those pages fail with `column "report_filed_at" does not exist`.
 - **The Activity Log keeps past filings.** The Log is append-only history. Existing `report_filed`
   entries keep their label (**Laporan dikirim**), their totals and the `/log` Aksi filter, and the
   value stays in `ACTIVITY_LOG_ACTIONS` and the Log's CHECK. Nothing writes it any more:
   `logActivity`'s type no longer accepts it, as with `advance_*` under ADR-0051.
 - **Who writes a trip is unchanged.** [ADR-0048](./0048-a-perjadin-is-written-by-its-group.md)'s
   rule — the trip's Group, a Perjadin Editor or an Administrator — still covers Catat transaksi,
-  Unggah bukti and Hapus. Laporkan had no plumbing of its own to remove.
+  Unggah bukti and Hapus. Laporkan ran the same `requirePerjadinWriter` check as those writes, so
+  removing it leaves no permission code behind.
 
 ## Consequences
 
