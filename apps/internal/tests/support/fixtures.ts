@@ -60,12 +60,15 @@ export async function addGrant(personId: string, grant: Grant) {
 }
 
 /**
- * The same Person holding the **Editor** Grant, stored and on the caller — what planning a Perjadin and
- * recording, editing or deleting an online Session need (ADR-0047).
+ * The same Person holding `grant`, stored and on the caller — Perjadin Editor to plan a Perjadin,
+ * Daring Editor to record, edit or delete an online Session (ADR-0047, ADR-0052).
  */
-export async function asEditor<P extends { id: string; grants: Grant[] }>(person: P): Promise<P> {
-  await addGrant(person.id, "Editor");
-  return { ...person, grants: [...person.grants, "Editor"] };
+export async function withGrant<P extends { id: string; grants: Grant[] }>(
+  person: P,
+  grant: Grant,
+): Promise<P> {
+  await addGrant(person.id, grant);
+  return { ...person, grants: [...person.grants, grant] };
 }
 
 /** Every `better_auth.user` row. The invite gate's job is to leave this empty. */
@@ -518,8 +521,6 @@ export type PerjadinFixture = {
   subClusterName?: string;
   startsOn?: string;
   endsOn?: string;
-  /** Uang Perjalanan; `null` is a trip planned without one, not yet filled in (#437). */
-  advanceIdr: number | null;
   /**
    * Where the trip goes. A Perjadin needs one, so `addPerjadin` builds a throwaway Cluster
    * and Sub-Cluster when a test does not supply this — the Schools-belong-to-the-Sub-Cluster
@@ -573,7 +574,6 @@ export async function addPerjadin(fixture: PerjadinFixture) {
         subClusterId,
         startsOn: fixture.startsOn ?? "2026-09-01",
         endsOn: fixture.endsOn ?? "2026-09-03",
-        advanceIdr: fixture.advanceIdr,
         picPersonId: fixture.picPersonId,
         picRole: "Staff",
       })
@@ -622,7 +622,7 @@ export type TransactionFixture = {
 };
 
 /**
- * One line item against the Advance.
+ * One line item on a trip.
  *
  * The default category matches the default description — a taxi is
  * `Transport Lokal Dalam Provinsi` — so a test that cares about neither still reads as a

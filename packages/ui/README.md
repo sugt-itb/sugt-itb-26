@@ -114,7 +114,7 @@ each row was added, then cropped its own title and buttons once it outgrew the s
 
 - **`default`** — the small centred popup, as `shadcn add` wrote it. It grows with its content, so
   it is for content that does not grow: confirmations (Hapus, Tandai terlaksana, Batalkan Sesi),
-  single-value edits (Ubah Uang Perjalanan, Ubah tanggal), the Story editor's link popup and the two
+  single-value edits (Ubah tanggal), the Story editor's link popup and the two
   QR popups.
 - **`panel`** — for every popup where data is entered. A fixed panel about 900px wide and the
   screen's height less a margin on desktop, the whole screen below `sm`; **the same size from

@@ -1,5 +1,10 @@
 # Every transaction is recorded with its evidence (1–5 receipts)
 
+> **Partially superseded by [ADR-0050](./0050-transactions-and-receipts-may-be-deleted-and-the-log-keeps-the-copy.md).**
+> The "No receipt deletion" consequence below no longer holds: a receipt may be deleted with its
+> row's Hapus, trashed in Drive and logged, and its slot counts toward the five again. A line still
+> keeps at least one receipt, so the one-to-five rule stands.
+
 > **Partially superseded by [ADR-0040](./0040-transaction-evidence-is-stored-in-the-company-google-drive.md).**
 > Receipts are stored in the company's Google Drive, not the Supabase `receipts` bucket. The upload
 > URLs minted against Storage, the read-back from Storage, and the argument that orphan objects are

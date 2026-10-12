@@ -15,23 +15,31 @@ import {
   type ReceiptContentType,
 } from "-/lib/drive/receipt-files";
 import { reconcileTransaction } from "-/lib/drive/reconcile";
+import { trashIfLive, untrashIfPresent } from "-/lib/drive/trash-if-live";
 import { driveRefusal, isStagedUploadFor, staffOnTrip } from "-/lib/drive/upload-guard";
 import { requireEnv } from "-/lib/env";
 import { requirePerson, type Person } from "-/lib/person";
 import { staffSurface } from "-/lib/staff-surface";
 import {
   attachTransactionEvidence,
+  deleteTransaction,
+  deleteTransactionEvidence,
   filePerjadinReport,
+  receiptDeleteTarget,
   receiptsOnLine,
   recordTransaction,
+  transactionDeleteTarget,
   type FilePerjadinReportResult,
   type NewEvidence,
+  type TransactionDriveItems,
 } from "@sugt/db/queries";
 import { MAX_RECEIPTS_PER_TRANSACTION, MAX_UPLOAD_BYTES } from "@sugt/domain";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
 import type {
+  DeleteReceiptActionResult,
+  DeleteTransactionActionResult,
   FinalizeReceiptsResult,
   OpenReceiptSessionsResult,
   ReceiptToOpen,
@@ -52,8 +60,9 @@ import type {
  * close the path, since a layout does not run before a Server Action. Every one that touches
  * Drive — opening upload sessions, recording a line, attaching receipts to one — also calls the
  * guard itself, first, through `staffOnTrip`
- * (`-/lib/drive/upload-guard`), because Google is reached before any query runs. Every refusal
- * comes back as a value.
+ * (`-/lib/drive/upload-guard`), because Google is reached before any query runs; deleting a receipt
+ * or a line runs `receiptDeleteTarget` or `transactionDeleteTarget` first for the same reason. Every
+ * refusal comes back as a value.
  */
 
 /**
@@ -189,7 +198,7 @@ async function reconcileAfterCommit(
 }
 
 /**
- * Record one line item against the Advance, **with the receipts the dialog has already uploaded to
+ * Record one line item on the trip, **with the receipts the dialog has already uploaded to
  * Drive** (ADR-0039, ADR-0040). The write order is the ADR's:
  *
  * 1. **Check** — Staff, the Perjadin, the count, the amount, the connection — before any Drive call.
@@ -341,6 +350,140 @@ export async function finalizeReceiptsAction(
   const synced = await reconcileAfterCommit(person, drive, access.folders, transactionId);
   revalidatePath(`/perjadin/${perjadinId}/laporan`);
   return { outcome: "attached", attached: result.count, failed, synced };
+}
+
+/**
+ * **Hapus bukti — delete one receipt from its line** (#462, ADR-0050). **The file is trashed first,
+ * then the row**, as Dokumen Hapus does (ADR-0042), so a row never vanishes while its link-shared
+ * file stays live:
+ *
+ * 1. **Guard** — Staff, the receipt and its trip's writer (ADR-0048) — then **the count**: a line's
+ *    only receipt is refused here, with nothing trashed. Then the connection. All before any Drive
+ *    call.
+ * 2. **Trash the file.** One already in the trash, or gone, counts as done: a retry is safe. A
+ *    receipt still unsynced is trashed from `_staging` the same way.
+ * 3. **Delete the row and log `evidence_deleted`**, in one transaction, counting again under the
+ *    line's lock (`deleteTransactionEvidence`). If that fails after the trash, the row stays,
+ *    pointing at a trashed file; Hapus again ends it.
+ * 4. **If the commit refuses the count** — a concurrent Hapus on the line won the race and this
+ *    receipt is now its only one — **take the file back out of the trash**, so the surviving
+ *    receipt's link opens, and refuse.
+ */
+export async function deleteReceiptAction(evidenceId: string): Promise<DeleteReceiptActionResult> {
+  const person = await requirePerson();
+
+  const target = await staffSurface(() => receiptDeleteTarget(person, evidenceId));
+  if (!target) return staleReceipt();
+  if (target.held <= 1) return { outcome: "only-receipt" };
+
+  const access = await driveAccessToken(person);
+  if (access.outcome !== "ok") return driveRefusal(person, access.outcome);
+  const drive = openDrive(access.accessToken);
+
+  try {
+    await trashIfLive(drive, target.driveFileId);
+  } catch (error) {
+    if (isDriveFailure(error)) return { outcome: "drive-unreachable" };
+    throw error;
+  }
+
+  const result = await staffSurface(() => deleteTransactionEvidence(person, evidenceId));
+  if (result.outcome === "only-receipt") {
+    try {
+      await untrashIfPresent(drive, target.driveFileId);
+    } catch (error) {
+      // The row stands with its file in the trash, which only restoring it by hand from the Drive
+      // trash puts right — so say which file, for whoever does.
+      console.error(`Receipt ${evidenceId} kept its row, but its file stayed in the trash.`, error);
+      if (isDriveFailure(error)) return { outcome: "drive-unreachable" };
+      throw error;
+    }
+    return result;
+  }
+  if (result.outcome === "no-such-evidence") return staleReceipt();
+  revalidatePath(`/perjadin/${result.perjadinId}/laporan`);
+  return { outcome: "deleted" };
+}
+
+/**
+ * A receipt already gone — Hapus pressed twice, or on a stale screen. Its trip is unknown by now, so
+ * every Laporan is revalidated and the one on screen drops the receipt.
+ */
+function staleReceipt(): DeleteReceiptActionResult {
+  revalidatePath("/perjadin/[id]/laporan", "page");
+  return { outcome: "no-such-receipt" };
+}
+
+/**
+ * **Hapus transaksi — delete one whole line** (#463, ADR-0050). **Drive first, then the row**, as
+ * Hapus bukti does:
+ *
+ * 1. **Guard** — Staff, the line and its trip's writer (ADR-0048) — then the connection, all before
+ *    any Drive call.
+ * 2. **Trash what the line holds**: its folder, and with it every receipt inside, then any receipt
+ *    outside it — still in `_staging`, its reconcile never finished. Anything already in the trash,
+ *    or gone, counts as done, so a retry is safe. If this fails, nothing is deleted.
+ * 3. **Delete the line, its evidence rows and log `transaction_deleted`**, in one transaction
+ *    (`deleteTransaction`). If that fails after the trash, the line stays listed; Hapus again ends
+ *    it.
+ * 4. **Trash what joined the line meanwhile.** A reconcile may have claimed a folder, or an Unggah
+ *    bukti added a receipt, between step 1's read and the commit's lock. The commit answers what the
+ *    line held, and anything step 2 did not see is trashed now. The line is gone by then, so a
+ *    failure here is logged with the ids, not answered — Hapus cannot be pressed again.
+ *
+ * A line with no receipt, or more than five, is deleted the same way; so is one on a filed Laporan.
+ */
+export async function deleteTransactionAction(
+  transactionId: string,
+): Promise<DeleteTransactionActionResult> {
+  const person = await requirePerson();
+
+  const target = await staffSurface(() => transactionDeleteTarget(person, transactionId));
+  if (!target) return staleTransaction();
+
+  const access = await driveAccessToken(person);
+  if (access.outcome !== "ok") return driveRefusal(person, access.outcome);
+  const drive = openDrive(access.accessToken);
+
+  try {
+    await trashLine(drive, target);
+  } catch (error) {
+    if (isDriveFailure(error)) return { outcome: "drive-unreachable" };
+    throw error;
+  }
+
+  const result = await staffSurface(() => deleteTransaction(person, transactionId));
+  if (result.outcome === "no-such-transaction") return staleTransaction();
+
+  const joinedMeanwhile: TransactionDriveItems = {
+    driveFolderId: result.driveFolderId === target.driveFolderId ? null : result.driveFolderId,
+    driveFileIds: result.driveFileIds.filter((id) => !target.driveFileIds.includes(id)),
+  };
+  await trashLine(drive, joinedMeanwhile).catch((error: unknown) => {
+    console.error(
+      `Transaction ${transactionId} is deleted, but what joined it meanwhile is not all in the ` +
+        `trash: folder ${joinedMeanwhile.driveFolderId ?? "none"}, receipts ${joinedMeanwhile.driveFileIds.join(", ") || "none"}.`,
+      error,
+    );
+  });
+
+  revalidatePath(`/perjadin/${result.perjadinId}/laporan`);
+  return { outcome: "deleted" };
+}
+
+/**
+ * Trash a line's folder, then each receipt — one inside the folder is already trashed with it, so
+ * only those outside it are trashed by themselves.
+ */
+async function trashLine(drive: DriveClient, items: TransactionDriveItems): Promise<void> {
+  if (items.driveFolderId) await trashIfLive(drive, items.driveFolderId);
+  await Promise.all(items.driveFileIds.map((id) => trashIfLive(drive, id)));
+}
+
+/** A line already gone — Hapus pressed twice, or on a stale screen. As `staleReceipt`. */
+function staleTransaction(): DeleteTransactionActionResult {
+  revalidatePath("/perjadin/[id]/laporan", "page");
+  return { outcome: "no-such-transaction" };
 }
 
 /**

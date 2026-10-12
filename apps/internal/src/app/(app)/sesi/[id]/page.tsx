@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: PageProps<"/sesi/[id]">): Pro
  * professor opening the Session they taught to see who else still owes a Record is the
  * ordinary case, not an edge one.
  *
- * The writes are the trip's Group's, an Editor's or an Administrator's (ADR-0048), and they are
+ * The writes are the trip's Group's, a Perjadin Editor's or an Administrator's (ADR-0048), and they are
  * **absent rather than disabled** for anyone else. Hiding them is a courtesy and not the
  * enforcement: `requireSessionWriter` inside each query function is what actually closes the
  * path, since a layout does not run before a Server Action.
@@ -57,7 +57,7 @@ export default async function Page({ params }: PageProps<"/sesi/[id]">) {
   // An online Session's detail and editing live on `/sesi-daring/[id]`; only offline stays here.
   if (session.mode === "online") redirect(`/sesi-daring/${id}`);
 
-  // An offline Session is written by its trip's Group, an Editor or an Administrator (ADR-0048).
+  // An offline Session is written by its trip's Group, a Perjadin Editor or an Administrator (ADR-0048).
   const canWrite =
     session.perjadin !== null && (await canWritePerjadin(person, session.perjadin.id));
   const [footage, gate] = await Promise.all([

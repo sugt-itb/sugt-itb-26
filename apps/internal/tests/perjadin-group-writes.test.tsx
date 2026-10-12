@@ -12,7 +12,6 @@ import {
   setPerjadinPimpinanAction,
   setPerjadinStaffAction,
   togglePreparationItemAction,
-  updatePerjadinAdvanceAction,
   updatePerjadinDatesAction,
 } from "-/app/(app)/perjadin/[id]/actions";
 import {
@@ -21,6 +20,8 @@ import {
   recordDocumentAction,
 } from "-/app/(app)/perjadin/[id]/dokumen/actions";
 import {
+  deleteReceiptAction,
+  deleteTransactionAction,
   filePerjadinReportAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
@@ -53,6 +54,7 @@ import {
   checkDocumentFields,
   deletePerjadinDocument,
   deleteSessionFootage,
+  deleteTransaction,
   editPerjadinSession,
   filePerjadinReport,
   fileSessionRecord,
@@ -72,7 +74,7 @@ import {
   setPerjadinPimpinan,
   setPerjadinStaff,
   togglePreparationItem,
-  updatePerjadinAdvance,
+  transactionDeleteTarget,
   updatePerjadinDates,
   type Person,
 } from "@sugt/db/queries";
@@ -96,10 +98,10 @@ import {
 } from "./support/fixtures";
 
 /**
- * **A Perjadin is written by its Group; Editor and Administrator write every Perjadin** (#439,
+ * **A Perjadin is written by its Group; Perjadin Editor and Administrator write every Perjadin** (#439,
  * ADR-0048). The ticket's T3 table, on its own people and its own Perjadin A:
  * - every write on a trip and its offline Sessions, called by each of the seven — the PIC, a member,
- *   a Staff member off the trip with no Grant, one with Dashboard Viewer, an Editor and an
+ *   a Staff member off the trip with no Grant, one with Dashboard Viewer, a Perjadin Editor and an
  *   Administrator off the trip, and a Pimpinan — lands for the first two and the last-but-one two,
  *   and is refused with `NotOnPerjadinError` for the two non-members (`NotStaffError` for the
  *   Pimpinan, first, as before);
@@ -166,7 +168,7 @@ async function people() {
     andi: await staffWith([], "Andi Wijaya"),
     fajar: await staffWith([], "Fajar Pratama"),
     dewi: await staffWith(["Dashboard Viewer"], "Dewi Lestari"),
-    budi: await staffWith(["Editor"], "Budi Santoso"),
+    budi: await staffWith(["Perjadin Editor"], "Budi Santoso"),
     sari: await staffWith(["Administrator"], "Sari Utami"),
     hadi: (await addPerson({
       fullName: "Pak Hadi",
@@ -223,7 +225,6 @@ async function perjadinA(who: People, where: Place) {
   const trip = await addPerjadin({
     subClusterId: where.subCluster.id,
     picPersonId: who.rina.id,
-    advanceIdr: 5_000_000,
     startsOn: "2026-10-12",
     endsOn: "2026-10-13",
   });
@@ -251,7 +252,10 @@ async function perjadinA(who: People, where: Place) {
     spentOn: "2026-10-12",
     createdByPersonId: who.rina.id,
   });
-  await addTransactionEvidence({ transactionId: line.id, uploadedByPersonId: who.rina.id });
+  const receipt = await addTransactionEvidence({
+    transactionId: line.id,
+    uploadedByPersonId: who.rina.id,
+  });
   const documentId = randomUUID();
   await recordPerjadinDocument(who.rina, sheet(trip.id, documentId));
   const footageId = randomUUID();
@@ -262,6 +266,7 @@ async function perjadinA(who: People, where: Place) {
     deliveredId: delivered.id,
     teacherId: teacher!.id,
     transactionId: line.id,
+    evidenceId: receipt.id,
     documentId,
     footageId,
   };
@@ -299,6 +304,10 @@ const receipt = () => [
  * **Every write in the ticket's §2**, called as `caller` on a fresh Perjadin A, with the outcome it
  * lands with when the caller may write.
  */
+/** Ubah tanggal on trip `perjadinId` — any write a member may make will do. */
+const moveDates = (caller: Person, perjadinId: string) =>
+  updatePerjadinDates(caller, perjadinId, { startsOn: "2026-10-12", endsOn: "2026-10-14" });
+
 const WRITES: [
   string,
   (caller: Person, a: PerjadinA, who: People, where: Place) => Promise<unknown>,
@@ -309,7 +318,6 @@ const WRITES: [
     (c, a) => updatePerjadinDates(c, a.id, { startsOn: "2026-10-12", endsOn: "2026-10-14" }),
     "updated",
   ],
-  ["Uang Perjalanan", (c, a) => updatePerjadinAdvance(c, a.id, 6_000_000), "updated"],
   ["Group Staff", (c, a, who) => setPerjadinStaff(c, a.id, [who.andi.id]), "set"],
   ["Change PIC", (c, a, who) => changePerjadinPic(c, a.id, who.andi.id), "changed"],
   ["Pimpinan", (c, a, who) => setPerjadinPimpinan(c, a.id, [who.hadi.id]), "set"],
@@ -384,6 +392,12 @@ const WRITES: [
     "attached",
   ],
   ["Unggah bukti's early count", (c, a) => receiptsOnLine(c, a.id, a.transactionId), undefined],
+  [
+    "Hapus transaksi's early read",
+    (c, a) => transactionDeleteTarget(c, a.transactionId),
+    undefined,
+  ],
+  ["Hapus transaksi", (c, a) => deleteTransaction(c, a.transactionId), "deleted"],
   ["Laporkan", (c, a) => filePerjadinReport(c, a.id), "filed"],
   [
     "Dokumen check",
@@ -417,12 +431,12 @@ describe("every write on Perjadin A, by each of the ticket's people", () => {
       }
     };
 
-    // The PIC and a member who is not PIC; an Editor and an Administrator off the trip.
+    // The PIC and a member who is not PIC; a Perjadin Editor and an Administrator off the trip.
     await lands(who.rina);
     await lands(who.andi);
     await lands(who.budi);
     await lands(who.sari);
-    // Off the trip without the Editor Grant: no Grant, or Dashboard Viewer only.
+    // Off the trip without the Perjadin Editor Grant: no Grant, or Dashboard Viewer only.
     for (const outsider of [who.fajar, who.dewi]) {
       const answer = await outcome(outsider);
       expect(isNotOnPerjadinError((answer as { error?: unknown }).error)).toBe(true);
@@ -448,11 +462,11 @@ describe("what stays open, and what follows the Group", () => {
 
     await expect(setPerjadinStaff(who.andi, a.id, [])).resolves.toEqual({ outcome: "set" });
 
-    const refusal = await refusalOf(() => updatePerjadinAdvance(who.andi, a.id, 1_000));
+    const refusal = await refusalOf(() => moveDates(who.andi, a.id));
     expect(isNotOnPerjadinError(refusal)).toBe(true);
   });
 
-  it("lets Dewi write A, and only A, once an Editor adds her to its Group", async () => {
+  it("lets Dewi write A, and only A, once a Perjadin Editor adds her to its Group", async () => {
     const who = await people();
     const where = await place();
     const a = await perjadinA(who, where);
@@ -460,20 +474,16 @@ describe("what stays open, and what follows the Group", () => {
 
     await setPerjadinStaff(who.budi, a.id, [who.andi.id, who.dewi.id]);
 
-    await expect(updatePerjadinAdvance(who.dewi, a.id, 1_000)).resolves.toEqual({
-      outcome: "updated",
-    });
-    expect(
-      isNotOnPerjadinError(await refusalOf(() => updatePerjadinAdvance(who.dewi, b.id, 1_000))),
-    ).toBe(true);
+    await expect(moveDates(who.dewi, a.id)).resolves.toMatchObject({ outcome: "updated" });
+    expect(isNotOnPerjadinError(await refusalOf(() => moveDates(who.dewi, b.id)))).toBe(true);
   });
 
   it("still answers a stale Perjadin id as a value, not a refusal", async () => {
     const who = await people();
 
-    await expect(
-      updatePerjadinAdvance(who.fajar, "00000000-0000-4000-8000-000000000000", 1_000),
-    ).resolves.toEqual({ outcome: "no-such-perjadin" });
+    await expect(moveDates(who.fajar, "00000000-0000-4000-8000-000000000000")).resolves.toEqual({
+      outcome: "no-such-perjadin",
+    });
   });
 });
 
@@ -483,7 +493,6 @@ describe("the actions answer a non-member with a 403", () => {
     const a = await perjadinA(who, await place());
     signedInAs(who.dewi);
 
-    await expect(digestOf(updatePerjadinAdvanceAction(a.id, 1_000))).resolves.toBe(FORBIDDEN);
     await expect(
       digestOf(updatePerjadinDatesAction(a.id, { startsOn: "2026-10-12", endsOn: "2026-10-14" })),
     ).resolves.toBe(FORBIDDEN);
@@ -543,7 +552,7 @@ describe("the actions answer a non-member with a 403", () => {
     expect(driveAccessToken).not.toHaveBeenCalled();
   });
 
-  it("before Drive is asked anything, on every upload opener and both Hapus", async () => {
+  it("before Drive is asked anything, on every upload opener and every Hapus", async () => {
     const who = await people();
     const a = await perjadinA(who, await place());
     signedInAs(who.fajar);
@@ -569,6 +578,8 @@ describe("the actions answer a non-member with a 403", () => {
     ).resolves.toBe(FORBIDDEN);
     await expect(digestOf(deleteDocumentAction(a.documentId))).resolves.toBe(FORBIDDEN);
     await expect(digestOf(deleteFootageAction(a.footageId))).resolves.toBe(FORBIDDEN);
+    await expect(digestOf(deleteReceiptAction(a.evidenceId))).resolves.toBe(FORBIDDEN);
+    await expect(digestOf(deleteTransactionAction(a.transactionId))).resolves.toBe(FORBIDDEN);
 
     expect(driveAccessToken).not.toHaveBeenCalled();
   });
@@ -577,7 +588,7 @@ describe("the actions answer a non-member with a 403", () => {
 describe("the write controls follow who writes the trip", () => {
   const WRITE_CONTROLS = ["Ubah tanggal", "Ubah Group", "Tambah Sesi"];
 
-  it("hides Perjadin A's controls from a non-member and shows them to a member and an Editor", async () => {
+  it("hides Perjadin A's controls from a non-member and shows them to a member and a Perjadin Editor", async () => {
     const who = await people();
     const a = await perjadinA(who, await place());
     const render = async (viewer: Person) => {
@@ -651,7 +662,6 @@ describe("the write controls follow who writes the trip", () => {
     await addPerjadin({
       subClusterId: where.subCluster.id,
       picPersonId: who.fajar.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-11-09",
       endsOn: "2026-11-10",
     });

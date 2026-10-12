@@ -94,3 +94,11 @@ the query-layer `Person` caller on every request), so revocation and the active-
 exactly as before. The `/masuk` indistinguishability property holds by the same construction: one
 Indonesian sentence for every value of `?error`, never echoed — this change only removes refusal
 _causes_, not the single message.
+
+## Amendment (2026-10-12): an Administrator keeps the invite list
+
+Adding and revoking People — writing the invite list — is now an **Administrator**'s, not any Staff
+member's ([#470](https://github.com/sugt-itb/sugt-itb-26/issues/470)). `addPerson` and
+`revokePerson` require the Administrator Grant, and `/orang` shows Tambah orang and Nonaktifkan to an
+Administrator alone. Everyone signed in still reads the roster. An Administrator cannot deactivate
+themselves, so no Administrator removes their own access.

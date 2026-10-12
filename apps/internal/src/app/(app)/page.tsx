@@ -30,7 +30,8 @@ export const metadata: Metadata = { title: "Dashboard" };
  * School's Sessions into Sesi, building the two matrices, the timeline and the overdue warnings —
  * against the programme constants in `@sugt/domain`. It is the landing surface for a Pimpinan and
  * for a **granted** Staff, but **reading it now needs a grant** (#322): a `Pimpinan` reads it by
- * Role, a `Staff` by holding `Editor` or `Dashboard Viewer` (an `Administrator` implies both). This
+ * Role, a `Staff` by holding `Dashboard Viewer` (which `Dashboard Editor` and `Administrator` imply,
+ * ADR-0052). This
  * reverses the earlier "open to every signed-in Person" rule (#265) — a grant-less Staff Person is
  * redirected to `/pendamping`, the mirror of the `/pendamping → /` Pimpinan redirect. The predicate
  * is `canViewDashboard`, shared with the sidebar so a link is shown exactly when the page renders.
@@ -65,7 +66,7 @@ export default async function Page({ searchParams }: PageProps<"/">) {
     // The raw Pelaksanaan rows in one round trip, folded below by `deriveDashboard`.
     monitoringData(person),
     // The Persiapan Program tab's cards (#221). Reading is open to any signed-in Person; `canEdit` — the
-    // "Editor" Grant — gates the tab's editor controls. The Grant is re-checked in every write, so
+    // Dashboard Editor Grant — gates the tab's editor controls. The Grant is re-checked in every write, so
     // this only hides controls a non-holder could not use anyway. An Administrator implies the
     // Grant, which `hasGrant` already folds in.
     preparationCards(person),
@@ -75,7 +76,7 @@ export default async function Page({ searchParams }: PageProps<"/">) {
     // Persiapan Luring's week (#423): its Perjadins and their resolved checklists, batched.
     preparationWeek(person, weekStarts(monday)),
   ]);
-  const canEdit = hasGrant(person, "Editor");
+  const canEdit = hasGrant(person, "Dashboard Editor");
   const derived = deriveDashboard(data, today, completions);
   // The Peringatan section's warnings, merged in a stable order — the server's Luring-overdue
   // warnings first, then the Persiapan due-date warnings (#234) folded from the same `cards` already

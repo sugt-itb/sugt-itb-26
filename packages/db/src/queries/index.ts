@@ -20,7 +20,9 @@
  *    money — and since #180 money **reads** are open, so the guard is not about reading money
  *    either: **writing** money is Staff-only (ADR-0026 reversed ADR-0004's read half), and
  *    **arranging delivery** is Staff-only by the surface list. One guard, two reasons — see
- *    `./staff-only.ts`.
+ *    `./staff-only.ts`. Two reads are gated after all, each by a Grant: the Dashboard
+ *    (ADR-0037, by its page through `canViewDashboard`) and `/keuangan`'s programme-wide table
+ *    (ADR-0053, by every query through `requireGrant`).
  * 5. **A write function owns its own transaction.** Several writes are
  *    multi-statement: Rencanakan Perjadin writes `perjadin`, `group_member` and N
  *    `session` rows; a Group is replaced wholesale. The boundary belongs in the function
@@ -88,20 +90,30 @@ export {
 export {
   DEFAULT_FEEDBACK_SORT,
   NO_FEEDBACK_FILTERS,
+  NO_PARTICIPANT_FEEDBACK_SCOPE,
   NO_PERJADIN_FEEDBACK_FILTERS,
+  NO_PERJADIN_FEEDBACK_SCOPE,
   participantFeedbackAverages,
   participantFeedbackPage,
+  participantFeedbackSchools,
   perjadinFeedbackAverages,
   perjadinFeedbackPage,
+  perjadinFeedbackTrips,
   type FeedbackCursor,
   type FeedbackFilters,
   type FeedbackFilterValue,
+  type FeedbackPerjadinOption,
+  type FeedbackSchoolOption,
+  type FeedbackSessionOption,
   type FeedbackSort,
   type ParticipantFeedbackAverages,
   type ParticipantFeedbackRow,
+  type ParticipantFeedbackScope,
+  type PerjadinFeedbackAverages,
   type PerjadinFeedbackCursor,
   type PerjadinFeedbackFilters,
   type PerjadinFeedbackRow,
+  type PerjadinFeedbackScope,
 } from "./feedback";
 export { monitoringData, type MonitoringData, type MonitoringSession } from "./monitoring";
 export {
@@ -154,7 +166,6 @@ export {
   perjadinDetail,
   setPerjadinPimpinan,
   setPerjadinStaff,
-  updatePerjadinAdvance,
   updatePerjadinDates,
   type ChangePerjadinPicResult,
   type EligibleSchool,
@@ -164,7 +175,6 @@ export {
   type PerjadinSession,
   type SetPerjadinPimpinanResult,
   type SetPerjadinStaffResult,
-  type UpdatePerjadinAdvanceResult,
   type UpdatePerjadinDatesResult,
 } from "./perjadin-detail";
 export {
@@ -324,18 +334,26 @@ export {
 } from "./perjadin-planning";
 export {
   attachTransactionEvidence,
+  deleteTransaction,
+  deleteTransactionEvidence,
   filePerjadinReport,
   perjadinAcquittal,
+  receiptDeleteTarget,
   receiptsOnLine,
   recordTransaction,
+  transactionDeleteTarget,
   type AcquittalEvidence,
   type AcquittalTransaction,
   type AttachEvidenceResult,
+  type DeleteEvidenceResult,
+  type DeleteTransactionResult,
   type FilePerjadinReportResult,
+  type ReceiptDeleteTarget,
   type NewEvidence,
   type NewTransaction,
   type PerjadinAcquittal,
   type RecordTransactionResult,
+  type TransactionDriveItems,
 } from "./perjadin-report";
 export {
   schoolDetail,
@@ -366,6 +384,19 @@ export {
   type SessionRecordRatings,
 } from "./session-records";
 export { assignGrant, personGrants, revokeGrant, type SetGrantResult } from "./grants";
+export {
+  DEFAULT_KEUANGAN_SORT,
+  KEUANGAN_SORT_KEYS,
+  keuanganExport,
+  keuanganPage,
+  keuanganPerjadinOptions,
+  type KeuanganFilters,
+  type KeuanganPage,
+  type KeuanganPerjadinOption,
+  type KeuanganRow,
+  type KeuanganSort,
+  type KeuanganSortKey,
+} from "./keuangan";
 export type { DriveConnectionStatus, DriveFolderProblem } from "../schema/drive";
 export {
   driveConnectionCard,

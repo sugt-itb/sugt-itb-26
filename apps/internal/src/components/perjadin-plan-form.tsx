@@ -14,7 +14,6 @@ import type {
   PlanPerjadinResult,
 } from "@sugt/db/queries";
 import {
-  formatIdr,
   MAX_EXTRA_STAFF_PER_GROUP,
   MAX_OFFLINE_SESSIONS_PER_SCHOOL_PER_PERJADIN,
   MAX_TEACHING_TEAM_PER_PERJADIN,
@@ -80,11 +79,10 @@ function PerjadinPlanForm({
   const router = useRouter();
   const [subClusterId, setSubClusterId] = useState("");
   // The trip's range is two typed dates (ADR-0041) — a Perjadin carries no travel legs to derive
-  // it from — beside the Advance and the PIC.
+  // it from — beside the PIC.
   const [trip, setTrip] = useState({
     startsOn: "",
     endsOn: "",
-    advanceIdr: "",
     picPersonId: "",
   });
   // The Teaching Team as trip-scoped names (ADR-0020): a list of plain strings, added one at a time
@@ -103,7 +101,6 @@ function PerjadinPlanForm({
   const [saving, startSaving] = useTransition();
 
   const subClusterFieldId = useId();
-  const advanceId = useId();
   const picId = useId();
   const teacherDraftId = useId();
   const extraStaffId = useId();
@@ -185,8 +182,8 @@ function PerjadinPlanForm({
   }
 
   /**
-   * Every field the database needs before a trip can be written. Teaching Team, Staff, Pimpinan and
-   * Uang Perjalanan (#437) are optional.
+   * Every field the database needs before a trip can be written. Teaching Team, Staff and Pimpinan are
+   * optional.
    */
   const incomplete =
     subClusterId === "" ||
@@ -205,7 +202,6 @@ function PerjadinPlanForm({
         subClusterId,
         startsOn: trip.startsOn,
         endsOn: trip.endsOn,
-        advanceIdr: advanceFromField(trip.advanceIdr),
         picPersonId: trip.picPersonId,
         extraStaffPersonIds: extraStaff,
         teacherNames: teacherNames.map((name) => name.trim()).filter((name) => name !== ""),
@@ -290,32 +286,6 @@ function PerjadinPlanForm({
             placeholder="Pilih PIC"
             onSelect={(personId) => {
               setTrip((previous) => ({ ...previous, picPersonId: personId }));
-            }}
-          />
-        </Field>
-
-        <Field
-          id={advanceId}
-          label="Uang Perjalanan (Rp) — opsional"
-        >
-          {/*
-            Optional (#437): a trip is often planned before anyone knows its Uang Perjalanan. Left
-            empty it is stored as null — "Belum diisi", never Rp 0 — and filled in later on the
-            Perjadin page; only filing the Laporan waits for it.
-
-            A masked text input, not `type="number"`: it groups the thousands as they type so
-            a seven-figure advance's magnitude is legible at the point of entry. `advanceIdr` stays
-            a plain digit string in state — every non-digit is stripped back out on change — so
-            submit's `Number(...)` and the empty-value guard are unchanged.
-          */}
-          <Input
-            id={advanceId}
-            type="text"
-            inputMode="numeric"
-            value={trip.advanceIdr === "" ? "" : formatIdr(Number(trip.advanceIdr))}
-            onChange={(event) => {
-              const digits = event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-              setTrip((previous) => ({ ...previous, advanceIdr: digits }));
             }}
           />
         </Field>
@@ -670,9 +640,6 @@ function Refused({ result, schools }: { result: PlanPerjadinResult; schools: Pla
             <p>Tanggal selesai tidak boleh lebih awal dari Tanggal mulai.</p>
           )}
           {result.outcome === "no-schools" && <p>Belum ada Sesi pada Perjadin ini.</p>}
-          {result.outcome === "negative-advance" && (
-            <p>Uang Perjalanan tidak boleh kurang dari nol.</p>
-          )}
           {result.outcome === "duplicate-staff" && (
             <p>Setiap Pendamping tambahan harus berbeda, dan bukan PIC.</p>
           )}
@@ -789,12 +756,4 @@ function Field({
   );
 }
 
-/**
- * The Uang Perjalanan field's digit string as what `planPerjadin` takes. Empty is "not filled in yet"
- * (#437) and becomes `null` — never `Number("")`, which is Rp 0 and would log `advance_set`.
- */
-function advanceFromField(digits: string): number | null {
-  return digits === "" ? null : Number(digits);
-}
-
-export { advanceFromField, PerjadinPlanForm };
+export { PerjadinPlanForm };

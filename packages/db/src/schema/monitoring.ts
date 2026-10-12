@@ -22,7 +22,7 @@ import { school } from "./reference";
 
 /**
  * **Preparation Cards** — the free-standing cards on the Dashboard (`/`) Persiapan
- * tab (ADR-0028's Editor Grant gates writing them). A Card is a title, a date or date-range, and a
+ * tab (the Dashboard Editor Grant, ADR-0052, gates writing them). A Card is a title, a date or date-range, and a
  * variable checklist; the **Jenis category lives on each checklist item**, not on the Card (#292).
  *
  * **This is a different concept from the Perjadin Preparation Checklist** ([ADR-0018](../../../../docs/adr/0018-the-preparation-checklist-stores-ticks-and-derives-the-list.md)),
@@ -62,7 +62,7 @@ export const preparationCard = pgTable(
  *
  * `jenis` is the item's category, moved down from the Card (#292): it CHECKs the four
  * `PREPARATION_JENIS` values character for character. **Its `Pimpinan` value is a category label, not
- * the Person Role** — an item's Jenis never gates access; only the Monitoring Editor Grant does.
+ * the Person Role** — an item's Jenis never gates access; only the Dashboard Editor Grant does.
  *
  * The `≤ 20 items per card` ceiling is **not** a column constraint — it is a per-Card count the
  * write enforces (`MAX_PREPARATION_CHECKLIST_ITEMS`), the same way the app caps trip-scoped teachers.

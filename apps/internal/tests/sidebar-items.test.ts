@@ -13,7 +13,8 @@ function hrefsFor(role: Role, grants: Grant[]) {
   const person: Person = { id: "p", fullName: "P", email: "p@example.com", role, grants };
   return sidebarItems({
     role,
-    canEditMonitoring: hasGrant(person, "Editor"),
+    canEditDaring: hasGrant(person, "Daring Editor"),
+    canViewKeuangan: hasGrant(person, "Keuangan"),
     canViewDashboard: canViewDashboard(person),
     canAdminister: hasGrant(person, "Administrator"),
     driveNeedsAttention: false,
@@ -35,21 +36,75 @@ const FULL = [
 ];
 
 describe("sidebarItems", () => {
-  it("gives a Staff Administrator every link, Dashboard first and Log then Pengaturan last", () => {
-    expect(hrefsFor("Staff", ["Administrator"])).toEqual([...FULL, "/log", "/pengaturan"]);
+  /** `FULL` with Keuangan in its place, right after Pendamping and before Perjadin (#472). */
+  const WITH_KEUANGAN = FULL.flatMap((href) =>
+    href === "/pendamping" ? [href, "/keuangan"] : [href],
+  );
+
+  it("gives a Staff Administrator every link, Keuangan after Pendamping, and Log then Pengaturan last", () => {
+    expect(hrefsFor("Staff", ["Administrator"])).toEqual([...WITH_KEUANGAN, "/log", "/pengaturan"]);
     expect(hrefsFor("Staff", ["Administrator", "Dashboard Viewer"])).toEqual([
-      ...FULL,
+      ...WITH_KEUANGAN,
       "/log",
       "/pengaturan",
     ]);
+    expect(WITH_KEUANGAN.slice(3, 6)).toEqual(["/pendamping", "/keuangan", "/perjadin"]);
   });
 
-  it("gives a Staff Editor every link but Log and Pengaturan, with or without Dashboard Viewer", () => {
-    expect(hrefsFor("Staff", ["Editor"])).toEqual(FULL);
-    expect(hrefsFor("Staff", ["Editor", "Dashboard Viewer"])).toEqual(FULL);
+  it("keeps Keuangan in its place when Pendamping moves to the top for a Keuangan-only Staff (#472)", () => {
+    expect(hrefsFor("Staff", ["Keuangan"])).toEqual([
+      "/pendamping",
+      "/kalender",
+      "/keuangan",
+      "/perjadin",
+      "/sesi-daring",
+      "/feedback",
+      "/cerita",
+      "/sekolah",
+      "/kelompok-sekolah",
+      "/orang",
+    ]);
   });
 
-  it("drops only Pretest for a Staff Dashboard Viewer", () => {
+  it("shows no Keuangan link without the Grant, nor to a Pimpinan", () => {
+    for (const grants of [
+      [],
+      ["Perjadin Editor"],
+      ["Dashboard Editor", "Daring Editor"],
+    ] as const) {
+      expect(hrefsFor("Staff", [...grants])).not.toContain("/keuangan");
+    }
+    expect(hrefsFor("Pimpinan", [])).not.toContain("/keuangan");
+  });
+
+  it("gives a Staff Daring Editor who reads the Dashboard every link but Log and Pengaturan", () => {
+    expect(hrefsFor("Staff", ["Daring Editor", "Dashboard Viewer"])).toEqual(FULL);
+    expect(hrefsFor("Staff", ["Daring Editor", "Dashboard Editor"])).toEqual(FULL);
+  });
+
+  it("puts Pendamping first for a Staff holding only Daring Editor, Pretest kept (ADR-0052)", () => {
+    expect(hrefsFor("Staff", ["Daring Editor"])).toEqual([
+      "/pendamping",
+      "/kalender",
+      "/pretest",
+      "/perjadin",
+      "/sesi-daring",
+      "/feedback",
+      "/cerita",
+      "/sekolah",
+      "/kelompok-sekolah",
+      "/orang",
+    ]);
+  });
+
+  it("puts Pendamping first, with no Dashboard or Pretest, for a Staff holding only Perjadin Editor (ADR-0052)", () => {
+    expect(hrefsFor("Staff", ["Perjadin Editor"])).toEqual(hrefsFor("Staff", []));
+  });
+
+  it("drops only Pretest for a Staff Dashboard Viewer, and for a Dashboard Editor", () => {
+    expect(hrefsFor("Staff", ["Dashboard Editor"])).toEqual(
+      hrefsFor("Staff", ["Dashboard Viewer"]),
+    );
     expect(hrefsFor("Staff", ["Dashboard Viewer"])).toEqual([
       "/",
       "/kalender",
@@ -78,7 +133,7 @@ describe("sidebarItems", () => {
     ]);
   });
 
-  it("gives a Pimpinan the Dashboard first and no Staff-only or Editor links", () => {
+  it("gives a Pimpinan the Dashboard first and no Staff-only or Grant-gated links", () => {
     expect(hrefsFor("Pimpinan", [])).toEqual([
       "/",
       "/kalender",
@@ -102,7 +157,8 @@ describe("sidebarItems", () => {
     const items = (driveNeedsAttention: boolean) =>
       sidebarItems({
         role: "Staff",
-        canEditMonitoring: true,
+        canEditDaring: true,
+        canViewKeuangan: true,
         canViewDashboard: true,
         canAdminister: hasGrant(admin, "Administrator"),
         driveNeedsAttention,

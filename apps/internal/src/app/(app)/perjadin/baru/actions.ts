@@ -9,7 +9,7 @@ import { planPerjadin, type PlanPerjadinInput, type PlanPerjadinResult } from "@
  *
  * It opens no transaction: the boundary is convention 5's and lives in `planPerjadin`,
  * where the Perjadin, its Group and its Sessions commit together. It re-checks no role
- * either — `requireStaff` and `requireGrant(…, "Editor")` (ADR-0047) inside the query are what close
+ * either — `requireStaff` and `requireGrant(…, "Perjadin Editor")` (ADR-0047) inside the query are what close
  * the path, since a layout does not
  * run before a Server Action.
  *

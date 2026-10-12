@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Perjadin" };
  *
  * One `requirePerson()`, one query, no role check: a trip's name, its Schools and how
  * many Schools it reaches are delivery data, and ADR-0004 opens that to everyone signed in.
- * The Advance is not here at all — it is `perjadinAcquittal`'s, which any signed-in Person may
+ * Money is not here at all — it is `perjadinAcquittal`'s, which any signed-in Person may
  * read now (ADR-0004 reversed by ADR-0026, #180); this list simply never fetches money, and
  * writing it is the trip's writers' (ADR-0048).
  *
@@ -22,8 +22,8 @@ export const metadata: Metadata = { title: "Perjadin" };
  *
  * The table lives in the `"use client"` `PerjadinDirectoryList`, which filters (#334) and sorts
  * (#343) the payload in the browser — the page stays a Server Component that fetches the full list
- * once. The Persiapan checklist toggles from a row only for whoever writes that trip — its Group, an
- * Editor or an Administrator (ADR-0048); every other row's pill is static.
+ * once. The Persiapan checklist toggles from a row only for whoever writes that trip — its Group, a
+ * Perjadin Editor or an Administrator (ADR-0048); every other row's pill is static.
  *
  * The route keeps the `/perjadin` slug [#14](https://github.com/mafiefa02/sugt/issues/14)
  * chose. It mirrors the surface name enumerated in
@@ -57,8 +57,8 @@ export default async function Page() {
             </LinkButton>
           )}
           {/* The create action, moved off the sidebar onto its list page (#294). It needs the
-              Editor Grant (ADR-0047); anyone without it renders nothing — no disabled state. */}
-          {hasGrant(person, "Editor") && (
+              Perjadin Editor Grant (ADR-0047); anyone without it renders nothing — no disabled state. */}
+          {hasGrant(person, "Perjadin Editor") && (
             <LinkButton render={<Link href="/perjadin/baru" />}>
               <Plus data-icon="inline-start" />
               Rencanakan Perjadin
@@ -70,7 +70,7 @@ export default async function Page() {
       {trips.length === 0 ? (
         <p className="p-4 text-sm text-muted-foreground sm:p-7">
           Belum ada Perjadin.
-          {hasGrant(person, "Editor") &&
+          {hasGrant(person, "Perjadin Editor") &&
             " Buka Rencanakan Perjadin untuk merencanakan yang pertama."}
         </p>
       ) : (

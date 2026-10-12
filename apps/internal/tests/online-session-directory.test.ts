@@ -140,7 +140,7 @@ describe("onlineSessionDirectory", () => {
     const pic = await staff();
     const school = await oneSchool();
     await addSession({ schoolId: school.id, heldOn: "2026-09-10" });
-    const trip = await addPerjadin({ advanceIdr: 5_000_000, picPersonId: pic.id });
+    const trip = await addPerjadin({ picPersonId: pic.id });
     await addOfflineSession({ schoolId: school.id, heldOn: "2026-09-02", perjadinId: trip.id });
 
     const rows = await onlineSessionDirectory(pic);

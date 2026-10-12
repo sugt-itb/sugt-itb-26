@@ -66,7 +66,10 @@ export type FootageLogDetails = {
 
 /**
  * What `details` holds for each action. `document_deleted` is the same snapshot as
- * `document_uploaded`, taken of the row as it is deleted (#398), since the row is then gone.
+ * `document_uploaded`, taken of the row as it is deleted (#398), since the row is then gone. The two
+ * money deletes (ADR-0050) are snapshots for the same reason: `evidence_deleted` of the receipt and
+ * its line (#462), `transaction_deleted` of the whole line (#463). The two `advance_*` shapes are
+ * history only: nothing writes them since the Advance stopped being tracked (ADR-0051, #464).
  */
 export type ActivityLogDetails = {
   advance_set: { amountIdr: number };
@@ -94,12 +97,40 @@ export type ActivityLogDetails = {
   document_deleted: DocumentLogDetails;
   footage_uploaded: FootageLogDetails;
   footage_deleted: FootageLogDetails;
+  evidence_deleted: {
+    transactionId: string;
+    evidenceId: string;
+    category: TransactionCategory;
+    amountIdr: number;
+    spentOn: string;
+    /** What the line holds after it — never zero, since the only receipt cannot be deleted. */
+    left: number;
+  };
+  transaction_deleted: {
+    transactionId: string;
+    category: TransactionCategory;
+    amountIdr: number;
+    participantType: TransactionParticipantType;
+    spentOn: string;
+    description: string;
+    /** The receipts the line held, trashed with it. */
+    receiptCount: number;
+  };
 };
 
 /** One act: its action and the details shaped for it. */
 export type ActivityLogEntry = {
   [A in ActivityLogAction]: { action: A; details: ActivityLogDetails[A] };
 }[ActivityLogAction];
+
+/**
+ * The actions the app still writes. `advance_set` and `advance_changed` are history only (ADR-0051,
+ * #464): the Log reads and renders them, and `logActivity` cannot be handed one.
+ */
+export type WritableActivityLogEntry = Exclude<
+  ActivityLogEntry,
+  { action: "advance_set" | "advance_changed" }
+>;
 
 /** The Aksi column: the action's label, and "(dari data lama)" after it on a backfilled row. */
 export function activityLogAksi(action: ActivityLogAction, backfilled: boolean): string {
@@ -125,6 +156,15 @@ export function activityLogRincian(entry: ActivityLogEntry): string {
     case "evidence_uploaded": {
       const { category, amountIdr, spentOn, added, total } = entry.details;
       return `${category} · ${formatRupiah(amountIdr)} · tgl ${spentOn} · +${added} bukti (kini ${total}/${MAX_RECEIPTS_PER_TRANSACTION})`;
+    }
+    case "evidence_deleted": {
+      const { category, amountIdr, spentOn, left } = entry.details;
+      return `${category} · ${formatRupiah(amountIdr)} · tgl ${spentOn} · -1 bukti (kini ${left}/${MAX_RECEIPTS_PER_TRANSACTION})`;
+    }
+    case "transaction_deleted": {
+      const { category, amountIdr, participantType, spentOn, description, receiptCount } =
+        entry.details;
+      return `${category} · ${formatRupiah(amountIdr)} · ${participantType} · tgl ${spentOn} · ${description} · ${receiptCount} bukti`;
     }
     case "report_filed":
       return `${entry.details.transactionCount} transaksi · total ${formatRupiah(entry.details.totalIdr)}`;
@@ -175,7 +215,7 @@ export async function logActivity(
   tx: Tx,
   actor: Person,
   perjadinId: string,
-  entry: ActivityLogEntry,
+  entry: WritableActivityLogEntry,
 ): Promise<void> {
   await tx.insert(activityLog).values({
     actorPersonId: actor.id,
@@ -191,13 +231,17 @@ export async function logActivity(
 export const ACTIVITY_LOG_PAGE_SIZE = 50;
 
 /**
- * The Aksi dropdown's choices besides Semua, keyed by their `?aksi=` value. Uang Perjalanan,
- * Dokumen and Foto & Video each cover two actions.
+ * The Aksi dropdown's choices besides Semua, keyed by their `?aksi=` value. Every one but Laporan
+ * dikirim covers two actions: Catat transaksi and Unggah bukti each carry their own Hapus
+ * (ADR-0050). Uang Perjalanan finds history only — nothing writes `advance_*` any more (ADR-0051).
  */
 export const ACTIVITY_LOG_AKSI_FILTERS = {
   "uang-perjalanan": { label: "Uang Perjalanan", actions: ["advance_set", "advance_changed"] },
-  "catat-transaksi": { label: "Catat transaksi", actions: ["transaction_recorded"] },
-  "unggah-bukti": { label: "Unggah bukti", actions: ["evidence_uploaded"] },
+  "catat-transaksi": {
+    label: "Catat transaksi",
+    actions: ["transaction_recorded", "transaction_deleted"],
+  },
+  "unggah-bukti": { label: "Unggah bukti", actions: ["evidence_uploaded", "evidence_deleted"] },
   dokumen: { label: "Dokumen", actions: ["document_uploaded", "document_deleted"] },
   "foto-video": { label: "Foto & Video", actions: ["footage_uploaded", "footage_deleted"] },
   laporan: { label: "Laporan dikirim", actions: ["report_filed"] },

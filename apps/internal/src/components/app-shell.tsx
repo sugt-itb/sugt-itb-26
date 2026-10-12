@@ -30,7 +30,8 @@ import { Avatar, AvatarFallback } from "@sugt/ui/components/avatar";
 function AppShell({
   role,
   personName,
-  canEditMonitoring,
+  canEditDaring,
+  canViewKeuangan,
   canViewDashboard,
   canAdminister,
   driveNeedsAttention,
@@ -40,8 +41,10 @@ function AppShell({
 }: {
   role: Role;
   personName: string;
-  /** Whether the viewer holds the Editor Grant — gates the `/pretest` nav link. */
-  canEditMonitoring: boolean;
+  /** Whether the viewer holds the Daring Editor Grant — gates the `/pretest` nav link. */
+  canEditDaring: boolean;
+  /** Whether the viewer holds the Keuangan Grant — gates the `/keuangan` nav link (#472). */
+  canViewKeuangan: boolean;
   /** Whether the viewer may read the Dashboard (`/`) — gates its nav link (#322). */
   canViewDashboard: boolean;
   /** Whether the viewer holds the Administrator Grant — gates the `/pengaturan` nav link (#372). */
@@ -58,7 +61,8 @@ function AppShell({
     <SidebarBody
       role={role}
       personName={personName}
-      canEditMonitoring={canEditMonitoring}
+      canEditDaring={canEditDaring}
+      canViewKeuangan={canViewKeuangan}
       canViewDashboard={canViewDashboard}
       canAdminister={canAdminister}
       driveNeedsAttention={driveNeedsAttention}
@@ -102,7 +106,8 @@ function AppShell({
 function SidebarBody({
   role,
   personName,
-  canEditMonitoring,
+  canEditDaring,
+  canViewKeuangan,
   canViewDashboard,
   canAdminister,
   driveNeedsAttention,
@@ -110,7 +115,8 @@ function SidebarBody({
 }: {
   role: Role;
   personName: string;
-  canEditMonitoring: boolean;
+  canEditDaring: boolean;
+  canViewKeuangan: boolean;
   canViewDashboard: boolean;
   canAdminister: boolean;
   driveNeedsAttention: boolean;
@@ -122,7 +128,8 @@ function SidebarBody({
 
       <AppSidebarNav
         role={role}
-        canEditMonitoring={canEditMonitoring}
+        canEditDaring={canEditDaring}
+        canViewKeuangan={canViewKeuangan}
         canViewDashboard={canViewDashboard}
         canAdminister={canAdminister}
         driveNeedsAttention={driveNeedsAttention}

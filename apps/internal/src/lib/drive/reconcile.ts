@@ -36,6 +36,11 @@ import { evidenceFileName, isReceiptContentType, transactionFolderName } from ".
  * unsynced and the answer says why. Any failure from Drive does the same — the database already
  * holds the line, so a failed reconcile costs only the sync, which the next run finishes.
  *
+ * **A line deleted while this runs** (Hapus transaksi, #463, ADR-0050) brings nothing back. Its
+ * folder is in the trash by then, so the run stops at step 2 — or, if this run made the folder, the
+ * claim finds no row, and the folder goes straight to the trash. A receipt moved into a trashed
+ * folder is trashed with it. The run answers `no-such-transaction` once it sees the row gone.
+ *
  * **It assumes a usable connection**: its `drive` and `folders` are what `driveAccessToken` answers
  * with `ok`, and only then. A caller holding neither cannot call it — that is how "not connected
  * touches nothing" is held.
@@ -136,12 +141,11 @@ async function reconcileOnce(
           sugtTransactionId: target.transactionId,
         },
       });
-      transactionFolderId = await claimTransactionDriveFolder(
-        person,
-        target.transactionId,
-        made.id,
-      );
-      if (transactionFolderId !== made.id) await drive.trashFile(made.id);
+      const claimed = await claimTransactionDriveFolder(person, target.transactionId, made.id);
+      if (claimed !== made.id) await drive.trashFile(made.id);
+      // Deleted by a Hapus transaksi since `reconcileTarget` read it (#463): nothing to put in place.
+      if (claimed === null) return { outcome: "no-such-transaction" };
+      transactionFolderId = claimed;
     }
 
     const folder = await drive.getFile(transactionFolderId);
@@ -186,10 +190,13 @@ async function reconcileOnce(
   }
 
   // 5. Only for the receipts handled here — a newer one, committed meanwhile, keeps the line owed.
-  const synced = await markTransactionSynced(
+  const marked = await markTransactionSynced(
     person,
     target.transactionId,
     target.evidence.map((receipt) => receipt.id),
   );
-  return synced ? { outcome: "synced" } : { outcome: "unsynced", reason: "newer-receipts" };
+  if (marked === "gone") return { outcome: "no-such-transaction" };
+  return marked === "synced"
+    ? { outcome: "synced" }
+    : { outcome: "unsynced", reason: "newer-receipts" };
 }

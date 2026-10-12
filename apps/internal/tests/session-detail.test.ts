@@ -111,7 +111,6 @@ describe("Detail Sesi", () => {
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-03",
     });
@@ -180,12 +179,11 @@ describe("Detail Sesi", () => {
    * fixture the owed tests below share. Session Records are an **offline-only** debt now (#284):
    * online Sessions have no PIC and owe nothing.
    */
-  async function deliveredOfflineSession(advanceIdr: number | null = 5_000_000) {
+  async function deliveredOfflineSession() {
     const pic = await staff();
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr,
       startsOn: "2026-09-01",
       endsOn: "2026-09-03",
     });
@@ -207,7 +205,6 @@ describe("Detail Sesi", () => {
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-03",
     });
@@ -236,12 +233,6 @@ describe("Detail Sesi", () => {
     expect(detail?.owed).toEqual([
       { kind: "session-record", personId: pic.id, fullName: "Rina Nurhayati" },
     ]);
-  });
-
-  it("marks an offline Session delivered while Uang Perjalanan is not filled in yet (#437)", async () => {
-    const { pic, session } = await deliveredOfflineSession(null);
-
-    await expect(markSessionDelivered(pic, session.id)).resolves.toEqual({ outcome: "delivered" });
   });
 
   it("stops owing a Session Record once the PIC files one", async () => {
@@ -329,7 +320,6 @@ describe("Tandai terlaksana — offline", () => {
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-03",
     });
@@ -524,7 +514,6 @@ describe("moving a date", () => {
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-03",
     });
@@ -548,7 +537,6 @@ describe("moving a date", () => {
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-03",
     });
@@ -572,7 +560,6 @@ describe("moving a date", () => {
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-03",
     });
@@ -602,7 +589,6 @@ describe("moving a date", () => {
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-03",
     });
@@ -633,7 +619,6 @@ describe("moving a date", () => {
     const school = await oneSchool();
     const perjadin = await addPerjadin({
       picPersonId: pic.id,
-      advanceIdr: 5_000_000,
       startsOn: "2026-09-01",
       endsOn: "2026-09-03",
     });

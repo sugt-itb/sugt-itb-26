@@ -29,8 +29,8 @@ export async function generateMetadata({
  * and ADR-0004 opens it to everyone signed in.
  *
  * **The record-a-Session affordance is the second entry point for Catat Sesi daring (#70, #318)**
- * — you are already thinking about one School here. It needs the Editor Grant (ADR-0047), so its read
- * runs only for an Editor (or Administrator) and renders only when it returns; the guard in the write
+ * — you are already thinking about one School here. It needs the Daring Editor Grant (ADR-0047), so its read
+ * runs only for a Daring Editor (or Administrator) and renders only when it returns; the guard in the write
  * is the enforcement, since a layout does not run before a Server Action.
  *
  * Keyed on the School's `slug` rather than its id — the column is unique, it is what the public
@@ -44,7 +44,7 @@ export default async function Page({ params }: PageProps<"/sekolah/[slug]">) {
   const school = await schoolDetail(person, slug);
   if (!school) notFound();
 
-  const arrange = hasGrant(person, "Editor")
+  const arrange = hasGrant(person, "Daring Editor")
     ? await staffSurface(() => arrangeOnlineSessionAt(person, slug))
     : null;
 

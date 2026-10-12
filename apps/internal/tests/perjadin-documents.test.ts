@@ -62,7 +62,6 @@ async function scene() {
     kabupatenKota: "Kota Samarinda",
   });
   const trip = await addPerjadin({
-    advanceIdr: 1_000_000,
     picPersonId: staff.id,
     subClusterId: subCluster.id,
     startsOn: "2026-10-12",
@@ -198,7 +197,6 @@ describe("the CHECKs", () => {
   it("holds one SPPD per School per Perjadin, and leaves the attendance kinds unbounded", async () => {
     const { staff, trip, inside } = await scene();
     const other = await addPerjadin({
-      advanceIdr: 1,
       picPersonId: staff.id,
       subClusterId: trip.subClusterId,
       startsOn: "2026-11-09",
@@ -404,7 +402,6 @@ describe("an SPPD (#441)", () => {
       role: "Staff",
     })) as Person;
     const b = await addPerjadin({
-      advanceIdr: 1_000_000,
       picPersonId: dimas.id,
       subClusterId: a.subClusterId,
       startsOn: "2026-11-09",

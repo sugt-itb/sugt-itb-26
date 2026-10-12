@@ -19,7 +19,7 @@ import {
 
 /**
  * **The guard every upload write runs before it touches Drive**: `requirePerjadinWriter` — Staff,
- * then the trip's Group or the Editor Grant (ADR-0048) — then a read of the Perjadin. Returns whether
+ * then the trip's Group or the Perjadin Editor Grant (ADR-0048) — then a read of the Perjadin. Returns whether
  * the Perjadin exists.
  *
  * The order is load-bearing. An upload session is a write credential on the company Drive, and the

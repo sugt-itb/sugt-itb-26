@@ -78,7 +78,6 @@ async function deliveredSession(picPersonId: string) {
   const school = await oneSchool();
   const perjadin = await addPerjadin({
     picPersonId,
-    advanceIdr: 5_000_000,
     startsOn: "2026-09-01",
     endsOn: "2026-09-30",
   });

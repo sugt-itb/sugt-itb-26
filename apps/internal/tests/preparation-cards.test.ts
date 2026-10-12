@@ -1,3 +1,4 @@
+import { db, schema } from "@sugt/db";
 import {
   addChecklistItem,
   createPreparationCard,
@@ -12,6 +13,7 @@ import {
   type Person,
 } from "@sugt/db/queries";
 import type { Grant, PreparationJenis } from "@sugt/domain";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { resetDatabase } from "./support/fixtures";
@@ -24,13 +26,13 @@ import { resetDatabase } from "./support/fixtures";
  * nothing off the caller but `role` and `grants` (that is all `requireGrant` inspects), and that
  * resolution threads a real Person's grants onto the caller is proven in `grant-foundation.test.ts`.
  * So a literal caller is a faithful stand-in here, and it is the only way to drive the guard's every
- * branch — an Editor, an Administrator (who implies it), and a plain Staff who is refused.
+ * branch — a Dashboard Editor, an Administrator (who implies it), and a plain Staff who is refused.
  */
 function caller(grants: Grant[], id = "00000000-0000-0000-0000-0000000000e1"): Person {
   return { id, fullName: "Orang", email: "orang@ditsama.itb.ac.id", role: "Staff", grants };
 }
 
-const editor = () => caller(["Editor"]);
+const editor = () => caller(["Dashboard Editor"]);
 
 const A_CARD = { title: "Persiapan Teknis", startsOn: "2026-10-01" } as const;
 
@@ -41,6 +43,30 @@ function labeled(labels: string[], jenis: PreparationJenis = "Teknis") {
 
 describe("preparationCards read", () => {
   beforeEach(resetDatabase);
+
+  it("hands cards over by start date, then creation time, then id — the order the tab's ties keep (#466)", async () => {
+    const me = editor();
+    const made = [];
+    for (const title of ["Satu", "Dua", "Tiga"]) {
+      const result = await createPreparationCard(me, { title, startsOn: "2026-10-05" });
+      if (result.outcome !== "created") throw new Error(result.outcome);
+      made.push(result.cardId);
+    }
+    await createPreparationCard(me, { title: "Lebih awal", startsOn: "2026-10-01" });
+    // Creation order made the opposite of id order, so only `created_at` can explain the result.
+    const byIdDescending = made.toSorted().toReversed();
+    for (const [index, id] of byIdDescending.entries()) {
+      await db
+        .update(schema.preparationCard)
+        .set({ createdAt: new Date(Date.UTC(2026, 8, 1 + index)) })
+        .where(eq(schema.preparationCard.id, id));
+    }
+
+    const cards = await preparationCards(me);
+
+    expect(cards.map((card) => card.title)[0]).toBe("Lebih awal");
+    expect(cards.slice(1).map((card) => card.id)).toEqual(byIdDescending);
+  });
 
   it("returns cards with items ordered (checked, position) — unchecked first, then checked", async () => {
     const me = editor();
@@ -325,7 +351,7 @@ describe("checklist item writes", () => {
   });
 });
 
-describe("Preparation Card writes are Editor-guarded", () => {
+describe("Preparation Card writes are Dashboard Editor-guarded", () => {
   beforeEach(resetDatabase);
 
   it("refuses a Staff Person without the Grant, with a distinguishable typed error", async () => {
@@ -347,7 +373,17 @@ describe("Preparation Card writes are Editor-guarded", () => {
     expect(isNotGrantedError(refusal)).toBe(true);
   });
 
-  it("lets an Administrator write — Administrator implies Editor", async () => {
+  it.each(["Dashboard Viewer", "Perjadin Editor", "Daring Editor", "Keuangan"] as const)(
+    "refuses a Staff Person holding only %s — reading the Dashboard is not writing it (ADR-0052)",
+    async (grant) => {
+      const refusal = await createPreparationCard(caller([grant]), A_CARD).catch(
+        (error: unknown) => error,
+      );
+      expect(isNotGrantedError(refusal)).toBe(true);
+    },
+  );
+
+  it("lets an Administrator write — Administrator implies Dashboard Editor", async () => {
     const admin = caller(["Administrator"]);
     expect((await createPreparationCard(admin, A_CARD)).outcome).toBe("created");
   });
@@ -358,7 +394,7 @@ describe("Preparation Card writes are Editor-guarded", () => {
       fullName: "Bapak",
       email: "pimpinan@ditsama.itb.ac.id",
       role: "Pimpinan",
-      grants: ["Editor"],
+      grants: ["Dashboard Editor"],
     };
     const refusal = await createPreparationCard(pimpinan, A_CARD).catch((error: unknown) => error);
     expect(isNotGrantedError(refusal)).toBe(true);
