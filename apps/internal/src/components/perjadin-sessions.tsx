@@ -42,14 +42,16 @@ import Link from "next/link";
 import { useId, useState, useTransition } from "react";
 
 type TripTeacher = { id: string; name: string };
+type RosterPimpinan = { id: string; fullName: string };
 
 /**
  * A Perjadin's offline Sessions, and — for Staff — the per-Session controls: add one, edit an
- * arranged one's School, date, time and "Diajar oleh", and cancel one (which is how a Session is
- * removed, kept visible as an attempt). Every rule the plan form checks — inside the trip's window, at
- * a School of its Sub-Cluster, no two *different* Schools sharing a moment, the ten-per-School
- * ceiling — is re-checked by the write against the trip's other Sessions; one Session per School per
- * moment (ADR-0038) is left to the database index, whose refusal comes back as `duplicate-session`.
+ * arranged one's School, date, time, "Diajar oleh" and Pimpinan, and cancel one (which is how a
+ * Session is removed, kept visible as an attempt). Every rule the plan form checks — inside the
+ * trip's window, at a School of its Sub-Cluster, no two *different* Schools sharing a moment, the
+ * ten-per-School ceiling — is re-checked by the write against the trip's other Sessions; one
+ * Session per School per moment (ADR-0038) is left to the database index, whose refusal comes back
+ * as `duplicate-session`.
  *
  * The list is shown to everyone (a Session carries no money); the controls appear only for Staff.
  */
@@ -58,6 +60,7 @@ function PerjadinSessions({
   sessions,
   eligibleSchools,
   teachers,
+  pimpinanRoster,
   startsOn,
   endsOn,
   canEdit,
@@ -66,6 +69,7 @@ function PerjadinSessions({
   sessions: PerjadinSession[];
   eligibleSchools: EligibleSchool[];
   teachers: TripTeacher[];
+  pimpinanRoster: RosterPimpinan[];
   startsOn: string;
   endsOn: string;
   canEdit: boolean;
@@ -79,6 +83,7 @@ function PerjadinSessions({
             perjadinId={perjadinId}
             eligibleSchools={eligibleSchools}
             teachers={teachers}
+            pimpinanRoster={pimpinanRoster}
             startsOn={startsOn}
             endsOn={endsOn}
             trigger={
@@ -126,6 +131,7 @@ function PerjadinSessions({
                       session={session}
                       eligibleSchools={eligibleSchools}
                       teachers={teachers}
+                      pimpinanRoster={pimpinanRoster}
                       startsOn={startsOn}
                       endsOn={endsOn}
                       trigger={
@@ -156,6 +162,17 @@ function PerjadinSessions({
                   ))}
                 </ul>
               )}
+              {/* Its Pimpinan the same way, one per line under the Narasumber (#492). */}
+              {session.pimpinan.length > 0 && (
+                <ul
+                  aria-label={`Pimpinan Sesi ${session.heldOn} ${session.schoolName}`}
+                  className="mt-1 grid gap-0.5 pl-4 text-muted-foreground"
+                >
+                  {session.pimpinan.map((entry) => (
+                    <li key={entry.personId}>Pimpinan: {entry.name}</li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>
@@ -166,14 +183,16 @@ function PerjadinSessions({
 
 /**
  * Add or edit one Session. With `session` it edits that one (its fields seed the form); without, it
- * adds a new one. The same four fields either way — School, date, time, "Diajar oleh" — and the same
- * write shape, so one dialog serves both. No Stream: a Session teaches both (ADR-0038).
+ * adds a new one. The same five fields either way — School, date, time, "Diajar oleh", Pimpinan —
+ * and the same write shape, so one dialog serves both. No Stream: a Session teaches both
+ * (ADR-0038).
  */
 function SessionDialog({
   perjadinId,
   session,
   eligibleSchools,
   teachers,
+  pimpinanRoster,
   startsOn,
   endsOn,
   trigger,
@@ -182,6 +201,7 @@ function SessionDialog({
   session?: PerjadinSession;
   eligibleSchools: EligibleSchool[];
   teachers: TripTeacher[];
+  pimpinanRoster: RosterPimpinan[];
   startsOn: string;
   endsOn: string;
   trigger: React.ReactElement;
@@ -193,11 +213,22 @@ function SessionDialog({
   const [taughtBy, setTaughtBy] = useState<string[]>(
     () => session?.taughtBy.map((teacher) => teacher.id) ?? [],
   );
+  const [pimpinan, setPimpinan] = useState<string[]>(
+    () => session?.pimpinan.map((entry) => entry.personId) ?? [],
+  );
   const [refusal, setRefusal] = useState<React.ReactNode>(null);
   const [saving, startSaving] = useTransition();
   const idPrefix = useId();
 
   const teacherOptions = teachers.map((teacher) => ({ value: teacher.id, label: teacher.name }));
+  // The roster, plus anyone already on this Session who has since left it (a revoked Pimpinan), so
+  // their chip still shows and can be removed. The write keeps an already-recorded Pimpinan.
+  const pimpinanOptions = [
+    ...pimpinanRoster.map((person) => ({ value: person.id, label: person.fullName })),
+    ...(session?.pimpinan ?? [])
+      .filter((entry) => !pimpinanRoster.some((person) => person.id === entry.personId))
+      .map((entry) => ({ value: entry.personId, label: entry.name })),
+  ];
   const incomplete = schoolId === "" || date === "" || time === "";
 
   // The picked School's Time Zone, for the Jam Mulai label. In add mode it appears and flips as the
@@ -214,6 +245,7 @@ function SessionDialog({
         heldOn: date,
         startsAt: time,
         taughtByTeacherIds: taughtBy,
+        pimpinanPersonIds: pimpinan,
       };
       const result = session
         ? await editPerjadinSessionAction(perjadinId, session.sessionId, input)
@@ -236,7 +268,9 @@ function SessionDialog({
       <DialogContent size="panel">
         <DialogHeader>
           <DialogTitle>{session ? "Ubah Sesi" : "Tambah Sesi"}</DialogTitle>
-          <DialogDescription>Sekolah, tanggal, jam dan siapa yang mengajar.</DialogDescription>
+          <DialogDescription>
+            Sekolah, tanggal, jam, siapa yang mengajar dan Pimpinan yang hadir.
+          </DialogDescription>
         </DialogHeader>
 
         <DialogBody>
@@ -331,6 +365,29 @@ function SessionDialog({
                   setRefusal(null);
                 }}
               />
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor={`${idPrefix}-pimpinan`}>Pimpinan</Label>
+              <MultiSelectCombobox
+                id={`${idPrefix}-pimpinan`}
+                aria-label="Pimpinan"
+                placeholder={
+                  pimpinanOptions.length === 0 ? "Belum ada Pimpinan" : "Pilih Pimpinan…"
+                }
+                emptyLabel="Tidak ada Pimpinan."
+                options={pimpinanOptions}
+                value={pimpinan}
+                onValueChange={(next) => {
+                  setPimpinan(next);
+                  setRefusal(null);
+                }}
+              />
+              {pimpinanRoster.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Belum ada Pimpinan di roster — minta Administrator menambahkannya lewat /orang.
+                </p>
+              )}
             </div>
           </div>
         </DialogBody>
@@ -465,6 +522,8 @@ function sessionRefusalMessage(
       return "Dua Sekolah yang berbeda tidak bisa berada di tanggal dan jam yang sama.";
     case "unknown-teacher":
       return "Ada narasumber yang sudah tidak ada. Muat ulang halaman.";
+    case "unknown-pimpinan":
+      return "Ada Pimpinan yang sudah tidak ada di roster. Muat ulang halaman.";
     case "school-booked-on-another-perjadin":
       return <SchoolBookedElsewhere refusal={result} />;
     default:

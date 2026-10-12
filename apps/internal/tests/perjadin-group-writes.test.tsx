@@ -9,7 +9,6 @@ import {
   editPerjadinSessionAction,
   removePerjadinTeacherAction,
   renamePerjadinTeacherAction,
-  setPerjadinPimpinanAction,
   setPerjadinStaffAction,
   togglePreparationItemAction,
   updatePerjadinDatesAction,
@@ -69,7 +68,6 @@ import {
   recordTransaction,
   removePerjadinTeacher,
   renamePerjadinTeacher,
-  setPerjadinPimpinan,
   setPerjadinStaff,
   togglePreparationItem,
   transactionDeleteTarget,
@@ -318,7 +316,18 @@ const WRITES: [
   ],
   ["Group Staff", (c, a, who) => setPerjadinStaff(c, a.id, [who.andi.id]), "set"],
   ["Change PIC", (c, a, who) => changePerjadinPic(c, a.id, who.andi.id), "changed"],
-  ["Pimpinan", (c, a, who) => setPerjadinPimpinan(c, a.id, [who.hadi.id]), "set"],
+  [
+    "Session Pimpinan",
+    (c, a, who, where) =>
+      editPerjadinSession(c, a.arrangedId, {
+        schoolId: where.bontang.id,
+        heldOn: "2026-10-12",
+        startsAt: nextTime(),
+        taughtByTeacherIds: [],
+        pimpinanPersonIds: [who.hadi.id],
+      }),
+    "edited",
+  ],
   ["Narasumber add", (c, a) => addPerjadinTeacher(c, a.id, "Dr. Sari"), "added"],
   ["Narasumber rename", (c, a) => renamePerjadinTeacher(c, a.teacherId, "Dr. Bagus P."), "renamed"],
   ["Narasumber remove", (c, a) => removePerjadinTeacher(c, a.teacherId), "removed"],
@@ -330,6 +339,7 @@ const WRITES: [
         heldOn: "2026-10-13",
         startsAt: nextTime(),
         taughtByTeacherIds: [],
+        pimpinanPersonIds: [],
       }),
     "added",
   ],
@@ -341,6 +351,7 @@ const WRITES: [
         heldOn: "2026-10-12",
         startsAt: nextTime(),
         taughtByTeacherIds: [a.teacherId],
+        pimpinanPersonIds: [],
       }),
     "edited",
   ],
@@ -512,12 +523,20 @@ describe("the actions answer a non-member with a 403", () => {
       heldOn: "2026-10-13",
       startsAt: nextTime(),
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     };
 
     const calls: [string, () => Promise<unknown>][] = [
       ["Group Staff", () => setPerjadinStaffAction(a.id, [])],
       ["Change PIC", () => changePerjadinPicAction(a.id, who.andi.id)],
-      ["Pimpinan", () => setPerjadinPimpinanAction(a.id, [])],
+      [
+        "Session Pimpinan",
+        () =>
+          editPerjadinSessionAction(a.id, a.arrangedId, {
+            ...session,
+            pimpinanPersonIds: [who.hadi.id],
+          }),
+      ],
       ["Narasumber add", () => addPerjadinTeacherAction(a.id, "Dr. Sari")],
       ["Narasumber rename", () => renamePerjadinTeacherAction(a.id, a.teacherId, "Dr. Baru")],
       ["Narasumber remove", () => removePerjadinTeacherAction(a.id, a.teacherId)],

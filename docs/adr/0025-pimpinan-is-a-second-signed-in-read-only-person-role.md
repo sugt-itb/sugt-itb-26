@@ -78,4 +78,6 @@ every money read until #180 lands.
   Beranda redirect actually refusing a real signed-in Person rather than standing as defense in depth.
 - The `perjadin_pimpinan` trip record is still the fixed set of three names (the `PIMPINAN` CHECK),
   and a Perjadin Evaluation's `filed_by_role` is still a self-declared untrusted string (ADR-0024).
-  Neither is this Person role; unifying the former is deferred to #181.
+  Neither is this Person role; unifying the former is deferred to #181. _Since done: #181 made the
+  trip record real Pimpinan-Person rows, and #492 moved it onto the Sessions they attended
+  ([ADR-0056](./0056-a-pimpinan-is-recorded-per-session.md)); `perjadin_pimpinan` is gone._

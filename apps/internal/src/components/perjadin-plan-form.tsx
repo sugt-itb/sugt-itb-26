@@ -21,7 +21,6 @@ import {
 } from "@sugt/domain";
 import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
-import { Checkbox } from "@sugt/ui/components/checkbox";
 import { Input } from "@sugt/ui/components/input";
 import { Label } from "@sugt/ui/components/label";
 import { LinkButton } from "@sugt/ui/components/link-button";
@@ -38,29 +37,33 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
-/** One offline Session on a School's list: its date, time and "Diajar oleh" teacher indexes. */
+/** One offline Session on a School's list: its date, time, "Diajar oleh" and Pimpinan. */
 type SessionDraft = {
   date: string;
   time: string;
   /** Indexes into `teacherNames` — which of the trip's teachers staffed this Session. May be empty. */
   taughtBy: number[];
+  /** Person ids from the Pimpinan roster — who attended this Session (#492). May be empty. */
+  pimpinan: string[];
 };
 
 function emptySession(): SessionDraft {
-  return { date: "", time: "", taughtBy: [] };
+  return { date: "", time: "", taughtBy: [], pimpinan: [] };
 }
 
 /**
- * The trip, its Staff-only Group, its trip-scoped Teaching Team names, its Pimpinan and its
- * Sessions, on one form and one submit (#137, ADR-0019, ADR-0020).
+ * The trip, its Staff-only Group, its trip-scoped Teaching Team names and its Sessions, on one form
+ * and one submit (#137, ADR-0019, ADR-0020).
  *
  * **Planning starts from a Sub-Cluster** (#69): pick one, and its Schools appear. Each School holds
  * a repeatable list of Sessions — a School is "kept" on the trip exactly when it has at least one —
  * and each Session carries its own date, start time and the subset of the trip's Teaching Team who
- * taught it — no Stream, since a Session teaches both (ADR-0038). One School holds at most one
- * Session per date and start time: parallel rooms are one Session, so a repeated slot is flagged on
- * its row and holds back submit. The Teaching Team are **free-text names**, not People (ADR-0020): typed in one
- * at a time and shown as removable chips. Pimpinan are chosen from the Pimpinan roster (#181).
+ * taught it — no Stream, since a Session teaches both (ADR-0038) — and the Pimpinan who attended
+ * it. One School holds at most one Session per date and start time: parallel rooms are one Session,
+ * so a repeated slot is flagged on its row and holds back submit. The Teaching Team are **free-text
+ * names**, not People (ADR-0020): typed in one at a time and shown as removable chips. A Session's
+ * Pimpinan are chosen from the Pimpinan roster (#181), per Session rather than for the whole trip
+ * (#492, ADR-0056).
  *
  * A client component because every row is editable and none of that state is worth a URL. The
  * Sub-Clusters and the Staff and Pimpinan rosters arrive as props; nothing here fetches. The action
@@ -91,9 +94,6 @@ function PerjadinPlanForm({
   const [teacherDraft, setTeacherDraft] = useState("");
   // Extra Staff on the Group beyond the PIC — a searchable multi-select of Person ids, capped at ten.
   const [extraStaff, setExtraStaff] = useState<string[]>([]);
-  // The Pimpinan recorded on the trip — personIds chosen from the Pimpinan roster. Record-only
-  // (ADR-0020, #181).
-  const [pimpinan, setPimpinan] = useState<string[]>([]);
   // Sessions keyed by School id, seeded empty when a Sub-Cluster is picked. A School with no Sessions
   // is simply not kept, so there is no separate "include" toggle any more.
   const [sessions, setSessions] = useState<Record<string, SessionDraft[]>>({});
@@ -121,6 +121,12 @@ function PerjadinPlanForm({
   const teacherOptions = teacherNames
     .map((name, index) => ({ value: String(index), label: name.trim() }))
     .filter((option) => option.label !== "");
+
+  // Each Session's Pimpinan picker offers the whole Pimpinan roster (#492).
+  const pimpinanOptions = pimpinanRoster.map((person) => ({
+    value: person.id,
+    label: person.fullName,
+  }));
 
   // The Staff roster minus the PIC — a Group holds each person once, and the PIC is already on it.
   const extraStaffOptions = staff
@@ -205,7 +211,6 @@ function PerjadinPlanForm({
         picPersonId: trip.picPersonId,
         extraStaffPersonIds: extraStaff,
         teacherNames: teacherNames.map((name) => name.trim()).filter((name) => name !== ""),
-        pimpinan,
         // Flatten each kept School's Sessions. The guard above proves date and time are set.
         sessions: keptSchools.flatMap((school) =>
           (sessions[school.id] ?? []).map((draft) => ({
@@ -213,6 +218,7 @@ function PerjadinPlanForm({
             heldOn: draft.date,
             startsAt: draft.time,
             taughtByTeacherIndexes: draft.taughtBy,
+            pimpinanPersonIds: draft.pimpinan,
           })),
         ),
       });
@@ -374,48 +380,6 @@ function PerjadinPlanForm({
               }}
             />
           </Field>
-
-          <div className="grid gap-1.5">
-            <Label>Pimpinan</Label>
-            <p className="-mt-0.5 text-xs text-muted-foreground">
-              Pimpinan DITSAMA yang ikut memantau — tercatat saja, bukan anggota Group.
-            </p>
-            {pimpinanRoster.length === 0 ? (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Belum ada Pimpinan di roster — minta Administrator menambahkannya lewat /orang.
-              </p>
-            ) : (
-              <ul className="mt-1 grid gap-2">
-                {pimpinanRoster.map((person) => {
-                  const checkboxId = `${idPrefix}-pimpinan-${person.id}`;
-                  return (
-                    <li
-                      key={person.id}
-                      className="flex items-center gap-2.5"
-                    >
-                      <Checkbox
-                        id={checkboxId}
-                        checked={pimpinan.includes(person.id)}
-                        onCheckedChange={(checked) => {
-                          setPimpinan((previous) =>
-                            checked === true
-                              ? [...previous, person.id]
-                              : previous.filter((entry) => entry !== person.id),
-                          );
-                        }}
-                      />
-                      <Label
-                        htmlFor={checkboxId}
-                        className="text-sm font-normal"
-                      >
-                        {person.fullName}
-                      </Label>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
         </div>
       </div>
 
@@ -452,6 +416,13 @@ function PerjadinPlanForm({
           />
         </Field>
       </div>
+
+      {/* Each Session's Pimpinan picker is empty until an Administrator adds Pimpinan (#488). */}
+      {selected !== undefined && pimpinanRoster.length === 0 && (
+        <p className="border-b border-border px-4 py-3 text-sm text-muted-foreground sm:px-7">
+          Belum ada Pimpinan di roster — minta Administrator menambahkannya lewat /orang.
+        </p>
+      )}
 
       {selected === undefined ? (
         <p className="px-4 py-6 text-sm text-muted-foreground sm:px-7">
@@ -560,6 +531,29 @@ function PerjadinPlanForm({
                                   patchSession(school.id, index, {
                                     taughtBy: next.map(Number),
                                   });
+                                }}
+                              />
+                            </div>
+                          </Field>
+
+                          <Field
+                            id={`${idPrefix}-pimpinan-${school.id}-${index}`}
+                            label="Pimpinan"
+                          >
+                            <div className="w-64">
+                              <MultiSelectCombobox
+                                id={`${idPrefix}-pimpinan-${school.id}-${index}`}
+                                aria-label="Pimpinan"
+                                placeholder={
+                                  pimpinanOptions.length === 0
+                                    ? "Belum ada Pimpinan"
+                                    : "Pilih Pimpinan…"
+                                }
+                                emptyLabel="Tidak ada Pimpinan."
+                                options={pimpinanOptions}
+                                value={draft.pimpinan}
+                                onValueChange={(next) => {
+                                  patchSession(school.id, index, { pimpinan: next });
                                 }}
                               />
                             </div>

@@ -86,13 +86,13 @@ describe("Planning writes the typed range", () => {
       subClusterId: subCluster.id,
       picPersonId: pic.id,
       teacherNames: [],
-      pimpinan: [],
       sessions: [
         {
           schoolId: school.id,
           heldOn: "2026-09-02",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
       startsOn: "2026-09-01",

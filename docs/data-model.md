@@ -672,6 +672,56 @@ gone. It is the offline analogue of an online Session's two `pengajar_*` columns
 **Offline Class Records fall out of scope** as a consequence: their filers would be the teachers,
 and a name is not a Person who can sign in and file. See the open question in `CONTEXT.md`.
 
+### Who attended: the Pimpinan
+
+A **Pimpinan** who joins a trip is recorded on the offline Sessions they attended
+([#492](https://github.com/sugt-itb/sugt-itb-26/issues/492),
+[ADR-0056](./adr/0056-a-pimpinan-is-recorded-per-session.md)), the same shape as "Diajar oleh":
+
+```sql
+create table session_pimpinan (
+  session_id  uuid not null,
+  person_id   uuid not null,
+  role        text not null default 'Pimpinan' check (role = 'Pimpinan'),
+
+  primary key (session_id, person_id),
+  constraint session_pimpinan_session_fk
+    foreign key (session_id) references session (id) on delete cascade,
+  constraint session_pimpinan_is_pimpinan
+    foreign key (person_id, role) references person (id, role)
+);
+```
+
+**Record-only**: a Pimpinan is not a working Group member, files no Perjadin Evaluation as one and
+adds nothing to the Preparation Checklist, which is why this is not a `group_member` row. A row
+references a **real `person` of role Pimpinan** — `role` is pinned to `'Pimpinan'`, and the
+composite `(person_id, role)` foreign key into `person (id, role)` refuses anyone else, the
+guarantee `perjadin_pimpinan` held since [#181](https://github.com/mafiefa02/sugt/issues/181). It
+cascades with its Session. The primary key records a Pimpinan at most once per Session.
+
+**A trip's Pimpinan are derived, never stored**: everyone recorded on at least one of its
+non-cancelled Sessions. One query serves the trip page, the Laporan and its CSV and the
+`/pendamping` card (`tripPimpinan` in `queries/trip-pimpinan.ts`):
+
+```sql
+select distinct session.perjadin_id, person.id, person.full_name, school.name
+from session_pimpinan
+join session on session.id = session_pimpinan.session_id
+join person  on person.id  = session_pimpinan.person_id
+join school  on school.id  = session.school_id
+where session.perjadin_id = any($1) and session.status <> 'cancelled'
+order by person.full_name, person.id, school.name;
+```
+
+A cancelled Session keeps its rows — its own line still shows who was meant to be there — but adds
+nobody to the trip. The trip page lists each Pimpinan with the Schools above; the Laporan and
+`/pendamping` take the names.
+
+**Migration `0054`** created the table and copied every `perjadin_pimpinan` row onto every
+non-cancelled Session of its trip, or onto all its Sessions when none was live, then dropped
+`perjadin_pimpinan`. A trip with no Session at all had nowhere to keep its Pimpinan; the migration
+test shows the query counting those rows (expected: none).
+
 ### Pretest/Posttest completion
 
 Whether a **Pretest** — and later a **Posttest** — was **administered** to a cohort at a School,
@@ -1373,23 +1423,13 @@ transactions are untouched — only the membership is destroyed and rebuilt.
 That is what makes the last Group rule cheap. See
 [what the database does not hold](#what-the-database-does-not-hold).
 
-### The Teaching Team and Pimpinan on a Perjadin
+### The Teaching Team on a Perjadin
 
 ```sql
 create table perjadin_teacher (
   id           uuid primary key default gen_random_uuid(),
   perjadin_id  uuid not null references perjadin (id) on delete cascade,
   name         text not null
-);
-
-create table perjadin_pimpinan (
-  perjadin_id  uuid not null references perjadin (id) on delete cascade,
-  person_id    uuid not null,
-  role         text not null default 'Pimpinan' check (role = 'Pimpinan'),
-
-  primary key (perjadin_id, person_id),
-  constraint perjadin_pimpinan_is_pimpinan
-    foreign key (person_id, role) references person (id, role)
 );
 ```
 
@@ -1404,18 +1444,11 @@ are added, renamed and removed one at a time (T3), and each row has an `id` so
 Stream and no Person FK** — a name is not a Person, and no Session carries a Stream (ADR-0038). `on delete
 cascade`: the names are the trip's and outlive nothing.
 
-**`perjadin_pimpinan` records a Pimpinan on a Perjadin — record-only.** A leader of DITSAMA ITB who
-rarely joins the Kelompok Perjalanan to monitor the offline Sessions is noted here and named on the
-Laporan Perjadin, but is **not a working Group member**: they file no Perjadin Evaluation and add
-nothing to the Preparation Checklist, which is exactly why they are not a `group_member` row. A row
-references a **real `person` of role Pimpinan** ([#181](https://github.com/mafiefa02/sugt/issues/181)):
-the Pimpinan roster is the single source of truth, so the old fixed-three `name` column with its CHECK
-and the `PIMPINAN` constant in `@sugt/domain` are gone. `role` is pinned to `'Pimpinan'` and the
-composite `(person_id, role)` foreign key into `person (id, role)` guarantees a non-Pimpinan can never
-be recorded — the same PIC-is-Staff discipline as `perjadin_pic_is_staff` and `group_member`'s role
-FK. The primary key `(perjadin_id, person_id)` makes a Pimpinan recordable at most once per trip.
-Writing and rendering them is T3/T7
-([#138](https://github.com/mafiefa02/sugt/issues/138), [#142](https://github.com/mafiefa02/sugt/issues/142)).
+**`perjadin_pimpinan` is gone** ([#492](https://github.com/sugt-itb/sugt-itb-26/issues/492)). It
+recorded the Pimpinan on a Perjadin as a whole; a Pimpinan is now recorded on the Sessions they
+attended, and the trip's list is derived from those — see
+[Who attended: the Pimpinan](#who-attended-the-pimpinan) and
+[ADR-0056](./adr/0056-a-pimpinan-is-recorded-per-session.md).
 
 ### The Preparation Checklist
 
@@ -2526,10 +2559,11 @@ exists at all.
 `group_member` cascades. `transaction` cascades, and `transaction_evidence` cascades from
 that — so deleting a Perjadin destroys its acquittal rows, and nothing warns you. The files are
 not removed: the Perjadin's folder in the company Google Drive (ADR-0040) outlives its rows. No
-path in the app deletes a Perjadin. `perjadin_teacher` and `perjadin_pimpinan` cascade too — the
-trip-scoped teacher names and the recorded Pimpinan are the trip's and outlive nothing — and
-`session_teaching_team` cascades from `perjadin_teacher`, so an offline Session's "Diajar oleh"
-links go with the names. `activity_log` cascades too, so the trip's Activity Log entries go with it.
+path in the app deletes a Perjadin. `perjadin_teacher` cascades too — the trip-scoped teacher names
+are the trip's and outlive nothing — and `session_teaching_team` cascades from `perjadin_teacher`,
+so an offline Session's "Diajar oleh" links go with the names. A Session's `session_pimpinan` rows
+cascade from the Session. `activity_log` cascades too, so the trip's Activity Log entries go with
+it.
 So do `perjadin_document` and `perjadin_document_folder`; the files and folders stay in Drive.
 `session_footage` does not cascade from `session`, which an offline Session's `perjadin_id` keeps
 from being deleted anyway.

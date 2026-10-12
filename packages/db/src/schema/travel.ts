@@ -174,40 +174,6 @@ export const perjadinTeacher = pgTable(
 );
 
 /**
- * The **Pimpinan** recorded on a Perjadin — record-only (ADR-0020, and the Pimpinan entry in
- * `CONTEXT.md`). A leader of DITSAMA ITB who rarely joins the Kelompok Perjalanan to monitor the
- * offline Sessions is noted here and named on the Laporan Perjadin, but is **not a working Group
- * member**: they file no Perjadin Evaluation and add nothing to the Preparation Checklist, so they
- * are deliberately not a `group_member` row.
- *
- * A row references a **real Person of role Pimpinan** — the Pimpinan roster is the single source of
- * truth now (#181), so the old fixed-three `PIMPINAN` constant and the `name` CHECK that mirrored it
- * are gone. `role` is pinned to `'Pimpinan'` and the composite `(person_id, role)` foreign key into
- * `person (id, role)` guarantees a non-Pimpinan can never be recorded here, the same discipline the
- * PIC-is-Staff family (`perjadin_pic_is_staff`, `group_member_person_role_fk`) enforces. The primary
- * key `(perjadin_id, person_id)` makes a Pimpinan recordable at most once per trip.
- */
-export const perjadinPimpinan = pgTable(
-  "perjadin_pimpinan",
-  {
-    perjadinId: uuid("perjadin_id")
-      .notNull()
-      .references(() => perjadin.id, { onDelete: "cascade" }),
-    personId: uuid("person_id").notNull(),
-    role: text("role").$type<"Pimpinan">().notNull().default("Pimpinan"),
-  },
-  (t) => [
-    primaryKey({ columns: [t.perjadinId, t.personId] }),
-    check("perjadin_pimpinan_role_check", sql`${t.role} = 'Pimpinan'`),
-    foreignKey({
-      name: "perjadin_pimpinan_is_pimpinan",
-      columns: [t.personId, t.role],
-      foreignColumns: [person.id, person.role],
-    }),
-  ],
-);
-
-/**
  * The acquittal's line items: every transaction on the trip, a line for the trip as a whole rather
  * than a person's share of it. Their sum is Uang Perjalanan Terpakai (ADR-0051).
  *

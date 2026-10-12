@@ -10,6 +10,8 @@ import {
   addPerson,
   addProvince,
   addSchool,
+  addSchoolOnTrip,
+  addSessionPimpinan,
   addSubCluster,
   addTransaction,
   COMPANY_PREPARATION_ITEMS,
@@ -276,14 +278,28 @@ describe("myPerjadin lists the trip's members", () => {
       email: "joko@ditsama.itb.ac.id",
       role: "Pimpinan",
     });
+    // Another, recorded only on a Session that was cancelled — on that Session, not on the trip.
+    const absent = await addPerson({
+      fullName: "Bu Sinta",
+      email: "sinta@ditsama.itb.ac.id",
+      role: "Pimpinan",
+    });
 
     const trip = await addPerjadin({
       picPersonId: caller.id,
       startsOn: daysFromToday(1),
       endsOn: daysFromToday(4),
-      pimpinan: [pimpinan.id],
     });
     await addGroupMember(trip.id, anwar.id);
+    // The trip's Pimpinan are derived from its live Sessions (#492).
+    const live = await addSchoolOnTrip({ perjadin: trip, name: "SMAN 1 Bandung" });
+    await addSessionPimpinan(live.sessionId, [pimpinan.id]);
+    const cancelled = await addSchoolOnTrip({
+      perjadin: trip,
+      name: "SMAN 2 Bandung",
+      status: "cancelled",
+    });
+    await addSessionPimpinan(cancelled.sessionId, [absent.id]);
     // Trip-scoped teacher names (ADR-0020), inserted out of name order to prove the sort.
     await db.insert(schema.perjadinTeacher).values([
       { perjadinId: trip.id, name: "Sri Wahyuni" },

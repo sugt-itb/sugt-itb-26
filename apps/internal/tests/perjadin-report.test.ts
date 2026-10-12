@@ -16,6 +16,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   addPerjadin,
   addPerson,
+  addSchoolOnTrip,
+  addSessionPimpinan,
   addTransaction,
   addTransactionEvidence,
   refusedBy,
@@ -219,9 +221,11 @@ describe("the acquittal payload", () => {
 
   it("names the Pimpinan who joined the trip, ordered, and reads none as an empty list", async () => {
     /**
-     * The Laporan names who travelled (#142). A Pimpinan is record-only — now the name of a real
-     * Pimpinan-Person row (#181, joined from `person`) — so the acquittal carries the names and
-     * nothing more, ordered so the screen and its CSV read the same on every load.
+     * The Laporan names who travelled (#142). A Pimpinan is record-only — the name of a real
+     * Pimpinan-Person row (#181) — so the acquittal carries the names and nothing more, ordered so
+     * the screen and its CSV read the same on every load. The list is derived from the trip's
+     * Sessions (#492): a Pimpinan on two is named once, and one recorded only on a cancelled
+     * Session is not named at all.
      */
     const staff = await pic();
     const fatimah = await addPerson({
@@ -234,10 +238,22 @@ describe("the acquittal payload", () => {
       email: "anton@ditsama.itb.ac.id",
       role: "Pimpinan",
     });
-    const trip = await addPerjadin({
-      picPersonId: staff.id,
-      pimpinan: [fatimah.id, anton.id],
+    const sinta = await addPerson({
+      fullName: "Sinta Dewi",
+      email: "sinta@ditsama.itb.ac.id",
+      role: "Pimpinan",
     });
+    const trip = await addPerjadin({ picPersonId: staff.id });
+    const first = await addSchoolOnTrip({ perjadin: trip, name: "SMAN 1 Bandung" });
+    const second = await addSchoolOnTrip({ perjadin: trip, name: "SMAN 3 Bandung" });
+    const cancelled = await addSchoolOnTrip({
+      perjadin: trip,
+      name: "SMAN 5 Bandung",
+      status: "cancelled",
+    });
+    await addSessionPimpinan(first.sessionId, [fatimah.id, anton.id]);
+    await addSessionPimpinan(second.sessionId, [anton.id]);
+    await addSessionPimpinan(cancelled.sessionId, [sinta.id]);
 
     const acquittal = await perjadinAcquittal(staff, trip.id);
     // Ordered by name — "Anton …" sorts before "Fatimah …".

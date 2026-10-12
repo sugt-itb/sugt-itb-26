@@ -14,7 +14,6 @@ import {
   issuePerjadinFeedbackToken,
   removePerjadinTeacher,
   renamePerjadinTeacher,
-  setPerjadinPimpinan,
   setPerjadinStaff,
   togglePreparationItem,
   updatePerjadinDates,
@@ -27,7 +26,6 @@ import {
   type PerjadinSessionInput,
   type RemovePerjadinTeacherResult,
   type RenamePerjadinTeacherResult,
-  type SetPerjadinPimpinanResult,
   type SetPerjadinStaffResult,
   type TogglePreparationItemResult,
   type UpdatePerjadinDatesResult,
@@ -68,18 +66,6 @@ export async function changePerjadinPicAction(
 
   const result = await staffSurface(() => changePerjadinPic(person, perjadinId, newPicPersonId));
   if (result.outcome === "changed") revalidatePath(`/perjadin/${perjadinId}`);
-  return result;
-}
-
-/** **Set the Pimpinan recorded on the trip** — a subset of the Pimpinan roster, by Person id (#181). */
-export async function setPerjadinPimpinanAction(
-  perjadinId: string,
-  personIds: string[],
-): Promise<SetPerjadinPimpinanResult> {
-  const person = await requirePerson();
-
-  const result = await staffSurface(() => setPerjadinPimpinan(person, perjadinId, personIds));
-  if (result.outcome === "set") revalidatePath(`/perjadin/${perjadinId}`);
   return result;
 }
 

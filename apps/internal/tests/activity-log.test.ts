@@ -106,13 +106,13 @@ describe("each money write logs one entry with the change", () => {
       subClusterId: subCluster.id,
       picPersonId: pic.id,
       teacherNames: [],
-      pimpinan: [],
       sessions: [
         {
           schoolId: school.id,
           heldOn: "2026-10-12",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
       startsOn: "2026-10-12",
@@ -134,7 +134,6 @@ describe("each money write logs one entry with the change", () => {
       subClusterId: randomUUID(),
       picPersonId: pic.id,
       teacherNames: [],
-      pimpinan: [],
       sessions: [],
       startsOn: "2026-10-12",
       endsOn: "2026-10-15",

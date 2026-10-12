@@ -112,19 +112,20 @@ async function validPlan(kabupatenKota?: [string, string]) {
     subClusterId: subCluster.id,
     picPersonId: pic.id,
     teacherNames: [],
-    pimpinan: [],
     sessions: [
       {
         schoolId: schools[0].id,
         heldOn: "2026-09-01",
         startsAt: "09:00",
         taughtByTeacherIndexes: [],
+        pimpinanPersonIds: [],
       },
       {
         schoolId: schools[1].id,
         heldOn: "2026-09-03",
         startsAt: "09:00",
         taughtByTeacherIndexes: [],
+        pimpinanPersonIds: [],
       },
     ],
     startsOn: STARTS_ON,
@@ -171,12 +172,17 @@ async function teachersOf(perjadinId: string) {
     .where(eq(schema.perjadinTeacher.perjadinId, perjadinId));
 }
 
-async function pimpinanOf(perjadinId: string) {
-  return db
-    .select({ name: schema.person.fullName })
-    .from(schema.perjadinPimpinan)
-    .innerJoin(schema.person, eq(schema.person.id, schema.perjadinPimpinan.personId))
-    .where(eq(schema.perjadinPimpinan.perjadinId, perjadinId));
+/** The Pimpinan recorded on one Session (#492), by name, in name order. */
+async function pimpinanOf(sessionId: string) {
+  return (
+    await db
+      .select({ name: schema.person.fullName })
+      .from(schema.sessionPimpinan)
+      .innerJoin(schema.person, eq(schema.person.id, schema.sessionPimpinan.personId))
+      .where(eq(schema.sessionPimpinan.sessionId, sessionId))
+  )
+    .map((row) => row.name)
+    .sort();
 }
 
 /** The teacher names linked to one Session, joined through `session_teaching_team`. */
@@ -238,9 +244,9 @@ describe("Rencanakan Perjadin", () => {
 
   /**
    * The rich acceptance scenario: one School with **three** offline Sessions at different times, a
-   * two-name Teaching Team each Session draws from, and two Pimpinan. Every piece is asserted: the
-   * Sessions, the `session_teaching_team` links, and the `perjadin_teacher` and `perjadin_pimpinan`
-   * rows.
+   * two-name Teaching Team each Session draws from, and two Pimpinan, each on the Sessions they
+   * attended (#492). Every piece is asserted: the Sessions, the `session_teaching_team` links, the
+   * `perjadin_teacher` rows and each Session's `session_pimpinan` rows.
    */
   it("persists three Sessions, the teaching-team links, the teachers and the Pimpinan", async () => {
     const pic = await staff();
@@ -260,25 +266,27 @@ describe("Rencanakan Perjadin", () => {
       subClusterId: subCluster.id,
       picPersonId: pic.id,
       teacherNames: ["Dr. Andi", "Dr. Bella"],
-      pimpinan: [pimpinanA.id, pimpinanB.id],
       sessions: [
         {
           schoolId: schools[0].id,
           heldOn: "2026-09-01",
           startsAt: "08:00",
           taughtByTeacherIndexes: [0],
+          pimpinanPersonIds: [pimpinanA.id],
         },
         {
           schoolId: schools[0].id,
           heldOn: "2026-09-01",
           startsAt: "10:00",
           taughtByTeacherIndexes: [0, 1],
+          pimpinanPersonIds: [pimpinanA.id, pimpinanB.id],
         },
         {
           schoolId: schools[0].id,
           heldOn: "2026-09-01",
           startsAt: "13:00",
           taughtByTeacherIndexes: [1],
+          pimpinanPersonIds: [],
         },
       ],
       startsOn: STARTS_ON,
@@ -294,10 +302,6 @@ describe("Rencanakan Perjadin", () => {
     const teachers = await teachersOf(planned.perjadinId);
     expect(teachers.map((row) => row.name).sort()).toEqual(["Dr. Andi", "Dr. Bella"]);
 
-    expect((await pimpinanOf(planned.perjadinId)).map((row) => row.name).sort()).toEqual(
-      [pimpinanA.fullName, pimpinanB.fullName].sort(),
-    );
-
     const sessions = await sessionsOf(planned.perjadinId);
     expect(sessions).toHaveLength(3);
     // Each Session by its start time, so the links can be checked against the plan.
@@ -307,10 +311,19 @@ describe("Rencanakan Perjadin", () => {
     expect(await taughtBy(byTime.get("08:00")!.id)).toEqual(["Dr. Andi"]);
     expect(await taughtBy(byTime.get("10:00")!.id)).toEqual(["Dr. Andi", "Dr. Bella"]);
     expect(await taughtBy(byTime.get("13:00")!.id)).toEqual(["Dr. Bella"]);
+
+    expect(await pimpinanOf(byTime.get("08:00")!.id)).toEqual([pimpinanA.fullName]);
+    expect(await pimpinanOf(byTime.get("10:00")!.id)).toEqual(
+      [pimpinanA.fullName, pimpinanB.fullName].sort(),
+    );
+    expect(await pimpinanOf(byTime.get("13:00")!.id)).toEqual([]);
   });
 
-  /** A trip planned with two Pimpinan writes exactly those two `perjadin_pimpinan` rows. */
-  it("records the Pimpinan who join, as record-only rows", async () => {
+  /**
+   * Each Session's Pimpinan are written as `session_pimpinan` rows on that Session alone (#492),
+   * a repeated id once, and never as Group members.
+   */
+  it("records each Session's Pimpinan on that Session, as record-only rows", async () => {
     const { pic, input } = await validPlan();
     const pimpinanA = await addPerson({
       fullName: "Fatimah Arofiati Noor",
@@ -323,12 +336,22 @@ describe("Rencanakan Perjadin", () => {
       role: "Pimpinan",
     });
 
-    const planned = await planPerjadin(pic, { ...input, pimpinan: [pimpinanA.id, pimpinanB.id] });
+    const [first, second] = input.sessions;
+    const planned = await planPerjadin(pic, {
+      ...input,
+      sessions: [
+        { ...first!, pimpinanPersonIds: [pimpinanA.id, pimpinanB.id, pimpinanA.id] },
+        { ...second!, pimpinanPersonIds: [pimpinanB.id] },
+      ],
+    });
     if (planned.outcome !== "planned") throw new Error("fixture failed to plan");
 
-    expect((await pimpinanOf(planned.perjadinId)).map((row) => row.name).sort()).toEqual(
+    const sessions = await sessionsOf(planned.perjadinId);
+    const bySchool = new Map(sessions.map((row) => [row.schoolId, row.id]));
+    expect(await pimpinanOf(bySchool.get(first!.schoolId)!)).toEqual(
       [pimpinanA.fullName, pimpinanB.fullName].sort(),
     );
+    expect(await pimpinanOf(bySchool.get(second!.schoolId)!)).toEqual([pimpinanB.fullName]);
     // Pimpinan are never Group members.
     expect(await groupOf(planned.perjadinId)).toHaveLength(1);
   });
@@ -338,7 +361,11 @@ describe("Rencanakan Perjadin", () => {
     const { pic, input } = await validPlan();
     // The PIC is a valid Person id, but a Staff — the wrong role for the Pimpinan roster.
 
-    const result = await planPerjadin(pic, { ...input, pimpinan: [pic.id] });
+    const [first, second] = input.sessions;
+    const result = await planPerjadin(pic, {
+      ...input,
+      sessions: [first!, { ...second!, pimpinanPersonIds: [pic.id] }],
+    });
 
     expect(result).toEqual({ outcome: "unknown-pimpinan", offending: [pic.id] });
     expect(await perjadinRows()).toEqual([]);
@@ -382,6 +409,7 @@ describe("Rencanakan Perjadin", () => {
           heldOn: "2026-09-09",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
     });
@@ -396,6 +424,7 @@ describe("Rencanakan Perjadin", () => {
           heldOn: "2026-09-09",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
     });
@@ -413,12 +442,14 @@ describe("Rencanakan Perjadin", () => {
           heldOn: "2026-09-01",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
         {
           schoolId: schools[1].id,
           heldOn: "2026-09-03",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
     });
@@ -438,12 +469,14 @@ describe("Rencanakan Perjadin", () => {
           heldOn: "2026-09-02",
           startsAt: "08:30",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
         {
           schoolId: schools[1].id,
           heldOn: "2026-09-02",
           startsAt: "13:15",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
     });
@@ -486,6 +519,7 @@ describe("Rencanakan Perjadin", () => {
           heldOn: "2026-09-02",
           startsAt: "10:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
     });
@@ -510,12 +544,14 @@ describe("Rencanakan Perjadin", () => {
           heldOn: "2026-09-02",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
         {
           schoolId: schools[1].id,
           heldOn: "2026-09-02",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
     });
@@ -545,12 +581,14 @@ describe("Rencanakan Perjadin", () => {
           heldOn: "2026-09-02",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
         {
           schoolId: schools[0].id,
           heldOn: "2026-09-02",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
     });
@@ -574,12 +612,14 @@ describe("Rencanakan Perjadin", () => {
           heldOn: "2026-09-02",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
         {
           schoolId: schools[0].id,
           heldOn: "2026-09-02",
           startsAt: "13:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
     });
@@ -601,12 +641,14 @@ describe("Rencanakan Perjadin", () => {
           heldOn: "2026-09-02",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
         {
           schoolId: schools[1].id,
           heldOn: "2026-09-02",
           startsAt: "13:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
     });
@@ -758,6 +800,7 @@ describe("Rencanakan Perjadin caps", () => {
       heldOn: "2026-09-02",
       startsAt: `09:${String(n).padStart(2, "0")}`,
       taughtByTeacherIndexes: [],
+      pimpinanPersonIds: [],
     }));
 
     const result = await planPerjadin(pic, { ...input, sessions: eleven });
@@ -775,7 +818,13 @@ describe("the Perjadin's name and its Schools (ADR-0044)", () => {
 
   /** One planned Session at `school` on the plan's first day, so a trip may hold one School. */
   const oneSession = (schoolId: string) => [
-    { schoolId, heldOn: "2026-09-01", startsAt: "09:00", taughtByTeacherIndexes: [] },
+    {
+      schoolId,
+      heldOn: "2026-09-01",
+      startsAt: "09:00",
+      taughtByTeacherIndexes: [],
+      pimpinanPersonIds: [],
+    },
   ];
 
   it("plans two trips on one Sub-Cluster: one name, two School lines", async () => {
@@ -865,6 +914,7 @@ describe("the Perjadin list and detail", () => {
           heldOn: "2026-10-01",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
     });
@@ -908,6 +958,7 @@ describe("the Perjadin list and detail", () => {
           heldOn: "2026-09-01",
           startsAt: "09:00",
           taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
         },
       ],
     });
