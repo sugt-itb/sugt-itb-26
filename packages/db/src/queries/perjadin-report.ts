@@ -6,13 +6,13 @@ import {
 import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../client";
-import { person } from "../schema/people";
 import { subCluster } from "../schema/reference";
-import { perjadin, perjadinPimpinan, transaction, transactionEvidence } from "../schema/travel";
+import { perjadin, transaction, transactionEvidence } from "../schema/travel";
 import { logActivity } from "./activity-log";
 import type { Person } from "./caller";
 import { tripSchoolNames } from "./perjadin-naming";
 import { requirePerjadinWriter, requireStaff } from "./staff-only";
+import { tripPimpinan } from "./trip-pimpinan";
 
 /**
  * **Perjadin Report** — the acquittal of one Perjadin. Reading it is now open to any signed-in
@@ -88,10 +88,11 @@ export type PerjadinAcquittal = {
   gtkMsSpentIdr: number;
   transactions: AcquittalTransaction[];
   /**
-   * The Pimpinan who joined this trip — record-only, now the names of real Pimpinan-Person rows
-   * (#181, joined from `person`), ordered so the Report and its CSV read the same on every load. A
-   * printed trip report names who travelled; these carry no money, so they belong on the Laporan
-   * rather than a delivery surface ([#142], ADR-0004). Empty when none joined.
+   * The Pimpinan who joined this trip — record-only, the names of real Pimpinan-Person rows (#181)
+   * derived from the trip's non-cancelled Sessions (#492, ADR-0056), ordered so the Report and its
+   * CSV read the same on every load. A printed trip report names who travelled; these carry no
+   * money, so they belong on the Laporan rather than a delivery surface ([#142], ADR-0004). Empty
+   * when none joined.
    */
   pimpinan: string[];
 };
@@ -220,19 +221,14 @@ async function transactionsOf(perjadinId: string): Promise<AcquittalTransaction[
 }
 
 /**
- * The Pimpinan recorded on the trip, ordered by name. Record-only — a `perjadin_pimpinan` row now
- * references a real Person of role Pimpinan (#181), not a fixed-three name — so this joins `person`
- * for the name and, since the Laporan shows names only, returns the plain strings. Ordering here
- * rather than at the render sites keeps the Report and its CSV in step on every load.
+ * The trip's Pimpinan, ordered by name: the list `tripPimpinan` derives from its non-cancelled
+ * Sessions (#492), so the Laporan names the same people as the trip page. The Laporan shows names
+ * only, so this returns the plain strings. Ordering in the query rather than at the render sites
+ * keeps the Report and its CSV in step on every load.
  */
 async function pimpinanOf(perjadinId: string): Promise<string[]> {
-  const rows = await db
-    .select({ name: person.fullName })
-    .from(perjadinPimpinan)
-    .innerJoin(person, eq(person.id, perjadinPimpinan.personId))
-    .where(eq(perjadinPimpinan.perjadinId, perjadinId))
-    .orderBy(asc(person.fullName));
-  return rows.map((row) => row.name);
+  const byTrip = await tripPimpinan([perjadinId]);
+  return (byTrip.get(perjadinId) ?? []).map((entry) => entry.name);
 }
 
 /**

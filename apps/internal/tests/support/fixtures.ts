@@ -283,13 +283,13 @@ export async function addSchoolOnTrip(fixture: {
     subClusterId: fixture.perjadin.subClusterId,
     provinceCode: "JB",
   });
-  await addOfflineSession({
+  const session = await addOfflineSession({
     schoolId: school.id,
     heldOn: fixture.perjadin.startsOn,
     perjadinId: fixture.perjadin.id,
     status: fixture.status,
   });
-  return school;
+  return { ...school, sessionId: session.id };
 }
 
 /**
@@ -544,12 +544,6 @@ export type PerjadinFixture = {
   subClusterId?: string;
   /** Staff. They are the PIC and, by the deferred foreign key, a member of their own Group. */
   picPersonId: string;
-  /**
-   * The Pimpinan recorded on the trip — record-only rows referencing real People of role Pimpinan
-   * (#181). Pass the `person.id`s; the composite `perjadin_pimpinan_is_pimpinan` FK refuses any id
-   * that is not a Pimpinan. Empty or absent by default.
-   */
-  pimpinan?: string[];
 };
 
 /**
@@ -607,14 +601,19 @@ export async function addPerjadin(fixture: PerjadinFixture) {
       stream: null,
     });
 
-    if (fixture.pimpinan && fixture.pimpinan.length > 0) {
-      await tx
-        .insert(schema.perjadinPimpinan)
-        .values(fixture.pimpinan.map((personId) => ({ perjadinId: perjadin!.id, personId })));
-    }
-
     return perjadin!;
   });
+}
+
+/**
+ * Record Pimpinan as attending one Session (#492) — record-only rows referencing real People of role
+ * Pimpinan. The composite `session_pimpinan_is_pimpinan` FK refuses any id that is not a Pimpinan.
+ * A trip's Pimpinan are derived from these, so this is how a test puts a Pimpinan on a trip.
+ */
+export async function addSessionPimpinan(sessionId: string, personIds: string[]) {
+  await db
+    .insert(schema.sessionPimpinan)
+    .values(personIds.map((personId) => ({ sessionId, personId })));
 }
 
 /**

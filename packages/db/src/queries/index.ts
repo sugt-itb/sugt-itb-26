@@ -167,7 +167,6 @@ export {
 export {
   changePerjadinPic,
   perjadinDetail,
-  setPerjadinPimpinan,
   setPerjadinStaff,
   updatePerjadinDates,
   type ChangePerjadinPicResult,
@@ -176,7 +175,6 @@ export {
   type PerjadinDatesInput,
   type PerjadinDetail,
   type PerjadinSession,
-  type SetPerjadinPimpinanResult,
   type SetPerjadinStaffResult,
   type UpdatePerjadinDatesResult,
 } from "./perjadin-detail";
@@ -191,11 +189,14 @@ export {
 export {
   addPerjadinSession,
   editPerjadinSession,
+  setSessionPimpinan,
   type AddPerjadinSessionResult,
   type EditPerjadinSessionResult,
   type PerjadinSessionInput,
   type SessionPlacementRefusal,
+  type SetSessionPimpinanResult,
 } from "./perjadin-sessions";
+export { type TripPimpinan } from "./trip-pimpinan";
 export { type SchoolBookedOnAnotherPerjadin } from "./school-slot";
 export { type CoveredSession } from "./covered-sessions";
 export { type PerjadinNameRef } from "./perjadin-naming";

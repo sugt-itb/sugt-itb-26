@@ -126,13 +126,13 @@ describe("the plan form", () => {
         subClusterId: subCluster.id,
         picPersonId: pic.id,
         teacherNames: [],
-        pimpinan: [],
         sessions: [
           {
             schoolId: bontang.id,
             heldOn: "2026-11-02",
             startsAt: "08:00",
             taughtByTeacherIndexes: [],
+            pimpinanPersonIds: [],
           },
         ],
         startsOn: "2026-11-02",

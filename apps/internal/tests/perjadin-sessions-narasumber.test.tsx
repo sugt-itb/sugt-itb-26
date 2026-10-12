@@ -14,6 +14,7 @@ vi.mock("-/app/(app)/perjadin/[id]/actions", () => ({
   addPerjadinSessionAction: vi.fn(),
   cancelPerjadinSessionAction: vi.fn(),
   editPerjadinSessionAction: vi.fn(),
+  setSessionPimpinanAction: vi.fn(),
 }));
 
 const session: PerjadinSession = {
@@ -29,6 +30,7 @@ const session: PerjadinSession = {
     { id: "t-2", name: "Dr. Sari Wulandari" },
     { id: "t-1", name: "Prof. Adi Nugroho" },
   ],
+  pimpinan: [],
 };
 
 function renderSessions(sessions: PerjadinSession[], canEdit = true): string {
@@ -38,6 +40,7 @@ function renderSessions(sessions: PerjadinSession[], canEdit = true): string {
       sessions={sessions}
       eligibleSchools={[]}
       teachers={[]}
+      pimpinanRoster={[]}
       startsOn="2026-11-02"
       endsOn="2026-11-05"
       canEdit={canEdit}

@@ -254,7 +254,8 @@ spill sideways. Each section shows three cards with **Tampilkan lebih banyak** f
 left out when it has none. With neither, the page says "Anda belum tergabung dalam Perjalanan
 Dinas."
 
-**Who is on the trip** lists Pendamping and Pimpinan by name, as plain lists, and folds the
+**Who is on the trip** lists Pendamping and Pimpinan by name, as plain lists — the Pimpinan being
+everyone recorded on one of the trip's Sessions that was not cancelled (#492) — and folds the
 Narasumber away by School (#447) — a trip done PP over several Schools often carries a different
 six or so at each, full names with titles, which listed flat crowd the card:
 
@@ -506,6 +507,11 @@ not a date _and_ a time, because the Group cannot be in two places.
 **Creating a Perjadin is what brings its Sessions into existence** — one per School kept on
 the trip. This form is the arranging.
 
+**Each Session on the form carries its own "Diajar oleh" and Pimpinan** (#492): a **Pimpinan**
+multi-select from the Pimpinan roster sits right after "Diajar oleh" on every Session row. There is
+no trip-level Pimpinan list on the form; while the roster is empty, one line above the Schools says
+to ask an Administrator to add Pimpinan on /orang.
+
 **Each School shows what it already has on other trips**
 ([#409](https://github.com/sugt-itb/sugt-itb-26/issues/409)), because a Kelompok split across
 several trips is otherwise planned one School at a time from memory. Under each School row of the
@@ -523,6 +529,21 @@ planned like any other — only the same School at the same date and time is ref
 date, time, School and status badge — plus Ubah and Batalkan, for whoever writes the trip, while the
 Session is still arranged — then that Session's "Diajar oleh" beneath it, indented, A–Z, one name to
 a line, on every viewport. A Session with no Narasumber has nothing under its row.
+
+**A Pimpinan is recorded on the Sessions they attended**, not on the trip (#492,
+[ADR-0056](./adr/0056-a-pimpinan-is-recorded-per-session.md)): a Pimpinan on a trip across several
+Schools and days is often at only some of them. Under each Session's Narasumber its Pimpinan follow,
+one per line, as "Pimpinan: {name}". The Tambah/Ubah Sesi dialog has a **Pimpinan** multi-select
+right after "Diajar oleh", offering the Pimpinan roster — with a hint naming /orang while it is
+empty — and moving a Session to another School or date keeps them. A delivered Session, whose
+School, date and time are settled, has **Ubah Pimpinan** on its row instead, for the same people:
+who attended is often written down after the trip. A cancelled Session has neither.
+
+**The trip's Pimpinan section is read-only**: everyone recorded on at least one of its Sessions that
+was not cancelled, each followed by the Schools they were recorded at — "Prof. X — SMAN 1, SMAN 3" —
+or "Tidak ada.". A Pimpinan recorded only on a Session later cancelled stays on that Session's row
+but leaves this list. The Laporan's "Pimpinan yang turut serta", its CSV and the `/pendamping` card
+read the same list.
 
 Offline Sessions happen during a Perjadin. **Online Sessions have no Perjadin at all** —
 which is why counting trips never tells you how much teaching has happened, and why six
@@ -596,8 +617,9 @@ member without the Perjadin Editor Grant, who still runs any trip they are on bu
 Administrator** ([ADR-0048](./adr/0048-a-perjadin-is-written-by-its-group.md), #439). Everyone signed
 in reads every trip. On `/perjadin/[id]`, `/perjadin/[id]/laporan` and `/sesi/[id]`, anyone else sees
 everything with every write control absent — Ubah tanggal, Ubah Group, the
-Pimpinan and Narasumber edits, Tambah/Ubah/Batalkan Sesi, Tandai, the Persiapan boxes, Catat
-transaksi, Unggah bukti, Foto & Video's upload and Hapus — and a forced request answers 403.
+Narasumber edits, Tambah/Ubah/Batalkan Sesi (a Session's Pimpinan with it), Ubah Pimpinan, Tandai,
+the Persiapan boxes, Catat transaksi, Unggah bukti, Foto & Video's upload and Hapus — and a forced
+request answers 403.
 Only **Evaluasi Perjadin**'s link stays open to everyone signed in. A Staff member added to a Group
 writes that trip from then on; one who leaves it stops at once. `/pendamping` lists only a person's own
 trips, so every control on its cards stays theirs.
@@ -1020,10 +1042,10 @@ invitation, and nobody whose email has no row can sign in at all.
 
 **Only an Administrator sees Orang** (#488), in the sidebar and at `/orang`, to read as well as to
 write. Anyone else, Pimpinan included, gets the 403, as on Log and Pengaturan. Nothing else links
-here: the Perjadin form's Pimpinan picker reads its own list, so whoever plans a Perjadin still
-picks from it. Schools, Clusters and Topics have no admin screen because they are fixed reference
-data — People are not, so they do. The header says only an Administrator reads the roster, adds
-people and deactivates them.
+here: each Session's Pimpinan picker, on the Perjadin form and the trip's Session dialog, reads its
+own list, so whoever plans or runs a Perjadin still picks from it. Schools, Clusters and Topics
+have no admin screen because they are fixed reference data — People are not, so they do. The header
+says only an Administrator reads the roster, adds people and deactivates them.
 
 - **Tambah orang** and each row's **Nonaktifkan**: anyone but an Administrator calling either write
   gets a 403, and nothing is written.

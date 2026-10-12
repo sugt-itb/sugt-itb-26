@@ -37,3 +37,11 @@ of them taught each parallel Session.
   not by wholesale Group replacement — and each such change un-ticks "Pengajar sudah lengkap".
 - **`group_member` is now Staff-only**: the PIC plus up to ten other DITSAMA Staff. Teaching team
   leaves that table entirely.
+
+## Amendment (2026-10-13): a Pimpinan is recorded per Session
+
+The **Pimpinan** who join a trip, record-only beside the Group, are now recorded on the Sessions
+they attended rather than on the Perjadin, the way this ADR's teacher names record who taught each
+Session ([ADR-0056](./0056-a-pimpinan-is-recorded-per-session.md),
+[#492](https://github.com/sugt-itb/sugt-itb-26/issues/492)). They stay record-only: not Group
+members, and adding nothing to the Preparation Checklist.

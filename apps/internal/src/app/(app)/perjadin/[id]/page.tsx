@@ -134,12 +134,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
         canEdit={canWrite}
       />
 
-      <PerjadinPimpinan
-        perjadinId={trip.id}
-        pimpinan={trip.pimpinan}
-        roster={trip.pimpinanRoster}
-        canEdit={canWrite}
-      />
+      <PerjadinPimpinan pimpinan={trip.pimpinan} />
 
       {/*
         The Preparation Checklist — an internal Staff monitoring aid. Shown to everyone (it carries
@@ -174,6 +169,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
         sessions={trip.sessions}
         eligibleSchools={trip.eligibleSchools}
         teachers={trip.teachers}
+        pimpinanRoster={trip.pimpinanRoster}
         startsOn={trip.startsOn}
         endsOn={trip.endsOn}
         canEdit={canWrite}

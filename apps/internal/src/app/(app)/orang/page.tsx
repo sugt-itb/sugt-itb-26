@@ -11,8 +11,9 @@ export const metadata: Metadata = { title: "Orang" };
  *
  * **Administrator only, to read as well as to write** (#488): anyone else, a Pimpinan included,
  * gets `forbidden()` and the 403, as on `/log` and `/pengaturan`; the sidebar hides the link from
- * the same people. The Perjadin form's Pimpinan picker reads its own roster (`activeRosters`),
- * never this page, so planning a Perjadin needs no Administrator.
+ * the same people. Each Session's Pimpinan picker — on the Perjadin form (`activeRosters`) and in
+ * the trip's Session dialog (`perjadinDetail`) — reads its own roster, never this page, so planning
+ * or running a Perjadin needs no Administrator.
  *
  * **Every write here is an Administrator's** too (#470, ADR-0028), with
  * `requireGrant("Administrator")` inside each write as the enforcement, since a layout does not run

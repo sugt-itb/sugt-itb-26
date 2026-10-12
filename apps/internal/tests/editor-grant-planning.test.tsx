@@ -144,13 +144,13 @@ function perjadinGuarded(caller: Person, where: Awaited<ReturnType<typeof place>
         subClusterId: where.subCluster.id,
         picPersonId: caller.id,
         teacherNames: [],
-        pimpinan: [],
         sessions: [
           {
             schoolId: where.school.id,
             heldOn: "2026-10-12",
             startsAt: "09:00",
             taughtByTeacherIndexes: [],
+            pimpinanPersonIds: [],
           },
         ],
         startsOn: "2026-10-12",

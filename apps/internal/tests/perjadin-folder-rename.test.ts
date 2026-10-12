@@ -236,6 +236,7 @@ describe("a change to the trip's Schools", () => {
     heldOn,
     startsAt: "13:00",
     taughtByTeacherIds: [],
+    pimpinanPersonIds: [],
   });
 
   it("renames both folders when a Session is added at a School not yet on the trip", async () => {
