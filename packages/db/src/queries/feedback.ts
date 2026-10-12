@@ -292,7 +292,46 @@ export async function participantFeedbackPage(
     sort: FeedbackSort;
   },
 ): Promise<{ rows: ParticipantFeedbackRow[]; nextCursor: FeedbackCursor | null }> {
-  const { filters, scope, cursor, sort } = args;
+  const { cursor } = args;
+  const rows = await participantFeedbackRows(args, { limit: BATCH + 1, offset: cursor ?? 0 });
+
+  // The (BATCH + 1)th row is the proof a next page exists, never a row to show. Drop it and advance
+  // the cursor by one batch; short of a full-plus-one batch there is no next page.
+  return {
+    rows: await withSesi(rows.slice(0, BATCH)),
+    nextCursor: rows.length > BATCH ? (cursor ?? 0) + BATCH : null,
+  };
+}
+
+/**
+ * **Every Participant Feedback row the Peserta tab's choices match** (#490), for its CSV: the same
+ * scope, score filters and sort as `participantFeedbackPage` — the one read below, so the file and
+ * the screen cannot disagree — with no page. Open to anyone signed in, as the page.
+ */
+export async function participantFeedbackExport(
+  _caller: Person,
+  args: { filters: FeedbackFilters; scope: ParticipantFeedbackScope; sort: FeedbackSort },
+): Promise<ParticipantFeedbackRow[]> {
+  return withSesi(await participantFeedbackRows(args, null));
+}
+
+/** Each row with its Session's Sesi, read once for the Schools the rows are at. */
+async function withSesi(
+  rows: Omit<ParticipantFeedbackRow, "sesi">[],
+): Promise<ParticipantFeedbackRow[]> {
+  const sesi = await sesiNumbers([...new Set(rows.map((row) => row.schoolId))]);
+  return rows.map((row) => ({ ...row, sesi: sesi.get(row.sessionId) ?? null }));
+}
+
+/**
+ * The Peserta rows the scope and score filters match, in the sort's order — a window of them for a
+ * page, or all of them (`window` null) for the export. Both readers go through here.
+ */
+async function participantFeedbackRows(
+  args: { filters: FeedbackFilters; scope: ParticipantFeedbackScope; sort: FeedbackSort },
+  window: { limit: number; offset: number } | null,
+) {
+  const { filters, scope, sort } = args;
 
   // Each `all` filter yields `null` and is filtered out below; the active ones are conjoined by a
   // single `!= null` at the `where`, with the scope's (#466).
@@ -305,7 +344,7 @@ export async function participantFeedbackPage(
     bound(filters.relevance, participantFeedback.relevance),
   ];
 
-  const rows = await db
+  const query = db
     .select({
       id: participantFeedback.id,
       name: participantFeedback.name,
@@ -350,17 +389,9 @@ export async function participantFeedbackPage(
       dir(sort.date)(participantFeedback.submittedAt),
       asc(participantFeedback.id),
     )
-    .limit(BATCH + 1)
-    .offset(cursor ?? 0);
+    .$dynamic();
 
-  // The (BATCH + 1)th row is the proof a next page exists, never a row to show. Drop it and advance
-  // the cursor by one batch; short of a full-plus-one batch there is no next page.
-  const page = rows.slice(0, BATCH);
-  const sesi = await sesiNumbers([...new Set(page.map((row) => row.schoolId))]);
-  return {
-    rows: page.map((row) => ({ ...row, sesi: sesi.get(row.sessionId) ?? null })),
-    nextCursor: rows.length > BATCH ? (cursor ?? 0) + BATCH : null,
-  };
+  return window ? query.limit(window.limit).offset(window.offset) : query;
 }
 
 /** The Peserta tab's four summary averages. Hands-on RBL's is `null` until any row has one. */
@@ -536,7 +567,37 @@ export async function perjadinFeedbackPage(
     sort: FeedbackSort;
   },
 ): Promise<{ rows: PerjadinFeedbackRow[]; nextCursor: PerjadinFeedbackCursor | null }> {
-  const { filters, scope, cursor, sort } = args;
+  const { cursor } = args;
+  const rows = await perjadinFeedbackRows(args, { limit: BATCH + 1, offset: cursor ?? 0 });
+
+  // The (BATCH + 1)th row proves a next page exists; it is never shown. Drop it and advance the
+  // cursor by one batch; short of a full-plus-one batch there is no next page.
+  if (rows.length > BATCH) {
+    return { rows: rows.slice(0, BATCH), nextCursor: (cursor ?? 0) + BATCH };
+  }
+  return { rows, nextCursor: null };
+}
+
+/**
+ * **Every Perjadin Evaluation the Perjadin tab's choices match** (#490), for its CSV — the twin of
+ * `participantFeedbackExport`: the page's scope, score filters and sort through the same read, with
+ * no page.
+ */
+export async function perjadinFeedbackExport(
+  _caller: Person,
+  args: { filters: PerjadinFeedbackFilters; scope: PerjadinFeedbackScope; sort: FeedbackSort },
+): Promise<PerjadinFeedbackRow[]> {
+  return perjadinFeedbackRows(args, null);
+}
+
+/**
+ * The Perjadin rows the choices match, in order — a page's window, or all of them for the export.
+ */
+async function perjadinFeedbackRows(
+  args: { filters: PerjadinFeedbackFilters; scope: PerjadinFeedbackScope; sort: FeedbackSort },
+  window: { limit: number; offset: number } | null,
+): Promise<PerjadinFeedbackRow[]> {
+  const { filters, scope, sort } = args;
 
   const conditions: (SQL | null | undefined)[] = [
     ...perjadinScopeConditions(scope),
@@ -548,7 +609,7 @@ export async function perjadinFeedbackPage(
     bound(filters.pendampingSupport, perjadinEvaluation.pendampingSupport),
   ];
 
-  const rows = await db
+  const query = db
     .select({
       id: perjadinEvaluation.id,
       filedByName: perjadinEvaluation.filedByName,
@@ -587,15 +648,9 @@ export async function perjadinFeedbackPage(
       dir(sort.date)(perjadinEvaluation.createdAt),
       asc(perjadinEvaluation.id),
     )
-    .limit(BATCH + 1)
-    .offset(cursor ?? 0);
+    .$dynamic();
 
-  // The (BATCH + 1)th row proves a next page exists; it is never shown. Drop it and advance the
-  // cursor by one batch; short of a full-plus-one batch there is no next page.
-  if (rows.length > BATCH) {
-    return { rows: rows.slice(0, BATCH), nextCursor: (cursor ?? 0) + BATCH };
-  }
-  return { rows, nextCursor: null };
+  return window ? query.limit(window.limit).offset(window.offset) : query;
 }
 
 /** The Perjadin tab's five summary averages. Pendamping Support's is `null` while no row has one. */

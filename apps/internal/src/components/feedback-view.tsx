@@ -6,6 +6,7 @@ import {
   loadPerjadinFeedback,
   loadPerjadinFeedbackAverages,
 } from "-/app/(app)/feedback/actions";
+import { participantExportHref, perjadinExportHref } from "-/app/(app)/feedback/feedback-params";
 import { participantScopeLabel, perjadinScopeLabel, withSchool } from "-/components/feedback-scope";
 import { sesiLabel } from "-/components/session-labels";
 import { SingleSelectCombobox } from "-/components/single-select-combobox";
@@ -40,6 +41,7 @@ import {
 import { Badge } from "@sugt/ui/components/badge";
 import { Button } from "@sugt/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@sugt/ui/components/card";
+import { LinkButton } from "@sugt/ui/components/link-button";
 import {
   Select,
   SelectContent,
@@ -474,6 +476,8 @@ function ParticipantTab({
         />
       </div>
 
+      <ExportLink href={participantExportHref({ scope, filters, sort })} />
+
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Tidak ada masukan Peserta untuk saringan ini.
@@ -715,6 +719,8 @@ function PerjadinTab({
         />
       </div>
 
+      <ExportLink href={perjadinExportHref({ scope, filters, sort })} />
+
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Tidak ada evaluasi Perjadin untuk saringan ini.
@@ -736,6 +742,26 @@ function PerjadinTab({
         />
       )}
     </>
+  );
+}
+
+/**
+ * **Ekspor CSV** (#490), shared by both tabs: a plain link to the tab's export, carrying its
+ * current scope, filters and sort, so the file holds every matching row — not just the pages
+ * loaded — in the order on screen. A plain `<a>`, as `/keuangan`'s, since the response is a
+ * download.
+ */
+function ExportLink({ href }: { href: string }) {
+  return (
+    <div className="mb-3 flex justify-end">
+      <LinkButton
+        variant="outline"
+        size="sm"
+        render={<a href={href} />}
+      >
+        Ekspor CSV
+      </LinkButton>
+    </div>
   );
 }
 
