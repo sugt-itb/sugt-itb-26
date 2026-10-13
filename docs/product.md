@@ -87,6 +87,16 @@ restricted to an invite list — Staff with a DITSAMA account, Teaching Team wit
 account they have, and a `person` row required either way. See
 [ADR-0003](./adr/0003-google-sign-in-with-an-invite-list.md).
 
+**A deep link survives sign-in.** A signed-out Person who opens any page behind sign-in — most
+often a **Lihat Detail** link on the company's Unified Dashboard, such as `/`, `/sesi-daring` or
+`/feedback` — is sent to **Masuk** (`/masuk`) carrying that page's path and query string, and lands
+on it after Google sign-in. A Person already signed in who opens `/masuk` with a destination goes
+straight to it. Only a path on this app is honoured; anything else is dropped. Without a
+destination a Person lands where they always have: Staff on `/pendamping`, a Pimpinan on `/`.
+Sign-in only decides where to go. A page the Person may not read still turns them away with its own
+guard, exactly as it does when they follow a link while signed in. A refused sign-in returns to the
+one rejection message and does not carry the destination.
+
 **Nothing is approved.** There is no approver, no queue, no submitted-and-returned state on an
 acquittal, and no lifecycle on a Perjadin beyond its dates. Whatever sign-off DITSAMA does happens
 where it happens today; the tool records what a trip spent, with the evidence. This is said plainly because the shape is so common that its absence reads as an
