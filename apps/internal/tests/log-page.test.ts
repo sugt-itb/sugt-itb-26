@@ -121,6 +121,30 @@ describe("only an Administrator reaches /log", () => {
       "Tidak ada entri yang cocok dengan saringan ini.",
     );
   });
+
+  it("still renders a Laporan filing from before #489, with its totals, under Laporan dikirim", async () => {
+    const admin = await addPerson({ fullName: "Admin", email: "admin@itb.ac.id", role: "Staff" });
+    await addGrant(admin.id, "Administrator");
+    vi.mocked(requirePerson).mockResolvedValue({ ...admin, grants: ["Administrator"] } as Person);
+    const rina = await addPerson({
+      fullName: "Rina",
+      email: "rina@ditsama.itb.ac.id",
+      role: "Staff",
+    });
+    const trip = await addPerjadin({ picPersonId: rina.id });
+    await addActivityLogEntry({
+      perjadinId: trip.id,
+      actorPersonId: rina.id,
+      actorEmail: rina.email,
+      action: "report_filed",
+      details: { transactionCount: 14, totalIdr: 16_420_000 },
+    });
+
+    for (const html of [await render(), await render({ aksi: "laporan" })]) {
+      expect(html).toContain("Laporan dikirim");
+      expect(html).toContain("14 transaksi · total Rp16.420.000");
+    }
+  });
 });
 
 describe("the URL is the view", () => {

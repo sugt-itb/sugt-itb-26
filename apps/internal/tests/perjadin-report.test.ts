@@ -3,17 +3,12 @@ import { randomUUID } from "node:crypto";
 import { db, schema } from "@sugt/db";
 import {
   attachTransactionEvidence,
-  filePerjadinReport,
   isNotStaffError,
   perjadinAcquittal,
   recordTransaction,
   type NewEvidence,
 } from "@sugt/db/queries";
-import {
-  MAX_RECEIPTS_PER_TRANSACTION,
-  REPORT_DEADLINE_DAYS_AFTER_RETURN,
-  TRANSACTION_CATEGORIES,
-} from "@sugt/domain";
+import { MAX_RECEIPTS_PER_TRANSACTION, TRANSACTION_CATEGORIES } from "@sugt/domain";
 import type { Role } from "@sugt/domain";
 import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -21,6 +16,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   addPerjadin,
   addPerson,
+  addSchoolOnTrip,
+  addSessionPimpinan,
   addTransaction,
   addTransactionEvidence,
   refusedBy,
@@ -32,11 +29,11 @@ import {
  *
  * The invariants under test are the ones no column holds: the reconciliation is derived
  * rather than typed, a transaction is recorded with 1–5 receipts and never gains a sixth
- * (ADR-0039), filing still refuses a grandfathered line with none, and every entry point refuses a
- * non-Staff caller.
+ * (ADR-0039), and every entry point refuses a non-Staff caller. The Report is neither filed nor due
+ * (ADR-0055), so it carries no deadline and no filing.
  *
  * `staff-only.test.ts` covers the choke point itself at the sign-in seam. This file drives
- * the same guard on the four surfaces #30 added, and asserts on rows.
+ * the same guard on the surfaces #30 added that remain, and asserts on rows.
  */
 
 async function pic(email = "rina@ditsama.itb.ac.id") {
@@ -57,26 +54,6 @@ function nonStaff() {
     role: "Teaching Team" as unknown as Role,
     grants: [],
   };
-}
-
-// Calendar-day arithmetic on the `YYYY-MM-DD` strings the `date` columns hold, at UTC midnight
-// so the shift itself never crosses a boundary — the same helper `perjadin-detail.ts` keeps.
-const MS_PER_DAY = 86_400_000;
-
-function shiftDate(date: string, days: number): string {
-  return new Date(Date.parse(`${date}T00:00:00Z`) + days * MS_PER_DAY).toISOString().slice(0, 10);
-}
-
-/**
- * Today's date in the zone the deadline is counted in.
- *
- * Read from `Intl` rather than from the machine's local clock: a test that took the runner's
- * zone would agree with the query only on a machine that happens to sit in Jakarta, which is
- * both of the machines this has ever run on and neither of the ones it needs to keep working
- * on.
- */
-function jakartaToday(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
 }
 
 /**
@@ -160,46 +137,13 @@ describe("the acquittal payload", () => {
     });
   });
 
-  it("derives the deadline from the trip's end date", async () => {
-    /**
-     * It follows from `ends_on` plus the constant, so the assertion computes the same way
-     * rather than hard-coding a date — a hard-coded one would only be testing the clock.
-     */
-    const staff = await pic();
-    const endsOn = "2026-09-03";
-    const trip = await addPerjadin({
-      picPersonId: staff.id,
-      startsOn: "2026-09-01",
-      endsOn,
-    });
+  it("carries no deadline and no filing — the Report is neither due nor filed (ADR-0055, #489)", async () => {
+    const { staff, trip } = await aTrip();
 
     const acquittal = await perjadinAcquittal(staff, trip.id);
 
-    expect(acquittal?.reportDueOn).toBe(shiftDate(endsOn, REPORT_DEADLINE_DAYS_AFTER_RETURN));
-  });
-
-  it("counts the days left in Jakarta's calendar, and past the deadline as negative", async () => {
-    /**
-     * The arithmetic, driven at four offsets rather than asserted to be a number.
-     *
-     * "Today" is a zone, and the query names `Asia/Jakarta` rather than inheriting whatever the
-     * database session defaults to. So the expectation is computed in that zone too — reading
-     * the machine's own clock here would make this test pass or fail by where it runs, which is
-     * the exact bug the named zone exists to prevent.
-     */
-    const staff = await pic();
-    const today = jakartaToday();
-
-    for (const offset of [5, 0, -2, -10]) {
-      const endsOn = shiftDate(today, offset - REPORT_DEADLINE_DAYS_AFTER_RETURN);
-      const trip = await addPerjadin({
-        picPersonId: staff.id,
-        startsOn: shiftDate(endsOn, -2),
-        endsOn,
-      });
-
-      const acquittal = await perjadinAcquittal(staff, trip.id);
-      expect(acquittal?.daysRemaining).toBe(offset);
+    for (const gone of ["reportDueOn", "daysRemaining", "reportFiledAt"]) {
+      expect(acquittal).not.toHaveProperty(gone);
     }
   });
 
@@ -277,9 +221,11 @@ describe("the acquittal payload", () => {
 
   it("names the Pimpinan who joined the trip, ordered, and reads none as an empty list", async () => {
     /**
-     * The Laporan names who travelled (#142). A Pimpinan is record-only — now the name of a real
-     * Pimpinan-Person row (#181, joined from `person`) — so the acquittal carries the names and
-     * nothing more, ordered so the screen and its CSV read the same on every load.
+     * The Laporan names who travelled (#142). A Pimpinan is record-only — the name of a real
+     * Pimpinan-Person row (#181) — so the acquittal carries the names and nothing more, ordered so
+     * the screen and its CSV read the same on every load. The list is derived from the trip's
+     * Sessions (#492): a Pimpinan on two is named once, and one recorded only on a cancelled
+     * Session is not named at all.
      */
     const staff = await pic();
     const fatimah = await addPerson({
@@ -292,10 +238,22 @@ describe("the acquittal payload", () => {
       email: "anton@ditsama.itb.ac.id",
       role: "Pimpinan",
     });
-    const trip = await addPerjadin({
-      picPersonId: staff.id,
-      pimpinan: [fatimah.id, anton.id],
+    const sinta = await addPerson({
+      fullName: "Sinta Dewi",
+      email: "sinta@ditsama.itb.ac.id",
+      role: "Pimpinan",
     });
+    const trip = await addPerjadin({ picPersonId: staff.id });
+    const first = await addSchoolOnTrip({ perjadin: trip, name: "SMAN 1 Bandung" });
+    const second = await addSchoolOnTrip({ perjadin: trip, name: "SMAN 3 Bandung" });
+    const cancelled = await addSchoolOnTrip({
+      perjadin: trip,
+      name: "SMAN 5 Bandung",
+      status: "cancelled",
+    });
+    await addSessionPimpinan(first.sessionId, [fatimah.id, anton.id]);
+    await addSessionPimpinan(second.sessionId, [anton.id]);
+    await addSessionPimpinan(cancelled.sessionId, [sinta.id]);
 
     const acquittal = await perjadinAcquittal(staff, trip.id);
     // Ordered by name — "Anton …" sorts before "Fatimah …".
@@ -727,76 +685,5 @@ describe("attaching evidence", () => {
       existing: 3,
     });
     await expect(evidenceOn(line.id)).resolves.toHaveLength(3);
-  });
-});
-
-describe("filing the Report", () => {
-  beforeEach(resetDatabase);
-
-  it("still refuses a grandfathered line item with no receipt", async () => {
-    /**
-     * `recordTransaction` no longer writes a line without a receipt (ADR-0039), but the shared
-     * database may already hold one from before — no migration touched them. The fixture inserts
-     * such a row directly, and the filing check is what still catches it.
-     */
-    const { staff, trip } = await aTrip();
-    const line = await addTransaction({
-      perjadinId: trip.id,
-      amountIdr: 150_000,
-      createdByPersonId: staff.id,
-    });
-
-    const refused = await filePerjadinReport(staff, trip.id);
-    expect(refused).toEqual({ outcome: "evidence-missing", transactionIds: [line.id] });
-
-    const [row] = await db
-      .select({ filedAt: schema.perjadin.reportFiledAt })
-      .from(schema.perjadin)
-      .where(eq(schema.perjadin.id, trip.id));
-    expect(row?.filedAt).toBeNull();
-  });
-
-  it("files once every line item carries a receipt", async () => {
-    const { staff, trip } = await aTrip();
-    const line = await addTransaction({
-      perjadinId: trip.id,
-      amountIdr: 150_000,
-      createdByPersonId: staff.id,
-    });
-    await addTransactionEvidence({ transactionId: line.id, uploadedByPersonId: staff.id });
-
-    const filed = await filePerjadinReport(staff, trip.id);
-
-    expect(filed.outcome).toBe("filed");
-    const acquittal = await perjadinAcquittal(staff, trip.id);
-    expect(acquittal?.reportFiledAt).toBeInstanceOf(Date);
-  });
-
-  it("files a trip that spent nothing", async () => {
-    /** A vacuous truth is the right answer, not an edge case to refuse. */
-    const { staff, trip } = await aTrip();
-
-    await expect(filePerjadinReport(staff, trip.id)).resolves.toMatchObject({ outcome: "filed" });
-  });
-
-  it("refuses to re-file, so the timestamp keeps meaning when it happened", async () => {
-    const { staff, trip } = await aTrip();
-    const first = await filePerjadinReport(staff, trip.id);
-
-    await expect(filePerjadinReport(staff, trip.id)).resolves.toEqual({
-      outcome: "already-filed",
-      filedAt: (first as { filedAt: Date }).filedAt,
-    });
-  });
-
-  it("refuses a non-Staff caller, and a stale link as a value", async () => {
-    const { staff, trip } = await aTrip();
-
-    const refusal = await filePerjadinReport(nonStaff(), trip.id).catch((error: unknown) => error);
-    expect(isNotStaffError(refusal)).toBe(true);
-
-    await expect(
-      filePerjadinReport(staff, "00000000-0000-0000-0000-000000000000"),
-    ).resolves.toEqual({ outcome: "no-such-perjadin" });
   });
 });

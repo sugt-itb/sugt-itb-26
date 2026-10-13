@@ -37,8 +37,8 @@ import { tripSchoolNames } from "./perjadin-naming";
  * of every delivered Session leaves one, so the set grows without bound and both the filters and
  * the paging live in the query rather than in memory on the screen. The four summary averages
  * are the exception (`participantFeedbackAverages` below): they follow the tab's **scope** — the
- * School and Session it is narrowed to (#466) — but never its score filters, so they are one scalar
- * read the score filters never touch.
+ * School, Session and Tipe Peserta it is narrowed to (#466, #487) — but never its score filters, so
+ * they are one scalar read the score filters never touch.
  *
  * Open to anyone signed in, by ADR-0004 — feedback carries no money — so no `requireStaff`. The
  * `caller` is still first by convention 1 even though nothing here gates on it; it is named
@@ -109,25 +109,53 @@ export const NO_FEEDBACK_FILTERS: FeedbackFilters = {
 };
 
 /**
- * **What the Peserta tab is narrowed to** (#466): one School, and within it one Session. `null` is
- * Semua. Unlike the score filters, the scope also narrows the four averages. An id that names
- * nothing — or is not an id at all — matches no row, so the tab reads empty rather than failing: each
- * is compared as text, so a malformed one never reaches a `uuid` cast.
+ * **The Peserta tab's Tipe Peserta** (#487): the two-way split of the Daftar Hadir Peserta sheets and
+ * `/keuangan`. `Siswa` is the Student Class; `GTK-MS` is the GTK and MS Classes together. A filter
+ * value, not a stored one — a Participant still picks GTK, MS or Siswa — so it lives beside the query
+ * rather than in `@sugt/domain`, whose sets are glossary terms or the values a column holds.
  */
-export type ParticipantFeedbackScope = { schoolId: string | null; sessionId: string | null };
+export type FeedbackParticipantType = "Siswa" | "GTK-MS";
 
-/** Every School, every Session — the tab's first paint. */
+/** Which stored Classes each Tipe Peserta keeps. */
+const PARTICIPANT_TYPE_CLASSES: Record<FeedbackParticipantType, ClassKind[]> = {
+  Siswa: ["Student"],
+  "GTK-MS": ["GTK", "MS"],
+};
+
+/**
+ * **What the Peserta tab is narrowed to** (#466): one School, and within it one Session, and a Tipe
+ * Peserta (#487). `null` is Semua. Unlike the score filters, the scope also narrows the four
+ * averages. An id that names nothing — or is not an id at all — matches no row, so the tab reads
+ * empty rather than failing: each is compared as text, so a malformed one never reaches a `uuid`
+ * cast. A Tipe Peserta that names nothing matches no row either.
+ */
+export type ParticipantFeedbackScope = {
+  schoolId: string | null;
+  sessionId: string | null;
+  participantType: FeedbackParticipantType | null;
+};
+
+/** Every School, every Session, every Tipe Peserta — the tab's first paint. */
 export const NO_PARTICIPANT_FEEDBACK_SCOPE: ParticipantFeedbackScope = {
   schoolId: null,
   sessionId: null,
+  participantType: null,
 };
 
-/** The scope's predicates over the joined `session`, or none for Semua. */
+/** The scope's predicates over the joined `session` and the row's Class, or none for Semua. */
 function participantScopeConditions(scope: ParticipantFeedbackScope): SQL[] {
   return [
     scope.schoolId === null ? null : sql`${session.schoolId}::text = ${scope.schoolId}`,
     scope.sessionId === null ? null : sql`${session.id}::text = ${scope.sessionId}`,
+    scope.participantType === null ? null : participantTypeCondition(scope.participantType),
   ].filter((condition): condition is SQL => condition !== null);
+}
+
+/** The Classes a Tipe Peserta keeps, or none when the value is not one — a Server Action's input. */
+function participantTypeCondition(participantType: FeedbackParticipantType): SQL {
+  return Object.hasOwn(PARTICIPANT_TYPE_CLASSES, participantType)
+    ? inArray(participantFeedback.classKind, PARTICIPANT_TYPE_CLASSES[participantType])
+    : sql`false`;
 }
 
 /**
@@ -233,6 +261,7 @@ function bound(value: FeedbackFilterValue, expr: SQLWrapper): SQL | null {
 
 /**
  * One page of Participant Feedback, filtered and sorted by the caller's `FeedbackSort`, OFFSET-paged.
+ * The WHERE and ORDER BY below live in `participantFeedbackRows`, which the export shares (#490).
  *
  * **The filters AND together and only the active ones appear in the WHERE.** Each `all` filter
  * drops out; what remains is conjoined. `reviewType` gates on the raw (unrounded) row average so
@@ -264,7 +293,46 @@ export async function participantFeedbackPage(
     sort: FeedbackSort;
   },
 ): Promise<{ rows: ParticipantFeedbackRow[]; nextCursor: FeedbackCursor | null }> {
-  const { filters, scope, cursor, sort } = args;
+  const { cursor } = args;
+  const rows = await participantFeedbackRows(args, { limit: BATCH + 1, offset: cursor ?? 0 });
+
+  // The (BATCH + 1)th row is the proof a next page exists, never a row to show. Drop it and advance
+  // the cursor by one batch; short of a full-plus-one batch there is no next page.
+  return {
+    rows: await withSesi(rows.slice(0, BATCH)),
+    nextCursor: rows.length > BATCH ? (cursor ?? 0) + BATCH : null,
+  };
+}
+
+/**
+ * **Every Participant Feedback row the Peserta tab's choices match** (#490), for its CSV: the same
+ * scope, score filters and sort as `participantFeedbackPage` — the one read below, so the file and
+ * the screen cannot disagree — with no page. Open to anyone signed in, as the page.
+ */
+export async function participantFeedbackExport(
+  _caller: Person,
+  args: { filters: FeedbackFilters; scope: ParticipantFeedbackScope; sort: FeedbackSort },
+): Promise<ParticipantFeedbackRow[]> {
+  return withSesi(await participantFeedbackRows(args, null));
+}
+
+/** Each row with its Session's Sesi, read once for the Schools the rows are at. */
+async function withSesi(
+  rows: Omit<ParticipantFeedbackRow, "sesi">[],
+): Promise<ParticipantFeedbackRow[]> {
+  const sesi = await sesiNumbers([...new Set(rows.map((row) => row.schoolId))]);
+  return rows.map((row) => ({ ...row, sesi: sesi.get(row.sessionId) ?? null }));
+}
+
+/**
+ * The Peserta rows the scope and score filters match, in the sort's order — a window of them for a
+ * page, or all of them (`window` null) for the export. Both readers go through here.
+ */
+async function participantFeedbackRows(
+  args: { filters: FeedbackFilters; scope: ParticipantFeedbackScope; sort: FeedbackSort },
+  window: { limit: number; offset: number } | null,
+): Promise<Omit<ParticipantFeedbackRow, "sesi">[]> {
+  const { filters, scope, sort } = args;
 
   // Each `all` filter yields `null` and is filtered out below; the active ones are conjoined by a
   // single `!= null` at the `where`, with the scope's (#466).
@@ -277,7 +345,7 @@ export async function participantFeedbackPage(
     bound(filters.relevance, participantFeedback.relevance),
   ];
 
-  const rows = await db
+  const query = db
     .select({
       id: participantFeedback.id,
       name: participantFeedback.name,
@@ -322,17 +390,9 @@ export async function participantFeedbackPage(
       dir(sort.date)(participantFeedback.submittedAt),
       asc(participantFeedback.id),
     )
-    .limit(BATCH + 1)
-    .offset(cursor ?? 0);
+    .$dynamic();
 
-  // The (BATCH + 1)th row is the proof a next page exists, never a row to show. Drop it and advance
-  // the cursor by one batch; short of a full-plus-one batch there is no next page.
-  const page = rows.slice(0, BATCH);
-  const sesi = await sesiNumbers([...new Set(page.map((row) => row.schoolId))]);
-  return {
-    rows: page.map((row) => ({ ...row, sesi: sesi.get(row.sessionId) ?? null })),
-    nextCursor: rows.length > BATCH ? (cursor ?? 0) + BATCH : null,
-  };
+  return window ? query.limit(window.limit).offset(window.offset) : query;
 }
 
 /** The Peserta tab's four summary averages. Hands-on RBL's is `null` until any row has one. */
@@ -345,8 +405,9 @@ export type ParticipantFeedbackAverages = {
 
 /**
  * **The four summary averages, over the tab's scope and never its score filters** (#466). With no
- * School or Session picked they are programme-wide, over the whole `participant_feedback` table; a
- * scope narrows them to its School or Session. The score filters are deliberately not an argument:
+ * School, Session or Tipe Peserta picked they are programme-wide, over the whole
+ * `participant_feedback` table; a scope narrows them to its School, Session or Tipe Peserta (#487),
+ * so under GTK-MS Hands-on RBL is `null`. The score filters are deliberately not an argument:
  * averaging only the rows at or below 7 would read as the standing and mislead.
  *
  * An empty table makes `avg()` return NULL; `coalesce(…, 0)` turns that into `0` for the three
@@ -376,10 +437,10 @@ export async function participantFeedbackAverages(
 }
 
 /**
- * The five Perjadin filters, each independent and each ANDed with the others — the Peserta tab's
- * four plus one, because a Perjadin has four Aspects. `reviewType` gates on the **row average**
- * across the ratings that are present (see `perjadinRowAverageExpr`); the other four gate on their
- * own Aspect column. A screen sends all five every time; `all` on any of them contributes no
+ * The six Perjadin filters, each independent and each ANDed with the others — one per Aspect, the
+ * four logistics ones and Pendamping Support (#482), and `reviewType`, which gates on the **row
+ * average** across the ratings that are present (see `perjadinRowAverageExpr`); the other five gate
+ * on their own Aspect column. A screen sends all six every time; `all` on any of them contributes no
  * predicate.
  */
 export type PerjadinFeedbackFilters = {
@@ -389,6 +450,8 @@ export type PerjadinFeedbackFilters = {
   transport: FeedbackFilterValue;
   meals: FeedbackFilterValue;
   punctuality: FeedbackFilterValue;
+  /** Narasumber and Pimpinan only (ADR-0054): a row without one is in neither arm, as for `lodging`. */
+  pendampingSupport: FeedbackFilterValue;
 };
 
 /** All Perjadin filters off — the first page of everything, in the caller's chosen sort. */
@@ -398,6 +461,7 @@ export const NO_PERJADIN_FEEDBACK_FILTERS: PerjadinFeedbackFilters = {
   transport: "all",
   meals: "all",
   punctuality: "all",
+  pendampingSupport: "all",
 };
 
 /**
@@ -453,33 +517,41 @@ export type PerjadinFeedbackRow = {
   transport: number;
   meals: number;
   punctuality: number;
+  /**
+   * Nullable: a Pendamping is not asked it (ADR-0054), and an evaluation filed before #481 holds
+   * none. Like a null `lodging`, the card omits the row.
+   */
+  pendampingSupport: number | null;
   /** The present-ratings average, computed in SQL as numeric and mapped to Number. */
   rowAverage: number;
   lodgingComment: string | null;
   transportComment: string | null;
   mealsComment: string | null;
   punctualityComment: string | null;
+  pendampingSupportComment: string | null;
 };
 
 /**
- * The raw, unrounded Perjadin row average — **over the ratings that are present**. A day trip with
- * no hotel has a null `lodging`, so it must not count as a zero and must not divide by four: the
- * numerator `coalesce`s the absent hotel to 0 and the denominator drops it, so the average is over
- * three ratings when `lodging` is null and over four when it is not. `reviewType` gates on this,
- * and the row carries it.
+ * The raw, unrounded Perjadin row average — **over the ratings that are present**. Two Aspects may
+ * be null: `lodging` on a day trip with no hotel, and `pendamping_support` from a Pendamping or on
+ * an evaluation filed before #481 (ADR-0054). Neither may count as a zero or as a divisor: the
+ * numerator `coalesce`s each to 0 and the denominator counts only the present ones, so a row
+ * averages over three, four or five ratings. `reviewType` gates on this, and the row carries it.
  */
-const perjadinRowAverageExpr = sql<number>`(${perjadinEvaluation.transport} + ${perjadinEvaluation.meals} + ${perjadinEvaluation.punctuality} + coalesce(${perjadinEvaluation.lodging}, 0)) / (3.0 + (case when ${perjadinEvaluation.lodging} is null then 0 else 1 end))`;
+const perjadinRowAverageExpr = sql<number>`(${perjadinEvaluation.transport} + ${perjadinEvaluation.meals} + ${perjadinEvaluation.punctuality} + coalesce(${perjadinEvaluation.lodging}, 0) + coalesce(${perjadinEvaluation.pendampingSupport}, 0)) / (3.0 + (case when ${perjadinEvaluation.lodging} is null then 0 else 1 end) + (case when ${perjadinEvaluation.pendampingSupport} is null then 0 else 1 end))`;
 
 /**
  * One page of Perjadin Evaluations, filtered and sorted by the caller's `FeedbackSort`, OFFSET-paged
+ * (its WHERE and ORDER BY in `perjadinFeedbackRows`, which the export shares, #490)
  * — the twin of `participantFeedbackPage`, over `perjadin_evaluation` joined to `perjadin` and its
  * `sub_cluster` for the trip's name (ADR-0044) and the link target.
  *
- * **The five filters AND together and only the active ones appear in the WHERE.** Each `all` drops
+ * **The six filters AND together and only the active ones appear in the WHERE.** Each `all` drops
  * out. `reviewType` gates on the present-ratings average so the cut matches the number the card
  * shows before rounding. **A null-`lodging` row is naturally excluded from both lodging arms**:
  * `lodging <= 7` and `lodging > 7` are each NULL for it, so a `lodging` filter never keeps a day
- * trip with no hotel — no explicit null guard is needed.
+ * trip with no hotel — no explicit null guard is needed. A null `pendamping_support` falls out of
+ * both of its arms the same way.
  *
  * **The sort is compound: row average primary, `created_at` secondary, `id` last (#184)** — the
  * caller's `sort.score` and `sort.date` set the first two directions, the fixed `id asc` makes the
@@ -497,7 +569,37 @@ export async function perjadinFeedbackPage(
     sort: FeedbackSort;
   },
 ): Promise<{ rows: PerjadinFeedbackRow[]; nextCursor: PerjadinFeedbackCursor | null }> {
-  const { filters, scope, cursor, sort } = args;
+  const { cursor } = args;
+  const rows = await perjadinFeedbackRows(args, { limit: BATCH + 1, offset: cursor ?? 0 });
+
+  // The (BATCH + 1)th row proves a next page exists; it is never shown. Drop it and advance the
+  // cursor by one batch; short of a full-plus-one batch there is no next page.
+  if (rows.length > BATCH) {
+    return { rows: rows.slice(0, BATCH), nextCursor: (cursor ?? 0) + BATCH };
+  }
+  return { rows, nextCursor: null };
+}
+
+/**
+ * **Every Perjadin Evaluation the Perjadin tab's choices match** (#490), for its CSV — the twin of
+ * `participantFeedbackExport`: the page's scope, score filters and sort through the same read, with
+ * no page.
+ */
+export async function perjadinFeedbackExport(
+  _caller: Person,
+  args: { filters: PerjadinFeedbackFilters; scope: PerjadinFeedbackScope; sort: FeedbackSort },
+): Promise<PerjadinFeedbackRow[]> {
+  return perjadinFeedbackRows(args, null);
+}
+
+/**
+ * The Perjadin rows the choices match, in order — a page's window, or all of them for the export.
+ */
+async function perjadinFeedbackRows(
+  args: { filters: PerjadinFeedbackFilters; scope: PerjadinFeedbackScope; sort: FeedbackSort },
+  window: { limit: number; offset: number } | null,
+): Promise<PerjadinFeedbackRow[]> {
+  const { filters, scope, sort } = args;
 
   const conditions: (SQL | null | undefined)[] = [
     ...perjadinScopeConditions(scope),
@@ -506,9 +608,10 @@ export async function perjadinFeedbackPage(
     bound(filters.transport, perjadinEvaluation.transport),
     bound(filters.meals, perjadinEvaluation.meals),
     bound(filters.punctuality, perjadinEvaluation.punctuality),
+    bound(filters.pendampingSupport, perjadinEvaluation.pendampingSupport),
   ];
 
-  const rows = await db
+  const query = db
     .select({
       id: perjadinEvaluation.id,
       filedByName: perjadinEvaluation.filedByName,
@@ -522,17 +625,20 @@ export async function perjadinFeedbackPage(
       createdOn: sql<string>`to_char(${perjadinEvaluation.createdAt}, 'YYYY-MM-DD')`.mapWith(
         String,
       ),
-      // The smallint columns already read back as `number` (or null for `lodging`); the row average
-      // is a numeric expression, so only it needs the explicit `.mapWith(Number)`.
+      // The smallint columns already read back as `number` (or null for `lodging` and
+      // `pendampingSupport`); the row average is a numeric expression, so only it needs the explicit
+      // `.mapWith(Number)`.
       lodging: perjadinEvaluation.lodging,
       transport: perjadinEvaluation.transport,
       meals: perjadinEvaluation.meals,
       punctuality: perjadinEvaluation.punctuality,
+      pendampingSupport: perjadinEvaluation.pendampingSupport,
       rowAverage: perjadinRowAverageExpr.mapWith(Number),
       lodgingComment: perjadinEvaluation.lodgingComment,
       transportComment: perjadinEvaluation.transportComment,
       mealsComment: perjadinEvaluation.mealsComment,
       punctualityComment: perjadinEvaluation.punctualityComment,
+      pendampingSupportComment: perjadinEvaluation.pendampingSupportComment,
     })
     .from(perjadinEvaluation)
     .innerJoin(perjadin, eq(perjadin.id, perjadinEvaluation.perjadinId))
@@ -544,33 +650,31 @@ export async function perjadinFeedbackPage(
       dir(sort.date)(perjadinEvaluation.createdAt),
       asc(perjadinEvaluation.id),
     )
-    .limit(BATCH + 1)
-    .offset(cursor ?? 0);
+    .$dynamic();
 
-  // The (BATCH + 1)th row proves a next page exists; it is never shown. Drop it and advance the
-  // cursor by one batch; short of a full-plus-one batch there is no next page.
-  if (rows.length > BATCH) {
-    return { rows: rows.slice(0, BATCH), nextCursor: (cursor ?? 0) + BATCH };
-  }
-  return { rows, nextCursor: null };
+  return window ? query.limit(window.limit).offset(window.offset) : query;
 }
 
-/** The Perjadin tab's four summary averages. */
+/** The Perjadin tab's five summary averages. Pendamping Support's is `null` while no row has one. */
 export type PerjadinFeedbackAverages = {
   lodging: number;
   transport: number;
   meals: number;
   punctuality: number;
+  pendampingSupport: number | null;
 };
 
 /**
- * **The four Perjadin summary averages, over the tab's scope and never its score filters** (#466),
+ * **The five Perjadin summary averages, over the tab's scope and never its score filters** (#466),
  * as the Peserta tab's are: programme-wide with no trip or Peran picked, narrowed to them once one
  * is. The score filters are not an argument, so the cards never average only the low rows.
  *
  * `avg(lodging)` ignores NULL naturally — a day trip with no hotel is not a zero in the hotel
- * average, it is simply not in it. `coalesce(…, 0)` turns the empty-table NULL into `0` so the
- * caller gets four numbers to format; "0.0" reads as "nothing yet" rather than a real low score.
+ * average, it is simply not in it. `coalesce(…, 0)` turns the empty-table NULL into `0` for the
+ * four logistics Aspects, so the caller gets numbers to format; "0.0" reads as "nothing yet" rather
+ * than a real low score. **Pendamping Support's average is over the rows that have one** (#482)
+ * and stays `null`, shown as "—", while none in scope does — as Hands-on RBL's is on the Peserta
+ * tab. Under Peran Pendamping it is always "—": a Pendamping is never asked it (ADR-0054).
  */
 export async function perjadinFeedbackAverages(
   _caller: Person,
@@ -582,11 +686,14 @@ export async function perjadinFeedbackAverages(
       transport: sql<number>`coalesce(avg(${perjadinEvaluation.transport}), 0)`.mapWith(Number),
       meals: sql<number>`coalesce(avg(${perjadinEvaluation.meals}), 0)`.mapWith(Number),
       punctuality: sql<number>`coalesce(avg(${perjadinEvaluation.punctuality}), 0)`.mapWith(Number),
+      pendampingSupport: sql<number | null>`avg(${perjadinEvaluation.pendampingSupport})`.mapWith(
+        (value) => (value === null ? null : Number(value)),
+      ),
     })
     .from(perjadinEvaluation)
     .where(and(...perjadinScopeConditions(scope)));
 
-  return row ?? { lodging: 0, transport: 0, meals: 0, punctuality: 0 };
+  return row ?? { lodging: 0, transport: 0, meals: 0, punctuality: 0, pendampingSupport: null };
 }
 
 /** One Session a Peserta response was filed against, as the Sesi picker offers it (#466). */

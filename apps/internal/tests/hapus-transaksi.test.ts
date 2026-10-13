@@ -1,7 +1,6 @@
 import LogPage from "-/app/(app)/log/page";
 import {
   deleteTransactionAction,
-  filePerjadinReportAction,
   finalizeReceiptsAction,
   recordTransactionAction,
 } from "-/app/(app)/perjadin/[id]/laporan/actions";
@@ -470,14 +469,6 @@ describe("Hapus transaksi", () => {
     await expect(deleteTransactionAction("not-a-uuid")).resolves.toEqual({
       outcome: "no-such-transaction",
     });
-  });
-
-  it("still works after the Laporan has been filed", async () => {
-    const { trip, transactionId } = await scene();
-    await expect(filePerjadinReportAction(trip.id)).resolves.toMatchObject({ outcome: "filed" });
-
-    await expect(deleteTransactionAction(transactionId)).resolves.toEqual({ outcome: "deleted" });
-    await expect(lineOf(transactionId)).resolves.toBeNull();
   });
 
   it.each([0, 7])("deletes a grandfathered line with %i receipts", async (count) => {

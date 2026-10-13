@@ -11,8 +11,8 @@ import { describe, expect, it, vi } from "vitest";
 
 /**
  * **The Peserta tab's scope, rendered** (#466): the Sekolah picker and a Sesi select disabled until a
- * School is picked, the "Sesi n" line each response card carries — the same line the Sesi picker
- * offers — and the averages' titles, programme-wide on the first paint.
+ * School is picked, the Tipe Peserta select (#487), the "Sesi n" line each response card carries —
+ * the same line the Sesi picker offers — and the averages' titles, programme-wide on the first paint.
  */
 
 vi.mock("-/app/(app)/feedback/actions", () => ({
@@ -77,7 +77,13 @@ function render(rows: ParticipantFeedbackRow[]) {
       participantSchools={schools}
       perjadinInitialRows={[]}
       perjadinInitialCursor={null}
-      perjadinAverages={{ lodging: 0, transport: 0, meals: 0, punctuality: 0 }}
+      perjadinAverages={{
+        lodging: 0,
+        transport: 0,
+        meals: 0,
+        punctuality: 0,
+        pendampingSupport: null,
+      }}
       perjadinTrips={[]}
     />,
   );
@@ -112,6 +118,15 @@ describe("the Peserta tab's scope", () => {
     expect(html).toContain("Semua Sesi");
   });
 
+  it("offers a Tipe Peserta select, at Semua Tipe Peserta (#487)", () => {
+    const html = render([]);
+
+    const tipe =
+      /<button[^>]*aria-label="Tipe Peserta"[^>]*>[\s\S]*?<\/button>/.exec(html)?.[0] ?? "";
+    expect(tipe).toContain("Semua Tipe Peserta");
+    expect(tipe).not.toMatch(/disabled=""/);
+  });
+
   it("labels each card with its Sesi, online in WIB, linking to the Session", () => {
     const html = render([
       row({}),
@@ -141,20 +156,49 @@ describe("the Peserta tab's scope", () => {
   });
 });
 
+describe("Ekspor CSV (#490)", () => {
+  it("links the Peserta tab to its export, carrying the default choices as no query at all", () => {
+    const html = render([row({})]);
+
+    expect(html).toContain('href="/feedback/ekspor/peserta"');
+    expect(html).toContain(">Ekspor CSV<");
+  });
+});
+
 describe("the scope's rules", () => {
-  it("resets the Session whenever the School changes or is cleared", () => {
-    expect(withSchool("samarinda")).toEqual({ schoolId: "samarinda", sessionId: null });
-    expect(withSchool(null)).toEqual({ schoolId: null, sessionId: null });
+  it("resets the Session whenever the School changes or is cleared, and keeps the Tipe Peserta", () => {
+    const scope = { schoolId: "bontang", sessionId: "sesi-1", participantType: "GTK-MS" } as const;
+
+    expect(withSchool(scope, "samarinda")).toEqual({
+      schoolId: "samarinda",
+      sessionId: null,
+      participantType: "GTK-MS",
+    });
+    expect(withSchool(scope, null)).toEqual({
+      schoolId: null,
+      sessionId: null,
+      participantType: "GTK-MS",
+    });
   });
 
-  it("titles the Peserta averages by School, then Session, and programme-wide with neither", () => {
-    expect(participantScopeLabel(schools, { schoolId: null, sessionId: null })).toBeNull();
-    expect(participantScopeLabel(schools, { schoolId: "bontang", sessionId: null })).toBe(
+  it("titles the Peserta averages by School, Session, then Tipe Peserta, and programme-wide with none", () => {
+    const scope = { schoolId: null, sessionId: null, participantType: null };
+
+    expect(participantScopeLabel(schools, scope)).toBeNull();
+    expect(participantScopeLabel(schools, { ...scope, schoolId: "bontang" })).toBe(
       "SMAN 1 Bontang",
     );
-    expect(participantScopeLabel(schools, { schoolId: "bontang", sessionId: "sesi-1" })).toBe(
-      "SMAN 1 Bontang · Sesi 1 Luring",
-    );
+    expect(
+      participantScopeLabel(schools, { ...scope, schoolId: "bontang", sessionId: "sesi-1" }),
+    ).toBe("SMAN 1 Bontang · Sesi 1 Luring");
+    expect(
+      participantScopeLabel(schools, {
+        schoolId: "bontang",
+        sessionId: "sesi-1",
+        participantType: "GTK-MS",
+      }),
+    ).toBe("SMAN 1 Bontang · Sesi 1 Luring · GTK-MS");
+    expect(participantScopeLabel(schools, { ...scope, participantType: "Siswa" })).toBe("Siswa");
   });
 
   it("titles the Perjadin averages by trip, then Peran, and programme-wide with neither", () => {

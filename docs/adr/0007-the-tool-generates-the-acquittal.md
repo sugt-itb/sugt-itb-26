@@ -6,7 +6,7 @@ A PIC enters a Perjadin's transactions once, in this tool, and exports a filled 
 
 The obligation is concrete regardless of what we build. The Advance is fixed at planning, transferred to the PIC before departure, the leftover is returned to the Treasurer, and every transaction that consumed it has to be evidenced. Someone assembles that record either way. The only question is where.
 
-This decision originally rested on the tool sitting upstream of a compulsory institutional process. That argument is void: the acquittal is DITSAMA's own, on a deadline DITSAMA sets, nothing is gated, and the Treasurer accepts any format. **No structural force pushes a PIC into this tool.**
+This decision originally rested on the tool sitting upstream of a compulsory institutional process. That argument is void: the acquittal is DITSAMA's own, on a deadline DITSAMA sets, nothing is gated, and the Treasurer accepts any format. **No structural force pushes a PIC into this tool.** _The deadline is overtaken by the 2026-10-13 amendment below: the tool keeps none._
 
 So it has to be plainly better than the alternative — receipts photographed and uploaded from a phone at the airport, running reconciliation against the Advance, one click to the finished document. That beats a spreadsheet, a calculator and a folder of WhatsApp photos. People do adopt tools that are obviously faster without being made to.
 
@@ -70,6 +70,15 @@ derived remainder and the returned-to-Treasurer mark above no longer describe th
 every transaction on the trip, each with its evidence, summed as **Uang Perjalanan Terpakai** and split
 by cohort, reconciled against nothing. The bet is unchanged in kind: an itemised, evidenced record
 assembled on a phone, exported in one click, beats a spreadsheet and a folder of photos.
+
+## Amendment (2026-10-13): the Report is neither filed nor due
+
+The acquittal is no longer filed, and no deadline is shown for it
+([ADR-0055](./0055-the-perjadin-report-is-neither-filed-nor-due.md),
+[#489](https://github.com/sugt-itb/sugt-itb-26/issues/489)). "On a deadline DITSAMA sets" above
+described a date the tool showed and gated nothing on; it is gone, and so is Laporkan, which froze
+nothing. The bet is unchanged: the acquittal is the trip's running record, and the export is taken
+whenever it is needed.
 
 ## Amendment (2026-10-08): SPPD is uploaded, not generated
 

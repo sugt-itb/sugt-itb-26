@@ -6,9 +6,9 @@ import {
 import { asc, eq, inArray } from "drizzle-orm";
 
 import { db } from "../client";
-import { session, sessionTeachingTeam } from "../schema/delivery";
+import { session, sessionPimpinan, sessionTeachingTeam } from "../schema/delivery";
 import { cluster, province, school, subCluster } from "../schema/reference";
-import { groupMember, perjadin, perjadinPimpinan, perjadinTeacher } from "../schema/travel";
+import { groupMember, perjadin, perjadinTeacher } from "../schema/travel";
 import type { Person } from "./caller";
 import { type CoveredSession, offlineSessionsElsewhere } from "./covered-sessions";
 import { duplicatedStaff } from "./group-rules";
@@ -28,8 +28,8 @@ import { requireGrant, requireStaff } from "./staff-only";
 
 /**
  * **Rencanakan Perjadin** — the form that plans a trip, and the write that brings the
- * Perjadin, its Group, its Teaching Team names, its Pimpinan and its Sessions into existence
- * together.
+ * Perjadin, its Group, its Teaching Team names and its Sessions — each with its Pimpinan — into
+ * existence together.
  *
  * Staff-only, by the surface list: arranging delivery is one of `./staff-only.ts`'s two reasons. **And
  * it needs the Perjadin Editor Grant** (ADR-0047): planning a trip is a deliberate choice of who plans, not
@@ -44,8 +44,9 @@ import { requireGrant, requireStaff } from "./staff-only";
  */
 
 /**
- * One offline Session on the trip: the School, the day and time it runs, and which of the trip's
- * Teaching Team names staffed it. No Stream — a Session teaches both (ADR-0038).
+ * One offline Session on the trip: the School, the day and time it runs, which of the trip's
+ * Teaching Team names staffed it and which Pimpinan attended it. No Stream — a Session teaches both
+ * (ADR-0038).
  *
  * A School gets **many** of these now (ADR-0019) — the form repeats a Session per School, each on
  * its own date and time — so a School appears once per Session it holds rather than once overall.
@@ -69,6 +70,13 @@ export type PlannedSession = {
    * teachers can be assigned later on `/perjadin/[id]` (T3).
    */
   taughtByTeacherIndexes: number[];
+  /**
+   * The **Pimpinan** who attended this Session — `personId`s of real People of role Pimpinan, from
+   * the Pimpinan roster (#492, ADR-0056). Each is written as a `session_pimpinan` row; record-only,
+   * never a `group_member`. May be empty; an id that is not an active Pimpinan is refused
+   * (`unknown-pimpinan`).
+   */
+  pimpinanPersonIds: string[];
 };
 
 /**
@@ -108,13 +116,6 @@ export type PlanPerjadinInput = {
    * A Session's `taughtByTeacherIndexes` index into this list.
    */
   teacherNames: string[];
-  /**
-   * The **Pimpinan** recorded on the trip — the `personId`s of real People of role Pimpinan, chosen
-   * from the Pimpinan roster (#181, ADR-0020). Each is written as a `perjadin_pimpinan` row;
-   * record-only, never a `group_member`. Optional, zero or more; an id that is not an active
-   * Pimpinan is refused (`unknown-pimpinan`).
-   */
-  pimpinan: string[];
   sessions: PlannedSession[];
   /**
    * **Tanggal mulai**, `YYYY-MM-DD` — typed, written straight to `starts_on` (ADR-0041). A Perjadin
@@ -226,8 +227,8 @@ export type DuplicateSessionSlot = {
 };
 
 /**
- * Plan a Perjadin: the trip, its Staff-only Group, its trip-scoped Teaching Team names, its
- * Pimpinan and its Sessions — with each Session's "Diajar oleh" links — in one transaction.
+ * Plan a Perjadin: the trip, its Staff-only Group, its trip-scoped Teaching Team names and its
+ * Sessions — with each Session's "Diajar oleh" links and Pimpinan — in one transaction.
  *
  * **Creating the Perjadin is what arranges its Sessions**, per ADR-0006 — there are no
  * planned rows waiting to be filled in, so this form is the arranging and there is no
@@ -287,11 +288,14 @@ export async function planPerjadin(
     };
   }
 
-  // A Pimpinan is a real Person of role Pimpinan (#181); the composite `perjadin_pimpinan_is_pimpinan`
-  // FK refuses any other at the database too, but the form only offers the roster, so a stray id is a
-  // hand-edited payload — validated here against the active-Pimpinan roster and named rather than
-  // surfaced as a raw constraint violation.
-  const uniquePimpinan = [...new Set(input.pimpinan)];
+  // A Pimpinan is a real Person of role Pimpinan (#181); the composite
+  // `session_pimpinan_is_pimpinan` FK refuses any other at the database too, but the form only
+  // offers the roster, so a stray id is a hand-edited payload — validated here, across every
+  // Session, against the active-Pimpinan roster and named rather than surfaced as a raw constraint
+  // violation.
+  const uniquePimpinan = [
+    ...new Set(input.sessions.flatMap((planned) => planned.pimpinanPersonIds)),
+  ];
   const unknownPimpinan = await unknownPimpinanIds(uniquePimpinan);
   if (unknownPimpinan.length > 0)
     return { outcome: "unknown-pimpinan", offending: unknownPimpinan };
@@ -482,13 +486,17 @@ export async function planPerjadin(
         await tx.insert(sessionTeachingTeam).values(teachingLinks);
       }
 
-      // The Pimpinan recorded on the trip — record-only rows referencing a real Person, never
-      // `group_member` (ADR-0020, #181). Deduped so `(perjadin_id, person_id)` cannot collide; skipped
-      // when none join. `role` defaults to 'Pimpinan'.
-      if (uniquePimpinan.length > 0) {
-        await tx
-          .insert(perjadinPimpinan)
-          .values(uniquePimpinan.map((personId) => ({ perjadinId: id, personId })));
+      // Each Session's Pimpinan (#492) — record-only rows referencing a real Person, never
+      // `group_member` (ADR-0020). Deduped per Session so `(session_id, person_id)` cannot collide;
+      // skipped when no Session has one. `role` defaults to 'Pimpinan'.
+      const pimpinanRows = input.sessions.flatMap((planned, i) =>
+        [...new Set(planned.pimpinanPersonIds)].map((personId) => ({
+          sessionId: sessionIds[i]!,
+          personId,
+        })),
+      );
+      if (pimpinanRows.length > 0) {
+        await tx.insert(sessionPimpinan).values(pimpinanRows);
       }
 
       return id;
@@ -542,8 +550,9 @@ export type PerjadinPlan = {
    */
   staff: PlannablePerson[];
   /**
-   * Pimpinan, for the record-only Pimpinan checkbox list (#181). Real People of role Pimpinan chosen
-   * from the roster now, not the retired fixed-three constant; empty until Pimpinan are added.
+   * Pimpinan, for each Session's record-only Pimpinan picker (#181, #492). Real People of role
+   * Pimpinan chosen from the roster, not the retired fixed-three constant; empty until Pimpinan are
+   * added.
    */
   pimpinan: PlannablePerson[];
 };
@@ -604,8 +613,9 @@ async function plannableSubClusters(): Promise<SubClusterOfSchools[]> {
  * Sub-Cluster read and the roster read concurrent; the rosters come from `./rosters.ts`. What each
  * School already has on other trips (#409) is a second round trip after them, since it is keyed on
  * the Schools the first one found. Both the
- * `staff` and `pimpinan` halves are kept — Staff for the PIC/extra-Staff pickers, Pimpinan for the
- * record-only checkbox list (#181). The Teaching Team are trip-scoped names now, not a roster (ADR-0020).
+ * `staff` and `pimpinan` halves are kept — Staff for the PIC/extra-Staff pickers, Pimpinan for each
+ * Session's record-only picker (#181, #492). The Teaching Team are trip-scoped names now, not a
+ * roster (ADR-0020).
  */
 export async function perjadinPlan(caller: Person): Promise<PerjadinPlan> {
   requireStaff(caller);

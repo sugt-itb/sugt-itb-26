@@ -10,9 +10,9 @@ import {
   preparationItemWording,
 } from "../schema/travel";
 import type { Person } from "./caller";
-import { todayInDeadlineZone } from "./deadline";
 import { levelView } from "./preparation-settings";
 import { requireGrant } from "./staff-only";
+import { todayInWib } from "./today";
 
 /**
  * **Defining the Preparation Checklist's items** (ADR-0045): adding, removing, hiding, showing again
@@ -23,7 +23,7 @@ import { requireGrant } from "./staff-only";
  *
  * **What a change reaches is decided by its date, not by rewriting anything.** Adding, removing,
  * hiding or showing an item for every Perjadin or for a Cluster stamps the WIB day of the change
- * (`todayInDeadlineZone`), and `./preparation-checklist.ts` applies it only to the Perjadins that end
+ * (`todayInWib`), and `./preparation-checklist.ts` applies it only to the Perjadins that end
  * on or after that day — so a finished Perjadin's list never changes under it. A change for one
  * Perjadin is undated and always applies. A wording is undated everywhere.
  *
@@ -137,7 +137,7 @@ export async function addPreparationItem(
         // After every item of the same scope, removed ones included. Adds are serialised by the
         // lock, so two never take the same position.
         position: sql`(select coalesce(max(${preparationItem.position}), 0) + 1 from ${preparationItem} where ${sameScope})`,
-        addedOn: scope.level === "perjadin" ? null : sql`${todayInDeadlineZone}`,
+        addedOn: scope.level === "perjadin" ? null : sql`${todayInWib}`,
       })
       .returning({ id: preparationItem.id });
 
@@ -170,7 +170,7 @@ export async function removePreparationItem(
   } else {
     await db
       .update(preparationItem)
-      .set({ removedOn: sql`${todayInDeadlineZone}` })
+      .set({ removedOn: sql`${todayInWib}` })
       .where(and(eq(preparationItem.id, itemId), isNull(preparationItem.removedOn)));
   }
   return { outcome: "removed" };
@@ -208,7 +208,7 @@ export async function hidePreparationItem(
         ? {
             preparationItemId: input.itemId,
             clusterId: input.scope.clusterId,
-            hiddenOn: sql`${todayInDeadlineZone}`,
+            hiddenOn: sql`${todayInWib}`,
           }
         : { preparationItemId: input.itemId, perjadinId: input.scope.perjadinId },
     )
@@ -230,7 +230,7 @@ export async function showPreparationItem(
   if ("clusterId" in input.scope) {
     await db
       .update(preparationItemHide)
-      .set({ shownOn: sql`${todayInDeadlineZone}` })
+      .set({ shownOn: sql`${todayInWib}` })
       .where(
         and(
           eq(preparationItemHide.preparationItemId, input.itemId),

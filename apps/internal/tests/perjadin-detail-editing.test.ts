@@ -11,8 +11,8 @@ import {
   perjadinDetail,
   removePerjadinTeacher,
   renamePerjadinTeacher,
-  setPerjadinPimpinan,
   setPerjadinStaff,
+  setSessionPimpinan,
 } from "@sugt/db/queries";
 import type { Role } from "@sugt/domain";
 import { eq } from "drizzle-orm";
@@ -33,7 +33,7 @@ import {
 
 /**
  * **Detail Perjadin's per-item edits** (#138): the trip-scoped Teaching Team, the offline Sessions,
- * the Staff-only Group and its PIC, and the recorded Pimpinan — each changed one piece at a time on
+ * the Staff-only Group and its PIC, and each Session's Pimpinan — each changed one piece at a time on
  * `/perjadin/[id]`, against the new model (#136, #137). Every write is Staff-only and every rule the
  * plan form checks against the whole payload is re-checked here against the trip's existing rows plus
  * the one being written. Each block drives the query function against a real Postgres.
@@ -140,14 +140,14 @@ async function linkedTeacherIds(sessionId: string) {
     .sort();
 }
 
-/** The recorded Pimpinan's names, via the join — a `perjadin_pimpinan` row references a Person now (#181). */
-async function pimpinanOf(perjadinId: string) {
+/** The Pimpinan recorded on one Session (#492), by name — a row references a Person (#181). */
+async function pimpinanOf(sessionId: string) {
   return (
     await db
       .select({ name: schema.person.fullName })
-      .from(schema.perjadinPimpinan)
-      .innerJoin(schema.person, eq(schema.person.id, schema.perjadinPimpinan.personId))
-      .where(eq(schema.perjadinPimpinan.perjadinId, perjadinId))
+      .from(schema.sessionPimpinan)
+      .innerJoin(schema.person, eq(schema.person.id, schema.sessionPimpinan.personId))
+      .where(eq(schema.sessionPimpinan.sessionId, sessionId))
   )
     .map((row) => row.name)
     .sort();
@@ -324,6 +324,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-02",
       startsAt: "10:00",
       taughtByTeacherIds: [andi.teacherId, bella.teacherId],
+      pimpinanPersonIds: [],
     });
 
     expect(result.outcome).toBe("added");
@@ -347,6 +348,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-02",
       startsAt: "09:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     const result = await addPerjadinSession(pic, perjadinId, {
@@ -354,6 +356,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-02",
       startsAt: "09:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     expect(result.outcome).toBe("session-time-clash");
@@ -375,6 +378,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-02",
       startsAt: "09:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     };
     await addPerjadinSession(pic, perjadinId, input);
 
@@ -404,6 +408,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-02",
       startsAt: "09:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     expect(result).toEqual({ outcome: "duplicate-session" });
@@ -427,6 +432,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-02",
       startsAt: "09:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     expect(result.outcome).toBe("added");
@@ -444,6 +450,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-09",
       startsAt: "09:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     expect(result).toEqual({
@@ -474,6 +481,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-02",
       startsAt: "09:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     expect(result).toEqual({ outcome: "school-outside-sub-cluster", schoolId: stray.id });
@@ -488,6 +496,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-02",
       startsAt: "09:00",
       taughtByTeacherIds: [stray],
+      pimpinanPersonIds: [],
     });
 
     expect(result).toEqual({ outcome: "unknown-teacher", teacherIds: [stray] });
@@ -511,6 +520,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-02",
       startsAt: "13:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     expect(result).toEqual({
@@ -537,6 +547,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-03",
       startsAt: "11:30",
       taughtByTeacherIds: [andi.teacherId],
+      pimpinanPersonIds: [],
     });
 
     expect(result).toEqual({ outcome: "edited", schoolsChanged: true });
@@ -564,6 +575,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-01",
       startsAt: "09:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     expect(result).toEqual({ outcome: "edited", schoolsChanged: false });
@@ -586,6 +598,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-01",
       startsAt: "09:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     expect(result).toEqual({ outcome: "edited", schoolsChanged: true });
@@ -611,6 +624,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-02",
       startsAt: "09:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     expect(result.outcome).toBe("session-time-clash");
@@ -630,6 +644,7 @@ describe("editing a Perjadin's Sessions", () => {
       heldOn: "2026-09-02",
       startsAt: "09:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     expect(result).toEqual({ outcome: "not-arranged", status: "cancelled" });
@@ -662,6 +677,7 @@ describe("editing a Perjadin's Sessions", () => {
         heldOn: "2026-09-02",
         startsAt: "09:00",
         taughtByTeacherIds: [],
+        pimpinanPersonIds: [],
       }),
     ).rejects.toSatisfy(isNotStaffError);
   });
@@ -768,89 +784,202 @@ describe("editing a Perjadin's Staff and PIC", () => {
   });
 });
 
-describe("editing a Perjadin's Pimpinan", () => {
+describe("a Session's Pimpinan", () => {
   beforeEach(resetDatabase);
 
-  it("sets the recorded Pimpinan to the subset of the roster given", async () => {
-    const { pic, perjadinId } = await trip();
+  /** One arranged Session on the trip, at its first School, with the Pimpinan given. */
+  async function sessionWith(pimpinanPersonIds: string[]) {
+    const fixture = await trip();
+    const added = await addPerjadinSession(fixture.pic, fixture.perjadinId, {
+      schoolId: fixture.schools[0].id,
+      heldOn: "2026-09-02",
+      startsAt: "10:00",
+      taughtByTeacherIds: [],
+      pimpinanPersonIds,
+    });
+    return { ...fixture, added };
+  }
+
+  it("records the Pimpinan a new Session is added with, a repeated id once", async () => {
     const a = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
     const b = await pimpinan("Anton Timur Jaelani", "anton@ditsama.itb.ac.id");
+    const { perjadinId, added } = await sessionWith([a.id, b.id, a.id]);
+    if (added.outcome !== "added") throw new Error(`expected added, got ${added.outcome}`);
 
-    expect(await setPerjadinPimpinan(pic, perjadinId, [a.id, b.id])).toEqual({ outcome: "set" });
-    expect(await pimpinanOf(perjadinId)).toEqual([a.fullName, b.fullName].sort());
+    expect(await pimpinanOf(added.sessionId)).toEqual([a.fullName, b.fullName].sort());
     // They are never Group members.
     expect(await groupOf(perjadinId)).toHaveLength(1);
   });
 
-  it("clears the Pimpinan when given an empty set", async () => {
-    const { pic, perjadinId } = await trip();
+  it("replaces the set on edit, and clears it when given none", async () => {
     const a = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
-    await setPerjadinPimpinan(pic, perjadinId, [a.id]);
+    const b = await pimpinan("Anton Timur Jaelani", "anton@ditsama.itb.ac.id");
+    const { pic, schools, added } = await sessionWith([a.id]);
+    if (added.outcome !== "added") throw new Error(`expected added, got ${added.outcome}`);
+    const fields = {
+      schoolId: schools[0].id,
+      heldOn: "2026-09-02",
+      startsAt: "10:00",
+      taughtByTeacherIds: [],
+    };
 
-    expect(await setPerjadinPimpinan(pic, perjadinId, [])).toEqual({ outcome: "set" });
-    expect(await pimpinanOf(perjadinId)).toEqual([]);
+    expect(
+      await editPerjadinSession(pic, added.sessionId, { ...fields, pimpinanPersonIds: [b.id] }),
+    ).toMatchObject({ outcome: "edited" });
+    expect(await pimpinanOf(added.sessionId)).toEqual([b.fullName]);
+
+    expect(
+      await editPerjadinSession(pic, added.sessionId, { ...fields, pimpinanPersonIds: [] }),
+    ).toMatchObject({ outcome: "edited" });
+    expect(await pimpinanOf(added.sessionId)).toEqual([]);
   });
 
-  it("dedupes a repeated id rather than colliding on the primary key", async () => {
-    const { pic, perjadinId } = await trip();
+  it("keeps the Pimpinan when the Session moves to another School and date", async () => {
     const a = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
+    const { pic, schools, added } = await sessionWith([a.id]);
+    if (added.outcome !== "added") throw new Error(`expected added, got ${added.outcome}`);
 
-    expect(await setPerjadinPimpinan(pic, perjadinId, [a.id, a.id])).toEqual({ outcome: "set" });
-    expect(await pimpinanOf(perjadinId)).toEqual([a.fullName]);
+    expect(
+      await editPerjadinSession(pic, added.sessionId, {
+        schoolId: schools[1].id,
+        heldOn: "2026-09-03",
+        startsAt: "13:00",
+        taughtByTeacherIds: [],
+        pimpinanPersonIds: [a.id],
+      }),
+    ).toMatchObject({ outcome: "edited" });
+    expect(await pimpinanOf(added.sessionId)).toEqual([a.fullName]);
   });
 
-  it("refuses a Staff id, which is not an active Pimpinan, writing nothing", async () => {
-    const { pic, perjadinId } = await trip();
-    // `pic` is a Staff Person — a valid id, but the wrong role for the Pimpinan roster.
-    expect(await setPerjadinPimpinan(pic, perjadinId, [pic.id])).toEqual({
-      outcome: "unknown-pimpinan",
-      offending: [pic.id],
-    });
-    expect(await pimpinanOf(perjadinId)).toEqual([]);
-  });
-
-  it("refuses a random uuid that names no Person, writing nothing", async () => {
-    const { pic, perjadinId } = await trip();
-    const stranger = randomUUID();
-
-    expect(await setPerjadinPimpinan(pic, perjadinId, [stranger])).toEqual({
-      outcome: "unknown-pimpinan",
-      offending: [stranger],
-    });
-    expect(await pimpinanOf(perjadinId)).toEqual([]);
-  });
-
-  it("refuses a revoked Pimpinan, whose id is no longer active, writing nothing", async () => {
-    const { pic, perjadinId } = await trip();
-    // A once-valid Pimpinan, now revoked (active = false) — the roster check requires active, so a
-    // stale id from before the revoke is named rather than recorded.
+  it("refuses a Staff id, a stranger and a revoked Pimpinan, writing nothing", async () => {
     const gone = await pimpinan("Fatimah Azzahra", "fatimah@ditsama.itb.ac.id");
     await revokePerson(gone.id);
+    const stranger = randomUUID();
+    const { pic, perjadinId, schools } = await trip();
 
-    expect(await setPerjadinPimpinan(pic, perjadinId, [gone.id])).toEqual({
-      outcome: "unknown-pimpinan",
-      offending: [gone.id],
-    });
-    expect(await pimpinanOf(perjadinId)).toEqual([]);
+    // `pic` is a Staff Person — a valid id, but the wrong role for the Pimpinan roster.
+    expect(
+      await addPerjadinSession(pic, perjadinId, {
+        schoolId: schools[0].id,
+        heldOn: "2026-09-02",
+        startsAt: "10:00",
+        taughtByTeacherIds: [],
+        pimpinanPersonIds: [pic.id, stranger, gone.id],
+      }),
+    ).toEqual({ outcome: "unknown-pimpinan", personIds: [pic.id, stranger, gone.id] });
+    expect(await sessionsOf(perjadinId)).toEqual([]);
+    expect(await db.select().from(schema.sessionPimpinan)).toEqual([]);
   });
 
-  it("refuses a non-Staff caller", async () => {
-    const { perjadinId } = await trip();
-    const prof = nonStaff();
+  it("refuses a new revoked Pimpinan on edit, but keeps one already recorded there", async () => {
+    const kept = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
+    const later = await pimpinan("Anton Timur Jaelani", "anton@ditsama.itb.ac.id");
+    const { pic, schools, added } = await sessionWith([kept.id]);
+    if (added.outcome !== "added") throw new Error(`expected added, got ${added.outcome}`);
+    // Both leave the roster after the Session was recorded.
+    await revokePerson(kept.id);
+    await revokePerson(later.id);
+    const fields = {
+      schoolId: schools[0].id,
+      heldOn: "2026-09-02",
+      startsAt: "10:00",
+      taughtByTeacherIds: [],
+    };
 
-    await expect(setPerjadinPimpinan(prof, perjadinId, [])).rejects.toSatisfy(isNotStaffError);
+    // Re-saving keeps the revoked Pimpinan who attended; it is history, not a new pick.
+    expect(
+      await editPerjadinSession(pic, added.sessionId, {
+        ...fields,
+        startsAt: "11:00",
+        pimpinanPersonIds: [kept.id],
+      }),
+    ).toMatchObject({ outcome: "edited" });
+    expect(await pimpinanOf(added.sessionId)).toEqual([kept.fullName]);
+
+    // Adding a revoked Pimpinan who was not there is refused, and nothing changes.
+    expect(
+      await editPerjadinSession(pic, added.sessionId, {
+        ...fields,
+        pimpinanPersonIds: [kept.id, later.id],
+      }),
+    ).toEqual({ outcome: "unknown-pimpinan", personIds: [later.id] });
+    expect(await pimpinanOf(added.sessionId)).toEqual([kept.fullName]);
   });
 
   it("has the DB composite FK refuse a non-Pimpinan personId that bypassed the query", async () => {
-    const { pic, perjadinId } = await trip();
-    // A direct insert of a Staff person, skipping `setPerjadinPimpinan`'s roster check — the
-    // composite `(person_id, role)` FK into `person (id, role)` is the DB backstop that refuses it.
+    const { pic, added } = await sessionWith([]);
+    if (added.outcome !== "added") throw new Error(`expected added, got ${added.outcome}`);
+    // A direct insert of a Staff person, skipping the roster check — the composite
+    // `(person_id, role)` FK into `person (id, role)` is the DB backstop that refuses it.
     const refusal = await refusedBy(
       db
-        .insert(schema.perjadinPimpinan)
-        .values({ perjadinId, personId: pic.id, role: "Pimpinan" as const }),
+        .insert(schema.sessionPimpinan)
+        .values({ sessionId: added.sessionId, personId: pic.id, role: "Pimpinan" as const }),
     );
-    expect(refusal).toBe("perjadin_pimpinan_is_pimpinan");
+    expect(refusal).toBe("session_pimpinan_is_pimpinan");
+  });
+
+  /**
+   * A delivered Session's School, date and time are settled, but who attended is often recorded after
+   * the trip — and the migration left every trip Pimpinan on each live Session to be narrowed — so
+   * its Pimpinan alone stay writable. A cancelled Session no longer counts, and is left alone.
+   */
+  it("sets a delivered Session's Pimpinan alone, but not a cancelled one's", async () => {
+    const a = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
+    const b = await pimpinan("Anton Timur Jaelani", "anton@ditsama.itb.ac.id");
+    const { pic, perjadinId, schools } = await trip();
+    const delivered = await addOfflineSession({
+      schoolId: schools[0].id,
+      heldOn: "2026-09-01",
+      perjadinId,
+      status: "delivered",
+    });
+    const cancelled = await addOfflineSession({
+      schoolId: schools[1].id,
+      heldOn: "2026-09-02",
+      perjadinId,
+      status: "cancelled",
+    });
+
+    expect(await setSessionPimpinan(pic, delivered.id, [a.id, b.id, a.id])).toEqual({
+      outcome: "set",
+    });
+    expect(await pimpinanOf(delivered.id)).toEqual([a.fullName, b.fullName].sort());
+    expect(await setSessionPimpinan(pic, delivered.id, [b.id])).toEqual({ outcome: "set" });
+    expect(await pimpinanOf(delivered.id)).toEqual([b.fullName]);
+
+    // The same roster rule as the dialog: a Staff id is refused, nothing changes.
+    expect(await setSessionPimpinan(pic, delivered.id, [pic.id])).toEqual({
+      outcome: "unknown-pimpinan",
+      personIds: [pic.id],
+    });
+    expect(await pimpinanOf(delivered.id)).toEqual([b.fullName]);
+
+    expect(await setSessionPimpinan(pic, cancelled.id, [a.id])).toEqual({ outcome: "cancelled" });
+    expect(await pimpinanOf(cancelled.id)).toEqual([]);
+  });
+
+  it("refuses a non-Staff caller on a delivered Session's Pimpinan", async () => {
+    const { perjadinId, schools } = await trip();
+    const delivered = await addOfflineSession({
+      schoolId: schools[0].id,
+      heldOn: "2026-09-01",
+      perjadinId,
+      status: "delivered",
+    });
+
+    await expect(setSessionPimpinan(nonStaff(), delivered.id, [])).rejects.toSatisfy(
+      isNotStaffError,
+    );
+  });
+
+  it("goes with its Session — the rows cascade when the Session is deleted", async () => {
+    const a = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
+    const { added } = await sessionWith([a.id]);
+    if (added.outcome !== "added") throw new Error(`expected added, got ${added.outcome}`);
+
+    await db.delete(schema.session).where(eq(schema.session.id, added.sessionId));
+    expect(await db.select().from(schema.sessionPimpinan)).toEqual([]);
   });
 });
 
@@ -862,20 +991,22 @@ describe("perjadinDetail's new payload", () => {
     const andi = await addPerjadinTeacher(pic, perjadinId, "Dr. Andi");
     if (andi.outcome !== "added") throw new Error("fixture failed");
     const p0 = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
-    await setPerjadinPimpinan(pic, perjadinId, [p0.id]);
     const added = await addPerjadinSession(pic, perjadinId, {
       schoolId: schools[0].id,
       heldOn: "2026-09-02",
       startsAt: "10:00",
       taughtByTeacherIds: [andi.teacherId],
+      pimpinanPersonIds: [p0.id],
     });
     if (added.outcome !== "added") throw new Error("fixture failed to add session");
 
     const detail = await perjadinDetail(pic, perjadinId);
 
     expect(detail?.teachers).toEqual([{ id: andi.teacherId, name: "Dr. Andi" }]);
-    expect(detail?.pimpinan).toEqual([{ personId: p0.id, name: p0.fullName }]);
-    // The Pimpinan roster carries the active Pimpinan People the editor picks from.
+    expect(detail?.pimpinan).toEqual([
+      { personId: p0.id, name: p0.fullName, schools: ["SMAN 1 Bandung"] },
+    ]);
+    // The Pimpinan roster carries the active Pimpinan People each Session's picker offers.
     expect(detail?.pimpinanRoster).toEqual([{ id: p0.id, fullName: p0.fullName }]);
     expect(detail?.eligibleSchools.map((s) => s.id).sort()).toEqual(
       schools.map((s) => s.id).sort(),
@@ -887,5 +1018,67 @@ describe("perjadinDetail's new payload", () => {
     expect(detail).not.toHaveProperty("teachingTeam");
     const session = detail?.sessions[0];
     expect(session?.taughtBy).toEqual([{ id: andi.teacherId, name: "Dr. Andi" }]);
+    expect(session?.pimpinan).toEqual([{ personId: p0.id, name: p0.fullName }]);
+  });
+
+  /**
+   * The trip's Pimpinan are derived (#492, ADR-0056): everyone on at least one non-cancelled
+   * Session, once, with the Schools they were recorded at. A cancelled Session keeps its own
+   * Pimpinan on its row but adds nothing to the trip's list.
+   */
+  it("derives the trip's Pimpinan from its live Sessions, each with their Schools", async () => {
+    const { pic, perjadinId, schools } = await trip();
+    const fatimah = await pimpinan("Fatimah Arofiati Noor", "fatimah@ditsama.itb.ac.id");
+    const anton = await pimpinan("Anton Timur Jaelani", "anton@ditsama.itb.ac.id");
+    const sinta = await pimpinan("Sinta Dewi", "sinta@ditsama.itb.ac.id");
+    const add = async (
+      schoolId: string,
+      heldOn: string,
+      pimpinanPersonIds: string[],
+      startsAt = "10:00",
+    ) => {
+      const added = await addPerjadinSession(pic, perjadinId, {
+        schoolId,
+        heldOn,
+        startsAt,
+        taughtByTeacherIds: [],
+        pimpinanPersonIds,
+      });
+      if (added.outcome !== "added") throw new Error(`expected added, got ${added.outcome}`);
+      return added.sessionId;
+    };
+    // Fatimah at both Schools (twice at SMAN 2), Anton at SMAN 2 only, Sinta only at a Session
+    // that is then cancelled.
+    await add(schools[0].id, "2026-09-01", [fatimah.id]);
+    const both = await add(schools[1].id, "2026-09-02", [fatimah.id, anton.id]);
+    await add(schools[1].id, "2026-09-03", [fatimah.id]);
+    const called = await add(schools[0].id, "2026-09-03", [sinta.id], "13:00");
+    expect(await cancelSession(pic, called, "Sekolah libur")).toMatchObject({
+      outcome: "cancelled",
+    });
+
+    const detail = await perjadinDetail(pic, perjadinId);
+
+    expect(detail?.pimpinan).toEqual([
+      { personId: anton.id, name: anton.fullName, schools: ["SMAN 2 Bandung"] },
+      {
+        personId: fatimah.id,
+        name: fatimah.fullName,
+        schools: ["SMAN 1 Bandung", "SMAN 2 Bandung"],
+      },
+    ]);
+    // A Session's own list is in name order too, whatever order it was picked in.
+    expect(detail?.sessions.find((row) => row.sessionId === both)?.pimpinan).toEqual([
+      { personId: anton.id, name: anton.fullName },
+      { personId: fatimah.id, name: fatimah.fullName },
+    ]);
+    // The cancelled Session still lists Sinta on its own row.
+    const cancelled = detail?.sessions.find((row) => row.sessionId === called);
+    expect(cancelled?.pimpinan).toEqual([{ personId: sinta.id, name: sinta.fullName }]);
+  });
+
+  it("reads no Pimpinan as an empty list", async () => {
+    const { pic, perjadinId } = await trip();
+    expect((await perjadinDetail(pic, perjadinId))?.pimpinan).toEqual([]);
   });
 });

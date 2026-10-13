@@ -1,5 +1,5 @@
 import { staffSurface } from "-/lib/staff-surface";
-import { filePerjadinReport, isNotStaffError, perjadinAcquittal } from "@sugt/db/queries";
+import { deleteTransaction, isNotStaffError, perjadinAcquittal } from "@sugt/db/queries";
 import type { Role } from "@sugt/domain";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,7 +36,7 @@ function nonStaff() {
  * The boundary the choke point now holds is **read (any signed-in Person) vs write (Staff)**:
  * ADR-0004 kept money reads to Staff, and [ADR-0026](../../../docs/adr/0026-money-is-open-to-read-and-staff-only-to-write.md)
  * (#180) reversed that half, so what this file drives at the seam is a money **write** —
- * `filePerjadinReport` — while `perjadinAcquittal` reads open to everyone.
+ * `deleteTransaction` — while `perjadinAcquittal` reads open to everyone.
  */
 describe("money writes are Staff-only", () => {
   beforeEach(resetDatabase);
@@ -48,20 +48,20 @@ describe("money writes are Staff-only", () => {
   async function aPerjadinWithSpending() {
     const pic = await signInAsPerson("Staff", "rina@ditsama.itb.ac.id", "Rina Nurhayati");
     const perjadin = await addPerjadin({ picPersonId: pic.id });
-    await addTransaction({
+    const line = await addTransaction({
       perjadinId: perjadin.id,
       amountIdr: 1_250_000,
       category: "Konsumsi",
       createdByPersonId: pic.id,
     });
-    return { pic, perjadin };
+    return { pic, perjadin, line };
   }
 
   it("refuses a non-Staff Person a money write with a distinguishable typed error", async () => {
-    const { perjadin } = await aPerjadinWithSpending();
+    const { line } = await aPerjadinWithSpending();
     const teacher = nonStaff();
 
-    const refusal = await filePerjadinReport(teacher, perjadin.id).catch((error: unknown) => error);
+    const refusal = await deleteTransaction(teacher, line.id).catch((error: unknown) => error);
 
     expect(isNotStaffError(refusal)).toBe(true);
   });
@@ -69,13 +69,13 @@ describe("money writes are Staff-only", () => {
   it("refuses a write with a throw rather than a value outcome", async () => {
     /**
      * A refused caller is a bug or an attack, never a user state, so `requireStaff` throws
-     * before the write can return one of its reachable value outcomes (`filed`,
-     * `no-such-perjadin`, …). This asserts the refusal is not quietly one of those.
+     * before the write can return one of its reachable value outcomes (`deleted`,
+     * `no-such-transaction`). This asserts the refusal is not quietly one of those.
      */
-    const { perjadin } = await aPerjadinWithSpending();
+    const { line } = await aPerjadinWithSpending();
     const teacher = nonStaff();
 
-    await expect(filePerjadinReport(teacher, perjadin.id)).rejects.toThrow();
+    await expect(deleteTransaction(teacher, line.id)).rejects.toThrow();
   });
 
   it("opens the money READ to any signed-in Person now (ADR-0026, #180)", async () => {
@@ -126,10 +126,10 @@ describe("money writes are Staff-only", () => {
      * testing it against itself.
      */
     vi.stubEnv("__NEXT_EXPERIMENTAL_AUTH_INTERRUPTS", "1");
-    const { perjadin } = await aPerjadinWithSpending();
+    const { line } = await aPerjadinWithSpending();
     const teacher = nonStaff();
 
-    const thrown = await staffSurface(() => filePerjadinReport(teacher, perjadin.id)).catch(
+    const thrown = await staffSurface(() => deleteTransaction(teacher, line.id)).catch(
       (error: unknown) => error,
     );
 

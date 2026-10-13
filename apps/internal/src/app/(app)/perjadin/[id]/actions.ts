@@ -14,8 +14,8 @@ import {
   issuePerjadinFeedbackToken,
   removePerjadinTeacher,
   renamePerjadinTeacher,
-  setPerjadinPimpinan,
   setPerjadinStaff,
+  setSessionPimpinan,
   togglePreparationItem,
   updatePerjadinDates,
   type AddPerjadinSessionResult,
@@ -27,8 +27,8 @@ import {
   type PerjadinSessionInput,
   type RemovePerjadinTeacherResult,
   type RenamePerjadinTeacherResult,
-  type SetPerjadinPimpinanResult,
   type SetPerjadinStaffResult,
+  type SetSessionPimpinanResult,
   type TogglePreparationItemResult,
   type UpdatePerjadinDatesResult,
 } from "@sugt/db/queries";
@@ -68,18 +68,6 @@ export async function changePerjadinPicAction(
 
   const result = await staffSurface(() => changePerjadinPic(person, perjadinId, newPicPersonId));
   if (result.outcome === "changed") revalidatePath(`/perjadin/${perjadinId}`);
-  return result;
-}
-
-/** **Set the Pimpinan recorded on the trip** — a subset of the Pimpinan roster, by Person id (#181). */
-export async function setPerjadinPimpinanAction(
-  perjadinId: string,
-  personIds: string[],
-): Promise<SetPerjadinPimpinanResult> {
-  const person = await requirePerson();
-
-  const result = await staffSurface(() => setPerjadinPimpinan(person, perjadinId, personIds));
-  if (result.outcome === "set") revalidatePath(`/perjadin/${perjadinId}`);
   return result;
 }
 
@@ -181,6 +169,22 @@ export async function editPerjadinSessionAction(
  * was its School's last live Session on the trip, that School leaves the trip's Schools, so it
  * renames the trip's Drive folders (#407).
  */
+/**
+ * **Set a delivered Session's Pimpinan** (#492) — who attended, recorded after the Session
+ * happened. An arranged Session's Pimpinan are saved with the rest of it, through the edit above.
+ */
+export async function setSessionPimpinanAction(
+  perjadinId: string,
+  sessionId: string,
+  personIds: string[],
+): Promise<SetSessionPimpinanResult> {
+  const person = await requirePerson();
+
+  const result = await staffSurface(() => setSessionPimpinan(person, sessionId, personIds));
+  if (result.outcome === "set") revalidatePath(`/perjadin/${perjadinId}`);
+  return result;
+}
+
 export async function cancelPerjadinSessionAction(
   perjadinId: string,
   sessionId: string,

@@ -73,10 +73,12 @@ the gate still enters the whole line that evening and loses nothing.
   - A zero-receipt line is fixed through its row's "Unggah bukti".
   - A line with more than five keeps what it has and gains nothing.
   - `filePerjadinReport`'s evidence check stays as the backstop that still catches the first kind.
+    _Amended 2026-10-13: filing is gone ([ADR-0055](./0055-the-perjadin-report-is-neither-filed-nor-due.md)),
+    and the backstop with it; the Laporan still marks such a line._
 - **No receipt deletion.** There is still no way to remove a receipt, so a mistaken upload uses up
   one of the five slots. That is accepted and out of scope.
 - **This is a field the form insists on, not a new gate.** `data-model.md` separates two kinds of
   rule. One withholds an action until some _other_ record is complete; the other is a field a form
   insists on before it will submit. This is the second kind: the receipts are part of the line being
   written. Filing gains no new condition — its evidence check is unchanged, and now only ever fires
-  on a grandfathered line.
+  on a grandfathered line. _Amended 2026-10-13: there is no filing any more (ADR-0055)._

@@ -254,7 +254,8 @@ spill sideways. Each section shows three cards with **Tampilkan lebih banyak** f
 left out when it has none. With neither, the page says "Anda belum tergabung dalam Perjalanan
 Dinas."
 
-**Who is on the trip** lists Pendamping and Pimpinan by name, as plain lists, and folds the
+**Who is on the trip** lists Pendamping and Pimpinan by name, as plain lists — the Pimpinan being
+everyone recorded on one of the trip's Sessions that was not cancelled (#492) — and folds the
 Narasumber away by School (#447) — a trip done PP over several Schools often carries a different
 six or so at each, full names with titles, which listed flat crowd the card:
 
@@ -282,7 +283,8 @@ Narasumber (11)
   toggle is a full-width tap target, and a long School name wraps.
 
 This is how the trip is usually staffed, shown, not a rule: nothing about entering Narasumber or
-"Diajar oleh" changes, and `/perjadin/[id]` still names them per Session.
+"Diajar oleh" changes, and `/perjadin/[id]` still names them per Session (see
+[Perjadin](#perjadin)).
 
 **Each Session row of the timeline has its own buttons**: **Tandai** while it is still arranged,
 **Feedback**, and **Foto & Video** (#425) — in both sections, since footage is often uploaded after
@@ -467,10 +469,11 @@ read-only.
 
 **The form asks for no money.** The tool does not track how much Uang Perjalanan a trip received
 ([ADR-0051](./adr/0051-the-advance-is-not-tracked.md), #464): the figure is usually unknown unless
-someone asks the trip's members. The trip's screen carries a **Pengeluaran** strip — when the Laporan
-is due, a link to it, and one figure, **Uang Perjalanan Terpakai**: the sum of every transaction on
-the trip, all categories. The Laporan, its export and the `/pendamping` card show that same number.
-Nothing shows an amount received, a remainder or a progress bar.
+someone asks the trip's members. The trip's screen carries a **Pengeluaran** strip — a link to the
+Laporan and one figure, **Uang Perjalanan Terpakai**: the sum of every transaction on the trip, all
+categories. It shows no due date: the Laporan is neither filed nor due (ADR-0055, #489). The
+Laporan, its export and the `/pendamping` card show that same number. Nothing shows an amount
+received, a remainder or a progress bar.
 
 **A trip goes to one Sub-Cluster.** A Sub-Cluster is a set of Schools near enough that any of
 them can share a journey. Choosing it is what decides which Schools may appear on the trip at
@@ -504,6 +507,11 @@ not a date _and_ a time, because the Group cannot be in two places.
 **Creating a Perjadin is what brings its Sessions into existence** — one per School kept on
 the trip. This form is the arranging.
 
+**Each Session on the form carries its own "Diajar oleh" and Pimpinan** (#492): a **Pimpinan**
+multi-select from the Pimpinan roster sits right after "Diajar oleh" on every Session row. There is
+no trip-level Pimpinan list on the form; while the roster is empty, one line above the Schools says
+to ask an Administrator to add Pimpinan on /orang.
+
 **Each School shows what it already has on other trips**
 ([#409](https://github.com/sugt-itb/sugt-itb-26/issues/409)), because a Kelompok split across
 several trips is otherwise planned one School at a time from memory. Under each School row of the
@@ -516,6 +524,26 @@ leaving out this trip's own Sessions, which the screen already lists ("Belum ada
 Perjadin lain" when there are none). **The note is read-only and never blocks**: the cap of two
 offline Sessions per School is still not enforced, and a School with Sessions elsewhere can be
 planned like any other — only the same School at the same date and time is refused.
+
+**The trip's screen lists its Sessions, each with its Narasumber one per line** (#491): a row of
+date, time, School and status badge — plus Ubah and Batalkan, for whoever writes the trip, while the
+Session is still arranged — then that Session's "Diajar oleh" beneath it, indented, A–Z, one name to
+a line, on every viewport. A Session with no Narasumber has nothing under its row.
+
+**A Pimpinan is recorded on the Sessions they attended**, not on the trip (#492,
+[ADR-0056](./adr/0056-a-pimpinan-is-recorded-per-session.md)): a Pimpinan on a trip across several
+Schools and days is often at only some of them. Under each Session's Narasumber its Pimpinan follow,
+one per line, as "Pimpinan: {name}". The Tambah/Ubah Sesi dialog has a **Pimpinan** multi-select
+right after "Diajar oleh", offering the Pimpinan roster — with a hint naming /orang while it is
+empty — and moving a Session to another School or date keeps them. A delivered Session, whose
+School, date and time are settled, has **Ubah Pimpinan** on its row instead, for the same people:
+who attended is often written down after the trip. A cancelled Session has neither.
+
+**The trip's Pimpinan section is read-only**: everyone recorded on at least one of its Sessions that
+was not cancelled, each followed by the Schools they were recorded at — "Prof. X — SMAN 1, SMAN 3" —
+or "Tidak ada.". A Pimpinan recorded only on a Session later cancelled stays on that Session's row
+but leaves this list. The Laporan's "Pimpinan yang turut serta", its CSV and the `/pendamping` card
+read the same list.
 
 Offline Sessions happen during a Perjadin. **Online Sessions have no Perjadin at all** —
 which is why counting trips never tells you how much teaching has happened, and why six
@@ -589,8 +617,9 @@ member without the Perjadin Editor Grant, who still runs any trip they are on bu
 Administrator** ([ADR-0048](./adr/0048-a-perjadin-is-written-by-its-group.md), #439). Everyone signed
 in reads every trip. On `/perjadin/[id]`, `/perjadin/[id]/laporan` and `/sesi/[id]`, anyone else sees
 everything with every write control absent — Ubah tanggal, Ubah Group, the
-Pimpinan and Narasumber edits, Tambah/Ubah/Batalkan Sesi, Tandai, the Persiapan boxes, Catat
-transaksi, Unggah bukti, Laporkan, Foto & Video's upload and Hapus — and a forced request answers 403.
+Narasumber edits, Tambah/Ubah/Batalkan Sesi (a Session's Pimpinan with it), Ubah Pimpinan, Tandai,
+the Persiapan boxes, Catat transaksi, Unggah bukti, Foto & Video's upload and Hapus — and a forced
+request answers 403.
 Only **Evaluasi Perjadin**'s link stays open to everyone signed in. A Staff member added to a Group
 writes that trip from then on; one who leaves it stops at once. `/pendamping` lists only a person's own
 trips, so every control on its cards stays theirs.
@@ -625,16 +654,15 @@ as failed, and the rest are kept.
   slot for Unggah bukti. **A line's only receipt cannot be deleted**: its Hapus says _"Satu-satunya
   bukti tidak bisa dihapus. Unggah bukti yang benar dulu, atau hapus transaksinya."_ — so a single
   wrong receipt is replaced by uploading the right one first. Hapus is the trip writer's alone, like
-  Unggah bukti, is disabled with the reason while Drive is not connected or broken, and still works
-  after the Laporan is filed. Each one is a **Bukti dihapus** entry on `/log`, under the Unggah
-  bukti filter.
+  Unggah bukti, and is disabled with the reason while Drive is not connected or broken. Each one is
+  a **Bukti dihapus** entry on `/log`, under the Unggah bukti filter.
 - Each line carries its own **Hapus** (#463), for a line entered by mistake — against the wrong
   trip, or twice. It asks _"Hapus transaksi ini? Folder buktinya akan dipindahkan ke Sampah Google
   Drive."_, then moves the line's folder and receipts to the Drive trash and takes the line off the
   Laporan. The totals, the Siswa and GTK-MS subtotals and the export no longer count it. Any line can be deleted, with or without receipts. Like Hapus bukti, it is the trip writer's
-  alone, is disabled with the reason while Drive is not connected or broken, and still works after
-  filing. Each one is a **Transaksi dihapus** entry on `/log`, under the Catat transaksi filter; the
-  line's earlier entries stay, without their Buka folder link.
+  alone, and is disabled with the reason while Drive is not connected or broken. Each one is a
+  **Transaksi dihapus** entry on `/log`, under the Catat transaksi filter; the line's earlier entries
+  stay, without their Buka folder link.
 
 What both controls take:
 
@@ -673,14 +701,13 @@ with the receipt in hand either way. Both are first-class paths. There is no off
 support; capture needs connectivity, and where it fails the PIC enters it later, losing
 convenience but never data. Offline is worth adding eventually, not worth blocking on.
 
-**The Report is due two days after the Group gets back**, and the screen shows days
-remaining. Nothing enters that date — it follows from the Perjadin's end date, so it
-cannot be typed wrong and it moves by itself if the trip's dates are corrected.
-
-**Nothing is gated on the deadline.** DITSAMA sets that deadline itself, and the tool is never
-stricter than the process it serves — invented friction has the same escape route as duplicated
-work. Laporkan does not wait for Uang Perjalanan either, which the tool no longer tracks (ADR-0051).
-It refuses only a line without a receipt, and a Laporan that is already filed.
+**The Laporan is neither filed nor due**
+([ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md), #489). There is no
+Laporkan, no "Dilaporkan" line and no deadline, on the Laporan or on the trip's screen: it is the
+trip's running acquittal, the same before, during and after the trip, and the export is whatever it
+holds when it is taken. Filing froze nothing and the deadline gated nothing, so both were noise —
+the tool is never stricter than the process it serves. Past filings stay on `/log` as **Laporan
+dikirim**, with their totals.
 
 This screen is load-bearing in a way the others are not. Nothing structurally compels a
 PIC to use this tool: the paperwork is accepted in any format. So it has to be plainly better
@@ -788,6 +815,11 @@ say which Class they sat in, type their name, then answer, in this order (#446):
   on the concerns list.
 - The descriptions are on the form only. Everywhere else the Aspects keep their short names —
   Hands-on RBL, Materi, Narasumber, Relevansi.
+- The instruction above the first Aspect says which end of the scale is good: _"Skala 1–10: 1 =
+  paling rendah, 10 = paling tinggi."_ (#480). A Participant may otherwise read 1 as "best". The
+  Perjadin Evaluation form and the Session Record dialog carry the same sentence in their own
+  instruction. It is said once, not as captions at the two ends of every control: those repeat on
+  every row and are cramped on a phone.
 
 **On `/feedback`'s Peserta tab**, Hands-on RBL has its own average card and its own filter beside
 Narasumber, Materi and Relevansi. Its average is over the rows that have one — GTK, MS and Siswa
@@ -797,7 +829,7 @@ of the Ratings it has. Each card shows the two written answers under **"Peningka
 pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengkapnya" /
 "sembunyikan"); an empty one shows no heading.
 
-**The Peserta tab narrows by School, then by Session** (#466):
+**The Peserta tab narrows by School, then by Session, and by Tipe Peserta** (#466, #487):
 
 - **Sekolah** is a searchable picker, "Semua Sekolah" until one is chosen. It lists only the Schools
   with at least one response, by name, so a pick never reads empty.
@@ -806,11 +838,17 @@ pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengka
   `Sesi 1 · Luring · 12 Okt 2026 · 09.00 WITA`. The number is the Session's Sesi
   ([ADR-0027](./adr/0027-a-sessions-sesi-is-its-per-school-date-rank.md)), the number the Dashboard
   matrix and the planning note give it. An online Session's time is in WIB. Picking another School resets it to "Semua Sesi".
+- **Tipe Peserta** reads "Semua Tipe Peserta", then **Siswa** or **GTK-MS**: Siswa keeps the
+  Student Class's responses, GTK-MS the GTK and MS Classes' together — the same split as the Daftar
+  Hadir Peserta sheets and `/keuangan`. A Participant still picks GTK, MS or Siswa on the form.
+  Picking a School leaves it as it is.
 - **Each response card carries the same line**, linking to the Session.
-- Both AND with the score filters, and sorting and "Tampilkan lebih banyak" work as before.
-- **The four averages follow the School and Session, never the score filters**, and their titles say
-  what they cover: `Nilai rata-rata · Narasumber · SMAN 1 Bontang`, or
-  `… · SMAN 1 Bontang · Sesi 1 Luring`. With neither picked they are programme-wide.
+- All three AND with each other and with the score filters, each change goes back to the first
+  page, and sorting and "Tampilkan lebih banyak" work as before.
+- **The four averages follow the School, Session and Tipe Peserta, never the score filters**, and
+  their titles say what they cover: `Nilai rata-rata · Narasumber · SMAN 1 Bontang`, or
+  `… · SMAN 1 Bontang · Sesi 1 Luring · GTK-MS`. With none picked they are programme-wide. Under
+  GTK-MS the Hands-on RBL card reads "—", since only Siswa are asked it.
 - The choice lives in the browser, not the URL, like the other filters; switching tabs resets it.
 
 **Nothing asks them to rate themselves.** Comprehension, Participation and Readiness sit on the
@@ -845,6 +883,20 @@ They are separate because they fail independently — a good car an hour late is
 complaint from a bad car that was prompt, and one is the vendor's fault while the other is
 the plan's.
 
+A fifth, last on the form, once the filer picks Peran **Narasumber** or **Pimpinan**: **Pendamping
+Support**, asked as _"Pendamping membantu selama keberjalanan kegiatan."_ with a Rating and an
+optional Komentar like the others, and required (#481). A **Pendamping** is not shown it — they would
+be Rating themselves — and switching Peran to Pendamping clears a Rating and Komentar already given,
+as _Tidak menginap_ clears lodging. Nothing shows it before a Peran is picked. Its short name
+elsewhere is **Bantuan Pendamping**
+([ADR-0054](./adr/0054-pendamping-support-is-rated-only-by-narasumber-and-pimpinan.md)).
+
+Each Aspect reads top to bottom, at every width, as the Participant Feedback form's questions do
+(#486): the question, then its 1–10 selector on a row of its own and as wide as it, then its
+**Komentar (opsional)**. Lodging's _Tidak menginap (perjalanan pulang-hari)_ box sits between its
+selector and its Komentar. At 360px the selector's cells shrink to fit, and nothing scrolls
+sideways.
+
 Then **Problems** and **Suggestions**. There is no Covered field; nothing was taught on a
 journey.
 
@@ -869,11 +921,39 @@ anyway would produce an invented one.
   trip's Schools beneath. Typing a School's or a Kelompok's name finds the trip.
 - **Peran pengisi** is Semua Peran, Narasumber, Pendamping or Pimpinan: the role the filer declared.
 - There is no School filter; the Perjadin picker finds a trip by its Schools.
-- As on the Peserta tab, both AND with the score filters, and the four averages follow them — never
+- As on the Peserta tab, both AND with the score filters, and the five averages follow them — never
   the score filters — with titles naming the trip and the Peran.
+
+**Bantuan Pendamping has its own average card and its own filter** on the Perjadin tab (#482), after
+Ketepatan Waktu. As with Hands-on RBL on the Peserta tab, its average is over the rows that have
+one. A Pendamping's evaluation and one filed before the Aspect existed never count as 0, and the
+card reads "—" while none in scope does, so with Peran pengisi on Pendamping it always reads "—".
+Such a row is in neither arm of its filter, and its card has no Bantuan Pendamping line, as a day
+trip's has no Penginapan line. A row's average is the mean of the Ratings it has: three, four or
+five.
 
 The form deliberately matches the Session Record's shape. Two evaluation forms that behaved
 differently would be two things to learn.
+
+**Each `/feedback` tab has an Ekspor CSV button** (#490), above its list, for anyone who can read
+the page. It downloads that tab's own file:
+
+- **Every row the tab's choices match**, across all pages, not just those loaded: the scope (Sekolah,
+  Sesi and Tipe Peserta; Perjadin and Peran pengisi) and every score filter. Rows come **in the
+  tab's current sort**, lowest average first by default, so the file reads as the screen does —
+  unlike `/keuangan`, which always exports oldest first.
+- **Peserta:** Tanggal (the day it was filed), Sekolah, Sesi (the card's line), Tipe Peserta (GTK, MS
+  or Siswa), Nama, then Materi, Narasumber, Relevansi and Hands-on RBL each with its Komentar, the two
+  written answers, and Rata-rata. **Perjadin:** Tanggal, Perjadin (its name), Peran, Nama, then
+  Penginapan, Transportasi, Konsumsi, Ketepatan Waktu and Bantuan Pendamping each with its Komentar,
+  and Rata-rata.
+- **A Rating that was not given is an empty cell, never 0**; Rata-rata is the row's average over the
+  Ratings present, to one decimal, as on its card. The file is written as `/keuangan`'s is — a BOM,
+  every field quoted — so comments with commas, quotes or line breaks open intact in Excel.
+- Named `feedback-peserta-<filter>-<today>.csv` or `feedback-perjadin-<filter>-<today>.csv`: what the
+  scope covers, then `tersaring` when a score filter is on, or `semua` with neither.
+- The screen keeps its choices in the browser, so the button's link carries them as query
+  parameters; a bad or missing one falls back to the default.
 
 ### Publishing
 
@@ -960,18 +1040,19 @@ An Administrator adds and revokes People here (#470). This is the invite list fr
 [ADR-0003](./adr/0003-google-sign-in-with-an-invite-list.md): a `person` row **is** an
 invitation, and nobody whose email has no row can sign in at all.
 
-**Every write is an Administrator's**; reads follow the open-delivery rule, since a Group is
-assembled from the roster. Schools, Clusters and Topics have no admin screen because they are fixed
-reference data — People are not, so they do. The header says only an Administrator adds and
-deactivates people.
+**Only an Administrator sees Orang** (#488), in the sidebar and at `/orang`, to read as well as to
+write. Anyone else, Pimpinan included, gets the 403, as on Log and Pengaturan. Nothing else links
+here: each Session's Pimpinan picker, on the Perjadin form and the trip's Session dialog, reads its
+own list, so whoever plans or runs a Perjadin still picks from it. Schools, Clusters and Topics
+have no admin screen because they are fixed reference data — People are not, so they do. The header
+says only an Administrator reads the roster, adds people and deactivates them.
 
-- **Tambah orang** and each row's **Nonaktifkan** are shown only to an Administrator. Anyone else
-  calling either write gets a 403, and nothing is written.
+- **Tambah orang** and each row's **Nonaktifkan**: anyone but an Administrator calling either write
+  gets a 403, and nothing is written.
 - **An Administrator cannot Nonaktifkan themselves**: their own row has no button, and the write
   refuses it. Deactivating another Administrator is allowed.
-- **Akses** is a column only an Administrator sees. Each active Staff row has a searchable
-  multi-select of the six Grants, held ones as chips; adding or removing a chip assigns or revokes
-  at once. Each option carries a line saying what it gates — Administrator "semua akses", Keuangan
+- **Akses** is a column of Grants. Each active Staff row has a searchable multi-select of the six
+  Grants, held ones as chips; adding or removing a chip assigns or revokes at once. Each option carries a line saying what it gates — Administrator "semua akses", Keuangan
   "tabel dan ekspor semua transaksi", Perjadin Editor "merencanakan dan menulis setiap Perjadin", Daring Editor "Sesi
   daring dan Pretest", Dashboard Editor "termasuk Dashboard Viewer", Dashboard Viewer "membaca
   Dashboard". Only Grants actually held are chips: choosing Dashboard Editor shows Dashboard Editor
@@ -1114,7 +1195,8 @@ A table, newest first, 50 rows a page:
   dihapus. Entries derived from data recorded
   before the Log existed read "(dari data lama)" after it. The two Uang Perjalanan actions are
   history only: nothing writes them since the Advance stopped being tracked (ADR-0051), and past
-  entries still read as they did.
+  entries still read as they did. Laporan dikirim is history only the same way: nothing writes it
+  since the Laporan stopped being filed (ADR-0055).
 - **Rincian** says what changed. A transaction's row links to its folder in Drive, when it has one.
 
 **Above the table**, a search box, an Aksi filter and a Rentang tanggal:
@@ -1122,7 +1204,7 @@ A table, newest first, 50 rows a page:
 - the search matches, ignoring case, the email, the trip's Kelompok (its Sub-Cluster's name), its
   Schools, its PIC's name, and the Aksi and Rincian text;
 - Aksi is Semua, Uang Perjalanan, Catat transaksi, Unggah bukti, Dokumen, Foto & Video or Laporan
-  dikirim; Uang Perjalanan now finds history only;
+  dikirim; Uang Perjalanan and Laporan dikirim now find history only;
 - Rentang tanggal is two WIB dates, dari and sampai, both included.
 
 They combine, and **all of them are in the URL**, with the page number, so a view can be bookmarked.

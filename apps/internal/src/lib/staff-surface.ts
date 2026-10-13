@@ -19,7 +19,7 @@ import { forbidden } from "next/navigation";
  * Wrap the call instead:
  *
  * ```ts
- * const result = await staffSurface(() => filePerjadinReport(person, id));
+ * const result = await staffSurface(() => deleteTransaction(person, transactionId));
  * ```
  *
  * (The example is a money **write**: reading the acquittal is open to any signed-in Person since

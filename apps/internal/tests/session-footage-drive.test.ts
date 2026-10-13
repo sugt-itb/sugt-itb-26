@@ -624,6 +624,7 @@ describe("renames", () => {
       heldOn: "2026-10-16",
       startsAt: "10:00",
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     });
 
     const file = drive.files.get(driveFileId)!;

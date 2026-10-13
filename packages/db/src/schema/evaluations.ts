@@ -331,6 +331,12 @@ export const perjadinEvaluation = pgTable(
     transport: rating("transport"),
     meals: rating("meals"),
     punctuality: rating("punctuality"),
+    // **The second nullable Rating** (#481, ADR-0054): whether the Pendamping helped while the
+    // activity was under way. Null when the filer declared themselves Pendamping — they are not
+    // asked to Rate themselves — and on every evaluation filed before the Aspect existed, which is
+    // why nothing is backfilled and why the database cannot require it from a Narasumber or a
+    // Pimpinan. `least()` drops the NULL exactly as it drops a skipped `lodging`.
+    pendampingSupport: smallint("pendamping_support"),
 
     // One optional comment per Aspect, so a comment belongs to the Rating it explains and the
     // concerns list can show the prose for the Aspect actually Rated low — the shared `problems`
@@ -344,6 +350,7 @@ export const perjadinEvaluation = pgTable(
     transportComment: text("transport_comment"),
     mealsComment: text("meals_comment"),
     punctualityComment: text("punctuality_comment"),
+    pendampingSupportComment: text("pendamping_support_comment"),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -361,11 +368,21 @@ export const perjadinEvaluation = pgTable(
       transport: t.transport,
       meals: t.meals,
       punctuality: t.punctuality,
+      pendamping_support: t.pendampingSupport,
     }),
+    // The half of "who is asked Pendamping Support" a row can hold (ADR-0054): a Pendamping filer
+    // carries neither its Rating nor its comment. The other half — a Narasumber or Pimpinan must
+    // Rate it — is the write's alone, because rows filed before #481 hold a NULL from them too.
+    // Mirrors `participant_feedback_hands_on_rbl_student_check`.
+    check(
+      "perjadin_evaluation_pendamping_support_rater_check",
+      sql`${t.filedByRole} <> 'Pendamping' or (${t.pendampingSupport} is null and ${t.pendampingSupportComment} is null)`,
+    ),
     // Per-Aspect elaboration, not trip-wide. Each Aspect is either not-low or carries its OWN
-    // Komentar, and all four must hold — so a low `transport` cannot be excused by prose written
-    // about the hotel (#163). `lodging` is guarded by `IS NULL` first, the same way `least()`
-    // drops a skipped hotel out of the minimum: a day trip owes no lodging comment.
+    // Komentar, and all five must hold — so a low `transport` cannot be excused by prose written
+    // about the hotel (#163). `lodging` and `pendamping_support` are guarded by `IS NULL` first, the
+    // same way `least()` drops a NULL out of the minimum: a day trip owes no lodging comment, and an
+    // evaluation that was not asked Pendamping Support owes none for it.
     check(
       "perjadin_evaluation_low_rating_needs_prose",
       sql`(${t.lodging} is null or ${t.lodging} > ${sql.raw(String(CONCERN))}
@@ -375,11 +392,15 @@ export const perjadinEvaluation = pgTable(
           and (${t.meals} > ${sql.raw(String(CONCERN))}
              or btrim(coalesce(${t.mealsComment}, '')) <> '')
           and (${t.punctuality} > ${sql.raw(String(CONCERN))}
-             or btrim(coalesce(${t.punctualityComment}, '')) <> '')`,
+             or btrim(coalesce(${t.punctualityComment}, '')) <> '')
+          and (${t.pendampingSupport} is null or ${t.pendampingSupport} > ${sql.raw(String(CONCERN))}
+             or btrim(coalesce(${t.pendampingSupportComment}, '')) <> '')`,
     ),
     index("perjadin_evaluation_concerns_idx")
-      .on(sql`least(lodging, transport, meals, punctuality)`)
-      .where(sql`least(lodging, transport, meals, punctuality) <= ${sql.raw(String(CONCERN))}`),
+      .on(sql`least(lodging, transport, meals, punctuality, pendamping_support)`)
+      .where(
+        sql`least(lodging, transport, meals, punctuality, pendamping_support) <= ${sql.raw(String(CONCERN))}`,
+      ),
   ],
 );
 

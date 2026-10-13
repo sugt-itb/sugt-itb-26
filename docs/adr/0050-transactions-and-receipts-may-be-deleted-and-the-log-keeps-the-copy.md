@@ -47,6 +47,9 @@ and the process lets a PIC strike out a wrong entry.
   never leaves a row pointing at a file it says is live, nor a link-shared file that no row records.
 - **Still allowed after Laporkan.** Filing freezes nothing today: lines and receipts can still be
   added after it. The `report_filed` entry already keeps the totals as they were when filed.
+  _Amended 2026-10-13: there is no Laporkan any more
+  ([ADR-0055](./0055-the-perjadin-report-is-neither-filed-nor-due.md)), so nothing precedes a Hapus;
+  past `report_filed` entries keep the totals as they were filed._
 - **Who:** the trip's Group, an Editor or an Administrator
   ([ADR-0048](./0048-a-perjadin-is-written-by-its-group.md)), as for every other write on the trip.
   The check runs before any Drive call, so a non-writer gets a 403 and causes none. Anyone who cannot

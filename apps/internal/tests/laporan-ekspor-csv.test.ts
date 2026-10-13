@@ -23,11 +23,8 @@ function acquittal(overrides: Partial<PerjadinAcquittal> = {}): PerjadinAcquitta
     spentIdr: 0,
     siswaSpentIdr: 0,
     gtkMsSpentIdr: 0,
-    reportDueOn: "2026-09-05",
-    daysRemaining: 3,
     transactions: [],
     pimpinan: [],
-    reportFiledAt: null,
     ...overrides,
   };
 }

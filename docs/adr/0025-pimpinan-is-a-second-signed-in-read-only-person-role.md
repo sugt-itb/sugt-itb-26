@@ -72,9 +72,12 @@ every money read until #180 lands.
   key by force of the type — a compile error otherwise — so the labels cannot drift from the role
   set. `Pimpinan` reads its own name on both surfaces; it is not a DITSAMA Pendamping.
 - `/orang` offers a Staff | Pimpinan picker again, but the roster's add/revoke gating is unchanged —
-  a Pimpinan manages nobody (`canWrite` stays `role === "Staff"`).
+  a Pimpinan manages nobody (`canWrite` stays `role === "Staff"`). _Narrowed since by #470 and #488:
+  `/orang` is an Administrator's to write and to read, so a Pimpinan does not see it at all._
 - Two signed-in roles to reason about where there was one, and a first case of `requireStaff` and the
   Beranda redirect actually refusing a real signed-in Person rather than standing as defense in depth.
 - The `perjadin_pimpinan` trip record is still the fixed set of three names (the `PIMPINAN` CHECK),
   and a Perjadin Evaluation's `filed_by_role` is still a self-declared untrusted string (ADR-0024).
-  Neither is this Person role; unifying the former is deferred to #181.
+  Neither is this Person role; unifying the former is deferred to #181. _Since done: #181 made the
+  trip record real Pimpinan-Person rows, and #492 moved it onto the Sessions they attended
+  ([ADR-0056](./0056-a-pimpinan-is-recorded-per-session.md)); `perjadin_pimpinan` is gone._

@@ -1,6 +1,7 @@
 import {
   CONCERN_AT_OR_BELOW,
   PERJADIN_ASPECTS,
+  PERJADIN_ASPECTS_BY_ROLE,
   type PerjadinAspect,
   type PerjadinEvaluationRole,
 } from "@sugt/domain";
@@ -13,7 +14,7 @@ import type { PerjadinToken, Person } from "./caller";
 
 /**
  * **The Perjadin Evaluation** — how the trip went, as against how the teaching went. Four Aspects
- * about the journey and none about a School.
+ * about the journey, one about the Pendamping who accompanied it (#481), and none about a School.
  *
  * **Filed without signing in, through a token link (ADR-0024).** This used to be a
  * signed-in write gated on membership of the Group that travelled. That gate silently excluded
@@ -38,6 +39,10 @@ import type { PerjadinToken, Person } from "./caller";
  * and by `perjadin_evaluation_low_rating_needs_prose` behind it. A comment on a different Aspect no
  * longer excuses a low one. **`lodging` is a nullable Rating**: a skipped hotel needs no comment,
  * exactly as Postgres `least()` drops a NULL out of the minimum.
+ *
+ * **`pendamping_support` is the other nullable Rating, and the Role decides it** (ADR-0054): a
+ * Narasumber or a Pimpinan must give it and a Pendamping must not, since they would be Rating
+ * themselves — `PERJADIN_ASPECTS_BY_ROLE`, the shape `submitParticipantFeedback` gives Hands-on RBL.
  */
 
 /** Trim to the prose the CHECK counts, or `null` when only whitespace is left. */
@@ -107,14 +112,17 @@ export async function issuePerjadinFeedbackToken(
 }
 
 /**
- * The four Ratings on a Perjadin Evaluation. `lodging` is `null` when the Group did not stay
- * anywhere — a day trip has no hotel — and 1–10 otherwise. The other three are always given.
+ * The five Ratings on a Perjadin Evaluation. `lodging` is `null` when the Group did not stay
+ * anywhere — a day trip has no hotel — and 1–10 otherwise. `pendamping_support` is `null` exactly
+ * when the Role is not asked it (`PERJADIN_ASPECTS_BY_ROLE`): a Pendamping's. The other three are
+ * always given.
  */
 export type PerjadinEvaluationRatings = {
   lodging: number | null;
   transport: number;
   meals: number;
   punctuality: number;
+  pendamping_support: number | null;
 };
 
 /**
@@ -145,7 +153,13 @@ export type FilePerjadinEvaluationResult =
    * A Rating of 7 or below on an Aspect whose OWN Komentar is blank.
    * `perjadin_evaluation_low_rating_needs_prose` refuses it too, per-Aspect (#163).
    */
-  | { outcome: "prose-required" };
+  | { outcome: "prose-required" }
+  /**
+   * The Ratings are not the Role's Aspects: a Narasumber or Pimpinan with no Pendamping Support, a
+   * Pendamping with one (ADR-0054), or any filer missing one the Role always owes. The form never sends either; a forced request, or a form left
+   * open from before #481, gets this, and nothing is written.
+   */
+  | { outcome: "ratings-mismatch" };
 
 /**
  * File one Perjadin Evaluation.
@@ -170,6 +184,20 @@ export async function filePerjadinEvaluation(
   const name = input.name.trim();
   if (name === "") return { outcome: "name-required" };
 
+  // Pendamping Support is the Role's to give or not: required of a Narasumber or a Pimpinan and
+  // refused from a Pendamping. Only the second half has a CHECK behind it — rows filed before #481
+  // hold a NULL from every Role. The `?? []` is for a forged `role` from the unauthenticated form,
+  // which the types cannot rule out: it is asked nothing, so it is refused here rather than failing
+  // the CHECK. The `?? null` is for a form loaded before #481, which sends no Pendamping Support.
+  // `lodging` is asked of everyone and may still be null — a day trip — so it is the one Aspect
+  // whose presence is not the Role's to decide.
+  const asked = PERJADIN_ASPECTS_BY_ROLE[input.role] ?? [];
+  const pendampingSupport = input.ratings.pendamping_support ?? null;
+  const matches = PERJADIN_ASPECTS.every(
+    (aspect) => aspect === "lodging" || (input.ratings[aspect] != null) === asked.includes(aspect),
+  );
+  if (asked.length === 0 || !matches) return { outcome: "ratings-mismatch" };
+
   // Trim each Komentar blank → null once, and reuse it for both the gate and the insert so the
   // rule the client sees and the row that lands agree on what counts as "said".
   const comments: PerjadinEvaluationComments = {
@@ -177,17 +205,22 @@ export async function filePerjadinEvaluation(
     transport: prose(input.comments.transport),
     meals: prose(input.comments.meals),
     punctuality: prose(input.comments.punctuality),
+    // A Komentar on an Aspect the Role is not asked is dropped, as the form drops it.
+    pendamping_support: asked.includes("pendamping_support")
+      ? prose(input.comments.pendamping_support ?? null)
+      : null,
   };
   const ratings: Record<PerjadinAspect, number | null> = {
     lodging: input.ratings.lodging,
     transport: input.ratings.transport,
     meals: input.ratings.meals,
     punctuality: input.ratings.punctuality,
+    pendamping_support: pendampingSupport,
   };
 
   // Per-Aspect, not trip-wide: a low Aspect owes ITS OWN Komentar, and prose on a different Aspect
-  // does not satisfy it (#163). A null `lodging` is not low — it drops out of the check exactly as
-  // Postgres `least()` leaves a NULL out of the minimum — so it never demands one.
+  // does not satisfy it (#163). A null `lodging` or `pendamping_support` is not low — it drops out of
+  // the check exactly as Postgres `least()` leaves a NULL out of the minimum — so it never demands one.
   const lowAspectLacksProse = PERJADIN_ASPECTS.some((aspect) => {
     const rating = ratings[aspect];
     return rating !== null && rating <= CONCERN_AT_OR_BELOW && comments[aspect] === null;
@@ -204,10 +237,12 @@ export async function filePerjadinEvaluation(
       transport: input.ratings.transport,
       meals: input.ratings.meals,
       punctuality: input.ratings.punctuality,
+      pendampingSupport,
       lodgingComment: comments.lodging,
       transportComment: comments.transport,
       mealsComment: comments.meals,
       punctualityComment: comments.punctuality,
+      pendampingSupportComment: comments.pendamping_support,
     })
     .returning({ id: perjadinEvaluation.id });
 
