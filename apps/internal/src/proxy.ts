@@ -44,8 +44,8 @@ export function proxy(request: NextRequest) {
  *   - `/masuk` itself, or the redirect target redirects to itself.
  *   - `_next/static`, `_next/image` and the favicon. Standard, and cheap to get right.
  *
- * **Deliberate — the two authorisation holes.** These carry a decision and are the
- * ones a reviewer should scrutinise. Both are reached by something that is not a
+ * **Deliberate — the authorisation holes.** These carry a decision and are the
+ * ones a reviewer should scrutinise. Each is reached by something that is not a
  * Person, and the routes themselves belong to other specs:
  *
  *   - `/f/**` — the Participant Feedback handler. Reached by a **token** in the URL
@@ -55,7 +55,12 @@ export function proxy(request: NextRequest) {
  *     Pendamping or Pimpinan who need not sign in and self-declare who they are.
  *   - `/api/aggregates/**` — the four routes the public site reads. They authenticate
  *     with a **shared secret** in a header, not a session.
+ *   - `/api/unified-dashboard/**` — the summary the company's Unified Dashboard reads
+ *     (ADR-0057). It authenticates with a **short-lived JWT** in a header, not a session,
+ *     and a caller with no cookie must get its 401, not a redirect to a sign-in page.
  */
 export const config = {
-  matcher: ["/((?!api/auth|api/aggregates|masuk|f/|ep/|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!api/auth|api/aggregates|api/unified-dashboard|masuk|f/|ep/|_next/static|_next/image|favicon.ico).*)",
+  ],
 };

@@ -5,7 +5,7 @@ import { db } from "../client";
 import { session } from "../schema/delivery";
 import { cluster, school } from "../schema/reference";
 import { transaction } from "../schema/travel";
-import type { Person } from "./caller";
+import type { Person, UnifiedDashboardCaller } from "./caller";
 
 /**
  * **The Dashboard's one round trip** — the four raw shapes the screen's overview (`/`) reads from,
@@ -20,6 +20,12 @@ import type { Person } from "./caller";
  * a `Person` for the convention's sake (every query says who is asking) but asks no role of them.
  * The `_caller` prefix marks it unread, exactly as the other open reads here do. Writing money
  * stays Staff-only, enforced in each money-write query, not by this read.
+ *
+ * **Two reads, because there are two readers (#503).** `programmeDelivery` is the money-free part —
+ * Clusters, Schools and Sessions — and is open to the Unified Dashboard as well as to a Person, so
+ * its summary figures come from the same rows `/` folds. `monitoringData` adds the budget sum, and
+ * takes a `Person` only: the Unified Dashboard reads no money (ADR-0057), and naming the arm in the
+ * signature is what keeps it that way.
  */
 
 /** One Session as `/monitoring` ranks it: enough to place it in a School's per-mode ordering and to
@@ -36,11 +42,11 @@ export type MonitoringSession = {
 };
 
 /**
- * The raw inputs the derive seam folds into the view. **Every figure is a row or a plain sum** —
- * the four Clusters (the matrix columns), every School with its Cluster (the denominators), every
- * non-cancelled Session (the numerators, once ranked), and the programme-wide spend.
+ * The delivery rows the progress figures fold — the four Clusters (the matrix columns), every School
+ * with its Cluster (the denominators) and every non-cancelled Session (the numerators, once ranked).
+ * No money.
  */
-export type MonitoringData = {
+export type ProgrammeDelivery = {
   /** The four Clusters, ordered as the matrix columns render — the same order `scope` uses. */
   clusters: { id: string; name: string }[];
   /** Every School with its Cluster. The per-Cluster School count is each cell's denominator. */
@@ -51,16 +57,24 @@ export type MonitoringData = {
    * next Session take rank 1, exactly as the Sesi labelling means it (ADR-0027).
    */
   sessions: MonitoringSession[];
+};
+
+/**
+ * The raw inputs the derive seam folds into the view. **Every figure is a row or a plain sum** —
+ * the delivery rows above, and the programme-wide spend.
+ */
+export type MonitoringData = ProgrammeDelivery & {
   /** `SUM(transaction.amount_idr)` over every transaction, programme-wide. Coalesced to 0. */
   budgetUsedIdr: number;
 };
 
 /**
- * The four raw payloads in one call. Four independent selects because the lists are independent —
- * Clusters and Schools do not nest, the Session list is every non-cancelled row across all Schools,
- * and the budget is a single scalar over the whole `transaction` table.
+ * The three delivery lists. Three independent selects because the lists are independent — Clusters
+ * and Schools do not nest, and the Session list is every non-cancelled row across all Schools.
  */
-export async function monitoringData(_caller: Person): Promise<MonitoringData> {
+export async function programmeDelivery(
+  _caller: Person | UnifiedDashboardCaller,
+): Promise<ProgrammeDelivery> {
   const clusters = await db
     .select({ id: cluster.id, name: cluster.name })
     .from(cluster)
@@ -88,16 +102,25 @@ export async function monitoringData(_caller: Person): Promise<MonitoringData> {
     // has one to skip — a cancelled Session simply does not exist to it.
     .where(ne(session.status, "cancelled"));
 
+  return { clusters, schools, sessions };
+}
+
+/**
+ * The delivery lists plus the budget, for `/`. The budget is a single scalar over the whole
+ * `transaction` table, and a money read: a `Person` only.
+ */
+export async function monitoringData(caller: Person): Promise<MonitoringData> {
+  const [delivery, budget] = await Promise.all([programmeDelivery(caller), budgetUsedIdr()]);
+  return { ...delivery, budgetUsedIdr: budget };
+}
+
+/** `SUM(transaction.amount_idr)`, coalesced to 0. */
+async function budgetUsedIdr(): Promise<number> {
   const [budget] = await db
     .select({
       budgetUsedIdr: sql<number>`coalesce(sum(${transaction.amountIdr}), 0)`.mapWith(Number),
     })
     .from(transaction);
 
-  return {
-    clusters,
-    schools,
-    sessions,
-    budgetUsedIdr: budget?.budgetUsedIdr ?? 0,
-  };
+  return budget?.budgetUsedIdr ?? 0;
 }

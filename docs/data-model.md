@@ -2320,6 +2320,22 @@ None is `NEXT_PUBLIC_*`, and none may become one. A secret in the client bundle 
 anyone can read, and `AGGREGATES_SECRET` is the only thing making the endpoints
 non-browser-reachable.
 
+**The Unified Dashboard's summary route adds three more**
+([ADR-0057](./adr/0057-the-unified-dashboard-is-a-third-reader.md)). Only `@sugt/internal` reads
+them, and it reads them at call time, so a deploy without them builds and then answers 500 on the
+route:
+
+| Variable                         | Read by          | Declared on                 |
+| -------------------------------- | ---------------- | --------------------------- |
+| `UNIFIED_DASHBOARD_JWT_SECRET`   | `@sugt/internal` | `build`, `typecheck`, `dev` |
+| `UNIFIED_DASHBOARD_JWT_ISSUER`   | `@sugt/internal` | `build`, `typecheck`, `dev` |
+| `UNIFIED_DASHBOARD_JWT_AUDIENCE` | `@sugt/internal` | `build`, `typecheck`, `dev` |
+
+The secret is at least 32 random bytes (`openssl rand -base64 48`) and is shared with the Unified
+Dashboard's backend only. Staging uses a different secret from production. `iss` and `aud` are
+agreed with the Unified Dashboard's developer. Changing the secret rotates it, and is also how the
+integration is switched off.
+
 ---
 
 ## What the database does not hold
@@ -2482,16 +2498,24 @@ point needed a sibling for "no Person at all, but a valid secret". It does, and 
 a type rather than a second guard. Three kinds of caller now reach `@sugt/db`, and they are
 three named types rather than one with optional fields:
 
-| Caller             | Is                                                      | May read                     | May write                              |
-| ------------------ | ------------------------------------------------------- | ---------------------------- | -------------------------------------- |
-| `Person`           | somebody signed in whose `person` row is still `active` | delivery and money           | their own records; money only if Staff |
-| `ServiceCaller`    | `@sugt/public`, holding `AGGREGATES_SECRET`             | the three aggregate payloads | nothing                                |
-| `ParticipantToken` | a live Session feedback token                           | nothing                      | `participant_feedback` only            |
+| Caller                   | Is                                                      | May read                                | May write                              |
+| ------------------------ | ------------------------------------------------------- | --------------------------------------- | -------------------------------------- |
+| `Person`                 | somebody signed in whose `person` row is still `active` | delivery and money                      | their own records; money only if Staff |
+| `ServiceCaller`          | `@sugt/public`, holding `AGGREGATES_SECRET`             | the three aggregate payloads            | nothing                                |
+| `UnifiedDashboardCaller` | the company's Unified Dashboard, with a verified JWT    | the Programme summary; no money or name | nothing                                |
+| `ParticipantToken`       | a live Session feedback token                           | nothing                                 | `participant_feedback` only            |
 
 Every query takes one, and the money queries accept only `Person`. A single type carrying
 optional fields would turn "is this a Staff caller" into a runtime shape check — which is
 precisely what the composite foreign keys avoid everywhere else in this schema, and the same
 argument applies one layer up.
+
+**The Unified Dashboard is its own arm, not a second `ServiceCaller`**
+([ADR-0057](./adr/0057-the-unified-dashboard-is-a-third-reader.md)). `ServiceCaller` means the
+public site, and the Unified Dashboard reads for company leadership, behind its own login. One arm
+for both would open to the public site whatever is opened to leadership. It reads
+`programmeDelivery` and `assessmentCompletions`, the money-free half of what `/` reads. The budget
+sum stays in `monitoringData`, which takes a `Person` only.
 
 **A person on two overlapping Perjadins.** Genuinely preventable with `btree_gist` and an
 exclusion constraint, and genuinely useful — but it would mean denormalising the date range

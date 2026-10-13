@@ -1,4 +1,9 @@
-import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
+import type {
+  AssessmentCompletion,
+  MonitoringData,
+  MonitoringSession,
+  ProgrammeDelivery,
+} from "@sugt/db/queries";
 import {
   type AssessmentKind,
   KEGIATAN_UNITS_PER_SCHOOL,
@@ -72,6 +77,31 @@ export type PivotTable = { columns: string[]; groups?: ColumnGroup[]; rows: Pivo
  */
 export type ProgressSummary = { pretest: number; daring: number; luring: number; posttest: number };
 
+/**
+ * A count over its denominator, with the whole-number percent the screen shows — **computed from
+ * those two numbers and nothing else**, so `count / total` always reproduces `percent`. The Unified
+ * Dashboard (#503) shows all three; `/` shows the percent.
+ */
+export type Fraction = { count: number; total: number; percent: number };
+
+/**
+ * **The Programme's progress figures — the one derivation `/` and the Unified Dashboard share
+ * (#503).** Every percentage the Pelaksanaan tab shows, each with the count and denominator behind
+ * it. Nothing here reads money, so the Unified Dashboard can be handed it without the budget.
+ */
+export type ProgrammeProgress = {
+  /** Kegiatan terlaksana — delivered Sessions plus all-or-nothing assessment units, over Schools × 10. */
+  kegiatan: Fraction;
+  /** Delivered offline Sessions over Schools × `SESSIONS_PER_SCHOOL.offline` — the Luring figure. */
+  offline: Fraction;
+  /** Delivered online Sessions over Schools × `SESSIONS_PER_SCHOOL.online` — the Daring figure. */
+  online: Fraction;
+  /** Ticked Pretest boxes over Schools × 4. */
+  pretest: Fraction;
+  /** Ticked Posttest boxes over Schools × 4 — an honest 0 until posttest rows exist. */
+  posttest: Fraction;
+};
+
 /** A Luring Sesi's calendar window — the shape `LURING_SESI_WINDOWS` holds, accepted read-only. */
 type SesiWindow = { sesi: number; startsOn: string; endsOn: string };
 
@@ -136,16 +166,19 @@ export function deliveryMatrix(
   return rows;
 }
 
+/** `count` over `total` as a `Fraction`. A zero denominator is 0%, not a division by zero. */
+function fraction(count: number, total: number): Fraction {
+  return { count, total, percent: total === 0 ? 0 : Math.round((count / total) * 100) };
+}
+
 /**
- * How much of the programme is done — **Kegiatan terlaksana** — as a whole-number percent of every
- * School's ten units (`KEGIATAN_UNITS_PER_SCHOOL`: 8 Sessions + a pretest unit + a posttest unit,
- * ADR-0031/#249). `completedUnits` is the numerator the caller assembles — delivered Sessions plus
- * the assessment units from `completedAssessmentUnits`. Guards a zero School count — an empty
- * programme is 0%, not a division by zero.
+ * How much of the programme is done — **Kegiatan terlaksana** — out of every School's ten units
+ * (`KEGIATAN_UNITS_PER_SCHOOL`: 8 Sessions + a pretest unit + a posttest unit, ADR-0031/#249).
+ * `completedUnits` is the numerator the caller assembles — delivered Sessions plus the assessment
+ * units from `completedAssessmentUnits`. An empty programme is 0%, not a division by zero.
  */
-export function activitiesPercent(completedUnits: number, schoolCount: number): number {
-  if (schoolCount === 0) return 0;
-  return Math.round((completedUnits / (schoolCount * KEGIATAN_UNITS_PER_SCHOOL)) * 100);
+export function kegiatanTerlaksana(completedUnits: number, schoolCount: number): Fraction {
+  return fraction(completedUnits, schoolCount * KEGIATAN_UNITS_PER_SCHOOL);
 }
 
 /** Every `(stream, participant-type)` box a School must tick for one assessment kind to count. */
@@ -174,25 +207,24 @@ export function completedAssessmentUnits(completions: AssessmentCompletion[]): n
 }
 
 /**
- * A summary percentage for one delivery mode (#313): every `delivered` Session of that mode over the
- * mode's capacity — `schoolCount × perSchool` (2 offline, 6 online). Session-level, not
- * all-or-nothing per School — the same `status === "delivered"` count `deliveryMatrix` sums, just
- * rolled up rather than split by Sesi and Cluster. Guards a 0-School denominator at 0%.
+ * A summary figure for one delivery mode (#313): every `delivered` Session of that mode over the
+ * mode's capacity — `schoolCount × perSchool` (2 offline, 6 online), not the Sessions arranged so
+ * far. Session-level, not all-or-nothing per School — the same `status === "delivered"` count
+ * `deliveryMatrix` sums, just rolled up rather than split by Sesi and Cluster. Guards a 0-School
+ * denominator at 0%.
  */
 export function deliveryProgress(
   sessions: MonitoringSession[],
   mode: SessionMode,
   schoolCount: number,
   perSchool: number,
-): number {
-  const denominator = schoolCount * perSchool;
-  if (denominator === 0) return 0;
+): Fraction {
   const delivered = sessions.filter((s) => s.mode === mode && s.status === "delivered").length;
-  return Math.round((delivered / denominator) * 100);
+  return fraction(delivered, schoolCount * perSchool);
 }
 
 /**
- * A summary percentage for one assessment kind (#313): every ticked box of that kind over
+ * A summary figure for one assessment kind (#313): every ticked box of that kind over
  * `schoolCount × BOXES_PER_ASSESSMENT_UNIT` (the four `STREAMS × PRETEST_PARTICIPANT_TYPES` boxes a
  * School can tick). Box-level, matching the per-box meters this replaces — a School three-quarters
  * done still contributes its three boxes. Posttest stays 0% until posttest rows exist, by
@@ -202,11 +234,35 @@ export function assessmentProgress(
   completions: AssessmentCompletion[],
   kind: AssessmentKind,
   schoolCount: number,
-): number {
-  const denominator = schoolCount * BOXES_PER_ASSESSMENT_UNIT;
-  if (denominator === 0) return 0;
+): Fraction {
   const ticked = completions.filter((c) => c.kind === kind).length;
-  return Math.round((ticked / denominator) * 100);
+  return fraction(ticked, schoolCount * BOXES_PER_ASSESSMENT_UNIT);
+}
+
+/**
+ * Every progress figure, from the delivery rows and the completion rows (#503). `deriveDashboard`
+ * takes its percentages from here, and the Unified Dashboard's summary route takes its counts and
+ * percentages from here, so the two cannot disagree. Every denominator is the always-47 School count
+ * times a programme constant; posttest is honestly 0 until posttest rows exist.
+ */
+export function deriveProgress(
+  data: Pick<ProgrammeDelivery, "schools" | "sessions">,
+  completions: AssessmentCompletion[],
+): ProgrammeProgress {
+  const schoolCount = data.schools.length;
+  const deliveredTotal = data.sessions.filter((s) => s.status === "delivered").length;
+  return {
+    // Kegiatan terlaksana folds the all-or-nothing pretest/posttest units into the numerator, over
+    // the ×10 denominator (ADR-0031/#249).
+    kegiatan: kegiatanTerlaksana(
+      deliveredTotal + completedAssessmentUnits(completions),
+      schoolCount,
+    ),
+    offline: deliveryProgress(data.sessions, "offline", schoolCount, SESSIONS_PER_SCHOOL.offline),
+    online: deliveryProgress(data.sessions, "online", schoolCount, SESSIONS_PER_SCHOOL.online),
+    pretest: assessmentProgress(completions, "pretest", schoolCount),
+    posttest: assessmentProgress(completions, "posttest", schoolCount),
+  };
 }
 
 /**
@@ -310,24 +366,18 @@ export function overdueWarnings(
 
 /**
  * Assemble the whole view from the raw data, today's date and the assessment completion rows (#313).
- * The delivered total is every `delivered` Session across both modes (the data already excludes
- * cancelled), and the budget percent is spend against `PROGRAMME_BUDGET_IDR` to one decimal — the
- * same tiny fraction the scaffold showed as `0.2`. The two delivery tables are the ranked matrices
- * pivoted to Klaster rows; the two assessment tables count ticked boxes per Cluster; the four
- * summary percentages read against the same always-47 School denominator, posttest honestly 0 until
- * posttest rows exist. The overdue warnings still fold the Sesi-indexed Luring matrix, before it is
- * pivoted for the view.
+ * Kegiatan terlaksana and the four summary percentages are `deriveProgress`'s — the figures the
+ * Unified Dashboard reads too (#503). The budget percent is spend against `PROGRAMME_BUDGET_IDR` to
+ * one decimal — the same tiny fraction the scaffold showed as `0.2`. The two delivery tables are the
+ * ranked matrices pivoted to Klaster rows; the two assessment tables count ticked boxes per Cluster.
+ * The overdue warnings still fold the Sesi-indexed Luring matrix, before it is pivoted for the view.
  */
 export function deriveDashboard(
   data: MonitoringData,
   today: string,
   completions: AssessmentCompletion[],
 ): DerivedDashboard {
-  const schoolCount = data.schools.length;
-  const deliveredTotal = data.sessions.filter((s) => s.status === "delivered").length;
-  // Kegiatan terlaksana now folds the all-or-nothing pretest/posttest units into the numerator, over
-  // the ×10 denominator (ADR-0031/#249); posttest stays 0 until posttest rows exist.
-  const completedUnits = deliveredTotal + completedAssessmentUnits(completions);
+  const progress = deriveProgress(data, completions);
   const luringRows = deliveryMatrix(
     data.clusters,
     data.schools,
@@ -345,13 +395,13 @@ export function deriveDashboard(
   const usedIdr = data.budgetUsedIdr;
   const totalIdr = PROGRAMME_BUDGET_IDR;
   return {
-    activitiesPercent: activitiesPercent(completedUnits, schoolCount),
+    activitiesPercent: progress.kegiatan.percent,
     budget: { usedIdr, totalIdr, percent: Math.round((usedIdr / totalIdr) * 1000) / 10 },
     summary: {
-      pretest: assessmentProgress(completions, "pretest", schoolCount),
-      daring: deliveryProgress(data.sessions, "online", schoolCount, SESSIONS_PER_SCHOOL.online),
-      luring: deliveryProgress(data.sessions, "offline", schoolCount, SESSIONS_PER_SCHOOL.offline),
-      posttest: assessmentProgress(completions, "posttest", schoolCount),
+      pretest: progress.pretest.percent,
+      daring: progress.online.percent,
+      luring: progress.offline.percent,
+      posttest: progress.posttest.percent,
     },
     luring: pivotByCluster(data.clusters, luringRows),
     daring: pivotByCluster(data.clusters, daringRows),

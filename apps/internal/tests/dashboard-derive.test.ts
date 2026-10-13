@@ -1,11 +1,11 @@
 import {
-  activitiesPercent,
   assessmentProgress,
   assessmentTable,
   completedAssessmentUnits,
   deliveryMatrix,
   deliveryProgress,
   deriveDashboard,
+  kegiatanTerlaksana,
   overdueWarnings,
   pivotByCluster,
   type MatrixRow,
@@ -86,16 +86,16 @@ describe("deliveryMatrix", () => {
   });
 });
 
-describe("activitiesPercent", () => {
+describe("kegiatanTerlaksana", () => {
   it("is completed units over Schools times ten, rounded", () => {
     // 4 units of 2 Schools × 10 = 20 possible → 20%.
-    expect(activitiesPercent(4, 2)).toBe(20);
+    expect(kegiatanTerlaksana(4, 2)).toEqual({ count: 4, total: 20, percent: 20 });
     // 1 of 3 × 10 = 30 → 3.33… rounds to 3.
-    expect(activitiesPercent(1, 3)).toBe(3);
+    expect(kegiatanTerlaksana(1, 3)).toEqual({ count: 1, total: 30, percent: 3 });
   });
 
   it("guards a zero School count", () => {
-    expect(activitiesPercent(0, 0)).toBe(0);
+    expect(kegiatanTerlaksana(0, 0)).toEqual({ count: 0, total: 0, percent: 0 });
   });
 });
 
@@ -110,13 +110,17 @@ describe("deliveryProgress", () => {
 
   it("counts delivered Sessions of the mode over schoolCount × perSchool", () => {
     // 2 delivered offline of 3 schools × 2 = 6 → 33.33 rounds to 33.
-    expect(deliveryProgress(sessions, "offline", 3, 2)).toBe(33);
+    expect(deliveryProgress(sessions, "offline", 3, 2)).toEqual({
+      count: 2,
+      total: 6,
+      percent: 33,
+    });
     // 1 delivered online of 3 schools × 6 = 18 → 5.56 rounds to 6.
-    expect(deliveryProgress(sessions, "online", 3, 6)).toBe(6);
+    expect(deliveryProgress(sessions, "online", 3, 6)).toEqual({ count: 1, total: 18, percent: 6 });
   });
 
   it("guards a zero school count at 0%", () => {
-    expect(deliveryProgress(sessions, "offline", 0, 2)).toBe(0);
+    expect(deliveryProgress(sessions, "offline", 0, 2)).toEqual({ count: 2, total: 0, percent: 0 });
   });
 });
 
@@ -135,13 +139,23 @@ describe("assessmentProgress", () => {
       box("s2", "Research", "Siswa", "pretest"),
     ];
     // 3 pretest boxes of 3 schools × 4 = 12 → 25%.
-    expect(assessmentProgress(completions, "pretest", 3)).toBe(25);
+    expect(assessmentProgress(completions, "pretest", 3)).toEqual({
+      count: 3,
+      total: 12,
+      percent: 25,
+    });
     // No posttest rows → an honest 0%.
-    expect(assessmentProgress(completions, "posttest", 3)).toBe(0);
+    expect(assessmentProgress(completions, "posttest", 3)).toEqual({
+      count: 0,
+      total: 12,
+      percent: 0,
+    });
   });
 
   it("guards a zero school count at 0%", () => {
-    expect(assessmentProgress([box("s1", "STEM", "Siswa", "pretest")], "pretest", 0)).toBe(0);
+    expect(assessmentProgress([box("s1", "STEM", "Siswa", "pretest")], "pretest", 0).percent).toBe(
+      0,
+    );
   });
 });
 
