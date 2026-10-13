@@ -1,7 +1,7 @@
+import { deriveProgress } from "-/lib/programme-progress";
 import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
 import {
   type AssessmentKind,
-  KEGIATAN_UNITS_PER_SCHOOL,
   LURING_SESI_WINDOWS,
   PRETEST_PARTICIPANT_TYPES,
   PROGRAMME_BUDGET_IDR,
@@ -137,79 +137,6 @@ export function deliveryMatrix(
 }
 
 /**
- * How much of the programme is done — **Kegiatan terlaksana** — as a whole-number percent of every
- * School's ten units (`KEGIATAN_UNITS_PER_SCHOOL`: 8 Sessions + a pretest unit + a posttest unit,
- * ADR-0031/#249). `completedUnits` is the numerator the caller assembles — delivered Sessions plus
- * the assessment units from `completedAssessmentUnits`. Guards a zero School count — an empty
- * programme is 0%, not a division by zero.
- */
-export function activitiesPercent(completedUnits: number, schoolCount: number): number {
-  if (schoolCount === 0) return 0;
-  return Math.round((completedUnits / (schoolCount * KEGIATAN_UNITS_PER_SCHOOL)) * 100);
-}
-
-/** Every `(stream, participant-type)` box a School must tick for one assessment kind to count. */
-const BOXES_PER_ASSESSMENT_UNIT = STREAMS.length * PRETEST_PARTICIPANT_TYPES.length;
-
-/**
- * The **all-or-nothing** assessment units complete across all Schools, summed over both kinds
- * (ADR-0031/#249). A School earns one unit for a kind only when **all four** of that kind's boxes
- * (STREAMS × PRETEST_PARTICIPANT_TYPES) are present; three of four contributes nothing. Written
- * generically over `ASSESSMENT_KINDS`, so **posttest is already counted** — it simply stays 0 until
- * posttest rows exist, which is what caps the KPI near 90% this iteration. The unique constraint on
- * the completion row means a `(school, kind)` count of `BOXES_PER_ASSESSMENT_UNIT` is exactly "all
- * four distinct boxes", so a plain per-`(school, kind)` tally is the rollup.
- */
-export function completedAssessmentUnits(completions: AssessmentCompletion[]): number {
-  const boxesBySchoolKind = new Map<string, number>();
-  for (const c of completions) {
-    const key = `${c.schoolId}|${c.kind}`;
-    boxesBySchoolKind.set(key, (boxesBySchoolKind.get(key) ?? 0) + 1);
-  }
-  let units = 0;
-  for (const count of boxesBySchoolKind.values()) {
-    if (count >= BOXES_PER_ASSESSMENT_UNIT) units++;
-  }
-  return units;
-}
-
-/**
- * A summary percentage for one delivery mode (#313): every `delivered` Session of that mode over the
- * mode's capacity — `schoolCount × perSchool` (2 offline, 6 online). Session-level, not
- * all-or-nothing per School — the same `status === "delivered"` count `deliveryMatrix` sums, just
- * rolled up rather than split by Sesi and Cluster. Guards a 0-School denominator at 0%.
- */
-export function deliveryProgress(
-  sessions: MonitoringSession[],
-  mode: SessionMode,
-  schoolCount: number,
-  perSchool: number,
-): number {
-  const denominator = schoolCount * perSchool;
-  if (denominator === 0) return 0;
-  const delivered = sessions.filter((s) => s.mode === mode && s.status === "delivered").length;
-  return Math.round((delivered / denominator) * 100);
-}
-
-/**
- * A summary percentage for one assessment kind (#313): every ticked box of that kind over
- * `schoolCount × BOXES_PER_ASSESSMENT_UNIT` (the four `STREAMS × PRETEST_PARTICIPANT_TYPES` boxes a
- * School can tick). Box-level, matching the per-box meters this replaces — a School three-quarters
- * done still contributes its three boxes. Posttest stays 0% until posttest rows exist, by
- * construction. Guards a 0-School denominator at 0%.
- */
-export function assessmentProgress(
-  completions: AssessmentCompletion[],
-  kind: AssessmentKind,
-  schoolCount: number,
-): number {
-  const denominator = schoolCount * BOXES_PER_ASSESSMENT_UNIT;
-  if (denominator === 0) return 0;
-  const ticked = completions.filter((c) => c.kind === kind).length;
-  return Math.round((ticked / denominator) * 100);
-}
-
-/**
  * Pivot a Sesi-indexed delivery matrix into the Klaster-row shape the tab renders (#313): columns
  * become the Sesi labels, and each Cluster gets one row whose `i`th cell is its cell from Sesi `i+1`.
  * `deliveryMatrix` builds each row's cells in the Clusters' order, so cluster `ci` reads
@@ -310,24 +237,18 @@ export function overdueWarnings(
 
 /**
  * Assemble the whole view from the raw data, today's date and the assessment completion rows (#313).
- * The delivered total is every `delivered` Session across both modes (the data already excludes
- * cancelled), and the budget percent is spend against `PROGRAMME_BUDGET_IDR` to one decimal — the
- * same tiny fraction the scaffold showed as `0.2`. The two delivery tables are the ranked matrices
- * pivoted to Klaster rows; the two assessment tables count ticked boxes per Cluster; the four
- * summary percentages read against the same always-47 School denominator, posttest honestly 0 until
- * posttest rows exist. The overdue warnings still fold the Sesi-indexed Luring matrix, before it is
- * pivoted for the view.
+ * Kegiatan terlaksana and the four summary percentages are `deriveProgress`'s — the figures the
+ * Unified Dashboard reads too (#503). The budget percent is spend against `PROGRAMME_BUDGET_IDR` to
+ * one decimal — the same tiny fraction the scaffold showed as `0.2`. The two delivery tables are the
+ * ranked matrices pivoted to Klaster rows; the two assessment tables count ticked boxes per Cluster.
+ * The overdue warnings still fold the Sesi-indexed Luring matrix, before it is pivoted for the view.
  */
 export function deriveDashboard(
   data: MonitoringData,
   today: string,
   completions: AssessmentCompletion[],
 ): DerivedDashboard {
-  const schoolCount = data.schools.length;
-  const deliveredTotal = data.sessions.filter((s) => s.status === "delivered").length;
-  // Kegiatan terlaksana now folds the all-or-nothing pretest/posttest units into the numerator, over
-  // the ×10 denominator (ADR-0031/#249); posttest stays 0 until posttest rows exist.
-  const completedUnits = deliveredTotal + completedAssessmentUnits(completions);
+  const progress = deriveProgress(data, completions);
   const luringRows = deliveryMatrix(
     data.clusters,
     data.schools,
@@ -345,13 +266,13 @@ export function deriveDashboard(
   const usedIdr = data.budgetUsedIdr;
   const totalIdr = PROGRAMME_BUDGET_IDR;
   return {
-    activitiesPercent: activitiesPercent(completedUnits, schoolCount),
+    activitiesPercent: progress.kegiatan.percent,
     budget: { usedIdr, totalIdr, percent: Math.round((usedIdr / totalIdr) * 1000) / 10 },
     summary: {
-      pretest: assessmentProgress(completions, "pretest", schoolCount),
-      daring: deliveryProgress(data.sessions, "online", schoolCount, SESSIONS_PER_SCHOOL.online),
-      luring: deliveryProgress(data.sessions, "offline", schoolCount, SESSIONS_PER_SCHOOL.offline),
-      posttest: assessmentProgress(completions, "posttest", schoolCount),
+      pretest: progress.pretest.percent,
+      daring: progress.online.percent,
+      luring: progress.offline.percent,
+      posttest: progress.posttest.percent,
     },
     luring: pivotByCluster(data.clusters, luringRows),
     daring: pivotByCluster(data.clusters, daringRows),

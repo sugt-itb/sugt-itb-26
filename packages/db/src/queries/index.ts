@@ -42,7 +42,14 @@
  * **This package resolves nobody.** `@sugt/internal` produces the `Person` these
  * take; see `./caller.ts`.
  */
-export type { Caller, ParticipantToken, PerjadinToken, Person, ServiceCaller } from "./caller";
+export type {
+  Caller,
+  ParticipantToken,
+  PerjadinToken,
+  Person,
+  ServiceCaller,
+  UnifiedDashboardCaller,
+} from "./caller";
 export {
   ACTIVITY_LOG_AKSI_FILTERS,
   activityLogAksi,
@@ -118,7 +125,13 @@ export {
   type PerjadinFeedbackRow,
   type PerjadinFeedbackScope,
 } from "./feedback";
-export { monitoringData, type MonitoringData, type MonitoringSession } from "./monitoring";
+export {
+  monitoringData,
+  programmeDelivery,
+  type MonitoringData,
+  type MonitoringSession,
+  type ProgrammeDelivery,
+} from "./monitoring";
 export {
   assessmentCompletions,
   setAssessmentCompletion,

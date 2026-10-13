@@ -62,6 +62,13 @@ export default defineConfig({
       GOOGLE_DRIVE_CLIENT_SECRET: "test-drive-client-secret",
       GOOGLE_DRIVE_ACCOUNT_EMAIL: "bukti@perusahaan.test",
       DRIVE_TOKEN_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      /**
+       * The Unified Dashboard's JWT (#503). Values, not secrets: the suite signs its own tokens with
+       * this throwaway key and verifies them through the real `authorizeUnifiedDashboard`.
+       */
+      UNIFIED_DASHBOARD_JWT_SECRET: "test-unified-dashboard-secret-at-least-32-bytes",
+      UNIFIED_DASHBOARD_JWT_ISSUER: "unified-dashboard",
+      UNIFIED_DASHBOARD_JWT_AUDIENCE: "sugt-internal",
     },
   },
 });
