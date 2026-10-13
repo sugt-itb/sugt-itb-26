@@ -1,15 +1,17 @@
 import {
-  assessmentProgress,
   assessmentTable,
-  completedAssessmentUnits,
   deliveryMatrix,
-  deliveryProgress,
   deriveDashboard,
-  kegiatanTerlaksana,
   overdueWarnings,
   pivotByCluster,
   type MatrixRow,
 } from "-/app/(app)/dashboard-derive";
+import {
+  assessmentProgress,
+  completedAssessmentUnits,
+  deliveryProgress,
+  kegiatanTerlaksana,
+} from "-/lib/programme-progress";
 import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
 import { describe, expect, it } from "vitest";
 

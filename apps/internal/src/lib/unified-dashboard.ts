@@ -1,5 +1,5 @@
-import type { ProgrammeProgress } from "-/app/(app)/dashboard-derive";
 import { requireEnv } from "-/lib/env";
+import type { ProgrammeProgress } from "-/lib/programme-progress";
 import type { UnifiedDashboardCaller } from "@sugt/db/queries";
 import { jwtVerify } from "jose";
 
@@ -38,8 +38,8 @@ const CLOCK_TOLERANCE_SECONDS = 30;
  * - **The algorithm is pinned to `HS256`**, never taken from the token's header, so `alg: none` and
  *   an algorithm swap are both refused before the signature is looked at.
  * - **`exp` and `iat` are required, and `exp` is at most five minutes after `iat`.** With `iat` no
- *   later than now (give or take the tolerance), `exp` is at most five minutes from now: a stolen
- *   token is worth five minutes, and nobody can mint themselves a long-lived one.
+ *   later than now plus the 30-second tolerance, `exp` is at most five and a half minutes from
+ *   now: a stolen token is worth minutes, and nobody can mint themselves a long-lived one.
  * - **`iss` and `aud` are required** and must equal the configured values.
  *
  * **This is the one function that knows how a caller is verified.** Moving to the Unified

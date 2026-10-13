@@ -66,7 +66,7 @@ ES256) is a change to that function alone.
   keys without telling us. Rejected for now because the Unified Dashboard does not publish one yet.
   It is the planned next step, and the one-function seam is there so it costs little.
 - **HS256 over a shared secret, short-lived (chosen).** One secret to agree on, and a token that is
-  worth five minutes if it leaks. Changing the secret rotates it and also switches the integration
+  worth minutes if it leaks: five, plus the 30 seconds of tolerated clock skew. Changing the secret rotates it and also switches the integration
   off.
 
 ## Consequences

@@ -1,4 +1,4 @@
-import { deriveProgress } from "-/app/(app)/dashboard-derive";
+import { deriveProgress } from "-/lib/programme-progress";
 import { authorizeUnifiedDashboard, toSummaryPayload } from "-/lib/unified-dashboard";
 import { assessmentCompletions, programmeDelivery } from "@sugt/db/queries";
 import { NextResponse } from "next/server";

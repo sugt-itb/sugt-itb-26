@@ -17,9 +17,10 @@ import type { Person, UnifiedDashboardCaller } from "./caller";
  *
  * **No Staff choke point.** The budget figure is a money **read**, and money reads are open to any
  * signed-in Person since ADR-0026 (#180) reversed ADR-0004's read half — so `monitoringData` takes
- * a `Person` for the convention's sake (every query says who is asking) but asks no role of them.
- * The `_caller` prefix marks it unread, exactly as the other open reads here do. Writing money
- * stays Staff-only, enforced in each money-write query, not by this read.
+ * a `Person` for the convention's sake (every query says who is asking) but asks no role of them —
+ * it only hands the caller on to `programmeDelivery`, whose `_caller` prefix marks it unread,
+ * exactly as the other open reads here do. Writing money stays Staff-only, enforced in each
+ * money-write query, not by this read.
  *
  * **Two reads, because there are two readers (#503).** `programmeDelivery` is the money-free part —
  * Clusters, Schools and Sessions — and is open to the Unified Dashboard as well as to a Person, so

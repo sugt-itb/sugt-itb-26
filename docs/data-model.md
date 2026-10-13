@@ -2495,15 +2495,16 @@ a runtime check.
 
 **Who a caller is, is a type.** This document used to leave open whether the Staff-only choke
 point needed a sibling for "no Person at all, but a valid secret". It does, and the sibling is
-a type rather than a second guard. Three kinds of caller now reach `@sugt/db`, and they are
-three named types rather than one with optional fields:
+a type rather than a second guard. Each kind of caller that reaches `@sugt/db` is its own named
+type rather than one type with optional fields:
 
-| Caller                   | Is                                                      | May read                                | May write                              |
-| ------------------------ | ------------------------------------------------------- | --------------------------------------- | -------------------------------------- |
-| `Person`                 | somebody signed in whose `person` row is still `active` | delivery and money                      | their own records; money only if Staff |
-| `ServiceCaller`          | `@sugt/public`, holding `AGGREGATES_SECRET`             | the three aggregate payloads            | nothing                                |
-| `UnifiedDashboardCaller` | the company's Unified Dashboard, with a verified JWT    | the Programme summary; no money or name | nothing                                |
-| `ParticipantToken`       | a live Session feedback token                           | nothing                                 | `participant_feedback` only            |
+| Caller                   | Is                                                      | May read                        | May write                              |
+| ------------------------ | ------------------------------------------------------- | ------------------------------- | -------------------------------------- |
+| `Person`                 | somebody signed in whose `person` row is still `active` | delivery and money              | their own records; money only if Staff |
+| `ServiceCaller`          | `@sugt/public`, holding `AGGREGATES_SECRET`             | the four aggregate payloads     | nothing                                |
+| `UnifiedDashboardCaller` | the company's Unified Dashboard, with a verified JWT    | the Programme summary; no money | nothing                                |
+| `ParticipantToken`       | a live Session feedback token                           | nothing                         | `participant_feedback` only            |
+| `PerjadinToken`          | a live Perjadin feedback token                          | nothing                         | `perjadin_evaluation` only             |
 
 Every query takes one, and the money queries accept only `Person`. A single type carrying
 optional fields would turn "is this a Staff caller" into a runtime shape check — which is

@@ -1,5 +1,8 @@
 import { deriveDashboard } from "-/app/(app)/dashboard-derive";
+import { GET as deliveryRoute } from "-/app/api/aggregates/delivery/route";
 import { GET as scopeRoute } from "-/app/api/aggregates/scope/route";
+import { GET as storyRoute } from "-/app/api/aggregates/stories/[slug]/route";
+import { GET as storiesRoute } from "-/app/api/aggregates/stories/route";
 import { GET as summaryRoute } from "-/app/api/unified-dashboard/summary/route";
 import type { SummaryPayload } from "-/lib/unified-dashboard";
 import { config as proxyConfig } from "-/proxy";
@@ -130,14 +133,15 @@ describe("the Unified Dashboard gate", () => {
     expect(response.status).toBe(401);
   });
 
-  it("does not open the aggregates routes", async () => {
-    const response = await scopeRoute(
-      new Request(`${ORIGIN}/api/aggregates/scope`, {
-        headers: { authorization: `Bearer ${await sign()}` },
-      }),
-    );
+  it("does not open any of the aggregates routes", async () => {
+    const jwt = () =>
+      new Request(`${ORIGIN}/api/aggregates`, { headers: { authorization: `Bearer ${token}` } });
+    const token = await sign();
 
-    expect(response.status).toBe(401);
+    expect((await scopeRoute(jwt())).status).toBe(401);
+    expect((await deliveryRoute(jwt())).status).toBe(401);
+    expect((await storiesRoute(jwt())).status).toBe(401);
+    expect((await storyRoute(jwt(), { params: Promise.resolve({ slug: "x" }) })).status).toBe(401);
   });
 
   it("is not opened by a signed-in browser session", async () => {
