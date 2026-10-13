@@ -405,9 +405,9 @@ export type ParticipantFeedbackAverages = {
 };
 
 /**
- * Each Peserta Aspect's **raw** average over a scope, and how many responses the scope holds. An
- * Aspect with no Rating in scope is `null` — every Aspect on an empty table, and Hands-on RBL over
- * GTK and MS responses alone — never a stand-in number.
+ * Each Peserta Aspect's average over a scope, **to one decimal place**, and how many responses the
+ * scope holds. An Aspect with no Rating in scope is `null` — every Aspect on an empty table, and
+ * Hands-on RBL over GTK and MS responses alone — never a stand-in number.
  */
 export type ParticipantFeedbackFigures = {
   responseCount: number;
@@ -417,9 +417,17 @@ export type ParticipantFeedbackFigures = {
   relevance: number | null;
 };
 
-/** `avg()` of a column, `null` when no row in scope has a value — what Postgres returns. */
+/**
+ * `avg()` of a column **rounded to one decimal place in Postgres**, `null` when no row in scope has
+ * a value. `avg()` of an integer column is an exact `numeric`, so `round(…, 1)` rounds the true
+ * average half up: 167 / 20 = 8.35 is 8.4. Rounding the float in JavaScript instead would read 8.35
+ * as 8.3499… and show 8.3 (#504). Every reader — the cards and the Unified Dashboard — shows this one
+ * number.
+ */
 const averageOf = (column: AnyPgColumn) =>
-  sql<number | null>`avg(${column})`.mapWith((value) => (value === null ? null : Number(value)));
+  sql<number | null>`round(avg(${column}), 1)`.mapWith((value) =>
+    value === null ? null : Number(value),
+  );
 
 /**
  * **The one read behind every Peserta average** — `/feedback`'s cards through
@@ -445,15 +453,8 @@ export async function participantFeedbackFigures(
     .innerJoin(session, eq(session.id, participantFeedback.sessionId))
     .where(and(...participantScopeConditions(scope)));
 
-  return (
-    row ?? {
-      responseCount: 0,
-      handsOnRbl: null,
-      instructor: null,
-      materials: null,
-      relevance: null,
-    }
-  );
+  // An aggregate with no GROUP BY returns exactly one row, even over an empty table.
+  return row!;
 }
 
 /**
@@ -711,9 +712,10 @@ export type PerjadinFeedbackAverages = {
 };
 
 /**
- * Each Perjadin Aspect's **raw** average over a scope, and how many evaluations the scope holds. An
- * Aspect with no Rating in scope is `null` — every Aspect on an empty table, Lodging over day trips
- * alone, Pendamping Support over Pendamping filers alone — never a stand-in number.
+ * Each Perjadin Aspect's average over a scope, **to one decimal place**, and how many evaluations
+ * the scope holds. An Aspect with no Rating in scope is `null` — every Aspect on an empty table,
+ * Lodging over day trips alone, Pendamping Support over Pendamping filers alone — never a stand-in
+ * number.
  */
 export type PerjadinFeedbackFigures = {
   responseCount: number;
@@ -749,16 +751,8 @@ export async function perjadinFeedbackFigures(
     .from(perjadinEvaluation)
     .where(and(...perjadinScopeConditions(scope)));
 
-  return (
-    row ?? {
-      responseCount: 0,
-      lodging: null,
-      transport: null,
-      meals: null,
-      punctuality: null,
-      pendampingSupport: null,
-    }
-  );
+  // An aggregate with no GROUP BY returns exactly one row, even over an empty table.
+  return row!;
 }
 
 /**

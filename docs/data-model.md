@@ -2515,8 +2515,10 @@ argument applies one layer up.
 ([ADR-0057](./adr/0057-the-unified-dashboard-is-a-third-reader.md)). `ServiceCaller` means the
 public site, and the Unified Dashboard reads for company leadership, behind its own login. One arm
 for both would open to the public site whatever is opened to leadership. It reads
-`programmeDelivery` and `assessmentCompletions`, the money-free half of what `/` reads. The budget
-sum stays in `monitoringData`, which takes a `Person` only.
+`programmeDelivery` and `assessmentCompletions`, the money-free half of what `/` reads, and
+`participantFeedbackFigures` and `perjadinFeedbackFigures`, the read behind `/feedback`'s average
+cards (#504). The budget sum stays in `monitoringData`, which takes a `Person` only, and nothing
+it reads returns a comment, a name or a row.
 
 **A person on two overlapping Perjadins.** Genuinely preventable with `btree_gist` and an
 exclusion constraint, and genuinely useful — but it would mean denormalising the date range

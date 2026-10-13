@@ -95,7 +95,7 @@ const token = await new SignJWT({})
     "penginapan": 8.2,
     "transportasi": 7.9,
     "konsumsi": 8.5,
-    "ketepatanWaktu": 8.0,
+    "ketepatanWaktu": 8,
     "bantuanPendamping": 9.1,
   },
 }
@@ -128,27 +128,29 @@ ticked. The `pretest` percentage counts **boxes**. A School with three of four b
 `participantFeedback` and `perjadinFeedback` are the Rating averages the internal app's Feedback
 screen (`/feedback`) shows on its summary cards, **programme-wide**: every response, with no
 School, Session, trip or filer filter. A Rating runs from 1 to 10. Each average is the mean of the
-Ratings **present** for that Aspect, rounded to one decimal place exactly as the card rounds it,
-so the two never show different digits.
+Ratings **present** for that Aspect, rounded to one decimal place, half up, on the exact average
+(167 / 20 = 8.35 is `8.4`). The card shows the same rounded number, so the two never show different
+digits. An average is a JSON number, so a whole one arrives as `8`, not `8.0`: format each with one
+decimal place to show what the card shows.
 
 `responseCount` is how many responses the section holds: one per Participant Feedback form, or
 one per Perjadin Evaluation.
 
-| Field                                | Aspect             | Rated by                                                                     |
-| ------------------------------------ | ------------------ | ---------------------------------------------------------------------------- |
-| `participantFeedback.narasumber`     | Instructor         | every Participant                                                            |
-| `participantFeedback.materi`         | Materials          | every Participant                                                            |
-| `participantFeedback.relevansi`      | Relevance          | every Participant                                                            |
-| `participantFeedback.handsOnRbl`     | Hands-on RBL       | **Student Class Participants only**; GTK and MS Classes are not asked it     |
-| `perjadinFeedback.penginapan`        | Lodging            | every filer, **on a trip with an overnight stay**; a day trip has no Lodging |
-| `perjadinFeedback.transportasi`      | Transport          | every filer                                                                  |
-| `perjadinFeedback.konsumsi`          | Meals              | every filer                                                                  |
-| `perjadinFeedback.ketepatanWaktu`    | Punctuality        | every filer                                                                  |
-| `perjadinFeedback.bantuanPendamping` | Pendamping Support | **Narasumber and Pimpinan filers only**; a Pendamping is not asked it        |
+| Field                                | Aspect             | Rated by                                                                                                                          |
+| ------------------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `participantFeedback.narasumber`     | Instructor         | every Participant                                                                                                                 |
+| `participantFeedback.materi`         | Materials          | every Participant                                                                                                                 |
+| `participantFeedback.relevansi`      | Relevance          | every Participant                                                                                                                 |
+| `participantFeedback.handsOnRbl`     | Hands-on RBL       | **Student Class Participants only**: GTK and MS Classes are not asked it, and Student responses filed before it existed hold none |
+| `perjadinFeedback.penginapan`        | Lodging            | every filer, **who leaves it empty when the trip had no hotel**: a per-response skip, not a property of the trip                  |
+| `perjadinFeedback.transportasi`      | Transport          | every filer                                                                                                                       |
+| `perjadinFeedback.konsumsi`          | Meals              | every filer                                                                                                                       |
+| `perjadinFeedback.ketepatanWaktu`    | Punctuality        | every filer                                                                                                                       |
+| `perjadinFeedback.bantuanPendamping` | Pendamping Support | **Narasumber and Pimpinan filers only**: a Pendamping is not asked it, and evaluations filed before it existed hold none          |
 
 A conditional Aspect is averaged over the responses that have it. A GTK Class's missing Hands-on
-RBL, a day trip's missing Lodging and a Pendamping's missing Pendamping Support are left out of
-their averages. None of them counts as a zero.
+RBL, a skipped Lodging and a Pendamping's missing Pendamping Support are left out of their averages.
+None of them counts as a zero.
 
 The payload carries **no money**, **no names**, **no comments** and **no per-School, per-Session
 or per-response rows**.

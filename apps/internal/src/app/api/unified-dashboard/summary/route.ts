@@ -13,11 +13,12 @@ import { NextResponse } from "next/server";
 /**
  * **The Unified Dashboard's summary route** (#503, ADR-0057) — this Programme's summary for company
  * leadership, delivery progress and the two feedback averages (#504), read by the company's
- * Unified Dashboard from its backend. Behind an HS256 JWT, not a
- * session and not `AGGREGATES_SECRET`; programme-wide, with no query parameters.
+ * Unified Dashboard from its backend. Behind an HS256 JWT, not a session and not
+ * `AGGREGATES_SECRET`; programme-wide, with no query parameters.
  *
- * **Fresh on every request (`no-store`).** Every figure is the number `/` shows, from the same rows
- * and the same `deriveProgress`, and a cache would only let the two disagree. No CORS headers are
+ * **Fresh on every request (`no-store`).** Every progress figure is the number `/` shows, from the
+ * same rows and the same `deriveProgress`, and every average the number `/feedback`'s unscoped
+ * cards show, from the same read; a cache would only let them disagree. No CORS headers are
  * sent: a browser cannot call this, only the Unified Dashboard's server.
  */
 export async function GET(request: Request) {

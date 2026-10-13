@@ -50,9 +50,13 @@ async function aSession() {
   return { person: { ...staff, grants: [] } as Person, staff, sessionId: session.id };
 }
 
-/** A trip to file Perjadin Evaluations against. */
-async function aTrip(picPersonId: string) {
-  return addPerjadin({ picPersonId, startsOn: "2026-09-01", endsOn: "2026-09-02" });
+/** A trip to file Perjadin Evaluations against — overnight, or a day trip with no hotel. */
+async function aTrip(picPersonId: string, { dayTrip = false } = {}) {
+  return addPerjadin({
+    picPersonId,
+    startsOn: "2026-09-01",
+    endsOn: dayTrip ? "2026-09-01" : "2026-09-02",
+  });
 }
 
 describe("the feedback sections", () => {
@@ -137,8 +141,9 @@ describe("the feedback sections", () => {
     const trip = await aTrip(staff.id);
     await addPerjadinEvaluation({ perjadinId: trip.id, role: "Narasumber", pendampingSupport: 10 });
     await addPerjadinEvaluation({ perjadinId: trip.id, role: "Pimpinan", pendampingSupport: 7 });
+    const dayTrip = await aTrip(staff.id, { dayTrip: true });
     await addPerjadinEvaluation({
-      perjadinId: trip.id,
+      perjadinId: dayTrip.id,
       lodging: null,
       ratings: { transport: 5, meals: 9, punctuality: 8 },
     });
@@ -146,55 +151,51 @@ describe("the feedback sections", () => {
     const { participantFeedback, perjadinFeedback } = await summary();
     const peserta = await participantFeedbackAverages(person, NO_PARTICIPANT_FEEDBACK_SCOPE);
     const perjadin = await perjadinFeedbackAverages(person, NO_PERJADIN_FEEDBACK_SCOPE);
-    /** What the card renders, as the number the summary should carry. */
-    const card = (value: number | null) => (value === null ? null : Number(value.toFixed(1)));
-
     expect(participantFeedback).toMatchObject({
       responseCount: 4,
-      narasumber: card(peserta.instructor),
-      materi: card(peserta.materials),
-      relevansi: card(peserta.relevance),
-      handsOnRbl: card(peserta.handsOnRbl),
+      narasumber: peserta.instructor,
+      materi: peserta.materials,
+      relevansi: peserta.relevance,
+      handsOnRbl: peserta.handsOnRbl,
     });
     expect(perjadinFeedback).toMatchObject({
       responseCount: 3,
-      penginapan: card(perjadin.lodging),
-      transportasi: card(perjadin.transport),
-      konsumsi: card(perjadin.meals),
-      ketepatanWaktu: card(perjadin.punctuality),
-      bantuanPendamping: card(perjadin.pendampingSupport),
+      penginapan: perjadin.lodging,
+      transportasi: perjadin.transport,
+      konsumsi: perjadin.meals,
+      ketepatanWaktu: perjadin.punctuality,
+      bantuanPendamping: perjadin.pendampingSupport,
     });
     // Hands-on RBL is over the three Student rows, not the GTK one: (7 + 10 + 8) / 3.
     expect(participantFeedback.handsOnRbl).toBe(8.3);
-    // Lodging is over the two overnight trips, not the day trip.
-    expect(perjadinFeedback.penginapan).toBe(card(perjadin.lodging));
+    // Lodging is over the two evaluations that rated it, not the day trip's: (9 + 9) / 2.
+    expect(perjadinFeedback.penginapan).toBe(9);
   });
 
-  it("rounds a .x5 average the way the card does", async () => {
+  it("rounds a .x5 average half up, the same number the card shows", async () => {
     const { person, sessionId } = await aSession();
-    // Instructor: (8 + 8 + 8 + 9) / 4 = 8.25. Relevance: (9 + 9 + 9 + 8) / 4 = 8.75.
-    for (const [instructor, relevance] of [
-      [8, 9],
-      [8, 9],
-      [8, 9],
-      [9, 8],
-    ]) {
+    // Twenty responses. Instructor: (13 × 8 + 7 × 9) / 20 = 8.35. Materials: (15 × 8 + 5 × 9) / 20 =
+    // 8.25. Relevance: (17 × 8 + 3 × 9) / 20 = 8.15. 8.35 is the one a float gets wrong: 8.3499…
+    for (let i = 0; i < 20; i++) {
       await addParticipantFeedback({
         sessionId,
         classKind: "GTK",
-        ratings: { instructor, relevance },
+        ratings: {
+          instructor: i < 13 ? 8 : 9,
+          materials: i < 15 ? 8 : 9,
+          relevance: i < 17 ? 8 : 9,
+        },
       });
     }
 
     const { participantFeedback } = await summary();
     const peserta = await participantFeedbackAverages(person, NO_PARTICIPANT_FEEDBACK_SCOPE);
 
-    expect(peserta.instructor).toBe(8.25);
-    expect(participantFeedback.narasumber).toBe(8.3);
-    expect(participantFeedback.narasumber!.toFixed(1)).toBe(peserta.instructor.toFixed(1));
-    expect(peserta.relevance).toBe(8.75);
-    expect(participantFeedback.relevansi).toBe(8.8);
-    expect(participantFeedback.relevansi!.toFixed(1)).toBe(peserta.relevance.toFixed(1));
+    expect(participantFeedback).toMatchObject({ narasumber: 8.4, materi: 8.3, relevansi: 8.2 });
+    // The card renders `toFixed(1)` of the same number, so it reads the same digits.
+    expect(
+      [peserta.instructor, peserta.materials, peserta.relevance].map((v) => v.toFixed(1)),
+    ).toEqual(["8.4", "8.3", "8.2"]);
   });
 });
 
@@ -248,7 +249,7 @@ describe("an Aspect nobody rated is null, never 0", () => {
 
   it("gives Lodging null when only day trips were evaluated, where the card reads 0", async () => {
     const { person, staff } = await aSession();
-    const trip = await aTrip(staff.id);
+    const trip = await aTrip(staff.id, { dayTrip: true });
     await addPerjadinEvaluation({ perjadinId: trip.id, lodging: null });
 
     const { perjadinFeedback } = await summary();

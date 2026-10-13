@@ -88,7 +88,8 @@ type DeliveredFigure = { delivered: number; total: number; detailUrl: string };
 type CompletedFigure = { completed: number; total: number; detailUrl: string };
 
 /**
- * An Aspect's average as it travels: one decimal place, or `null` when no Rating of it exists. Never
+ * An Aspect's average as it travels: one decimal place, rounded half up in Postgres on the exact
+ * average — the number `/feedback`'s card shows — or `null` when no Rating of it exists. Never
  * `0` for "nothing yet" — the internal cards can say that with "0.0", but an outside reader would take
  * it for a real, terrible score (#504).
  */
@@ -149,18 +150,9 @@ export type FeedbackFigures = {
 };
 
 /**
- * An average to one decimal place, **rounded exactly as `/feedback`'s cards round it** —
- * `toFixed(1)` on the same number — so the summary and the card never show different digits.
- */
-function oneDecimal(average: number | null): Average {
-  return average === null ? null : Number(average.toFixed(1));
-}
-
-/**
  * Lay the shared figures out in the contract's shape. **Nothing is computed here** — every progress
- * number is one `deriveProgress` produced for `/` as well, and every average comes from the read
- * behind `/feedback`'s cards, rounded as they round it — so this only renames, and builds each
- * Lihat Detail link.
+ * number is one `deriveProgress` produced for `/` as well, and every average is the one the read
+ * behind `/feedback`'s cards rounded — so this only renames, and builds each Lihat Detail link.
  *
  * The links are built from **`BETTER_AUTH_URL`**, this app's own address, never a hard-coded host —
  * so a staging deploy links to staging. Pretest and Posttest point at `/`, whose Pelaksanaan tab has
@@ -202,19 +194,19 @@ export function toSummaryPayload(
     participantFeedback: {
       detailUrl: link("/feedback"),
       responseCount: participant.responseCount,
-      narasumber: oneDecimal(participant.instructor),
-      materi: oneDecimal(participant.materials),
-      relevansi: oneDecimal(participant.relevance),
-      handsOnRbl: oneDecimal(participant.handsOnRbl),
+      narasumber: participant.instructor,
+      materi: participant.materials,
+      relevansi: participant.relevance,
+      handsOnRbl: participant.handsOnRbl,
     },
     perjadinFeedback: {
       detailUrl: link("/feedback"),
       responseCount: perjadin.responseCount,
-      penginapan: oneDecimal(perjadin.lodging),
-      transportasi: oneDecimal(perjadin.transport),
-      konsumsi: oneDecimal(perjadin.meals),
-      ketepatanWaktu: oneDecimal(perjadin.punctuality),
-      bantuanPendamping: oneDecimal(perjadin.pendampingSupport),
+      penginapan: perjadin.lodging,
+      transportasi: perjadin.transport,
+      konsumsi: perjadin.meals,
+      ketepatanWaktu: perjadin.punctuality,
+      bantuanPendamping: perjadin.pendampingSupport,
     },
   };
 }
