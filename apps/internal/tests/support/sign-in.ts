@@ -1,5 +1,6 @@
 import { auth } from "-/lib/auth";
 import { resolvePerson, type Person } from "-/lib/person";
+import { SIGN_IN_PATH } from "-/lib/sign-in-destination";
 import type { Role } from "@sugt/domain";
 
 import { addPerson } from "./fixtures";
@@ -8,7 +9,7 @@ import { stubGoogle, type GoogleProfile } from "./google";
 const ORIGIN = "http://localhost:3001";
 
 /** Where a rejected visitor is sent, and where the sign-in screen lives. */
-export const SIGN_IN_PATH = "/masuk";
+export { SIGN_IN_PATH };
 
 export type SignInResult = {
   /** The callback's own response. Nothing follows the redirect. */
@@ -36,7 +37,11 @@ export type SignInResult = {
  * the code Google would have sent back. Nothing here is a Next.js server and nothing
  * is a browser driver — the assertions are on a real `Response`.
  */
-export async function signInWithGoogle(profile: GoogleProfile): Promise<SignInResult> {
+export async function signInWithGoogle(
+  profile: GoogleProfile,
+  /** Where the sign-in screen asks to land afterwards — the Masuk button's `callbackURL`. */
+  { callbackURL = "/" }: { callbackURL?: string } = {},
+): Promise<SignInResult> {
   const google = stubGoogle(profile);
 
   const start = await auth.handler(
@@ -45,7 +50,7 @@ export async function signInWithGoogle(profile: GoogleProfile): Promise<SignInRe
       headers: { "content-type": "application/json", origin: ORIGIN },
       body: JSON.stringify({
         provider: "google",
-        callbackURL: "/",
+        callbackURL,
         errorCallbackURL: SIGN_IN_PATH,
       }),
     }),

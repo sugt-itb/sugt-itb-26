@@ -2,6 +2,8 @@ import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { safeDestination, signInPath } from "./lib/sign-in-destination";
+
 /**
  * **The optimistic check, and nothing more.** Is a session cookie present? If not,
  * send the visitor to `/masuk` so they land on the sign-in screen rather than on a
@@ -13,11 +15,19 @@ import type { NextRequest } from "next/server";
  * session-management or authorisation solution, and it runs on every matched request.
  * The authoritative checks are the signed-in layout, for pages, and `@sugt/db`'s choke
  * point, for anything that writes.
+ *
+ * The redirect carries the path and query the visitor asked for (#502), so a deep link — a
+ * **Lihat Detail** on the Unified Dashboard — survives sign-in. Carrying it is all this does:
+ * whether it is a safe place to send anyone is decided by `safeDestination` here and again on
+ * `/masuk`, and whether the Person may read it by that page's own guard.
  */
 export function proxy(request: NextRequest) {
   if (getSessionCookie(request)) return NextResponse.next();
 
-  return NextResponse.redirect(new URL("/masuk", request.url));
+  const { pathname, search } = request.nextUrl;
+  return NextResponse.redirect(
+    new URL(signInPath(safeDestination(pathname + search)), request.url),
+  );
 }
 
 /**
