@@ -4,11 +4,9 @@ import { GET as scopeRoute } from "-/app/api/aggregates/scope/route";
 import { GET as storyRoute } from "-/app/api/aggregates/stories/[slug]/route";
 import { GET as storiesRoute } from "-/app/api/aggregates/stories/route";
 import { GET as summaryRoute } from "-/app/api/unified-dashboard/summary/route";
-import type { SummaryPayload } from "-/lib/unified-dashboard";
 import { config as proxyConfig } from "-/proxy";
 import { db, schema } from "@sugt/db";
 import { assessmentCompletions, monitoringData, type Person } from "@sugt/db/queries";
-import { SignJWT } from "jose";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -22,6 +20,16 @@ import {
   resetDatabase,
 } from "./support/fixtures";
 import { signInWithGoogle } from "./support/sign-in";
+import {
+  AUDIENCE,
+  bearer,
+  ISSUER,
+  nowSeconds,
+  ORIGIN,
+  signUnifiedDashboardToken as sign,
+  summary,
+  SUMMARY_URL,
+} from "./support/unified-dashboard";
 
 /**
  * **The Unified Dashboard's summary route (#503)** — a real `Request` in, a real `Response` out, the
@@ -34,53 +42,11 @@ import { signInWithGoogle } from "./support/sign-in";
  * rows, with each `x / total` reproducing its percentage.
  */
 
-const ORIGIN = "http://localhost:3001";
-const SUMMARY = `${ORIGIN}/api/unified-dashboard/summary`;
-const SECRET = process.env.UNIFIED_DASHBOARD_JWT_SECRET!;
-const ISSUER = process.env.UNIFIED_DASHBOARD_JWT_ISSUER!;
-const AUDIENCE = process.env.UNIFIED_DASHBOARD_JWT_AUDIENCE!;
-
-const nowSeconds = () => Math.floor(Date.now() / 1000);
-
-/** A token the way the Unified Dashboard's backend signs one; each option breaks one thing. */
-function sign({
-  secret = SECRET,
-  issuer = ISSUER,
-  audience = AUDIENCE,
-  issuedAt = nowSeconds(),
-  lifetimeSeconds = 60,
-  withExp = true,
-}: {
-  secret?: string;
-  issuer?: string;
-  audience?: string;
-  issuedAt?: number;
-  lifetimeSeconds?: number;
-  withExp?: boolean;
-} = {}) {
-  const jwt = new SignJWT({})
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setIssuer(issuer)
-    .setAudience(audience)
-    .setIssuedAt(issuedAt);
-  if (withExp) jwt.setExpirationTime(issuedAt + lifetimeSeconds);
-  return jwt.sign(new TextEncoder().encode(secret));
-}
-
 /** An unsigned token — `alg: none` — carrying otherwise perfect claims. */
 function unsigned() {
   const part = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
   const iat = nowSeconds();
   return `${part({ alg: "none", typ: "JWT" })}.${part({ iss: ISSUER, aud: AUDIENCE, iat, exp: iat + 60 })}.`;
-}
-
-const bearer = (token: string) =>
-  new Request(SUMMARY, { headers: { authorization: `Bearer ${token}` } });
-
-async function summary(token: string) {
-  const response = await summaryRoute(bearer(token));
-  expect(response.status).toBe(200);
-  return (await response.json()) as SummaryPayload;
 }
 
 beforeEach(resetDatabase);
@@ -97,7 +63,7 @@ describe("the Unified Dashboard gate", () => {
   });
 
   it.each<[string, () => Promise<Request> | Request]>([
-    ["no Authorization header", () => new Request(SUMMARY)],
+    ["no Authorization header", () => new Request(SUMMARY_URL)],
     [
       "a token signed with the wrong secret",
       async () => bearer(await sign({ secret: "a-different-secret-of-at-least-32-bytes" })),
@@ -154,7 +120,7 @@ describe("the Unified Dashboard gate", () => {
     expect(sessionCookie).not.toBeNull();
 
     const response = await summaryRoute(
-      new Request(SUMMARY, { headers: { cookie: sessionCookie! } }),
+      new Request(SUMMARY_URL, { headers: { cookie: sessionCookie! } }),
     );
 
     expect(response.status).toBe(401);
@@ -273,6 +239,24 @@ describe("the summary figures", () => {
         online: { delivered: 3, total: 18, detailUrl: `${ORIGIN}/sesi-daring` },
         pretest: { completed: 6, total: 12, detailUrl: `${ORIGIN}/` },
         posttest: { completed: 0, total: 12, detailUrl: `${ORIGIN}/` },
+      },
+      // No feedback filed yet: every average is `null`, never 0 (#504).
+      participantFeedback: {
+        detailUrl: `${ORIGIN}/feedback`,
+        responseCount: 0,
+        narasumber: null,
+        materi: null,
+        relevansi: null,
+        handsOnRbl: null,
+      },
+      perjadinFeedback: {
+        detailUrl: `${ORIGIN}/feedback`,
+        responseCount: 0,
+        penginapan: null,
+        transportasi: null,
+        konsumsi: null,
+        ketepatanWaktu: null,
+        bantuanPendamping: null,
       },
     });
   });

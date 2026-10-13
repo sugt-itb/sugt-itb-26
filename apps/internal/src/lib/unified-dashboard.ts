@@ -1,6 +1,10 @@
 import { requireEnv } from "-/lib/env";
 import type { ProgrammeProgress } from "-/lib/programme-progress";
-import type { UnifiedDashboardCaller } from "@sugt/db/queries";
+import type {
+  ParticipantFeedbackFigures,
+  PerjadinFeedbackFigures,
+  UnifiedDashboardCaller,
+} from "@sugt/db/queries";
 import { jwtVerify } from "jose";
 
 /**
@@ -83,6 +87,13 @@ type DeliveredFigure = { delivered: number; total: number; detailUrl: string };
 /** An assessment figure as it travels: ticked boxes over Schools × 4. Not a Session, so not "delivered". */
 type CompletedFigure = { completed: number; total: number; detailUrl: string };
 
+/**
+ * An Aspect's average as it travels: one decimal place, or `null` when no Rating of it exists. Never
+ * `0` for "nothing yet" — the internal cards can say that with "0.0", but an outside reader would take
+ * it for a real, terrible score (#504).
+ */
+type Average = number | null;
+
 /** The summary route's body. `docs/unified-dashboard-api.md` gives each field's meaning and grain. */
 export type SummaryPayload = {
   version: number;
@@ -101,11 +112,54 @@ export type SummaryPayload = {
     pretest: CompletedFigure;
     posttest: CompletedFigure;
   };
+  /** Participant Feedback (#504), keyed by the Aspects' Indonesian names, as the cards read. */
+  participantFeedback: {
+    detailUrl: string;
+    responseCount: number;
+    /** Instructor. */
+    narasumber: Average;
+    /** Materials. */
+    materi: Average;
+    /** Relevance. */
+    relevansi: Average;
+    /** Hands-on RBL — the Student Class only. */
+    handsOnRbl: Average;
+  };
+  /** Perjadin Evaluation (#504). */
+  perjadinFeedback: {
+    detailUrl: string;
+    responseCount: number;
+    /** Lodging — not asked of a day trip. */
+    penginapan: Average;
+    /** Transport. */
+    transportasi: Average;
+    /** Meals. */
+    konsumsi: Average;
+    /** Punctuality. */
+    ketepatanWaktu: Average;
+    /** Pendamping Support — asked of Narasumber and Pimpinan filers only (ADR-0054). */
+    bantuanPendamping: Average;
+  };
+};
+
+/** The two feedback tables' figures, read programme-wide, that the summary carries. */
+export type FeedbackFigures = {
+  participant: ParticipantFeedbackFigures;
+  perjadin: PerjadinFeedbackFigures;
 };
 
 /**
- * Lay the shared progress figures out in the contract's shape. **Nothing is computed here** — every
- * number is one `deriveProgress` produced for `/` as well — so this only renames, and builds each
+ * An average to one decimal place, **rounded exactly as `/feedback`'s cards round it** —
+ * `toFixed(1)` on the same number — so the summary and the card never show different digits.
+ */
+function oneDecimal(average: number | null): Average {
+  return average === null ? null : Number(average.toFixed(1));
+}
+
+/**
+ * Lay the shared figures out in the contract's shape. **Nothing is computed here** — every progress
+ * number is one `deriveProgress` produced for `/` as well, and every average comes from the read
+ * behind `/feedback`'s cards, rounded as they round it — so this only renames, and builds each
  * Lihat Detail link.
  *
  * The links are built from **`BETTER_AUTH_URL`**, this app's own address, never a hard-coded host —
@@ -113,10 +167,15 @@ export type SummaryPayload = {
  * both tables (`/pretest` is the Daring Editor's, and Posttest has no page). A link opens no page's
  * guard: whoever follows it signs in and is checked like anyone else.
  */
-export function toSummaryPayload(progress: ProgrammeProgress, generatedAt: Date): SummaryPayload {
+export function toSummaryPayload(
+  progress: ProgrammeProgress,
+  feedback: FeedbackFigures,
+  generatedAt: Date,
+): SummaryPayload {
   const base = requireEnv("BETTER_AUTH_URL");
   const link = (path: string) => new URL(path, base).href;
   const { kegiatan, offline, online, pretest, posttest } = progress;
+  const { participant, perjadin } = feedback;
 
   return {
     version: SUMMARY_VERSION,
@@ -138,6 +197,24 @@ export function toSummaryPayload(progress: ProgrammeProgress, generatedAt: Date)
       online: { delivered: online.count, total: online.total, detailUrl: link("/sesi-daring") },
       pretest: { completed: pretest.count, total: pretest.total, detailUrl: link("/") },
       posttest: { completed: posttest.count, total: posttest.total, detailUrl: link("/") },
+    },
+    // Both link to `/feedback`: the screen keeps its tab in the browser, so there is no per-tab link.
+    participantFeedback: {
+      detailUrl: link("/feedback"),
+      responseCount: participant.responseCount,
+      narasumber: oneDecimal(participant.instructor),
+      materi: oneDecimal(participant.materials),
+      relevansi: oneDecimal(participant.relevance),
+      handsOnRbl: oneDecimal(participant.handsOnRbl),
+    },
+    perjadinFeedback: {
+      detailUrl: link("/feedback"),
+      responseCount: perjadin.responseCount,
+      penginapan: oneDecimal(perjadin.lodging),
+      transportasi: oneDecimal(perjadin.transport),
+      konsumsi: oneDecimal(perjadin.meals),
+      ketepatanWaktu: oneDecimal(perjadin.punctuality),
+      bantuanPendamping: oneDecimal(perjadin.pendampingSupport),
     },
   };
 }

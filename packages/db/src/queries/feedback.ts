@@ -17,13 +17,14 @@ import {
   type SQL,
   type SQLWrapper,
 } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 import { db } from "../client";
 import { session } from "../schema/delivery";
 import { participantFeedback, perjadinEvaluation } from "../schema/evaluations";
 import { province, school, subCluster } from "../schema/reference";
 import { perjadin } from "../schema/travel";
-import type { Person } from "./caller";
+import type { Person, UnifiedDashboardCaller } from "./caller";
 import { tripSchoolNames } from "./perjadin-naming";
 
 /**
@@ -404,36 +405,81 @@ export type ParticipantFeedbackAverages = {
 };
 
 /**
+ * Each Peserta Aspect's **raw** average over a scope, and how many responses the scope holds. An
+ * Aspect with no Rating in scope is `null` — every Aspect on an empty table, and Hands-on RBL over
+ * GTK and MS responses alone — never a stand-in number.
+ */
+export type ParticipantFeedbackFigures = {
+  responseCount: number;
+  handsOnRbl: number | null;
+  instructor: number | null;
+  materials: number | null;
+  relevance: number | null;
+};
+
+/** `avg()` of a column, `null` when no row in scope has a value — what Postgres returns. */
+const averageOf = (column: AnyPgColumn) =>
+  sql<number | null>`avg(${column})`.mapWith((value) => (value === null ? null : Number(value)));
+
+/**
+ * **The one read behind every Peserta average** — `/feedback`'s cards through
+ * `participantFeedbackAverages`, and the Unified Dashboard's summary (#504), which reads it
+ * programme-wide. The two present it differently; they never compute it differently.
+ *
+ * `avg()` skips a null, so **Hands-on RBL's average is over the rows that have one** (#446): GTK,
+ * MS and older Siswa rows never count as 0.
+ */
+export async function participantFeedbackFigures(
+  _caller: Person | UnifiedDashboardCaller,
+  scope: ParticipantFeedbackScope,
+): Promise<ParticipantFeedbackFigures> {
+  const [row] = await db
+    .select({
+      responseCount: sql<number>`count(*)`.mapWith(Number),
+      handsOnRbl: averageOf(participantFeedback.handsOnRbl),
+      instructor: averageOf(participantFeedback.instructor),
+      materials: averageOf(participantFeedback.materials),
+      relevance: averageOf(participantFeedback.relevance),
+    })
+    .from(participantFeedback)
+    .innerJoin(session, eq(session.id, participantFeedback.sessionId))
+    .where(and(...participantScopeConditions(scope)));
+
+  return (
+    row ?? {
+      responseCount: 0,
+      handsOnRbl: null,
+      instructor: null,
+      materials: null,
+      relevance: null,
+    }
+  );
+}
+
+/**
  * **The four summary averages, over the tab's scope and never its score filters** (#466). With no
  * School, Session or Tipe Peserta picked they are programme-wide, over the whole
  * `participant_feedback` table; a scope narrows them to its School, Session or Tipe Peserta (#487),
  * so under GTK-MS Hands-on RBL is `null`. The score filters are deliberately not an argument:
  * averaging only the rows at or below 7 would read as the standing and mislead.
  *
- * An empty table makes `avg()` return NULL; `coalesce(…, 0)` turns that into `0` for the three
- * every row has, so the caller gets numbers to format rather than a null to guard. Zero is outside
- * the 1–10 scale, so "0.0" on an empty dataset reads as "nothing yet" rather than as a real low
- * score. **Hands-on RBL's average is over the rows that have one** (#446) — `avg()` skips a null,
- * so GTK, MS and older Siswa rows never count as 0 — and stays `null`, shown as "—", while none do.
+ * An empty scope has no average; this turns that into `0` for the three every row has, so the
+ * cards get numbers to format rather than a null to guard. Zero is outside the 1–10 scale, so "0.0"
+ * on an empty dataset reads as "nothing yet" rather than as a real low score. Hands-on RBL stays
+ * `null`, shown as "—", while no row has one. The Unified Dashboard reads the raw figures instead:
+ * an outside reader would take "0.0" for a real score (#504).
  */
 export async function participantFeedbackAverages(
-  _caller: Person,
+  caller: Person,
   scope: ParticipantFeedbackScope,
 ): Promise<ParticipantFeedbackAverages> {
-  const [row] = await db
-    .select({
-      handsOnRbl: sql<number | null>`avg(${participantFeedback.handsOnRbl})`.mapWith((value) =>
-        value === null ? null : Number(value),
-      ),
-      instructor: sql<number>`coalesce(avg(${participantFeedback.instructor}), 0)`.mapWith(Number),
-      materials: sql<number>`coalesce(avg(${participantFeedback.materials}), 0)`.mapWith(Number),
-      relevance: sql<number>`coalesce(avg(${participantFeedback.relevance}), 0)`.mapWith(Number),
-    })
-    .from(participantFeedback)
-    .innerJoin(session, eq(session.id, participantFeedback.sessionId))
-    .where(and(...participantScopeConditions(scope)));
-
-  return row ?? { handsOnRbl: null, instructor: 0, materials: 0, relevance: 0 };
+  const figures = await participantFeedbackFigures(caller, scope);
+  return {
+    handsOnRbl: figures.handsOnRbl,
+    instructor: figures.instructor ?? 0,
+    materials: figures.materials ?? 0,
+    relevance: figures.relevance ?? 0,
+  };
 }
 
 /**
@@ -665,35 +711,79 @@ export type PerjadinFeedbackAverages = {
 };
 
 /**
- * **The five Perjadin summary averages, over the tab's scope and never its score filters** (#466),
- * as the Peserta tab's are: programme-wide with no trip or Peran picked, narrowed to them once one
- * is. The score filters are not an argument, so the cards never average only the low rows.
- *
- * `avg(lodging)` ignores NULL naturally — a day trip with no hotel is not a zero in the hotel
- * average, it is simply not in it. `coalesce(…, 0)` turns the empty-table NULL into `0` for the
- * four logistics Aspects, so the caller gets numbers to format; "0.0" reads as "nothing yet" rather
- * than a real low score. **Pendamping Support's average is over the rows that have one** (#482)
- * and stays `null`, shown as "—", while none in scope does — as Hands-on RBL's is on the Peserta
- * tab. Under Peran Pendamping it is always "—": a Pendamping is never asked it (ADR-0054).
+ * Each Perjadin Aspect's **raw** average over a scope, and how many evaluations the scope holds. An
+ * Aspect with no Rating in scope is `null` — every Aspect on an empty table, Lodging over day trips
+ * alone, Pendamping Support over Pendamping filers alone — never a stand-in number.
  */
-export async function perjadinFeedbackAverages(
-  _caller: Person,
+export type PerjadinFeedbackFigures = {
+  responseCount: number;
+  lodging: number | null;
+  transport: number | null;
+  meals: number | null;
+  punctuality: number | null;
+  pendampingSupport: number | null;
+};
+
+/**
+ * **The one read behind every Perjadin average** — `/feedback`'s cards through
+ * `perjadinFeedbackAverages`, and the Unified Dashboard's summary (#504), which reads it
+ * programme-wide.
+ *
+ * `avg()` ignores NULL naturally — a day trip with no hotel is not a zero in the hotel average, it
+ * is simply not in it — and **Pendamping Support's average is over the rows that have one** (#482):
+ * a Pendamping is never asked it (ADR-0054).
+ */
+export async function perjadinFeedbackFigures(
+  _caller: Person | UnifiedDashboardCaller,
   scope: PerjadinFeedbackScope,
-): Promise<PerjadinFeedbackAverages> {
+): Promise<PerjadinFeedbackFigures> {
   const [row] = await db
     .select({
-      lodging: sql<number>`coalesce(avg(${perjadinEvaluation.lodging}), 0)`.mapWith(Number),
-      transport: sql<number>`coalesce(avg(${perjadinEvaluation.transport}), 0)`.mapWith(Number),
-      meals: sql<number>`coalesce(avg(${perjadinEvaluation.meals}), 0)`.mapWith(Number),
-      punctuality: sql<number>`coalesce(avg(${perjadinEvaluation.punctuality}), 0)`.mapWith(Number),
-      pendampingSupport: sql<number | null>`avg(${perjadinEvaluation.pendampingSupport})`.mapWith(
-        (value) => (value === null ? null : Number(value)),
-      ),
+      responseCount: sql<number>`count(*)`.mapWith(Number),
+      lodging: averageOf(perjadinEvaluation.lodging),
+      transport: averageOf(perjadinEvaluation.transport),
+      meals: averageOf(perjadinEvaluation.meals),
+      punctuality: averageOf(perjadinEvaluation.punctuality),
+      pendampingSupport: averageOf(perjadinEvaluation.pendampingSupport),
     })
     .from(perjadinEvaluation)
     .where(and(...perjadinScopeConditions(scope)));
 
-  return row ?? { lodging: 0, transport: 0, meals: 0, punctuality: 0, pendampingSupport: null };
+  return (
+    row ?? {
+      responseCount: 0,
+      lodging: null,
+      transport: null,
+      meals: null,
+      punctuality: null,
+      pendampingSupport: null,
+    }
+  );
+}
+
+/**
+ * **The five Perjadin summary averages, over the tab's scope and never its score filters** (#466),
+ * as the Peserta tab's are: programme-wide with no trip or Peran picked, narrowed to them once one
+ * is. The score filters are not an argument, so the cards never average only the low rows.
+ *
+ * An empty scope has no average; this turns that into `0` for the four logistics Aspects, so the
+ * cards get numbers to format; "0.0" reads as "nothing yet" rather than a real low score. (So does
+ * Lodging over day trips alone, as it always has on the cards.) Pendamping Support stays `null`,
+ * shown as "—", while none in scope has one — as Hands-on RBL's is on the Peserta tab; under Peran
+ * Pendamping it is always "—". The Unified Dashboard reads the raw figures instead (#504).
+ */
+export async function perjadinFeedbackAverages(
+  caller: Person,
+  scope: PerjadinFeedbackScope,
+): Promise<PerjadinFeedbackAverages> {
+  const figures = await perjadinFeedbackFigures(caller, scope);
+  return {
+    lodging: figures.lodging ?? 0,
+    transport: figures.transport ?? 0,
+    meals: figures.meals ?? 0,
+    punctuality: figures.punctuality ?? 0,
+    pendampingSupport: figures.pendampingSupport,
+  };
 }
 
 /** One Session a Peserta response was filed against, as the Sesi picker offers it (#466). */
