@@ -81,6 +81,23 @@ const token = await new SignJWT({})
     "pretest": { "completed": 115, "total": 188, "detailUrl": "https://internal.sugtitb.com/" },
     "posttest": { "completed": 0, "total": 188, "detailUrl": "https://internal.sugtitb.com/" },
   },
+  "participantFeedback": {
+    "detailUrl": "https://internal.sugtitb.com/feedback",
+    "responseCount": 812,
+    "narasumber": 8.6,
+    "materi": 8.4,
+    "relevansi": 8.9,
+    "handsOnRbl": 8.1,
+  },
+  "perjadinFeedback": {
+    "detailUrl": "https://internal.sugtitb.com/feedback",
+    "responseCount": 64,
+    "penginapan": 8.2,
+    "transportasi": 7.9,
+    "konsumsi": 8.5,
+    "ketepatanWaktu": 8,
+    "bantuanPendamping": 9.1,
+  },
 }
 ```
 
@@ -106,22 +123,54 @@ A Pretest unit in `kegiatanTerlaksana` counts only when **all four** of a School
 ticked. The `pretest` percentage counts **boxes**. A School with three of four boxes ticked adds 3 to
 `sessions.pretest.completed` and nothing to `kegiatanTerlaksana.completed`.
 
-The payload carries **no money**, **no names**, **no comments** and **no per-School rows**.
+### The feedback sections
+
+`participantFeedback` and `perjadinFeedback` are the Rating averages the internal app's Feedback
+screen (`/feedback`) shows on its summary cards, **programme-wide**: every response, with no
+School, Session, trip or filer filter. A Rating runs from 1 to 10. Each average is the mean of the
+Ratings **present** for that Aspect, rounded to one decimal place, half up, on the exact average
+(167 / 20 = 8.35 is `8.4`). The card shows the same rounded number, so the two never show different
+digits. An average is a JSON number, so a whole one arrives as `8`, not `8.0`: format each with one
+decimal place to show what the card shows.
+
+`responseCount` is how many responses the section holds: one per Participant Feedback form, or
+one per Perjadin Evaluation.
+
+| Field                                | Aspect             | Rated by                                                                                                                          |
+| ------------------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `participantFeedback.narasumber`     | Instructor         | every Participant                                                                                                                 |
+| `participantFeedback.materi`         | Materials          | every Participant                                                                                                                 |
+| `participantFeedback.relevansi`      | Relevance          | every Participant                                                                                                                 |
+| `participantFeedback.handsOnRbl`     | Hands-on RBL       | **Student Class Participants only**: GTK and MS Classes are not asked it, and Student responses filed before it existed hold none |
+| `perjadinFeedback.penginapan`        | Lodging            | every filer, **who leaves it empty when the trip had no hotel**: a per-response skip, not a property of the trip                  |
+| `perjadinFeedback.transportasi`      | Transport          | every filer                                                                                                                       |
+| `perjadinFeedback.konsumsi`          | Meals              | every filer                                                                                                                       |
+| `perjadinFeedback.ketepatanWaktu`    | Punctuality        | every filer                                                                                                                       |
+| `perjadinFeedback.bantuanPendamping` | Pendamping Support | **Narasumber and Pimpinan filers only**: a Pendamping is not asked it, and evaluations filed before it existed hold none          |
+
+A conditional Aspect is averaged over the responses that have it. A GTK Class's missing Hands-on
+RBL, a skipped Lodging and a Pendamping's missing Pendamping Support are left out of their averages.
+None of them counts as a zero.
+
+The payload carries **no money**, **no names**, **no comments** and **no per-School, per-Session
+or per-response rows**.
 
 ### Versions
 
 `version` changes only when a field is **removed or retyped**. **Adding a field does not change
-it.** The Participant Feedback and Perjadin Evaluation averages
-([#504](https://github.com/sugt-itb/sugt-itb-26/issues/504)) arrive as new fields at version 1.
-Therefore:
+it.** The two feedback sections ([#504](https://github.com/sugt-itb/sugt-itb-26/issues/504))
+arrived as new fields at version 1. Therefore:
 
 - **Refuse a version you do not know** rather than render half a payload.
 - **Ignore fields you do not know.**
 
 ### `null`
 
-No field in version 1 is ever `null`. The averages #504 adds can be `null`, meaning nothing has
-been rated yet. **Render `null` as "—", never as 0.**
+**A feedback average is `null` when no Rating of that Aspect exists**, and only then. That happens
+for every Aspect while a section has no responses, when `responseCount` is `0`. It also happens for
+a conditional Aspect whose filers have not rated it yet, for example `handsOnRbl` while only GTK
+and MS Classes have filed. **Render `null` as "—", never as 0.** A `0.0` would read as a real,
+terrible score. No other field is ever `null`.
 
 ## Lihat Detail
 
@@ -157,5 +206,5 @@ cannot pass. A Pimpinan can read `/`, `/perjadin`, `/sesi-daring` and `/feedback
 2. Sign `HS256` with `iss`, `aud`, `iat` and `exp ≤ iat + 5 min`, per call or reused for under five
    minutes. Keep the server clock NTP-synced.
 3. Check `version`, and refuse one you do not know.
-4. Render `null` as "—", never as 0.
+4. Render a `null` average as "—", never as 0.
 5. Render Lihat Detail as a plain link to `detailUrl`, opened in a new tab.
