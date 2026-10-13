@@ -10,6 +10,7 @@ import {
   perjadinFeedbackPage,
   type FeedbackCursor,
   type FeedbackFilters,
+  type FeedbackFilterValue,
   type FeedbackSort,
   type PerjadinFeedbackCursor,
   type PerjadinFeedbackFilters,
@@ -932,6 +933,89 @@ describe("perjadinFeedbackPage", () => {
     expect(high.rows).toHaveLength(0);
   });
 
+  it("averages over three, four or five Ratings: Pendamping Support counts only when present (#482)", async () => {
+    const person = await signedIn();
+    const trip = await oneTrip(person.id);
+    // A Pendamping on a day trip: no hotel, not asked Pendamping Support — three Ratings.
+    await addPerjadinEvaluation({
+      perjadinId: trip.id,
+      role: "Pendamping",
+      name: "Tiga",
+      lodging: null,
+      ratings: { transport: 9, meals: 9, punctuality: 9 },
+      createdAt: new Date("2026-09-04T00:00:00Z"),
+    });
+    // A Narasumber who stayed the night and Rated the Pendamping low — all five.
+    await addPerjadinEvaluation({
+      perjadinId: trip.id,
+      role: "Narasumber",
+      name: "Lima",
+      lodging: 10,
+      ratings: { transport: 10, meals: 10, punctuality: 10 },
+      pendampingSupport: 5,
+      comments: { pendamping_support: "Pendamping jarang hadir." },
+      createdAt: new Date("2026-09-05T00:00:00Z"),
+    });
+    // Filed before #481 (ADR-0054): four Ratings, no Pendamping Support.
+    await addPerjadinEvaluation({
+      perjadinId: trip.id,
+      role: "Pimpinan",
+      name: "Empat",
+      lodging: 8,
+      ratings: { transport: 8, meals: 8, punctuality: 8 },
+    });
+
+    const page = await perjadinFeedbackPage(person, {
+      scope: NO_PERJADIN_FEEDBACK_SCOPE,
+      filters: NO_PERJADIN_FEEDBACK_FILTERS,
+      cursor: null,
+      sort: DEFAULT_FEEDBACK_SORT,
+    });
+    // Empat's 8, then a tie at 9: Lima's low Pendamping Support pulls its 10s down to Tiga's three
+    // 9s, and the newest-first tiebreak puts Lima, filed a day later, ahead.
+    expect(page.rows.map((row) => row.filedByName)).toEqual(["Empat", "Lima", "Tiga"]);
+    const byName = new Map(page.rows.map((row) => [row.filedByName, row]));
+    expect(byName.get("Tiga")?.rowAverage).toBeCloseTo((9 + 9 + 9) / 3, 5);
+    expect(byName.get("Tiga")?.pendampingSupport).toBeNull();
+    expect(byName.get("Empat")?.rowAverage).toBeCloseTo((8 + 8 + 8 + 8) / 4, 5);
+    expect(byName.get("Empat")?.pendampingSupport).toBeNull();
+    expect(byName.get("Lima")?.rowAverage).toBeCloseTo((10 + 10 + 10 + 10 + 5) / 5, 5);
+    expect(byName.get("Lima")?.pendampingSupport).toBe(5);
+    expect(byName.get("Lima")?.pendampingSupportComment).toBe("Pendamping jarang hadir.");
+  });
+
+  it("filters on Pendamping Support, and a null one is in neither arm (#482)", async () => {
+    const person = await signedIn();
+    const trip = await oneTrip(person.id);
+    await addPerjadinEvaluation({
+      perjadinId: trip.id,
+      role: "Narasumber",
+      name: "Rendah",
+      pendampingSupport: 7,
+    });
+    await addPerjadinEvaluation({
+      perjadinId: trip.id,
+      role: "Pimpinan",
+      name: "Tinggi",
+      pendampingSupport: 9,
+    });
+    await addPerjadinEvaluation({ perjadinId: trip.id, role: "Pendamping", name: "Tidak ditanya" });
+
+    const names = async (pendampingSupport: FeedbackFilterValue) =>
+      (
+        await perjadinFeedbackPage(person, {
+          scope: NO_PERJADIN_FEEDBACK_SCOPE,
+          filters: perjadinFilters({ pendampingSupport }),
+          cursor: null,
+          sort: DEFAULT_FEEDBACK_SORT,
+        })
+      ).rows.map((row) => row.filedByName);
+
+    await expect(names("le7")).resolves.toEqual(["Rendah"]);
+    await expect(names("gt7")).resolves.toEqual(["Tinggi"]);
+    await expect(names("all")).resolves.toHaveLength(3);
+  });
+
   it("pages the whole set under the default sort with no repeat or gap (score asc)", async () => {
     const person = await signedIn();
     const trip = await oneTrip(person.id);
@@ -1023,6 +1107,7 @@ describe("perjadinFeedbackAverages", () => {
       transport: 0,
       meals: 0,
       punctuality: 0,
+      pendampingSupport: null,
     });
   });
 
@@ -1047,5 +1132,27 @@ describe("perjadinFeedbackAverages", () => {
     expect(averages.transport).toBeCloseTo((4 + 8) / 2, 5);
     expect(averages.meals).toBeCloseTo((6 + 10) / 2, 5);
     expect(averages.punctuality).toBeCloseTo((8 + 10) / 2, 5);
+    // Both are the default Pendamping filer, who is not asked Pendamping Support (ADR-0054).
+    expect(averages.pendampingSupport).toBeNull();
+  });
+
+  it("averages Pendamping Support over the rows that have one, and '—' (null) under Pendamping (#482)", async () => {
+    const person = await signedIn();
+    const trip = await oneTrip(person.id);
+    await addPerjadinEvaluation({ perjadinId: trip.id, role: "Narasumber", pendampingSupport: 6 });
+    await addPerjadinEvaluation({ perjadinId: trip.id, role: "Pimpinan", pendampingSupport: 9 });
+    // A Pendamping's null, and an evaluation filed before #481's, never count as 0.
+    await addPerjadinEvaluation({ perjadinId: trip.id, role: "Pendamping" });
+    await addPerjadinEvaluation({ perjadinId: trip.id, role: "Narasumber" });
+
+    const all = await perjadinFeedbackAverages(person, NO_PERJADIN_FEEDBACK_SCOPE);
+    expect(all.pendampingSupport).toBeCloseTo((6 + 9) / 2, 5);
+    const pimpinan = await perjadinFeedbackAverages(person, { perjadinId: null, role: "Pimpinan" });
+    expect(pimpinan.pendampingSupport).toBeCloseTo(9, 5);
+    const pendamping = await perjadinFeedbackAverages(person, {
+      perjadinId: null,
+      role: "Pendamping",
+    });
+    expect(pendamping.pendampingSupport).toBeNull();
   });
 });

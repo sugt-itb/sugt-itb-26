@@ -249,6 +249,21 @@ describe("the roster's writes are an Administrator's (#470)", () => {
 describe("roster", () => {
   beforeEach(resetDatabase);
 
+  it("refuses everyone but an Administrator, a Pimpinan included (#488)", async () => {
+    const staff = await plainStaff();
+    const pimpinan = await seedPerson({
+      fullName: "Pak Hadi",
+      email: "hadi@gmail.com",
+      role: "Pimpinan",
+    });
+
+    for (const caller of [staff, { ...pimpinan, grants: [] } as Person]) {
+      const refused = await roster(caller).catch((error: unknown) => error);
+      expect(isNotGrantedError(refused), caller.email).toBe(true);
+    }
+    await expect(roster(await administrator())).resolves.toHaveLength(3);
+  });
+
   it("shows the three states — invited, signed in, and revoked", async () => {
     const admin = await administrator();
     await seedPerson({ fullName: "Invited", email: "invited@gmail.com", role: "Staff" });

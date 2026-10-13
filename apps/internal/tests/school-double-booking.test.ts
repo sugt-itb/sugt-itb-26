@@ -132,6 +132,7 @@ const at = (schoolId: string, heldOn: string, startsAt: string) => ({
   heldOn,
   startsAt,
   taughtByTeacherIds: [],
+  pimpinanPersonIds: [],
 });
 
 const sessionsOn = (perjadinId: string) =>
@@ -153,8 +154,13 @@ describe("the same School at the same moment on another trip", () => {
       subClusterId: subCluster.id,
       picPersonId: pic.id,
       teacherNames: [],
-      pimpinan: [],
-      sessions: [{ ...at(bontang.id, "2026-10-12", "08:00"), taughtByTeacherIndexes: [] }],
+      sessions: [
+        {
+          ...at(bontang.id, "2026-10-12", "08:00"),
+          taughtByTeacherIndexes: [],
+          pimpinanPersonIds: [],
+        },
+      ],
       startsOn: "2026-10-12",
       endsOn: "2026-10-12",
     };
@@ -172,10 +178,17 @@ describe("the same School at the same moment on another trip", () => {
         subClusterId: subCluster.id,
         picPersonId: pic.id,
         teacherNames: [],
-        pimpinan: [],
         sessions: [
-          { ...at(bontang.id, "2026-10-12", "10:00"), taughtByTeacherIndexes: [] },
-          { ...at(samarinda.id, "2026-10-12", "08:00"), taughtByTeacherIndexes: [] },
+          {
+            ...at(bontang.id, "2026-10-12", "10:00"),
+            taughtByTeacherIndexes: [],
+            pimpinanPersonIds: [],
+          },
+          {
+            ...at(samarinda.id, "2026-10-12", "08:00"),
+            taughtByTeacherIndexes: [],
+            pimpinanPersonIds: [],
+          },
         ],
         startsOn: "2026-10-12",
         endsOn: "2026-10-12",
@@ -323,8 +336,13 @@ describe("the database holds it on its own", () => {
         subClusterId: subCluster.id,
         picPersonId: pic.id,
         teacherNames: [],
-        pimpinan: [],
-        sessions: [{ ...at(bontang.id, "2026-10-12", "08:00"), taughtByTeacherIndexes: [] }],
+        sessions: [
+          {
+            ...at(bontang.id, "2026-10-12", "08:00"),
+            taughtByTeacherIndexes: [],
+            pimpinanPersonIds: [],
+          },
+        ],
         startsOn: "2026-10-12",
         endsOn: "2026-10-12",
       }),

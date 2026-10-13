@@ -53,13 +53,18 @@ describe("PerjadinPlanForm's required markers", () => {
     expect(required).toEqual(["Kelompok Sekolah", "PIC", "Tanggal mulai", "Tanggal selesai"]);
   });
 
-  /** Optional fields stay simply unmarked. Uang Perjalanan is gone from the form (ADR-0051). */
-  it("leaves Pendamping tambahan and Pimpinan unmarked, and asks for no Uang Perjalanan", () => {
+  /**
+   * Optional fields stay simply unmarked. Uang Perjalanan is gone from the form (ADR-0051), and so is
+   * the trip-level Pimpinan list: a Pimpinan is picked per Session now (#492, ADR-0056), on a
+   * Session row this empty form has none of.
+   */
+  it("leaves Pendamping tambahan unmarked, with no trip-level Pimpinan or Uang Perjalanan", () => {
     const html = render();
     const all = labels(html);
 
     expect(all.find((label) => label.text === "Pendamping tambahan")?.required).toBe(false);
-    expect(all.find((label) => label.text === "Pimpinan")?.required).toBe(false);
+    expect(all.find((label) => label.text === "Pimpinan")).toBeUndefined();
+    expect(html).not.toContain("Pimpinan Satu");
     expect(html).not.toContain("Uang Perjalanan");
     expect(html).not.toContain("opsional");
   });

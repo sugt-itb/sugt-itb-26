@@ -4,13 +4,7 @@ import LaporanPage from "-/app/(app)/perjadin/[id]/laporan/page";
 import PerjadinDetailPage from "-/app/(app)/perjadin/[id]/page";
 import { TripMoney } from "-/components/my-perjadin-section";
 import { requirePerson } from "-/lib/person";
-import {
-  filePerjadinReport,
-  monitoringData,
-  myPerjadin,
-  perjadinAcquittal,
-  type Person,
-} from "@sugt/db/queries";
+import { monitoringData, myPerjadin, perjadinAcquittal, type Person } from "@sugt/db/queries";
 import { formatRupiah } from "@sugt/domain";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -150,18 +144,6 @@ describe("Uang Perjalanan Terpakai is one number on every screen", () => {
       expect(html).toContain(">Pengeluaran</h2>");
       expect(html).not.toContain(">Uang Perjalanan</h2>");
     }
-  });
-});
-
-describe("Laporkan does not wait for an Advance", () => {
-  it("files a trip that never had one, and still refuses filing twice", async () => {
-    const rina = await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" });
-    const trip = await addPerjadin({ picPersonId: rina.id });
-
-    await expect(filePerjadinReport(rina, trip.id)).resolves.toMatchObject({ outcome: "filed" });
-    await expect(filePerjadinReport(rina, trip.id)).resolves.toMatchObject({
-      outcome: "already-filed",
-    });
   });
 });
 

@@ -43,6 +43,8 @@ asks for.
 - **The automatic return time zone (`deriveReturnZone`) is gone**, with nothing to replace it: there
   is no return time for a zone to qualify.
 - **The Report deadline is unchanged**: still `ends_on + REPORT_DEADLINE_DAYS_AFTER_RETURN`.
+  _Amended 2026-10-13: there is no Report deadline any more
+  ([ADR-0055](./0055-the-perjadin-report-is-neither-filed-nor-due.md))._
 - **The Preparation Checklist drops from seven boxes to six.** "Tiket keberangkatan" and "Tiket
   kepulangan" become one **"Tiket / transportasi PP"** (`tiket_pp`). Ticks stored on the two retired
   keys stay in `perjadin_preparation_item` as ignored orphans, exactly like the old `dosen:` ones

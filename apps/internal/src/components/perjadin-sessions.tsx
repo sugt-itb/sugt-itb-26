@@ -4,6 +4,7 @@ import {
   addPerjadinSessionAction,
   cancelPerjadinSessionAction,
   editPerjadinSessionAction,
+  setSessionPimpinanAction,
 } from "-/app/(app)/perjadin/[id]/actions";
 import { CoveredSessionsNote } from "-/components/covered-sessions-note";
 import { MultiSelectCombobox } from "-/components/multi-select-combobox";
@@ -42,14 +43,16 @@ import Link from "next/link";
 import { useId, useState, useTransition } from "react";
 
 type TripTeacher = { id: string; name: string };
+type RosterPimpinan = { id: string; fullName: string };
 
 /**
  * A Perjadin's offline Sessions, and — for Staff — the per-Session controls: add one, edit an
- * arranged one's School, date, time and "Diajar oleh", and cancel one (which is how a Session is
- * removed, kept visible as an attempt). Every rule the plan form checks — inside the trip's window, at
- * a School of its Sub-Cluster, no two *different* Schools sharing a moment, the ten-per-School
- * ceiling — is re-checked by the write against the trip's other Sessions; one Session per School per
- * moment (ADR-0038) is left to the database index, whose refusal comes back as `duplicate-session`.
+ * arranged one's School, date, time, "Diajar oleh" and Pimpinan, and cancel one (which is how a
+ * Session is removed, kept visible as an attempt). Every rule the plan form checks — inside the
+ * trip's window, at a School of its Sub-Cluster, no two *different* Schools sharing a moment, the
+ * ten-per-School ceiling — is re-checked by the write against the trip's other Sessions; one
+ * Session per School per moment (ADR-0038) is left to the database index, whose refusal comes back
+ * as `duplicate-session`.
  *
  * The list is shown to everyone (a Session carries no money); the controls appear only for Staff.
  */
@@ -58,6 +61,7 @@ function PerjadinSessions({
   sessions,
   eligibleSchools,
   teachers,
+  pimpinanRoster,
   startsOn,
   endsOn,
   canEdit,
@@ -66,6 +70,7 @@ function PerjadinSessions({
   sessions: PerjadinSession[];
   eligibleSchools: EligibleSchool[];
   teachers: TripTeacher[];
+  pimpinanRoster: RosterPimpinan[];
   startsOn: string;
   endsOn: string;
   canEdit: boolean;
@@ -79,6 +84,7 @@ function PerjadinSessions({
             perjadinId={perjadinId}
             eligibleSchools={eligibleSchools}
             teachers={teachers}
+            pimpinanRoster={pimpinanRoster}
             startsOn={startsOn}
             endsOn={endsOn}
             trigger={
@@ -100,52 +106,81 @@ function PerjadinSessions({
           {sessions.map((session) => (
             <li
               key={session.sessionId}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+              className="text-sm"
             >
-              <Link
-                href={`/sesi/${session.sessionId}`}
-                className="tabular-nums hover:underline"
-              >
-                {session.heldOn}
-              </Link>
-              <span className="text-muted-foreground tabular-nums">
-                {formatSessionStartTimeWithWib(session.startsAt, session.timeZone)}
-              </span>
-              <Link
-                href={`/sekolah/${session.schoolSlug}`}
-                className="text-muted-foreground hover:underline"
-              >
-                {session.schoolName}
-              </Link>
-              {session.taughtBy.length > 0 && (
-                <span className="text-muted-foreground">
-                  · {session.taughtBy.map((teacher) => teacher.name).join(", ")}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Link
+                  href={`/sesi/${session.sessionId}`}
+                  className="tabular-nums hover:underline"
+                >
+                  {session.heldOn}
+                </Link>
+                <span className="text-muted-foreground tabular-nums">
+                  {formatSessionStartTimeWithWib(session.startsAt, session.timeZone)}
                 </span>
-              )}
-              <SessionStatusBadge status={session.status} />
-              {canEdit && session.status === "arranged" && (
-                <span className="flex gap-1">
-                  <SessionDialog
+                <Link
+                  href={`/sekolah/${session.schoolSlug}`}
+                  className="text-muted-foreground hover:underline"
+                >
+                  {session.schoolName}
+                </Link>
+                <SessionStatusBadge status={session.status} />
+                {canEdit && session.status === "arranged" && (
+                  <span className="flex gap-1">
+                    <SessionDialog
+                      perjadinId={perjadinId}
+                      session={session}
+                      eligibleSchools={eligibleSchools}
+                      teachers={teachers}
+                      pimpinanRoster={pimpinanRoster}
+                      startsOn={startsOn}
+                      endsOn={endsOn}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                        >
+                          Ubah
+                        </Button>
+                      }
+                    />
+                    <CancelDialog
+                      perjadinId={perjadinId}
+                      sessionId={session.sessionId}
+                    />
+                  </span>
+                )}
+                {/* A delivered Session's place and time are settled; its Pimpinan are not. */}
+                {canEdit && session.status === "delivered" && (
+                  <PimpinanDialog
                     perjadinId={perjadinId}
                     session={session}
-                    eligibleSchools={eligibleSchools}
-                    teachers={teachers}
-                    startsOn={startsOn}
-                    endsOn={endsOn}
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                      >
-                        Ubah
-                      </Button>
-                    }
+                    pimpinanRoster={pimpinanRoster}
                   />
-                  <CancelDialog
-                    perjadinId={perjadinId}
-                    sessionId={session.sessionId}
-                  />
-                </span>
+                )}
+              </div>
+              {/* One Narasumber per line (#491), indented under the row, which keeps the badge and
+                  the controls. */}
+              {session.taughtBy.length > 0 && (
+                <ul
+                  aria-label={`Narasumber Sesi ${session.heldOn} ${session.schoolName}`}
+                  className="mt-1 grid gap-0.5 pl-4 text-muted-foreground"
+                >
+                  {session.taughtBy.map((teacher) => (
+                    <li key={teacher.id}>{teacher.name}</li>
+                  ))}
+                </ul>
+              )}
+              {/* Its Pimpinan the same way, one per line under the Narasumber (#492). */}
+              {session.pimpinan.length > 0 && (
+                <ul
+                  aria-label={`Pimpinan Sesi ${session.heldOn} ${session.schoolName}`}
+                  className="mt-1 grid gap-0.5 pl-4 text-muted-foreground"
+                >
+                  {session.pimpinan.map((entry) => (
+                    <li key={entry.personId}>Pimpinan: {entry.name}</li>
+                  ))}
+                </ul>
               )}
             </li>
           ))}
@@ -157,14 +192,16 @@ function PerjadinSessions({
 
 /**
  * Add or edit one Session. With `session` it edits that one (its fields seed the form); without, it
- * adds a new one. The same four fields either way — School, date, time, "Diajar oleh" — and the same
- * write shape, so one dialog serves both. No Stream: a Session teaches both (ADR-0038).
+ * adds a new one. The same five fields either way — School, date, time, "Diajar oleh", Pimpinan —
+ * and the same write shape, so one dialog serves both. No Stream: a Session teaches both
+ * (ADR-0038).
  */
 function SessionDialog({
   perjadinId,
   session,
   eligibleSchools,
   teachers,
+  pimpinanRoster,
   startsOn,
   endsOn,
   trigger,
@@ -173,6 +210,7 @@ function SessionDialog({
   session?: PerjadinSession;
   eligibleSchools: EligibleSchool[];
   teachers: TripTeacher[];
+  pimpinanRoster: RosterPimpinan[];
   startsOn: string;
   endsOn: string;
   trigger: React.ReactElement;
@@ -184,11 +222,15 @@ function SessionDialog({
   const [taughtBy, setTaughtBy] = useState<string[]>(
     () => session?.taughtBy.map((teacher) => teacher.id) ?? [],
   );
+  const [pimpinan, setPimpinan] = useState<string[]>(
+    () => session?.pimpinan.map((entry) => entry.personId) ?? [],
+  );
   const [refusal, setRefusal] = useState<React.ReactNode>(null);
   const [saving, startSaving] = useTransition();
   const idPrefix = useId();
 
   const teacherOptions = teachers.map((teacher) => ({ value: teacher.id, label: teacher.name }));
+  const pimpinanOptions = sessionPimpinanOptions(pimpinanRoster, session);
   const incomplete = schoolId === "" || date === "" || time === "";
 
   // The picked School's Time Zone, for the Jam Mulai label. In add mode it appears and flips as the
@@ -205,6 +247,7 @@ function SessionDialog({
         heldOn: date,
         startsAt: time,
         taughtByTeacherIds: taughtBy,
+        pimpinanPersonIds: pimpinan,
       };
       const result = session
         ? await editPerjadinSessionAction(perjadinId, session.sessionId, input)
@@ -227,7 +270,9 @@ function SessionDialog({
       <DialogContent size="panel">
         <DialogHeader>
           <DialogTitle>{session ? "Ubah Sesi" : "Tambah Sesi"}</DialogTitle>
-          <DialogDescription>Sekolah, tanggal, jam dan siapa yang mengajar.</DialogDescription>
+          <DialogDescription>
+            Sekolah, tanggal, jam, siapa yang mengajar dan Pimpinan yang hadir.
+          </DialogDescription>
         </DialogHeader>
 
         <DialogBody>
@@ -323,6 +368,29 @@ function SessionDialog({
                 }}
               />
             </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor={`${idPrefix}-pimpinan`}>Pimpinan</Label>
+              <MultiSelectCombobox
+                id={`${idPrefix}-pimpinan`}
+                aria-label="Pimpinan"
+                placeholder={
+                  pimpinanOptions.length === 0 ? "Belum ada Pimpinan" : "Pilih Pimpinan…"
+                }
+                emptyLabel="Tidak ada Pimpinan."
+                options={pimpinanOptions}
+                value={pimpinan}
+                onValueChange={(next) => {
+                  setPimpinan(next);
+                  setRefusal(null);
+                }}
+              />
+              {pimpinanRoster.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Belum ada Pimpinan di roster — minta Administrator menambahkannya lewat /orang.
+                </p>
+              )}
+            </div>
           </div>
         </DialogBody>
 
@@ -340,6 +408,114 @@ function SessionDialog({
             onClick={submit}
           >
             {saving ? "Menyimpan…" : "Simpan Sesi"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Change a delivered Session's Pimpinan alone (#492, ADR-0056) — who attended is often recorded
+ * after the trip, and the migration put every trip Pimpinan on each of its live Sessions to be
+ * narrowed. The same picker as the Session dialog, offering the same options.
+ */
+function PimpinanDialog({
+  perjadinId,
+  session,
+  pimpinanRoster,
+}: {
+  perjadinId: string;
+  session: PerjadinSession;
+  pimpinanRoster: RosterPimpinan[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [pimpinan, setPimpinan] = useState<string[]>(() =>
+    session.pimpinan.map((entry) => entry.personId),
+  );
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [saving, startSaving] = useTransition();
+  const pickerId = useId();
+  const options = sessionPimpinanOptions(pimpinanRoster, session);
+
+  function submit() {
+    startSaving(async () => {
+      const result = await setSessionPimpinanAction(perjadinId, session.sessionId, pimpinan);
+      if (result.outcome === "set") {
+        setOpen(false);
+        return;
+      }
+      setRefusal(
+        result.outcome === "cancelled"
+          ? "Sesi ini sudah dibatalkan. Muat ulang halaman."
+          : "Ada Pimpinan yang sudah tidak ada di roster. Muat ulang halaman.",
+      );
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={setOpen}
+    >
+      <DialogTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+          >
+            Ubah Pimpinan
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Pimpinan Sesi</DialogTitle>
+          <DialogDescription>Pimpinan yang hadir di Sesi ini.</DialogDescription>
+        </DialogHeader>
+
+        {refusal !== null && (
+          <Alert variant="destructive">
+            <AlertTitle>Pimpinan belum tersimpan.</AlertTitle>
+            <AlertDescription>{refusal}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid gap-1.5">
+          <Label htmlFor={pickerId}>Pimpinan</Label>
+          <MultiSelectCombobox
+            id={pickerId}
+            aria-label="Pimpinan"
+            placeholder={options.length === 0 ? "Belum ada Pimpinan" : "Pilih Pimpinan…"}
+            emptyLabel="Tidak ada Pimpinan."
+            options={options}
+            value={pimpinan}
+            onValueChange={(next) => {
+              setPimpinan(next);
+              setRefusal(null);
+            }}
+          />
+          {pimpinanRoster.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Belum ada Pimpinan di roster — minta Administrator menambahkannya lewat /orang.
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            Batal
+          </Button>
+          <Button
+            disabled={saving}
+            onClick={submit}
+          >
+            {saving ? "Menyimpan…" : "Simpan"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -435,6 +611,23 @@ function CancelDialog({ perjadinId, sessionId }: { perjadinId: string; sessionId
   );
 }
 
+/**
+ * What a Session's Pimpinan picker offers: the roster, plus anyone already on this Session who has
+ * since left it (a revoked Pimpinan), so their chip still shows and can be removed. The write keeps
+ * an already-recorded Pimpinan, so offering them is offering what is there.
+ */
+function sessionPimpinanOptions(
+  roster: RosterPimpinan[],
+  session?: PerjadinSession,
+): { value: string; label: string }[] {
+  return [
+    ...roster.map((person) => ({ value: person.id, label: person.fullName })),
+    ...(session?.pimpinan ?? [])
+      .filter((entry) => !roster.some((person) => person.id === entry.personId))
+      .map((entry) => ({ value: entry.personId, label: entry.name })),
+  ];
+}
+
 /** What each add/edit refusal says. Field-level messages; nothing was written. */
 function sessionRefusalMessage(
   result: AddPerjadinSessionResult | EditPerjadinSessionResult,
@@ -456,6 +649,8 @@ function sessionRefusalMessage(
       return "Dua Sekolah yang berbeda tidak bisa berada di tanggal dan jam yang sama.";
     case "unknown-teacher":
       return "Ada narasumber yang sudah tidak ada. Muat ulang halaman.";
+    case "unknown-pimpinan":
+      return "Ada Pimpinan yang sudah tidak ada di roster. Muat ulang halaman.";
     case "school-booked-on-another-perjadin":
       return <SchoolBookedElsewhere refusal={result} />;
     default:
@@ -463,4 +658,4 @@ function sessionRefusalMessage(
   }
 }
 
-export { PerjadinSessions };
+export { PerjadinSessions, sessionPimpinanOptions };

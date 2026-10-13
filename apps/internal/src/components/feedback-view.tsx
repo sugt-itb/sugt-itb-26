@@ -6,6 +6,7 @@ import {
   loadPerjadinFeedback,
   loadPerjadinFeedbackAverages,
 } from "-/app/(app)/feedback/actions";
+import { participantExportHref, perjadinExportHref } from "-/app/(app)/feedback/feedback-params";
 import { participantScopeLabel, perjadinScopeLabel, withSchool } from "-/components/feedback-scope";
 import { sesiLabel } from "-/components/session-labels";
 import { SingleSelectCombobox } from "-/components/single-select-combobox";
@@ -19,6 +20,7 @@ import type {
   FeedbackCursor,
   FeedbackFilters,
   FeedbackFilterValue,
+  FeedbackParticipantType,
   FeedbackPerjadinOption,
   FeedbackSchoolOption,
   FeedbackSort,
@@ -39,6 +41,7 @@ import {
 import { Badge } from "@sugt/ui/components/badge";
 import { Button } from "@sugt/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@sugt/ui/components/card";
+import { LinkButton } from "@sugt/ui/components/link-button";
 import {
   Select,
   SelectContent,
@@ -98,6 +101,7 @@ const ALL_PERJADIN_FILTERS: PerjadinFeedbackFilters = {
   transport: "all",
   meals: "all",
   punctuality: "all",
+  pendampingSupport: "all",
 };
 
 /**
@@ -120,13 +124,17 @@ const DATE_SORT_OPTIONS: Record<FeedbackSort["date"], string> = {
   asc: "Terlama",
 };
 
-/** Every School, every Session — the Peserta tab's starting scope, mirroring the server's. */
-const ALL_PARTICIPANT_SCOPE: ParticipantFeedbackScope = { schoolId: null, sessionId: null };
+/** Every School, Session and Tipe Peserta — the Peserta tab's starting scope, as the server's. */
+const ALL_PARTICIPANT_SCOPE: ParticipantFeedbackScope = {
+  schoolId: null,
+  sessionId: null,
+  participantType: null,
+};
 
 /** Every trip, every Peran — the Perjadin tab's starting scope, mirroring the server's. */
 const ALL_PERJADIN_SCOPE: PerjadinFeedbackScope = { perjadinId: null, role: null };
 
-/** The Sesi and Peran selects' "everything" option — a plain `Select` needs a value for it. */
+/** The Sesi, Tipe Peserta and Peran selects' "everything" option — a plain `Select` needs one. */
 const ALL = "semua" as const;
 
 /** The Peran pengisi select: Semua Peran, then the three self-declared roles as stored. */
@@ -136,6 +144,16 @@ const ROLE_OPTIONS: Record<PerjadinEvaluationRole | typeof ALL, string> = {
     PerjadinEvaluationRole,
     string
   >),
+};
+
+/**
+ * The Tipe Peserta select (#487): Semua Tipe Peserta, then the two-way split as the server names it —
+ * Siswa is the Student Class, GTK-MS the GTK and MS Classes together.
+ */
+const PARTICIPANT_TYPE_OPTIONS: Record<FeedbackParticipantType | typeof ALL, string> = {
+  [ALL]: "Semua Tipe Peserta",
+  Siswa: "Siswa",
+  "GTK-MS": "GTK-MS",
 };
 
 /** One filter's three options, in Indonesian. `label` prefixes name the column the filter gates. */
@@ -161,29 +179,16 @@ const MATERIALS_OPTIONS = aspectOptions(PARTICIPANT_ASPECT_LABELS.materials);
 
 const RELEVANCE_OPTIONS = aspectOptions(PARTICIPANT_ASPECT_LABELS.relevance);
 
-const LODGING_OPTIONS: FilterOptions = {
-  all: "Semua: Penginapan",
-  le7: "Penginapan ≤ 7",
-  gt7: "Penginapan > 7",
-};
+const LODGING_OPTIONS = aspectOptions("Penginapan");
 
-const TRANSPORT_OPTIONS: FilterOptions = {
-  all: "Semua: Transportasi",
-  le7: "Transportasi ≤ 7",
-  gt7: "Transportasi > 7",
-};
+const TRANSPORT_OPTIONS = aspectOptions("Transportasi");
 
-const MEALS_OPTIONS: FilterOptions = {
-  all: "Semua: Konsumsi",
-  le7: "Konsumsi ≤ 7",
-  gt7: "Konsumsi > 7",
-};
+const MEALS_OPTIONS = aspectOptions("Konsumsi");
 
-const PUNCTUALITY_OPTIONS: FilterOptions = {
-  all: "Semua: Ketepatan Waktu",
-  le7: "Ketepatan Waktu ≤ 7",
-  gt7: "Ketepatan Waktu > 7",
-};
+const PUNCTUALITY_OPTIONS = aspectOptions("Ketepatan Waktu");
+
+/** Pendamping Support (#482): a row without one — a Pendamping's, or one filed before #481 — is in neither arm. */
+const PENDAMPING_SUPPORT_OPTIONS = aspectOptions("Bantuan Pendamping");
 
 function FeedbackView({
   participantInitialRows,
@@ -245,8 +250,8 @@ function FeedbackView({
 }
 
 /**
- * The Peserta tab: four summary cards, the Sekolah and Sesi pickers, five server-side filters, two
- * sort dropdowns, and an OFFSET-paged card list.
+ * The Peserta tab: four summary cards, the Sekolah, Sesi and Tipe Peserta pickers, five server-side
+ * filters, two sort dropdowns, and an OFFSET-paged card list.
  *
  * A scope, filter or sort change refetches the first page (cursor `null`) and REPLACES the list; a
  * scope change refetches the averages with it. "Load more" carries the current scope, filters, sort
@@ -337,8 +342,8 @@ function ParticipantTab({
 
   return (
     <>
-      {/* The standing over the picked School or Session — programme-wide with neither — and unmoved
-          by the score filters below. */}
+      {/* The standing over the picked School, Session and Tipe Peserta — programme-wide with none —
+          and unmoved by the score filters below. */}
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <AverageCard
           label={PARTICIPANT_ASPECT_LABELS.instructor}
@@ -355,7 +360,7 @@ function ParticipantTab({
           covers={covers}
           value={averages.values.relevance}
         />
-        {/* Over the rows that have one; "—" until any does (#446). */}
+        {/* Over the rows that have one; "—" until any does (#446), and always under GTK-MS (#487). */}
         <AverageCard
           label={PARTICIPANT_ASPECT_LABELS.hands_on_rbl}
           covers={covers}
@@ -363,8 +368,9 @@ function ParticipantTab({
         />
       </div>
 
-      {/* The scope (#466): a School, then one of its Sessions. Changing the School resets the Sesi. */}
-      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* The scope (#466): a School, then one of its Sessions, and a Tipe Peserta (#487). Changing the
+          School resets the Sesi. */}
+      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SingleSelectCombobox
           aria-label="Sekolah"
           placeholder="Semua Sekolah"
@@ -373,7 +379,7 @@ function ParticipantTab({
           value={scope.schoolId}
           disabled={pending}
           onValueChange={(schoolId) => {
-            changeScope(withSchool(schoolId));
+            changeScope(withSchool(scope, schoolId));
           }}
         />
         <OptionSelect
@@ -383,6 +389,18 @@ function ParticipantTab({
           disabled={pending || school === null}
           onChange={(sessionId) => {
             changeScope({ ...scope, sessionId: sessionId === ALL ? null : sessionId });
+          }}
+        />
+        <OptionSelect
+          ariaLabel="Tipe Peserta"
+          options={PARTICIPANT_TYPE_OPTIONS}
+          value={scope.participantType ?? ALL}
+          disabled={pending}
+          onChange={(participantType) => {
+            changeScope({
+              ...scope,
+              participantType: participantType === ALL ? null : participantType,
+            });
           }}
         />
       </div>
@@ -458,6 +476,8 @@ function ParticipantTab({
         />
       </div>
 
+      <ExportLink href={participantExportHref({ scope, filters, sort })} />
+
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Tidak ada masukan Peserta untuk saringan ini.
@@ -483,9 +503,9 @@ function ParticipantTab({
 }
 
 /**
- * The Perjadin tab: four summary cards, five server-side filters, two sort dropdowns, and an
- * OFFSET-paged card list. The shape is the Peserta tab's — the extra Aspect (`lodging`) is the only
- * difference — so the filter, sort and paging machinery is identical, just over `loadPerjadinFeedback`.
+ * The Perjadin tab: five summary cards, six server-side filters, two sort dropdowns, and an
+ * OFFSET-paged card list. The shape is the Peserta tab's — one Aspect more — so the filter, sort and
+ * paging machinery is identical, just over `loadPerjadinFeedback`.
  */
 function PerjadinTab({
   initialRows,
@@ -565,7 +585,7 @@ function PerjadinTab({
     <>
       {/* The standing over the picked trip and Peran — programme-wide with neither — and unmoved by
           the score filters below. */}
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <AverageCard
           label="Penginapan"
           covers={covers}
@@ -585,6 +605,12 @@ function PerjadinTab({
           label="Ketepatan Waktu"
           covers={covers}
           value={averages.values.punctuality}
+        />
+        {/* Over the rows that have one; "—" until any in scope does, and always under Pendamping. */}
+        <AverageCard
+          label="Bantuan Pendamping"
+          covers={covers}
+          value={averages.values.pendampingSupport}
         />
       </div>
 
@@ -635,8 +661,8 @@ function PerjadinTab({
         />
       </div>
 
-      {/* The five server-side filters. Each change refetches the first page and resets paging. */}
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      {/* The six server-side filters. Each change refetches the first page and resets paging. */}
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <FilterSelect
           ariaLabel="Jenis ulasan"
           options={REVIEW_TYPE_OPTIONS}
@@ -682,7 +708,18 @@ function PerjadinTab({
             changeFilter("punctuality", value);
           }}
         />
+        <FilterSelect
+          ariaLabel="Nilai Bantuan Pendamping"
+          options={PENDAMPING_SUPPORT_OPTIONS}
+          value={filters.pendampingSupport}
+          disabled={pending}
+          onChange={(value) => {
+            changeFilter("pendampingSupport", value);
+          }}
+        />
       </div>
+
+      <ExportLink href={perjadinExportHref({ scope, filters, sort })} />
 
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -705,6 +742,26 @@ function PerjadinTab({
         />
       )}
     </>
+  );
+}
+
+/**
+ * **Ekspor CSV** (#490), shared by both tabs: a plain link to the tab's export, carrying its
+ * current scope, filters and sort, so the file holds every matching row — not just the pages
+ * loaded — in the order on screen. A plain `<a>`, as `/keuangan`'s, since the response is a
+ * download.
+ */
+function ExportLink({ href }: { href: string }) {
+  return (
+    <div className="mb-3 flex justify-end">
+      <LinkButton
+        variant="outline"
+        size="sm"
+        render={<a href={href} />}
+      >
+        Ekspor CSV
+      </LinkButton>
+    </div>
   );
 }
 
@@ -940,9 +997,11 @@ function ParticipantCard({ row }: { row: ParticipantFeedbackRow }) {
  * links, because a trip has a home page a submission does not — the day the filer filed it
  * ("Diisi"), and the row average as the headline number.
  *
- * Below it, the four Aspects in a fixed order, each with its score and — when the filer left one —
+ * Below it, the five Aspects in a fixed order, each with its score and — when the filer left one —
  * the comment about that Aspect. **The Penginapan row is omitted entirely when `lodging` is null**:
- * a day trip has no hotel to rate, and its average was already taken over the three present ratings.
+ * a day trip has no hotel to rate. **So is Bantuan Pendamping when `pendampingSupport` is**: a
+ * Pendamping is not asked it, and an evaluation filed before #481 holds none (ADR-0054). Either way
+ * the row average was already taken over the ratings present, never counting a missing one as 0.
  */
 function PerjadinCard({ row }: { row: PerjadinFeedbackRow }) {
   return (
@@ -988,6 +1047,13 @@ function PerjadinCard({ row }: { row: PerjadinFeedbackRow }) {
           score={row.punctuality}
           comment={row.punctualityComment}
         />
+        {row.pendampingSupport !== null && (
+          <AspectRow
+            label="Bantuan Pendamping"
+            score={row.pendampingSupport}
+            comment={row.pendampingSupportComment}
+          />
+        )}
       </CardContent>
     </Card>
   );

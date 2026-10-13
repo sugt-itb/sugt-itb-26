@@ -67,7 +67,8 @@ list below exists so nobody later "completes" the schema by adding the rest.
 | Project Team, Final Project                                  | Not stored at all. [ADR-0009](./adr/0009-the-tool-tracks-delivery-not-outcomes.md) is explicit; they reach the public as curated pieces, never as records. |
 | Advance                                                      | Not stored (ADR-0051). Its column was dropped in migration 0050 (#465).                                                                                    |
 | Uang Perjalanan Terpakai                                     | Not a column. The sum of a Perjadin's transactions, all categories, derived on every read.                                                                 |
-| Report deadline                                              | Not a column. Two days after the Group returns, derived from `perjadin.ends_on` and a constant.                                                            |
+| A trip's Pimpinan                                            | Not a table. Everyone in `session_pimpinan` on one of the trip's non-cancelled Sessions, derived on every read (ADR-0056).                                 |
+| Report deadline                                              | None. The Report is neither filed nor due (ADR-0055, #489), so no deadline is stored or derived.                                                           |
 | Aspect                                                       | Not a table and not a value. Every Aspect on all four evaluations is a **column**; `@sugt/domain` names each rubric.                                       |
 | Rating                                                       | Not a table. A Rating is one Aspect column on one row of an evaluation.                                                                                    |
 | Transaction category                                         | Not a table. A `text` column on `transaction`, CHECKed against a closed set — see [Money](#money).                                                         |
@@ -672,6 +673,56 @@ gone. It is the offline analogue of an online Session's two `pengajar_*` columns
 **Offline Class Records fall out of scope** as a consequence: their filers would be the teachers,
 and a name is not a Person who can sign in and file. See the open question in `CONTEXT.md`.
 
+### Who attended: the Pimpinan
+
+A **Pimpinan** who joins a trip is recorded on the offline Sessions they attended
+([#492](https://github.com/sugt-itb/sugt-itb-26/issues/492),
+[ADR-0056](./adr/0056-a-pimpinan-is-recorded-per-session.md)), the same shape as "Diajar oleh":
+
+```sql
+create table session_pimpinan (
+  session_id  uuid not null,
+  person_id   uuid not null,
+  role        text not null default 'Pimpinan' check (role = 'Pimpinan'),
+
+  primary key (session_id, person_id),
+  constraint session_pimpinan_session_fk
+    foreign key (session_id) references session (id) on delete cascade,
+  constraint session_pimpinan_is_pimpinan
+    foreign key (person_id, role) references person (id, role)
+);
+```
+
+**Record-only**: a Pimpinan is not a working Group member, files no Perjadin Evaluation as one and
+adds nothing to the Preparation Checklist, which is why this is not a `group_member` row. A row
+references a **real `person` of role Pimpinan** — `role` is pinned to `'Pimpinan'`, and the
+composite `(person_id, role)` foreign key into `person (id, role)` refuses anyone else, the
+guarantee `perjadin_pimpinan` held since [#181](https://github.com/mafiefa02/sugt/issues/181). It
+cascades with its Session. The primary key records a Pimpinan at most once per Session.
+
+**A trip's Pimpinan are derived, never stored**: everyone recorded on at least one of its
+non-cancelled Sessions. One query serves the trip page, the Laporan and its CSV and the
+`/pendamping` card (`tripPimpinan` in `queries/trip-pimpinan.ts`):
+
+```sql
+select distinct session.perjadin_id, person.id, person.full_name, school.name
+from session_pimpinan
+join session on session.id = session_pimpinan.session_id
+join person  on person.id  = session_pimpinan.person_id
+join school  on school.id  = session.school_id
+where session.perjadin_id = any($1) and session.status <> 'cancelled'
+order by person.full_name, person.id, school.name;
+```
+
+A cancelled Session keeps its rows — its own line still shows who was meant to be there — but adds
+nobody to the trip. The trip page lists each Pimpinan with the Schools above; the Laporan and
+`/pendamping` take the names.
+
+**Migration `0054`** created the table and copied every `perjadin_pimpinan` row onto every
+non-cancelled Session of its trip, or onto all its Sessions when none was live, then dropped
+`perjadin_pimpinan`. A trip with no Session at all had nowhere to keep its Pimpinan; the migration
+test shows the query counting those rows (expected: none).
+
 ### Pretest/Posttest completion
 
 Whether a **Pretest** — and later a **Posttest** — was **administered** to a cohort at a School,
@@ -725,12 +776,12 @@ open to any signed-in Person; the one write (tick/un-tick) opens with `requireGr
 A Session is judged from three vantage points, and a Perjadin from a fourth. Each has its own
 rubric, because each asks a question only that person can answer.
 
-| Table                  | Filed by      | One per               | Aspects                                                                          |
-| ---------------------- | ------------- | --------------------- | -------------------------------------------------------------------------------- |
-| `class_record`         | Teaching Team | Class, per professor  | Comprehension, Participation, Readiness, Materials, Delivery, Facilities, Timing |
-| `session_record`       | PIC / Staff   | Session               | Facilities, Turnout, School support, Timing, Coordination                        |
-| `participant_feedback` | Participants  | Class, per respondent | Materials, Instructor, Relevance; Hands-on RBL for the Student Class only        |
-| `perjadin_evaluation`  | Token link    | Perjadin (no dedup)   | Lodging, Transport, Meals, Punctuality                                           |
+| Table                  | Filed by      | One per               | Aspects                                                                                      |
+| ---------------------- | ------------- | --------------------- | -------------------------------------------------------------------------------------------- |
+| `class_record`         | Teaching Team | Class, per professor  | Comprehension, Participation, Readiness, Materials, Delivery, Facilities, Timing             |
+| `session_record`       | PIC / Staff   | Session               | Facilities, Turnout, School support, Timing, Coordination                                    |
+| `participant_feedback` | Participants  | Class, per respondent | Materials, Instructor, Relevance; Hands-on RBL for the Student Class only                    |
+| `perjadin_evaluation`  | Token link    | Perjadin (no dedup)   | Lodging, Transport, Meals, Punctuality; Pendamping Support from Narasumber and Pimpinan only |
 
 They share a scale (1–10), a threshold (`CONCERN_AT_OR_BELOW`, 7), and one rule — **a Rating at
 or below the threshold cannot be filed without saying what went wrong** — so all four feed one
@@ -1012,32 +1063,44 @@ create table perjadin_evaluation (
   filed_by_role  text not null check (filed_by_role in ('Narasumber', 'Pendamping', 'Pimpinan')),
   filed_by_name  text not null,
 
-  lodging      smallint          check (lodging     between 1 and 10),   -- nullable; see below
-  transport    smallint not null check (transport   between 1 and 10),
-  meals        smallint not null check (meals       between 1 and 10),
-  punctuality  smallint not null check (punctuality between 1 and 10),
+  lodging             smallint          check (lodging            between 1 and 10),  -- nullable; see below
+  transport           smallint not null check (transport          between 1 and 10),
+  meals               smallint not null check (meals              between 1 and 10),
+  punctuality         smallint not null check (punctuality        between 1 and 10),
+  pendamping_support  smallint          check (pendamping_support between 1 and 10),  -- nullable; see below
 
-  lodging_comment      text,
-  transport_comment    text,
-  meals_comment        text,
-  punctuality_comment  text,
+  lodging_comment             text,
+  transport_comment           text,
+  meals_comment               text,
+  punctuality_comment         text,
+  pendamping_support_comment  text,
 
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
 
+  -- A Pendamping filer is not asked Pendamping Support (ADR-0054), so their row carries neither the
+  -- Rating nor its comment. The other half — Narasumber and Pimpinan must give it — is not here.
+  constraint perjadin_evaluation_pendamping_support_rater_check check (
+    filed_by_role <> 'Pendamping'
+    or (pendamping_support is null and pendamping_support_comment is null)
+  ),
+
   -- Per-Aspect elaboration (ADR-0023): each Aspect is not-low or carries its OWN comment, and all
-  -- four must hold. `lodging` is guarded by `is null` first, so a skipped hotel owes no comment.
+  -- five must hold. `lodging` and `pendamping_support` are guarded by `is null` first, so a skipped
+  -- hotel or an unasked Pendamping Support owes no comment.
   check (
     (lodging is null or lodging > 7 or btrim(coalesce(lodging_comment, '')) <> '')
     and (transport   > 7 or btrim(coalesce(transport_comment, ''))   <> '')
     and (meals       > 7 or btrim(coalesce(meals_comment, ''))       <> '')
     and (punctuality > 7 or btrim(coalesce(punctuality_comment, '')) <> '')
+    and (pendamping_support is null or pendamping_support > 7
+         or btrim(coalesce(pendamping_support_comment, '')) <> '')
   )
 );
 
 create index perjadin_evaluation_concerns_idx
-  on perjadin_evaluation (least(lodging, transport, meals, punctuality))
-  where least(lodging, transport, meals, punctuality) <= 7;
+  on perjadin_evaluation (least(lodging, transport, meals, punctuality, pendamping_support))
+  where least(lodging, transport, meals, punctuality, pendamping_support) <= 7;
 ```
 
 **`perjadin_feedback_token` mirrors `session_feedback_token`.** Keyed on the token, with
@@ -1055,7 +1118,7 @@ nothing — exactly as `participant_feedback.name` is. The one-per-filer `unique
 sign-in: with no account behind a submission there is nothing to dedup on, and duplicates are
 allowed, the accepted cost of the token pattern ([ADR-0012](./adr/0012-participants-write-through-a-short-lived-session-token.md), [ADR-0024](./adr/0024-perjadin-evaluation-is-filed-through-an-unauthenticated-token-link.md)).
 
-Close to a Session Record's shape — four Ratings, the same 1–10 scale and threshold — but the
+Close to a Session Record's shape — four or five Ratings, the same 1–10 scale and threshold — but the
 prose is no longer a shared `problems`/`suggestions` pair. Each Aspect now
 carries its **own** optional comment, and the elaboration rule is retargeted per-Aspect: a low
 Aspect owes _its own_ comment, not one shared box (#163, [ADR-0023](adr/0023-perjadin-evaluation-has-a-comment-per-aspect.md)).
@@ -1065,8 +1128,8 @@ box is retired outright — advice with no per-Aspect home now lives inside the 
 nowhere. This mirrors the #102 reversal on `participant_feedback`, plus the per-Aspect CHECK that
 Participant Feedback (which owes no prose) never needed.
 
-**`lodging` is nullable, because a day-trip has no hotel** — one of two nullable Ratings, with
-`participant_feedback.hands_on_rbl` (#446). Not every Perjadin involves a night away — the
+**`lodging` is nullable, because a day-trip has no hotel** — one of three nullable Ratings, with
+`pendamping_support` below and `participant_feedback.hands_on_rbl` (#446). Not every Perjadin involves a night away — the
 programme budget carries at least one group visiting two Schools and returning the same day, with
 accommodation, flights and airport transfer all at zero. A `not null` column would require those
 travellers to rate a hotel they never saw, and inventing a Rating to satisfy a constraint is worse
@@ -1082,6 +1145,18 @@ argument is one. So `least(null, 8, 9, 9)` is `8` — the CHECK still fires on a
 Rating, the partial index below still selects the right rows, and `null <= 7` is never true, so
 a skipped Aspect cannot reach the concerns list. That behaviour is load-bearing and belongs on
 the invariant suite beside the other 54, not in a comment.
+
+**`pendamping_support` is nullable, because not every filer is asked it** (#481,
+[ADR-0054](./adr/0054-pendamping-support-is-rated-only-by-narasumber-and-pimpinan.md)). It asks
+whether the Pendamping helped while the activity was under way, so a filer who declares themselves
+Pendamping would be Rating themselves: they are not shown it, and
+`perjadin_evaluation_pendamping_support_rater_check` keeps both its Rating and its comment null on
+their row. A Narasumber or a Pimpinan must give it — but **that half is the write's alone**
+(`filePerjadinEvaluation`, `ratings-mismatch`), because every evaluation filed before migration
+`0052` was filed through a form that never asked, and holds a NULL from every Role. Nothing was
+backfilled: a NULL is "not asked", and an invented Rating would reach the averages and the concerns
+list. It drops out of `least()` exactly as a skipped `lodging` does, and out of the `/feedback`
+row average and Aspect averages the same way: they are over the Ratings present (#482).
 
 `transport` covers the ground transport generally rather than the shuttle specifically, and
 `punctuality` is whether the schedule held. They are separate Aspects because they fail
@@ -1163,11 +1238,12 @@ select 'Perjadin Evaluation',
   from perjadin_evaluation e
   join perjadin pj on pj.id = e.perjadin_id
   join sub_cluster sc on sc.id = pj.sub_cluster_id
-  cross join lateral (values ('lodging',     e.lodging,     e.lodging_comment),
-                             ('transport',   e.transport,   e.transport_comment),
-                             ('meals',       e.meals,       e.meals_comment),
-                             ('punctuality', e.punctuality, e.punctuality_comment))
-                     as r(aspect, rating, said)
+  cross join lateral (values ('lodging',            e.lodging,            e.lodging_comment),
+                             ('transport',          e.transport,          e.transport_comment),
+                             ('meals',              e.meals,              e.meals_comment),
+                             ('punctuality',        e.punctuality,        e.punctuality_comment),
+                             ('pendamping_support', e.pendamping_support, e.pendamping_support_comment))
+                     as r(aspect, rating, said)   -- a null lodging or pendamping_support drops out
  where r.rating <= 7
 
  order by when_ desc;
@@ -1219,7 +1295,6 @@ create table perjadin (
   pic_person_id               uuid not null,
   pic_role                    text not null default 'Staff' check (pic_role = 'Staff'),
 
-  report_filed_at             timestamptz,
   drive_folder_id             text,
   created_at                  timestamptz not null default now(),
 
@@ -1266,11 +1341,11 @@ alter table perjadin
 Any amounts they held went with them; the Activity Log's `advance_set` / `advance_changed` entries
 keep the history.
 
-**There is no `report_deadline` column.** The Report is due two days after the Group gets back,
-always, so the deadline is `ends_on + REPORT_DEADLINE_DAYS_AFTER_RETURN` and nothing stores it.
-Storing it would let it be entered wrong, and would leave it stale when a trip's dates are
-corrected — a derived deadline recomputes itself and a typed one does not. Nothing is gated on
-it either way; it is shown as days remaining.
+**The Report is neither filed nor due** ([ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md),
+[#489](https://github.com/sugt-itb/sugt-itb-26/issues/489)). There is no `report_deadline` column
+and nothing derives one, and migration `0053` dropped `report_filed_at`, the timestamp Laporkan used
+to set: filing gated nothing, so nothing replaces it. The Activity Log's `report_filed` entries keep
+the filings already made.
 
 **Money is `bigint` in whole rupiah.** `numeric(_, 2)` would imply a subunit nobody uses. The
 `_idr` suffix is on every money column so no reader has to guess the unit.
@@ -1349,23 +1424,13 @@ transactions are untouched — only the membership is destroyed and rebuilt.
 That is what makes the last Group rule cheap. See
 [what the database does not hold](#what-the-database-does-not-hold).
 
-### The Teaching Team and Pimpinan on a Perjadin
+### The Teaching Team on a Perjadin
 
 ```sql
 create table perjadin_teacher (
   id           uuid primary key default gen_random_uuid(),
   perjadin_id  uuid not null references perjadin (id) on delete cascade,
   name         text not null
-);
-
-create table perjadin_pimpinan (
-  perjadin_id  uuid not null references perjadin (id) on delete cascade,
-  person_id    uuid not null,
-  role         text not null default 'Pimpinan' check (role = 'Pimpinan'),
-
-  primary key (perjadin_id, person_id),
-  constraint perjadin_pimpinan_is_pimpinan
-    foreign key (person_id, role) references person (id, role)
 );
 ```
 
@@ -1380,18 +1445,11 @@ are added, renamed and removed one at a time (T3), and each row has an `id` so
 Stream and no Person FK** — a name is not a Person, and no Session carries a Stream (ADR-0038). `on delete
 cascade`: the names are the trip's and outlive nothing.
 
-**`perjadin_pimpinan` records a Pimpinan on a Perjadin — record-only.** A leader of DITSAMA ITB who
-rarely joins the Kelompok Perjalanan to monitor the offline Sessions is noted here and named on the
-Laporan Perjadin, but is **not a working Group member**: they file no Perjadin Evaluation and add
-nothing to the Preparation Checklist, which is exactly why they are not a `group_member` row. A row
-references a **real `person` of role Pimpinan** ([#181](https://github.com/mafiefa02/sugt/issues/181)):
-the Pimpinan roster is the single source of truth, so the old fixed-three `name` column with its CHECK
-and the `PIMPINAN` constant in `@sugt/domain` are gone. `role` is pinned to `'Pimpinan'` and the
-composite `(person_id, role)` foreign key into `person (id, role)` guarantees a non-Pimpinan can never
-be recorded — the same PIC-is-Staff discipline as `perjadin_pic_is_staff` and `group_member`'s role
-FK. The primary key `(perjadin_id, person_id)` makes a Pimpinan recordable at most once per trip.
-Writing and rendering them is T3/T7
-([#138](https://github.com/mafiefa02/sugt/issues/138), [#142](https://github.com/mafiefa02/sugt/issues/142)).
+**`perjadin_pimpinan` is gone** ([#492](https://github.com/sugt-itb/sugt-itb-26/issues/492)). It
+recorded the Pimpinan on a Perjadin as a whole; a Pimpinan is now recorded on the Sessions they
+attended, and the trip's list is derived from those — see
+[Who attended: the Pimpinan](#who-attended-the-pimpinan) and
+[ADR-0056](./adr/0056-a-pimpinan-is-recorded-per-session.md).
 
 ### The Preparation Checklist
 
@@ -1656,8 +1714,8 @@ Offline`, named as its other two; `session.drive_footage_folder_id` is the Sessi
 ## Money
 
 **There is no `perjadin_report` table.** A Perjadin yields exactly one Report, always, so the
-acquittal is the state already on `perjadin` — `report_filed_at` — plus the trip's transactions and
-their evidence: every transaction on the trip, reconciled against nothing (ADR-0051).
+acquittal is the trip's transactions and their evidence: every transaction on the trip, reconciled
+against nothing (ADR-0051), never filed and never due (ADR-0055).
 
 ```sql
 create table transaction (
@@ -1755,8 +1813,7 @@ the row with its `evidence_deleted` Log entry in one transaction. The count is c
 the trash, so a line's only receipt is refused with nothing trashed, and under the lock, so two
 concurrent Hapus on a two-receipt line cannot leave it with none. The loser of that race takes its
 file back out of the Drive trash, since its row stands. A grandfathered line with more than five may
-lose any of them, down to one. The freed slot counts toward the five again. Nothing about filing
-gates it.
+lose any of them, down to one. The freed slot counts toward the five again.
 
 **A line may be deleted whole** (#463, ADR-0050), with however many receipts it holds. Hapus
 transaksi trashes the line's Drive folder, and with it the receipts inside, then any receipt file
@@ -1871,7 +1928,7 @@ or failed write logs nothing. The money writes log as below, each through `logAc
 | `attachTransactionEvidence` | `evidence_uploaded`    | `{ transactionId, category, amountIdr, spentOn, added, total }`                    |
 | `deleteTransactionEvidence` | `evidence_deleted`     | `{ transactionId, evidenceId, category, amountIdr, spentOn, left }`, a copy (#462) |
 | `deleteTransaction`         | `transaction_deleted`  | as `transaction_recorded`, plus `description`; a copy (#463)                       |
-| `filePerjadinReport`        | `report_filed`         | `{ transactionCount, totalIdr }`, every category, as the acquittal totals          |
+| nothing, since ADR-0055     | `report_filed`         | `{ transactionCount, totalIdr }`; history only — Laporkan is gone (#489)           |
 
 **`actor_email` is a copy**, taken when the act happens, so the row stays true if the Person's email
 later changes. **`search_text`** is the Aksi and Rincian text `/log` shows, lower-cased once at
@@ -2046,9 +2103,9 @@ is complete has to make its own case rather than cite this one.
 Recording a transaction now requires its receipts
 ([ADR-0039](./adr/0039-every-transaction-is-recorded-with-its-evidence.md)), and **that is the
 other kind of rule: a field a form insists on before it will submit**. The receipts are part of
-the line being written, not a separate record the action waits on. Filing gains no new
-condition: `filePerjadinReport`'s evidence check is unchanged, and now only ever fires on a line
-recorded before the rule.
+the line being written, not a separate record the action waits on. (Filing, whose evidence check
+was the backstop for lines recorded before that rule, is gone: the Report is neither filed nor due,
+[ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md).)
 
 A Story's photographs are public by intent, which is the whole difference from a receipt — see
 [Object storage](#object-storage).
@@ -2384,8 +2441,10 @@ cancellation while a Session is `arranged` and never after, and offers no way ba
 
 **"Every transaction has at least one piece of evidence."** Also a cross-row count. Held at
 entry since [ADR-0039](./adr/0039-every-transaction-is-recorded-with-its-evidence.md), in the one
-write path: `recordTransaction` records a line with one to five receipts or refuses it. Filing
-still checks it, as the backstop for lines entered before that rule, which no migration touched.
+write path: `recordTransaction` records a line with one to five receipts or refuses it. A line
+entered before that rule may still have none; nothing catches it now that filing is gone
+([ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md)), and the Laporan marks it
+for its writer to Unggah bukti.
 
 **The four-offline-six-online cap.** Deliberately unenforced. Ten is the denominator for
 progress, not a limit on what may be recorded, and a cancelled Session counts for nothing
@@ -2450,6 +2509,14 @@ cannot sign in and file, so no Record can be filed and none is expected. The `cl
 stands unused; how name-taught teaching is evaluated is a later decision (the `CONTEXT.md` open
 question). See [who still owes what](#who-still-owes-what).
 
+**That a Narasumber or Pimpinan Rated Pendamping Support.** The write requires it of them
+(`filePerjadinEvaluation` returns `ratings-mismatch` without it), but no CHECK can: every evaluation
+filed before migration `0052` holds a NULL from every Role, and a constraint cannot tell those rows
+from a new one that skipped the Aspect. The database holds only the other half — a Pendamping's row
+carries neither the Rating nor its comment
+([ADR-0054](./adr/0054-pendamping-support-is-rated-only-by-narasumber-and-pimpinan.md)). The same
+split as Hands-on RBL, which is required of the Student Class by the write alone.
+
 **Who filed a Perjadin Evaluation.** There is no `filed_by_person_id` at all: the Evaluation is
 filed through an unauthenticated token link now, and the filer self-declares a Role and a Name that
 reference nothing (ADR-0024). The database cannot say whether a submission came from someone who was
@@ -2493,10 +2560,11 @@ exists at all.
 `group_member` cascades. `transaction` cascades, and `transaction_evidence` cascades from
 that — so deleting a Perjadin destroys its acquittal rows, and nothing warns you. The files are
 not removed: the Perjadin's folder in the company Google Drive (ADR-0040) outlives its rows. No
-path in the app deletes a Perjadin. `perjadin_teacher` and `perjadin_pimpinan` cascade too — the
-trip-scoped teacher names and the recorded Pimpinan are the trip's and outlive nothing — and
-`session_teaching_team` cascades from `perjadin_teacher`, so an offline Session's "Diajar oleh"
-links go with the names. `activity_log` cascades too, so the trip's Activity Log entries go with it.
+path in the app deletes a Perjadin. `perjadin_teacher` cascades too — the trip-scoped teacher names
+are the trip's and outlive nothing — and `session_teaching_team` cascades from `perjadin_teacher`,
+so an offline Session's "Diajar oleh" links go with the names. A Session's `session_pimpinan` rows
+cascade from the Session. `activity_log` cascades too, so the trip's Activity Log entries go with
+it.
 So do `perjadin_document` and `perjadin_document_folder`; the files and folders stay in Drive.
 `session_footage` does not cascade from `session`, which an offline Session's `perjadin_id` keeps
 from being deleted anyway.

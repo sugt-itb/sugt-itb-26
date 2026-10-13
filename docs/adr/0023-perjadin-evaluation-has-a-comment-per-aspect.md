@@ -1,5 +1,9 @@
 # Perjadin Evaluation has a comment per Aspect, not shared Kendala and Saran
 
+> **Extended by [ADR-0054](./0054-pendamping-support-is-rated-only-by-narasumber-and-pimpinan.md).**
+> A fifth Aspect, Pendamping Support, now joins the four below, with its own Komentar under the same
+> per-Aspect rule. It is asked only of a Narasumber or a Pimpinan, and is nullable. The rest stands.
+
 Perjadin Evaluation Rates four Aspects — **Lodging**, **Transport**, **Meals**, **Punctuality** —
 and now carries one optional comment against each of them, in `lodging_comment`,
 `transport_comment`, `meals_comment` and `punctuality_comment`. It began with two free-text boxes

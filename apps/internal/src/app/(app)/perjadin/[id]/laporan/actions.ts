@@ -24,12 +24,10 @@ import {
   attachTransactionEvidence,
   deleteTransaction,
   deleteTransactionEvidence,
-  filePerjadinReport,
   receiptDeleteTarget,
   receiptsOnLine,
   recordTransaction,
   transactionDeleteTarget,
-  type FilePerjadinReportResult,
   type NewEvidence,
   type TransactionDriveItems,
 } from "@sugt/db/queries";
@@ -431,7 +429,7 @@ function staleReceipt(): DeleteReceiptActionResult {
  *    line held, and anything step 2 did not see is trashed now. The line is gone by then, so a
  *    failure here is logged with the ids, not answered — Hapus cannot be pressed again.
  *
- * A line with no receipt, or more than five, is deleted the same way; so is one on a filed Laporan.
+ * A line with no receipt, or more than five, is deleted the same way.
  */
 export async function deleteTransactionAction(
   transactionId: string,
@@ -484,21 +482,4 @@ async function trashLine(drive: DriveClient, items: TransactionDriveItems): Prom
 function staleTransaction(): DeleteTransactionActionResult {
   revalidatePath("/perjadin/[id]/laporan", "page");
   return { outcome: "no-such-transaction" };
-}
-
-/**
- * File the Report.
- *
- * The evidence rule — every transaction carries at least one receipt — is held at entry since
- * ADR-0039, by `recordTransaction`. `filePerjadinReport` still checks it, as the backstop for lines
- * recorded before that rule, which no migration touched.
- */
-export async function filePerjadinReportAction(
-  perjadinId: string,
-): Promise<FilePerjadinReportResult> {
-  const person = await requirePerson();
-
-  const result = await staffSurface(() => filePerjadinReport(person, perjadinId));
-  if (result.outcome === "filed") revalidatePath(`/perjadin/${perjadinId}/laporan`);
-  return result;
 }

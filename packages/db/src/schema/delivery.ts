@@ -239,6 +239,47 @@ export const sessionTeachingTeam = pgTable(
 );
 
 /**
+ * The **Pimpinan** who attended one offline Session — record-only (ADR-0020, ADR-0056). A leader of
+ * DITSAMA ITB who joins part of a trip to monitor it is noted on the Sessions they were at, the
+ * same way "Diajar oleh" notes who taught each one; they are **not a working Group member**, file
+ * no Perjadin Evaluation and add nothing to the Preparation Checklist, so they are deliberately not
+ * a `group_member` row.
+ *
+ * This replaced the trip-level `perjadin_pimpinan` (#492): a trip covering several Schools and days
+ * often has a Pimpinan at only some of them. **A trip's Pimpinan are derived**, never stored —
+ * everyone recorded on at least one of its non-cancelled Sessions (`./queries/trip-pimpinan.ts`) —
+ * so the trip's list cannot disagree with its Sessions'. A cancelled Session keeps its rows; it
+ * just stops contributing to that list.
+ *
+ * A row references a **real Person of role Pimpinan**: `role` is pinned to `'Pimpinan'` and the
+ * composite `(person_id, role)` foreign key into `person (id, role)` refuses anyone else, the
+ * guarantee `perjadin_pimpinan_is_pimpinan` held before (#181). It cascades with its Session, like
+ * `session_teaching_team`; the primary key records a Pimpinan at most once per Session.
+ */
+export const sessionPimpinan = pgTable(
+  "session_pimpinan",
+  {
+    sessionId: uuid("session_id").notNull(),
+    personId: uuid("person_id").notNull(),
+    role: text("role").$type<"Pimpinan">().notNull().default("Pimpinan"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sessionId, t.personId] }),
+    check("session_pimpinan_role_check", sql`${t.role} = 'Pimpinan'`),
+    foreignKey({
+      name: "session_pimpinan_session_fk",
+      columns: [t.sessionId],
+      foreignColumns: [session.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "session_pimpinan_is_pimpinan",
+      columns: [t.personId, t.role],
+      foreignColumns: [person.id, person.role],
+    }),
+  ],
+);
+
+/**
  * **Session Footage** (#424, ADR-0046): the photos and videos documenting one offline Session, shown
  * as "Foto & Video". Each row is one file in the company Google Drive under `Foto & Video/`, uploaded
  * untouched and shared on its own; it is uploaded or deleted, never edited.

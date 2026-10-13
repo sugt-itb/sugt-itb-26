@@ -69,7 +69,8 @@ export type FootageLogDetails = {
  * `document_uploaded`, taken of the row as it is deleted (#398), since the row is then gone. The two
  * money deletes (ADR-0050) are snapshots for the same reason: `evidence_deleted` of the receipt and
  * its line (#462), `transaction_deleted` of the whole line (#463). The two `advance_*` shapes are
- * history only: nothing writes them since the Advance stopped being tracked (ADR-0051, #464).
+ * history only: nothing writes them since the Advance stopped being tracked (ADR-0051, #464). Nor
+ * does anything write `report_filed`, since the Laporan stopped being filed (ADR-0055, #489).
  */
 export type ActivityLogDetails = {
   advance_set: { amountIdr: number };
@@ -124,12 +125,13 @@ export type ActivityLogEntry = {
 }[ActivityLogAction];
 
 /**
- * The actions the app still writes. `advance_set` and `advance_changed` are history only (ADR-0051,
- * #464): the Log reads and renders them, and `logActivity` cannot be handed one.
+ * The actions the app still writes. `advance_set` and `advance_changed` (ADR-0051, #464) and
+ * `report_filed` (ADR-0055, #489) are history only: the Log reads and renders them, and
+ * `logActivity` cannot be handed one.
  */
 export type WritableActivityLogEntry = Exclude<
   ActivityLogEntry,
-  { action: "advance_set" | "advance_changed" }
+  { action: "advance_set" | "advance_changed" | "report_filed" }
 >;
 
 /** The Aksi column: the action's label, and "(dari data lama)" after it on a backfilled row. */
@@ -233,7 +235,8 @@ export const ACTIVITY_LOG_PAGE_SIZE = 50;
 /**
  * The Aksi dropdown's choices besides Semua, keyed by their `?aksi=` value. Every one but Laporan
  * dikirim covers two actions: Catat transaksi and Unggah bukti each carry their own Hapus
- * (ADR-0050). Uang Perjalanan finds history only — nothing writes `advance_*` any more (ADR-0051).
+ * (ADR-0050). Uang Perjalanan and Laporan dikirim find history only — nothing writes `advance_*`
+ * (ADR-0051) or `report_filed` (ADR-0055) any more.
  */
 export const ACTIVITY_LOG_AKSI_FILTERS = {
   "uang-perjalanan": { label: "Uang Perjalanan", actions: ["advance_set", "advance_changed"] },

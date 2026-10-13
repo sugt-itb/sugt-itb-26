@@ -5,6 +5,7 @@ import {
   PARTICIPANT_CLASS_LABELS,
   PARTICIPANT_WRITTEN_QUESTIONS,
 } from "-/lib/participant-feedback-copy";
+import { RATING_INSTRUCTION } from "-/lib/rating-copy";
 import { CONCERN_AT_OR_BELOW, RATING_MAX, RATING_MIN, type ClassKind } from "@sugt/domain";
 import { Button } from "@sugt/ui/components/button";
 import { Input } from "@sugt/ui/components/input";
@@ -104,8 +105,7 @@ function FeedbackForm({ token }: { token: string }) {
     <div>
       <h1 className="font-heading text-lg font-medium">Umpan balik sesi</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Beri nilai {RATING_MIN}–{RATING_MAX} untuk tiap aspek. Masukanmu membantu kami memperbaiki
-        sesi berikutnya.
+        {RATING_INSTRUCTION} Masukanmu membantu kami memperbaiki sesi berikutnya.
       </p>
 
       <div className="mt-5 grid gap-5">

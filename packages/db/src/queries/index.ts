@@ -94,14 +94,17 @@ export {
   NO_PERJADIN_FEEDBACK_FILTERS,
   NO_PERJADIN_FEEDBACK_SCOPE,
   participantFeedbackAverages,
+  participantFeedbackExport,
   participantFeedbackPage,
   participantFeedbackSchools,
   perjadinFeedbackAverages,
+  perjadinFeedbackExport,
   perjadinFeedbackPage,
   perjadinFeedbackTrips,
   type FeedbackCursor,
   type FeedbackFilters,
   type FeedbackFilterValue,
+  type FeedbackParticipantType,
   type FeedbackPerjadinOption,
   type FeedbackSchoolOption,
   type FeedbackSessionOption,
@@ -164,7 +167,6 @@ export {
 export {
   changePerjadinPic,
   perjadinDetail,
-  setPerjadinPimpinan,
   setPerjadinStaff,
   updatePerjadinDates,
   type ChangePerjadinPicResult,
@@ -173,7 +175,6 @@ export {
   type PerjadinDatesInput,
   type PerjadinDetail,
   type PerjadinSession,
-  type SetPerjadinPimpinanResult,
   type SetPerjadinStaffResult,
   type UpdatePerjadinDatesResult,
 } from "./perjadin-detail";
@@ -188,11 +189,14 @@ export {
 export {
   addPerjadinSession,
   editPerjadinSession,
+  setSessionPimpinan,
   type AddPerjadinSessionResult,
   type EditPerjadinSessionResult,
   type PerjadinSessionInput,
   type SessionPlacementRefusal,
+  type SetSessionPimpinanResult,
 } from "./perjadin-sessions";
+export { type TripPimpinan } from "./trip-pimpinan";
 export { type SchoolBookedOnAnotherPerjadin } from "./school-slot";
 export { type CoveredSession } from "./covered-sessions";
 export { type PerjadinNameRef } from "./perjadin-naming";
@@ -336,7 +340,6 @@ export {
   attachTransactionEvidence,
   deleteTransaction,
   deleteTransactionEvidence,
-  filePerjadinReport,
   perjadinAcquittal,
   receiptDeleteTarget,
   receiptsOnLine,
@@ -347,7 +350,6 @@ export {
   type AttachEvidenceResult,
   type DeleteEvidenceResult,
   type DeleteTransactionResult,
-  type FilePerjadinReportResult,
   type ReceiptDeleteTarget,
   type NewEvidence,
   type NewTransaction,

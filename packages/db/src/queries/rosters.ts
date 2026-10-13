@@ -5,6 +5,8 @@ import { db } from "../client";
 import { person } from "../schema/people";
 import { province, school } from "../schema/reference";
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 /**
  * The two lists every planning form picks from, and the Schools a Coverage selection names.
  *
@@ -106,22 +108,28 @@ export async function activeRosters(): Promise<{
 
 /**
  * Which of these Person ids are **not** an active Pimpinan — the offending set both Pimpinan writes
- * refuse before touching `perjadin_pimpinan`.
+ * refuse before touching `session_pimpinan`.
  *
- * **One rule, one place.** `planPerjadin` and `setPerjadinPimpinan` each need "is this id an active
- * Person of role Pimpinan?" (#181); the second module to want it is what earns a shared helper, the
- * same reasoning `activeRosters` sits here for. The composite `perjadin_pimpinan_is_pimpinan` FK is
- * the database backstop — this names a stray id up front rather than surfacing a raw violation.
+ * **One rule, one place.** `planPerjadin` and the per-Session writes in `./perjadin-sessions.ts`
+ * each need "is this id an active Person of role Pimpinan?" (#181, #492); the second module to want
+ * it is what earns a shared helper, the same reasoning `activeRosters` sits here for. The composite
+ * `session_pimpinan_is_pimpinan` FK is the database backstop — this names a stray id up front rather
+ * than surfacing a raw violation.
  *
  * Takes the ids to check (the caller dedupes for its own insert) and returns those with no matching
  * active-Pimpinan row, in input order. An empty input is a query with no answer, so it is skipped.
+ * A write that checks inside its transaction passes its `tx` as `reader`, so the check reads what
+ * the transaction sees.
  */
-export async function unknownPimpinanIds(ids: string[]): Promise<string[]> {
+export async function unknownPimpinanIds(
+  ids: string[],
+  reader: Tx | typeof db = db,
+): Promise<string[]> {
   if (ids.length === 0) return [];
 
   const valid = new Set(
     (
-      await db
+      await reader
         .select({ id: person.id })
         .from(person)
         .where(and(inArray(person.id, ids), eq(person.active, true), eq(person.role, "Pimpinan")))

@@ -100,7 +100,7 @@ import { type ReactElement, useId, useMemo, useRef, useState, useTransition } fr
  *
  * The five-receipt ceiling is held by the server (`recordTransaction`, `attachTransactionEvidence`);
  * the disabled buttons here only keep the form from offering the mistake. A row with no receipt can
- * still appear — a grandfathered line — and is marked, and the filing check still refuses it.
+ * still appear — a grandfathered line — and is marked, so its writer can Unggah bukti onto it.
  *
  * **While Drive cannot take an upload** — not connected, broken, or its folders unresolved — Catat
  * and every row's Unggah bukti and Hapus render disabled, and the reason is said once beside Catat. The

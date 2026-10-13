@@ -5,18 +5,13 @@ import { db } from "../client";
 import { session, sessionTeachingTeam } from "../schema/delivery";
 import { person } from "../schema/people";
 import { province, school, subCluster } from "../schema/reference";
-import {
-  groupMember,
-  perjadin,
-  perjadinPimpinan,
-  perjadinTeacher,
-  transaction,
-} from "../schema/travel";
+import { groupMember, perjadin, perjadinTeacher, transaction } from "../schema/travel";
 import type { Person } from "./caller";
-import { todayInDeadlineZone } from "./deadline";
 import { tripSchoolNames } from "./perjadin-naming";
 import { preparationChecklists, type PreparationItem } from "./preparation-checklist";
 import { requireGrant, requireStaff } from "./staff-only";
+import { todayInWib } from "./today";
+import { tripPimpinan } from "./trip-pimpinan";
 
 /**
  * **The caller's own trips**, for `/pendamping` (#197, #396): Perjalanan Dinas Anda — the trips not
@@ -28,8 +23,8 @@ import { requireGrant, requireStaff } from "./staff-only";
  * signed-in Person is Staff since T3, and a delivery read is open anyway). "Their trips" is
  * membership, not the PIC seat — the PIC is *a* `group_member` too (`perjadin_pic_is_a_group_member`
  * guarantees it), so joining `group_member` on `person_id = caller.id` already includes the trips
- * they lead and drops the trips they are merely PIC-eligible for but not on. There is no separate
- * `perjadin_pimpinan` path: a Pimpinan is record-only (ADR-0025) and this is a working-member view.
+ * they lead and drops the trips they are merely PIC-eligible for but not on. There is no Pimpinan
+ * path: a Pimpinan is record-only (ADR-0025) and this is a working-member view.
  *
  * **Money rides on this payload**, unlike `./perjadin-detail.ts` which carries none. This is a
  * personal work list — what the trip has spent so far is part of the point of it — and money reads
@@ -74,7 +69,10 @@ export type MyPerjadinPengajarBySchool = {
   unassigned: MyPerjadinPengajar[];
 };
 
-/** One Pimpinan recorded on the trip — record-only, the name of a real Pimpinan-Person (#181). */
+/**
+ * One Pimpinan on the trip — record-only, the name of a real Pimpinan-Person (#181), derived from
+ * the trip's non-cancelled Sessions (#492).
+ */
 export type MyPerjadinPimpinan = {
   personId: string;
   name: string;
@@ -219,9 +217,8 @@ export async function pendampingOptions(caller: Person): Promise<PendampingOptio
  */
 async function perjadinOf(personId: string): Promise<MyPerjadin> {
   // Not yet over: `ends_on` on or after today, reckoned in the office's zone via the shared
-  // `todayInDeadlineZone` fragment (`./deadline.ts`) — the same calendar the acquittal's
-  // `daysRemaining` counts in, not the database session's default zone.
-  const isCurrent = sql<boolean>`${perjadin.endsOn} >= ${todayInDeadlineZone}`;
+  // `todayInWib` fragment (`./today.ts`), not the database session's default zone.
+  const isCurrent = sql<boolean>`${perjadin.endsOn} >= ${todayInWib}`;
 
   // The base rows: every trip the caller is a `group_member` of. The `group_member` inner join both
   // filters (only the caller's trips) and cannot fan out — its primary key is
@@ -259,7 +256,7 @@ async function perjadinOf(personId: string): Promise<MyPerjadin> {
   const tripIds = rows.map((trip) => trip.id);
 
   // The seven hanging lists, gathered concurrently and each scoped to just these trips.
-  const [spentRows, staffRows, pengajarRows, pimpinanRows, sessionRows, taughtRows, checklists] =
+  const [spentRows, staffRows, pengajarRows, pimpinanByTrip, sessionRows, taughtRows, checklists] =
     await Promise.all([
       // Uang Perjalanan Terpakai per trip (ADR-0051): every category, grouped by `perjadin_id`. A trip
       // with no spend is absent and defaults to 0 below.
@@ -293,17 +290,9 @@ async function perjadinOf(personId: string): Promise<MyPerjadin> {
         .from(perjadinTeacher)
         .where(inArray(perjadinTeacher.perjadinId, tripIds))
         .orderBy(asc(perjadinTeacher.name)),
-      // The record-only Pimpinan (#181), joined to `person` for the display name, in name order.
-      db
-        .select({
-          perjadinId: perjadinPimpinan.perjadinId,
-          personId: perjadinPimpinan.personId,
-          name: person.fullName,
-        })
-        .from(perjadinPimpinan)
-        .innerJoin(person, eq(person.id, perjadinPimpinan.personId))
-        .where(inArray(perjadinPimpinan.perjadinId, tripIds))
-        .orderBy(asc(person.fullName)),
+      // The record-only Pimpinan (#181), derived from each trip's live Sessions (#492), in name
+      // order.
+      tripPimpinan(tripIds),
       // Every offline Session on these trips, with its School and the School's Province zone.
       // Cancelled ones are **included** — this is the trip's shape, the Schools it visited, not how
       // much teaching it delivered. Ordered by School name, then within a School by (held_on,
@@ -352,7 +341,6 @@ async function perjadinOf(personId: string): Promise<MyPerjadin> {
 
   const staffByTrip = new Map<string, MyPerjadinStaff[]>();
   const pengajarByTrip = new Map<string, MyPerjadinPengajar[]>();
-  const pimpinanByTrip = new Map<string, MyPerjadinPimpinan[]>();
   for (const row of staffRows) {
     const list = staffByTrip.get(row.perjadinId) ?? [];
     // `isPic` off the trip's own PIC id — the row is already ordered by name, so no re-sort.
@@ -363,11 +351,6 @@ async function perjadinOf(personId: string): Promise<MyPerjadin> {
     const list = pengajarByTrip.get(row.perjadinId) ?? [];
     list.push({ id: row.id, name: row.name });
     pengajarByTrip.set(row.perjadinId, list);
-  }
-  for (const row of pimpinanRows) {
-    const list = pimpinanByTrip.get(row.perjadinId) ?? [];
-    list.push({ personId: row.personId, name: row.name });
-    pimpinanByTrip.set(row.perjadinId, list);
   }
 
   // Sessions grouped by (trip, School), preserving the query's School-then-Session order. A trip's
@@ -415,7 +398,10 @@ async function perjadinOf(personId: string): Promise<MyPerjadin> {
       isPic: member.personId === trip.picPersonId,
     }));
     const pengajar = pengajarByTrip.get(trip.id) ?? [];
-    const pimpinan = pimpinanByTrip.get(trip.id) ?? [];
+    const pimpinan: MyPerjadinPimpinan[] = (pimpinanByTrip.get(trip.id) ?? []).map((entry) => ({
+      personId: entry.personId,
+      name: entry.name,
+    }));
     const schools = schoolsByTrip.get(trip.id) ?? [];
     const card: MyPerjadinTrip = {
       ...trip,

@@ -9,8 +9,8 @@ import {
   editPerjadinSessionAction,
   removePerjadinTeacherAction,
   renamePerjadinTeacherAction,
-  setPerjadinPimpinanAction,
   setPerjadinStaffAction,
+  setSessionPimpinanAction,
   togglePreparationItemAction,
   updatePerjadinDatesAction,
 } from "-/app/(app)/perjadin/[id]/actions";
@@ -22,7 +22,6 @@ import {
 import {
   deleteReceiptAction,
   deleteTransactionAction,
-  filePerjadinReportAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
   recordTransactionAction,
@@ -56,7 +55,6 @@ import {
   deleteSessionFootage,
   deleteTransaction,
   editPerjadinSession,
-  filePerjadinReport,
   fileSessionRecord,
   footageSession,
   isNotOnPerjadinError,
@@ -71,8 +69,8 @@ import {
   recordTransaction,
   removePerjadinTeacher,
   renamePerjadinTeacher,
-  setPerjadinPimpinan,
   setPerjadinStaff,
+  setSessionPimpinan,
   togglePreparationItem,
   transactionDeleteTarget,
   updatePerjadinDates,
@@ -320,7 +318,23 @@ const WRITES: [
   ],
   ["Group Staff", (c, a, who) => setPerjadinStaff(c, a.id, [who.andi.id]), "set"],
   ["Change PIC", (c, a, who) => changePerjadinPic(c, a.id, who.andi.id), "changed"],
-  ["Pimpinan", (c, a, who) => setPerjadinPimpinan(c, a.id, [who.hadi.id]), "set"],
+  [
+    "delivered Session Pimpinan",
+    (c, a, who) => setSessionPimpinan(c, a.deliveredId, [who.hadi.id]),
+    "set",
+  ],
+  [
+    "Session Pimpinan",
+    (c, a, who, where) =>
+      editPerjadinSession(c, a.arrangedId, {
+        schoolId: where.bontang.id,
+        heldOn: "2026-10-12",
+        startsAt: nextTime(),
+        taughtByTeacherIds: [],
+        pimpinanPersonIds: [who.hadi.id],
+      }),
+    "edited",
+  ],
   ["Narasumber add", (c, a) => addPerjadinTeacher(c, a.id, "Dr. Sari"), "added"],
   ["Narasumber rename", (c, a) => renamePerjadinTeacher(c, a.teacherId, "Dr. Bagus P."), "renamed"],
   ["Narasumber remove", (c, a) => removePerjadinTeacher(c, a.teacherId), "removed"],
@@ -332,6 +346,7 @@ const WRITES: [
         heldOn: "2026-10-13",
         startsAt: nextTime(),
         taughtByTeacherIds: [],
+        pimpinanPersonIds: [],
       }),
     "added",
   ],
@@ -343,6 +358,7 @@ const WRITES: [
         heldOn: "2026-10-12",
         startsAt: nextTime(),
         taughtByTeacherIds: [a.teacherId],
+        pimpinanPersonIds: [],
       }),
     "edited",
   ],
@@ -398,7 +414,6 @@ const WRITES: [
     undefined,
   ],
   ["Hapus transaksi", (c, a) => deleteTransaction(c, a.transactionId), "deleted"],
-  ["Laporkan", (c, a) => filePerjadinReport(c, a.id), "filed"],
   [
     "Dokumen check",
     (c, a) =>
@@ -503,7 +518,6 @@ describe("the actions answer a non-member with a 403", () => {
     await expect(digestOf(markSessionDeliveredFromPendampingAction(a.arrangedId))).resolves.toBe(
       FORBIDDEN,
     );
-    await expect(digestOf(filePerjadinReportAction(a.id))).resolves.toBe(FORBIDDEN);
   });
 
   it("on every other write in the ticket's table, each action of its own", async () => {
@@ -516,12 +530,24 @@ describe("the actions answer a non-member with a 403", () => {
       heldOn: "2026-10-13",
       startsAt: nextTime(),
       taughtByTeacherIds: [],
+      pimpinanPersonIds: [],
     };
 
     const calls: [string, () => Promise<unknown>][] = [
       ["Group Staff", () => setPerjadinStaffAction(a.id, [])],
       ["Change PIC", () => changePerjadinPicAction(a.id, who.andi.id)],
-      ["Pimpinan", () => setPerjadinPimpinanAction(a.id, [])],
+      [
+        "delivered Session Pimpinan",
+        () => setSessionPimpinanAction(a.id, a.deliveredId, [who.hadi.id]),
+      ],
+      [
+        "Session Pimpinan",
+        () =>
+          editPerjadinSessionAction(a.id, a.arrangedId, {
+            ...session,
+            pimpinanPersonIds: [who.hadi.id],
+          }),
+      ],
       ["Narasumber add", () => addPerjadinTeacherAction(a.id, "Dr. Sari")],
       ["Narasumber rename", () => renamePerjadinTeacherAction(a.id, a.teacherId, "Dr. Baru")],
       ["Narasumber remove", () => removePerjadinTeacherAction(a.id, a.teacherId)],
@@ -611,7 +637,7 @@ describe("the write controls follow who writes the trip", () => {
     }
   });
 
-  it("hides Catat transaksi, Unggah bukti and Laporkan on the Laporan from a non-member", async () => {
+  it("hides Catat transaksi and Unggah bukti on the Laporan from a non-member", async () => {
     const who = await people();
     const a = await perjadinA(who, await place());
     const render = async (viewer: Person) => {
@@ -622,15 +648,37 @@ describe("the write controls follow who writes the trip", () => {
     };
 
     const forFajar = await render(who.fajar);
-    for (const control of ["Catat transaksi", "Unggah bukti", "Laporkan"]) {
+    for (const control of ["Catat transaksi", "Unggah bukti"]) {
       expect(forFajar).not.toContain(control);
     }
     // The receipts stay readable.
     expect(forFajar).toContain("Bukti 1");
 
     const forRina = await render(who.rina);
-    for (const control of ["Catat transaksi", "Unggah bukti", "Laporkan"]) {
+    for (const control of ["Catat transaksi", "Unggah bukti"]) {
       expect(forRina).toContain(control);
+    }
+  });
+
+  it("shows nobody a deadline, Laporkan or Dilaporkan, on the Laporan or the trip (#489)", async () => {
+    const who = await people();
+    const a = await perjadinA(who, await place());
+    const render = async (viewer: Person) => {
+      signedInAs(viewer);
+      const params = { params: Promise.resolve({ id: a.id }) } as never;
+      return (
+        renderToStaticMarkup(await LaporanPage(params)) +
+        renderToStaticMarkup(await PerjadinDetailPage(params))
+      );
+    };
+
+    for (const viewer of [who.rina, who.sari, who.fajar]) {
+      const html = await render(viewer);
+      expect(html).toContain("Uang Perjalanan Terpakai");
+      for (const gone of ["Laporkan", "Dilaporkan", "atuh tempo", "terlambat"]) {
+        expect(html, `${viewer.email}: ${gone}`).not.toContain(gone);
+      }
+      expect(html).not.toMatch(/sisa \d+ hari/);
     }
   });
 

@@ -18,8 +18,8 @@ import type { Executor } from "./preparation-checklist";
  * strip, the `/monitoring` budget card), so `perjadinAcquittal` no longer opens with this guard. The
  * one money read gated again is `/keuangan`'s programme-wide table (ADR-0053), and by a Grant through
  * `requireGrant` below, not by this Staff line.
- * What this choke point guards is money **WRITES** — recording, attaching, deleting and filing a
- * transaction — and delivery-*arranging* writes: Jadwalkan Sesi daring
+ * What this choke point guards is money **WRITES** — recording, attaching and deleting a
+ * transaction or a receipt — and delivery-*arranging* writes: Jadwalkan Sesi daring
  * and Rencanakan Perjadin are Staff-only because [#9](https://github.com/mafiefa02/sugt/issues/9)
  * says so (and since ADR-0047 also need a Grant — Daring Editor or Perjadin Editor, ADR-0052 — through
  * `requireGrant` below), and ADR-0004 is silent on it (that ADR opens delivery data to both roles for **reading**

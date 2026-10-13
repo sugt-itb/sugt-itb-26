@@ -32,7 +32,6 @@ const FULL = [
   "/cerita",
   "/sekolah",
   "/kelompok-sekolah",
-  "/orang",
 ];
 
 describe("sidebarItems", () => {
@@ -41,13 +40,10 @@ describe("sidebarItems", () => {
     href === "/pendamping" ? [href, "/keuangan"] : [href],
   );
 
-  it("gives a Staff Administrator every link, Keuangan after Pendamping, and Log then Pengaturan last", () => {
-    expect(hrefsFor("Staff", ["Administrator"])).toEqual([...WITH_KEUANGAN, "/log", "/pengaturan"]);
-    expect(hrefsFor("Staff", ["Administrator", "Dashboard Viewer"])).toEqual([
-      ...WITH_KEUANGAN,
-      "/log",
-      "/pengaturan",
-    ]);
+  it("gives a Staff Administrator every link, Keuangan after Pendamping, and Orang, Log then Pengaturan last", () => {
+    const ADMIN = [...WITH_KEUANGAN, "/orang", "/log", "/pengaturan"];
+    expect(hrefsFor("Staff", ["Administrator"])).toEqual(ADMIN);
+    expect(hrefsFor("Staff", ["Administrator", "Dashboard Viewer"])).toEqual(ADMIN);
     expect(WITH_KEUANGAN.slice(3, 6)).toEqual(["/pendamping", "/keuangan", "/perjadin"]);
   });
 
@@ -62,7 +58,6 @@ describe("sidebarItems", () => {
       "/cerita",
       "/sekolah",
       "/kelompok-sekolah",
-      "/orang",
     ]);
   });
 
@@ -77,7 +72,20 @@ describe("sidebarItems", () => {
     expect(hrefsFor("Pimpinan", [])).not.toContain("/keuangan");
   });
 
-  it("gives a Staff Daring Editor who reads the Dashboard every link but Log and Pengaturan", () => {
+  it("shows Orang to an Administrator only: not to any other Grant, nor to a Pimpinan (#488)", () => {
+    expect(hrefsFor("Staff", ["Administrator"])).toContain("/orang");
+    for (const grants of [
+      [],
+      ["Keuangan"],
+      ["Perjadin Editor"],
+      ["Daring Editor", "Dashboard Editor", "Dashboard Viewer"],
+    ] as const) {
+      expect(hrefsFor("Staff", [...grants])).not.toContain("/orang");
+    }
+    expect(hrefsFor("Pimpinan", [])).not.toContain("/orang");
+  });
+
+  it("gives a Staff Daring Editor who reads the Dashboard every link but Orang, Log and Pengaturan", () => {
     expect(hrefsFor("Staff", ["Daring Editor", "Dashboard Viewer"])).toEqual(FULL);
     expect(hrefsFor("Staff", ["Daring Editor", "Dashboard Editor"])).toEqual(FULL);
   });
@@ -93,7 +101,6 @@ describe("sidebarItems", () => {
       "/cerita",
       "/sekolah",
       "/kelompok-sekolah",
-      "/orang",
     ]);
   });
 
@@ -115,7 +122,6 @@ describe("sidebarItems", () => {
       "/cerita",
       "/sekolah",
       "/kelompok-sekolah",
-      "/orang",
     ]);
   });
 
@@ -129,7 +135,6 @@ describe("sidebarItems", () => {
       "/cerita",
       "/sekolah",
       "/kelompok-sekolah",
-      "/orang",
     ]);
   });
 
@@ -142,7 +147,6 @@ describe("sidebarItems", () => {
       "/feedback",
       "/sekolah",
       "/kelompok-sekolah",
-      "/orang",
     ]);
   });
 

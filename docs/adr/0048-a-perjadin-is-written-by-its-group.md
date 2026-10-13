@@ -39,7 +39,9 @@ ADR-0047's.
 - the dates, Uang Perjalanan, the Group and its PIC, the Pimpinan, the Narasumber
 - an offline Session's add, edit, cancel, Tandai and date move, and its Session Record
 - the Persiapan ticks
-- Catat transaksi, Unggah bukti (and its early receipt count), Laporkan
+- Catat transaksi, Unggah bukti (and its early receipt count), Laporkan — _amended 2026-10-13:
+  Laporkan is gone, the Report being neither filed nor due
+  ([ADR-0055](./0055-the-perjadin-report-is-neither-filed-nor-due.md))_
 - Dokumen and Foto & Video: the upload openers, the record, and Hapus
 
 The guard runs on the write's own transaction where it has one, so the membership it reads is the state

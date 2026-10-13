@@ -283,13 +283,13 @@ export async function addSchoolOnTrip(fixture: {
     subClusterId: fixture.perjadin.subClusterId,
     provinceCode: "JB",
   });
-  await addOfflineSession({
+  const session = await addOfflineSession({
     schoolId: school.id,
     heldOn: fixture.perjadin.startsOn,
     perjadinId: fixture.perjadin.id,
     status: fixture.status,
   });
-  return school;
+  return { ...school, sessionId: session.id };
 }
 
 /**
@@ -405,6 +405,11 @@ export type PerjadinEvaluationFixture = {
   lodging?: number | null;
   ratings?: Partial<Record<"transport" | "meals" | "punctuality", number>>;
   /**
+   * Nullable, and null by default: the default filer is a Pendamping, who is not asked it, and every
+   * evaluation filed before #481 holds a null too (ADR-0054). Give one with a Narasumber or Pimpinan.
+   */
+  pendampingSupport?: number | null;
+  /**
    * Optional Komentar per Aspect, as the form is (#163). A low Aspect with none supplied gets
    * `WENT_WRONG` on its OWN comment so `perjadin_evaluation_low_rating_needs_prose` is satisfied —
    * so a caller passing FINE Ratings needs no comments at all.
@@ -418,13 +423,21 @@ export type PerjadinEvaluationFixture = {
   createdAt?: Date;
 };
 
-/** How the trip went. Four Aspects, `lodging` nullable, the elaboration rule now per-Aspect. */
+/**
+ * How the trip went. Five Aspects, `lodging` and `pendamping_support` nullable, the elaboration rule
+ * per-Aspect.
+ */
 export async function addPerjadinEvaluation(fixture: PerjadinEvaluationFixture) {
   const ratings = { transport: FINE, meals: FINE, punctuality: FINE, ...fixture.ratings };
   const lodging = fixture.lodging === undefined ? FINE : fixture.lodging;
-  const ratingByAspect: Record<PerjadinAspect, number | null> = { lodging, ...ratings };
+  const pendampingSupport = fixture.pendampingSupport ?? null;
+  const ratingByAspect: Record<PerjadinAspect, number | null> = {
+    lodging,
+    ...ratings,
+    pendamping_support: pendampingSupport,
+  };
   // A low Aspect owes ITS OWN Komentar (#163) — fill it with WENT_WRONG unless the test supplied
-  // one; a null (skipped) lodging is never low and needs none.
+  // one; a null (skipped or unasked) Rating is never low and needs none.
   const commentFor = (aspect: PerjadinAspect): string | null => {
     const supplied = fixture.comments?.[aspect];
     if (supplied !== undefined) return supplied;
@@ -439,10 +452,12 @@ export async function addPerjadinEvaluation(fixture: PerjadinEvaluationFixture) 
       filedByName: fixture.name ?? "Dewi Lestari",
       lodging,
       ...ratings,
+      pendampingSupport,
       lodgingComment: commentFor("lodging"),
       transportComment: commentFor("transport"),
       mealsComment: commentFor("meals"),
       punctualityComment: commentFor("punctuality"),
+      pendampingSupportComment: commentFor("pendamping_support"),
       ...(fixture.createdAt ? { createdAt: fixture.createdAt } : {}),
     })
     .returning();
@@ -529,12 +544,6 @@ export type PerjadinFixture = {
   subClusterId?: string;
   /** Staff. They are the PIC and, by the deferred foreign key, a member of their own Group. */
   picPersonId: string;
-  /**
-   * The Pimpinan recorded on the trip — record-only rows referencing real People of role Pimpinan
-   * (#181). Pass the `person.id`s; the composite `perjadin_pimpinan_is_pimpinan` FK refuses any id
-   * that is not a Pimpinan. Empty or absent by default.
-   */
-  pimpinan?: string[];
 };
 
 /**
@@ -592,14 +601,19 @@ export async function addPerjadin(fixture: PerjadinFixture) {
       stream: null,
     });
 
-    if (fixture.pimpinan && fixture.pimpinan.length > 0) {
-      await tx
-        .insert(schema.perjadinPimpinan)
-        .values(fixture.pimpinan.map((personId) => ({ perjadinId: perjadin!.id, personId })));
-    }
-
     return perjadin!;
   });
+}
+
+/**
+ * Record Pimpinan as attending one Session (#492) — record-only rows referencing real People of role
+ * Pimpinan. The composite `session_pimpinan_is_pimpinan` FK refuses any id that is not a Pimpinan.
+ * A trip's Pimpinan are derived from these, so this is how a test puts a Pimpinan on a trip.
+ */
+export async function addSessionPimpinan(sessionId: string, personIds: string[]) {
+  await db
+    .insert(schema.sessionPimpinan)
+    .values(personIds.map((personId) => ({ sessionId, personId })));
 }
 
 /**
@@ -804,7 +818,7 @@ export async function refusedBy(write: Promise<unknown>): Promise<string | null>
 
 /**
  * `offset` days from today **in WIB**, `YYYY-MM-DD` — the calendar every dated rule is reckoned in
- * (`todayInDeadlineZone`), so a fixture on a boundary lands exactly on it. `en-CA` renders ISO.
+ * (`todayInWib`), so a fixture on a boundary lands exactly on it. `en-CA` renders ISO.
  */
 export function wibDaysFromToday(offset: number): string {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
