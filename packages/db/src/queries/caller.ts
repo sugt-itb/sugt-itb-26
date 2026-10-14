@@ -1,7 +1,7 @@
 import type { Grant, Role } from "@sugt/domain";
 
 /**
- * Who is asking. **Three named types, not one type with optional fields.**
+ * Who is asking. **Named types, one per kind of caller, not one type with optional fields.**
  *
  * A single type carrying optional fields would turn "is this a Staff caller" into a
  * runtime shape check — which is precisely what the composite foreign keys avoid
@@ -9,16 +9,22 @@ import type { Grant, Role } from "@sugt/domain";
  * arms are separate types, and a query narrows by **naming the arm it accepts in its
  * signature** rather than by inspecting a value it was handed.
  *
- * | Caller             | Is                                                     | May read                      | May write                   |
- * | ------------------ | ------------------------------------------------------ | ----------------------------- | --------------------------- |
- * | `Person`           | somebody signed in whose `person` row is still `active` | delivery; money only if Staff | their own records           |
- * | `ServiceCaller`    | `@sugt/public`, holding `AGGREGATES_SECRET`            | the four aggregate payloads   | nothing                     |
- * | `ParticipantToken` | a live Session feedback token                          | nothing                       | `participant_feedback` only |
- * | `PerjadinToken`    | a live Perjadin feedback token                         | nothing                       | `perjadin_evaluation` only  |
+ * | Caller                   | Is                                                      | May read                        | May write                   |
+ * | ------------------------ | ------------------------------------------------------- | ------------------------------- | --------------------------- |
+ * | `Person`                 | somebody signed in whose `person` row is still `active` | delivery; money only if Staff   | their own records           |
+ * | `ServiceCaller`          | `@sugt/public`, holding `AGGREGATES_SECRET`             | the four aggregate payloads     | nothing                     |
+ * | `UnifiedDashboardCaller` | the company's Unified Dashboard, with a verified JWT    | the Programme summary; no money | nothing                     |
+ * | `ParticipantToken`       | a live Session feedback token                           | nothing                         | `participant_feedback` only |
+ * | `PerjadinToken`          | a live Perjadin feedback token                          | nothing                         | `perjadin_evaluation` only  |
  *
  * See `docs/data-model.md`, *what the database does not hold*.
  */
-export type Caller = Person | ServiceCaller | ParticipantToken | PerjadinToken;
+export type Caller =
+  | Person
+  | ServiceCaller
+  | UnifiedDashboardCaller
+  | ParticipantToken
+  | PerjadinToken;
 
 /**
  * Somebody signed in, whose `person` row is still `active`.
@@ -70,6 +76,22 @@ export type Person = {
 export type ServiceCaller = {
   /** Named so the type is not structurally empty, and so a log line says who called. */
   readonly kind: "service";
+};
+
+/**
+ * The company's **Unified Dashboard**, presenting a JWT `@sugt/internal` verified (ADR-0057). No
+ * Person at all: it is a machine reading the Programme summary for company leadership.
+ *
+ * **Not a `ServiceCaller`, and deliberately so.** That arm *means* `@sugt/public` — the public site
+ * reading what anybody may see. This reader is behind the company's own login and reads the
+ * aggregate Participant Feedback averages (#504), which ADR-0001 keeps away from the public site. One
+ * arm for both would let a query opened to the Unified Dashboard open to the public site too, so it
+ * gets its own, and a query it may read names it in its signature. It reads aggregates only: no
+ * money, no narrative, no comment and no name.
+ */
+export type UnifiedDashboardCaller = {
+  /** Named so the type is not structurally empty, and so a log line says who called. */
+  readonly kind: "unified-dashboard";
 };
 
 /**

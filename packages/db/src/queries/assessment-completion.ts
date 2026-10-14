@@ -3,7 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "../client";
 import { assessmentCompletion } from "../schema/monitoring";
-import type { Person } from "./caller";
+import type { Person, UnifiedDashboardCaller } from "./caller";
 import { requireGrant } from "./staff-only";
 
 /**
@@ -33,10 +33,13 @@ export type AssessmentCompletion = {
 
 /**
  * Every completion row, in a stable `(schoolId, stream, participantType, kind)` order so a caller —
- * and the suite — reads them deterministically. Open to any signed-in Person; the app folds these
- * into the /47 tracker.
+ * and the suite — reads them deterministically. Open to any signed-in Person, and to the Unified
+ * Dashboard, whose Pretest/Posttest figures fold the same rows (#503); the app folds these into the
+ * /47 tracker.
  */
-export async function assessmentCompletions(_caller: Person): Promise<AssessmentCompletion[]> {
+export async function assessmentCompletions(
+  _caller: Person | UnifiedDashboardCaller,
+): Promise<AssessmentCompletion[]> {
   return db
     .select({
       schoolId: assessmentCompletion.schoolId,

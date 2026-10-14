@@ -22,6 +22,7 @@
     "@vercel/speed-insights": "catalog:",
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
+    "jose": "catalog:",
     "lucide-react": "catalog:",
     "next": "catalog:",
     "next-themes": "catalog:",

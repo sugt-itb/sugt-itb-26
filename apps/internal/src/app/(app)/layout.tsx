@@ -3,6 +3,7 @@ import { parseSidebarState, SIDEBAR_STATE_COOKIE } from "-/components/sidebar-st
 import { SignOutButton } from "-/components/sign-out-button";
 import { uploadGate } from "-/lib/drive/upload-gate";
 import { getPerson } from "-/lib/person";
+import { SIGN_IN_PATH } from "-/lib/sign-in-destination";
 import { canViewDashboard, hasGrant } from "@sugt/db/queries";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -38,7 +39,10 @@ export default async function SignedInLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const person = await getPerson();
-  if (!person) redirect("/masuk");
+  // No destination here: a layout is not told its path. This is the stale-cookie case — the proxy saw
+  // a session cookie with no live session behind it — and the proxy already carries the path for
+  // every visitor who is plainly signed out (#502).
+  if (!person) redirect(SIGN_IN_PATH);
 
   // Read here so the server renders the desktop sidebar at its stored width: no flash of the
   // expanded width on a collapsed reload (#359). No cookie, or an unknown value, is expanded.

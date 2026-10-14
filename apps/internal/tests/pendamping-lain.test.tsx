@@ -95,7 +95,18 @@ async function people() {
 
 type People = Awaited<ReturnType<typeof people>>;
 
-/** Perjadin A, "Kelompok 10 · 12–13 Okt 2026": Rina (PIC) and Andi, one arranged Session. */
+/**
+ * A calendar date `offset` days from today, `YYYY-MM-DD`. The trip has to stay one of Rina's
+ * **current** trips whenever the suite runs — pinned to 12–13 Okt 2026 it slid into Perjalanan
+ * Dinas Sebelumnya the day after. A margin of days absorbs the UTC-to-WIB skew of "today".
+ */
+function daysFromToday(offset: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Perjadin A, "Kelompok 10", a week from now: Rina (PIC) and Andi, one arranged Session. */
 async function perjadinA(who: People) {
   await addProvince("KT", "Kalimantan Timur", "WITA");
   const cluster = await addCluster({ slug: "alpha", name: "Cluster Alpha" });
@@ -114,14 +125,14 @@ async function perjadinA(who: People) {
   const trip = await addPerjadin({
     subClusterId: subCluster.id,
     picPersonId: who.rina.id,
-    startsOn: "2026-10-12",
-    endsOn: "2026-10-13",
+    startsOn: daysFromToday(7),
+    endsOn: daysFromToday(8),
   });
   await addGroupMember(trip.id, who.andi.id);
   const session = await addOfflineSession({
     perjadinId: trip.id,
     schoolId: school.id,
-    heldOn: "2026-10-12",
+    heldOn: daysFromToday(7),
     startsAt: "08:00",
   });
   return { id: trip.id, sessionId: session.id };
@@ -315,7 +326,7 @@ describe("a write on Pendamping Lain is the Administrator's", () => {
         driveFileId: randomUUID(),
         byteSize: 2048,
         kind: "Daftar Hadir Pendamping",
-        documentDate: "2026-10-12",
+        documentDate: daysFromToday(7),
       }),
     ).resolves.toEqual({ outcome: "recorded" });
     const entries = await db

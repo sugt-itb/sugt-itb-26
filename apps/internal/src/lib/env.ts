@@ -12,7 +12,9 @@
  * revalidation call's `REVALIDATE_SECRET` and `PUBLIC_APP_URL`, `/kalender`'s
  * `JADWAL_SHEET_CSV_URL`, and the company Drive connection's
  * `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`,
- * `GOOGLE_DRIVE_ACCOUNT_EMAIL` and `DRIVE_TOKEN_KEY` — are declared on `build`,
+ * `GOOGLE_DRIVE_ACCOUNT_EMAIL` and `DRIVE_TOKEN_KEY`, and the Unified Dashboard's
+ * `UNIFIED_DASHBOARD_JWT_SECRET`, `UNIFIED_DASHBOARD_JWT_ISSUER` and
+ * `UNIFIED_DASHBOARD_JWT_AUDIENCE` — are declared on `build`,
  * `typecheck` and `dev` for `@sugt/internal`. Adding another means editing `turbo.json` as well as `.env`.
  */
 export function requireEnv(name: string): string {
