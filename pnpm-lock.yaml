@@ -253,6 +253,9 @@ catalogs:
     drizzle-orm:
       specifier: ^0.45.2
       version: 0.45.2
+    jose:
+      specifier: ^6.2.8
+      version: 6.2.8
     lucide-react:
       specifier: ^1.31.0
       version: 1.31.0
@@ -348,6 +351,9 @@ importers:
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(kysely@0.29.5)(postgres@3.4.9)
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.8
       lucide-react:
         specifier: 'catalog:'
         version: 1.31.0(react@19.2.4)

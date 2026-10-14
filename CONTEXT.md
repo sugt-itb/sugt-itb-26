@@ -233,6 +233,10 @@ _Avoid_: attendee, student (only one of the three Classes is students), user, re
 What one Participant says about the Class they sat in: a Rating of **Materials**, **Instructor** and **Relevance** from every Class, plus **Hands-on RBL** from the Student Class only — how the hands-on **RBL** (Research-Based Learning) module went; an optional comment on each Aspect they Rate; two optional written answers that are not Aspects and are never counted (whether the class added to what they know, and their suggestions); and a name they type themselves. Left without signing in, through the Session's link — one that never expires and is never replaced, so a QR printed the day before still works ([ADR-0049](./docs/adr/0049-feedback-links-never-expire-and-are-never-replaced.md)). Nothing asks them to rate themselves — Comprehension, Participation and Readiness are on the Class Record precisely because they are judgements about the room. Deliberately not part of any internal record; the two are filed by different people who expect different readers.
 _Avoid_: review, survey, evaluation (unqualified), Class Record, Session Record
 
+**Unified Dashboard**:
+The company-wide dashboard **outside this tool** that shows company leadership a summary of this Programme, among others. It reads one machine-to-machine route, `/api/unified-dashboard/summary`, with a short-lived token its backend signs. The route returns aggregate figures only, each the same number the **Dashboard** shows, with a _Lihat Detail_ link per figure back into this tool ([ADR-0057](./docs/adr/0057-the-unified-dashboard-is-a-third-reader.md)). It is a third reader, alongside a signed-in Person and the public site, and it reads no money, no narrative and no name.
+_Avoid_: Dashboard (that is `/`, inside this tool), the aggregates (that is what the public site reads)
+
 **Final Project**:
 The artefact one Project Team produces against its Cluster's Problem, worked on across the closing stretch of the Programme.
 _Avoid_: output, deliverable, capstone

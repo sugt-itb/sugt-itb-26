@@ -1,5 +1,6 @@
 import { getPerson } from "-/lib/person";
-import type { Metadata } from "next";
+import { DESTINATION_PARAM, safeDestination } from "-/lib/sign-in-destination";
+import type { Metadata, Route } from "next";
 import { redirect } from "next/navigation";
 
 import { GoogleSignInButton } from "./google-sign-in-button";
@@ -22,20 +23,31 @@ const REJECTION =
  * specifically removed is a conversation for a human; keeping the cases
  * indistinguishable is also the right property against a stranger probing the form for
  * who is on the roster.
+ *
+ * **`?next` is the page the visitor was sent here from (#502)**, and it is read only through
+ * `safeDestination`: anything that is not a path on this app reads as no destination at all.
+ * A rejected visitor's page ignores it, so the rejection screen never carries the destination —
+ * Better Auth's `errorCallbackURL` is a bare `/masuk`, so a real rejection has none to carry.
  */
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; [DESTINATION_PARAM]?: string | string[] }>;
 }) {
+  const params = await searchParams;
+  const rejected = "error" in params;
+  const destination = rejected ? null : safeDestination(params[DESTINATION_PARAM]);
+
   // Role-aware landing (#265): a Staff Person's home is the Pendamping; everyone else — the read-only
   // Pimpinan — lands on the Dashboard at `/`, which is open to them. `/pendamping` itself bounces a
   // non-Staff caller back to `/`, so the OAuth `callbackURL` can point everyone at `/pendamping` and let
-  // that guard sort them; here we already hold the Person, so we route them directly.
+  // that guard sort them; here we already hold the Person, so we route them directly. A destination
+  // wins over both, and its own page decides whether they may read it — a path that names no route
+  // is that page's 404, which is why the cast to `Route` claims nothing more than "a path here".
   const existing = await getPerson();
-  if (existing) redirect(existing.role === "Staff" ? "/pendamping" : "/");
-
-  const rejected = "error" in (await searchParams);
+  if (existing) {
+    redirect((destination as Route | null) ?? (existing.role === "Staff" ? "/pendamping" : "/"));
+  }
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
@@ -56,7 +68,7 @@ export default async function SignInPage({
           </p>
         )}
 
-        <GoogleSignInButton />
+        <GoogleSignInButton destination={destination} />
 
         <p className="text-xs text-muted-foreground">
           Gunakan akun Google yang terdaftar. Tim DITSAMA memakai akun Google apa pun yang sudah
