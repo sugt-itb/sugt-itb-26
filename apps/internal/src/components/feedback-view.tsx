@@ -7,6 +7,7 @@ import {
   loadPerjadinFeedbackAverages,
 } from "-/app/(app)/feedback/actions";
 import { participantExportHref, perjadinExportHref } from "-/app/(app)/feedback/feedback-params";
+import { ParticipantChartDialog } from "-/components/feedback-chart-dialog";
 import { participantScopeLabel, perjadinScopeLabel, withSchool } from "-/components/feedback-scope";
 import { sesiLabel } from "-/components/session-labels";
 import { SingleSelectCombobox } from "-/components/single-select-combobox";
@@ -51,7 +52,7 @@ import {
 } from "@sugt/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@sugt/ui/components/tabs";
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { type ReactNode, useMemo, useState, useTransition } from "react";
 
 /**
  * **The Feedback screen.** Two tabs — Peserta (what Participants said about a Session) and Perjadin
@@ -476,7 +477,13 @@ function ParticipantTab({
         />
       </div>
 
-      <ExportLink href={participantExportHref({ scope, filters, sort })} />
+      {/* Lihat Grafik (#510) beside Ekspor CSV: the figures follow the scope, never the filters. */}
+      <ExportLink href={participantExportHref({ scope, filters, sort })}>
+        <ParticipantChartDialog
+          scope={scope}
+          schools={schools}
+        />
+      </ExportLink>
 
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -749,11 +756,12 @@ function PerjadinTab({
  * **Ekspor CSV** (#490), shared by both tabs: a plain link to the tab's export, carrying its
  * current scope, filters and sort, so the file holds every matching row — not just the pages
  * loaded — in the order on screen. A plain `<a>`, as `/keuangan`'s, since the response is a
- * download.
+ * download. `children` sit before it on the same row — the Peserta tab's Lihat Grafik (#510).
  */
-function ExportLink({ href }: { href: string }) {
+function ExportLink({ href, children }: { href: string; children?: ReactNode }) {
   return (
-    <div className="mb-3 flex justify-end">
+    <div className="mb-3 flex justify-end gap-2">
+      {children}
       <LinkButton
         variant="outline"
         size="sm"

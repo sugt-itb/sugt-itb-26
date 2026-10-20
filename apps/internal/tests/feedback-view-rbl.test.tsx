@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("-/app/(app)/feedback/actions", () => ({
   loadParticipantFeedback: vi.fn(),
   loadParticipantFeedbackAverages: vi.fn(),
+  loadParticipantFeedbackCharts: vi.fn(),
   loadPerjadinFeedback: vi.fn(),
   loadPerjadinFeedbackAverages: vi.fn(),
 }));
