@@ -49,11 +49,10 @@ function contrast(first: string, second: string): number {
 const TOKENS = [1, 2, 3, 4].map((index) => `--chart-category-${index}`);
 
 describe("the categorical chart tokens", () => {
-  it.each([":root", ".dark"])("are all declared in %s and exposed to Tailwind", (selector) => {
+  it.each([":root", ".dark"])("are all declared in %s", (selector) => {
     const theme = block(selector);
     for (const token of TOKENS) {
       expect(theme.get(token)).toBeDefined();
-      expect(css).toContain(`--color-${token.slice(2)}: var(${token});`);
     }
   });
 

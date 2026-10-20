@@ -20,14 +20,12 @@ import {
  */
 
 /**
- * The Tipe Peserta, in the figures' order: Siswa (the Student Class), then GTK-MS (the GTK and MS
- * Classes together) — the split of the Tipe Peserta picker and the Daftar Hadir Peserta sheets.
- * Declared here rather than imported, for the reason `feedback-view.tsx` gives: a runtime value from
- * `@sugt/db` would drag the Postgres client into the browser.
+ * The Tipe Peserta, in the figures' order — Siswa (the Student Class), then GTK-MS (the GTK and MS
+ * Classes together), the split of the Tipe Peserta picker and the Daftar Hadir Peserta sheets — and
+ * the stored Classes each pools, as `PARTICIPANT_TYPE_CLASSES` on the query. Declared here rather
+ * than imported, for the reason `feedback-view.tsx` gives: a runtime value from `@sugt/db` would drag
+ * the Postgres client into the browser.
  */
-const CHART_PARTICIPANT_TYPES = ["Siswa", "GTK-MS"] as const satisfies FeedbackParticipantType[];
-
-/** Which stored Classes each Tipe Peserta pools, as `PARTICIPANT_TYPE_CLASSES` on the query. */
 const CLASSES_BY_TYPE = {
   Siswa: ["Student"],
   "GTK-MS": ["GTK", "MS"],
@@ -43,7 +41,7 @@ const CLASSES_BY_TYPE = {
 export function chartParticipantTypes(
   participantType: FeedbackParticipantType | null,
 ): FeedbackParticipantType[] {
-  return CHART_PARTICIPANT_TYPES.filter(
+  return (Object.keys(CLASSES_BY_TYPE) as FeedbackParticipantType[]).filter(
     (type) => participantType === null || type === participantType,
   );
 }
@@ -155,8 +153,9 @@ const TICK_LENGTH = 10;
 
 /**
  * A text's width in view-box units, estimated: SVG cannot measure text without a DOM. 0.6 em per
- * character is generous for Montserrat (and wider than most fallback sans-serifs), so an estimate
- * that fits leaves the real text room.
+ * character is an estimate, not a measurement. Checked in Chromium against Montserrat, a wrapped
+ * long School title, the legend and the tick labels all stayed inside the view box without
+ * overlapping (#510).
  */
 function textWidth(text: string, fontSize: number): number {
   return text.length * fontSize * 0.6;

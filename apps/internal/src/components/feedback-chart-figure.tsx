@@ -5,6 +5,7 @@ import {
   type ChartFigure,
   type ChartParts,
 } from "-/components/feedback-chart";
+import { useId } from "react";
 
 /**
  * **One Lihat Grafik figure, hand-written SVG** (#510) — not shadcn's `chart`. Recharts draws the
@@ -13,11 +14,12 @@ import {
  * fixed view box, which is what lets the PNG export (#511) serialise it whole.
  *
  * It only draws `chartLayout`'s positions. Colours are the theme's tokens through `var(…)`, so on
- * screen it follows Mode Gelap; each part carries a `data-part` naming the checkbox that hides it.
+ * screen it follows Mode Gelap. Each part the checkboxes hide carries a `data-part` naming it —
+ * `title`, `legend`, `axes`, `values` — and the bars and the empty notice carry `bar` and `empty`.
  */
 function ParticipantChartFigure({ figure, parts }: { figure: ChartFigure; parts: ChartParts }) {
   const layout = chartLayout(figure, parts);
-  const titleId = `grafik-peserta-${figure.participantType}`;
+  const titleId = useId();
   const muted = { fill: "var(--muted-foreground)" };
   const text = { fill: "var(--foreground)" };
   const axisLine = { stroke: "var(--muted-foreground)", strokeWidth: 2 };

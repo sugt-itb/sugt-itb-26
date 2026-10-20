@@ -52,7 +52,7 @@ import {
 } from "@sugt/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@sugt/ui/components/tabs";
 import Link from "next/link";
-import { type ReactNode, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 /**
  * **The Feedback screen.** Two tabs — Peserta (what Participants said about a Session) and Perjadin
@@ -478,12 +478,13 @@ function ParticipantTab({
       </div>
 
       {/* Lihat Grafik (#510) beside Ekspor CSV: the figures follow the scope, never the filters. */}
-      <ExportLink href={participantExportHref({ scope, filters, sort })}>
+      <div className="mb-3 flex justify-end gap-2">
         <ParticipantChartDialog
           scope={scope}
           schools={schools}
         />
-      </ExportLink>
+        <ExportLink href={participantExportHref({ scope, filters, sort })} />
+      </div>
 
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -726,7 +727,9 @@ function PerjadinTab({
         />
       </div>
 
-      <ExportLink href={perjadinExportHref({ scope, filters, sort })} />
+      <div className="mb-3 flex justify-end">
+        <ExportLink href={perjadinExportHref({ scope, filters, sort })} />
+      </div>
 
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -756,20 +759,17 @@ function PerjadinTab({
  * **Ekspor CSV** (#490), shared by both tabs: a plain link to the tab's export, carrying its
  * current scope, filters and sort, so the file holds every matching row — not just the pages
  * loaded — in the order on screen. A plain `<a>`, as `/keuangan`'s, since the response is a
- * download. `children` sit before it on the same row — the Peserta tab's Lihat Grafik (#510).
+ * download.
  */
-function ExportLink({ href, children }: { href: string; children?: ReactNode }) {
+function ExportLink({ href }: { href: string }) {
   return (
-    <div className="mb-3 flex justify-end gap-2">
-      {children}
-      <LinkButton
-        variant="outline"
-        size="sm"
-        render={<a href={href} />}
-      >
-        Ekspor CSV
-      </LinkButton>
-    </div>
+    <LinkButton
+      variant="outline"
+      size="sm"
+      render={<a href={href} />}
+    >
+      Ekspor CSV
+    </LinkButton>
   );
 }
 

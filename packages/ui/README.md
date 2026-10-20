@@ -116,13 +116,14 @@ each row was added, then cropped its own title and buttons once it outgrew the s
   it is for content that does not grow: confirmations (Hapus, Tandai terlaksana, Batalkan Sesi),
   single-value edits (Ubah tanggal), the Story editor's link popup and the two
   QR popups.
-- **`panel`** — for every popup where data is entered. A fixed panel about 900px wide and the
+- **`panel`** — for every popup where data is entered, and for a read-only one whose content is
+  wide and scrolls — `/feedback`'s Lihat Grafik figures ([#510](https://github.com/sugt-itb/sugt-itb-26/issues/510)). A fixed panel about 900px wide and the
   screen's height less a margin on desktop, the whole screen below `sm`; **the same size from
   opening to closing** whatever is added to it. It is a column: `DialogHeader` pinned at the top,
   `DialogFooter` at the bottom, and the fields inside **`DialogBody`**, the only part that scrolls.
   `DialogBody` belongs to `panel` only — its edge-to-edge margins assume the panel's padding.
   Used by Catat Transaksi, Dokumen, the Dashboard's Persiapan card editor, the Persiapan checklist,
-  Catatan Sesi, Tambah/Ubah Sesi, Ubah Group and Ubah Sesi daring.
+  Catatan Sesi, Tambah/Ubah Sesi, Ubah Group, Ubah Sesi daring and Lihat Grafik.
 
 Inside a panel, short fields may sit two or three to a row from `sm` up, and a row holding several controls
 wraps rather than spilling sideways. A panel never takes its own `max-h-*` or `overflow-*` — the
