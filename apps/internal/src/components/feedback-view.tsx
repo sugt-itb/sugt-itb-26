@@ -7,6 +7,7 @@ import {
   loadPerjadinFeedbackAverages,
 } from "-/app/(app)/feedback/actions";
 import { participantExportHref, perjadinExportHref } from "-/app/(app)/feedback/feedback-params";
+import { ParticipantChartDialog } from "-/components/feedback-chart-dialog";
 import { participantScopeLabel, perjadinScopeLabel, withSchool } from "-/components/feedback-scope";
 import { sesiLabel } from "-/components/session-labels";
 import { SingleSelectCombobox } from "-/components/single-select-combobox";
@@ -476,7 +477,14 @@ function ParticipantTab({
         />
       </div>
 
-      <ExportLink href={participantExportHref({ scope, filters, sort })} />
+      {/* Lihat Grafik (#510) beside Ekspor CSV: the figures follow the scope, never the filters. */}
+      <div className="mb-3 flex justify-end gap-2">
+        <ParticipantChartDialog
+          scope={scope}
+          schools={schools}
+        />
+        <ExportLink href={participantExportHref({ scope, filters, sort })} />
+      </div>
 
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -719,7 +727,9 @@ function PerjadinTab({
         />
       </div>
 
-      <ExportLink href={perjadinExportHref({ scope, filters, sort })} />
+      <div className="mb-3 flex justify-end">
+        <ExportLink href={perjadinExportHref({ scope, filters, sort })} />
+      </div>
 
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -753,15 +763,13 @@ function PerjadinTab({
  */
 function ExportLink({ href }: { href: string }) {
   return (
-    <div className="mb-3 flex justify-end">
-      <LinkButton
-        variant="outline"
-        size="sm"
-        render={<a href={href} />}
-      >
-        Ekspor CSV
-      </LinkButton>
-    </div>
+    <LinkButton
+      variant="outline"
+      size="sm"
+      render={<a href={href} />}
+    >
+      Ekspor CSV
+    </LinkButton>
   );
 }
 

@@ -1,8 +1,10 @@
 "use server";
 
+import { chartParticipantTypes, type ParticipantChartData } from "-/components/feedback-chart";
 import { requirePerson } from "-/lib/person";
 import {
   participantFeedbackAverages,
+  participantFeedbackFigures,
   participantFeedbackPage,
   perjadinFeedbackAverages,
   perjadinFeedbackPage,
@@ -56,6 +58,27 @@ export async function loadParticipantFeedbackAverages(
 ): Promise<ParticipantFeedbackAverages> {
   const person = await requirePerson();
   return participantFeedbackAverages(person, scope);
+}
+
+/**
+ * **The Lihat Grafik figures for the dialog's scope** (#510): one per Tipe Peserta — or only the one
+ * picked — each from `participantFeedbackFigures`, the read behind every Peserta average, called with
+ * that Tipe Peserta. So a bar is the number its average card shows under the same scope, but raw: an
+ * Aspect with no Rating stays `null`, and `responseCount` says how many responses a figure stands
+ * on. The cards' `participantFeedbackAverages` turns a missing Narasumber, Materi or Relevansi into
+ * 0, a bar a figure must never draw, and drops the count. The score filters are not an argument, as
+ * for the cards. Signed in, as its twins.
+ */
+export async function loadParticipantFeedbackCharts(
+  scope: ParticipantFeedbackScope,
+): Promise<ParticipantChartData[]> {
+  const person = await requirePerson();
+  return Promise.all(
+    chartParticipantTypes(scope.participantType).map(async (participantType) => ({
+      participantType,
+      figures: await participantFeedbackFigures(person, { ...scope, participantType }),
+    })),
+  );
 }
 
 /**
