@@ -8,7 +8,10 @@ import {
   type ChartParts,
   type ParticipantChartData,
 } from "-/components/feedback-chart";
+import { chartPngFileName } from "-/components/feedback-chart-export";
 import { ParticipantChartFigure } from "-/components/feedback-chart-figure";
+import { downloadChartPng } from "-/components/feedback-chart-png";
+import { formatWibDate } from "-/lib/format-wib";
 import type { FeedbackSchoolOption, ParticipantFeedbackScope } from "@sugt/db/queries";
 import { Button } from "@sugt/ui/components/button";
 import { Checkbox } from "@sugt/ui/components/checkbox";
@@ -140,15 +143,13 @@ function ParticipantChartDialog({
                   />
                 ))
               : charts.data.map((chart) => (
-                  <div
+                  <ChartPanel
                     key={chart.participantType}
-                    className="rounded-xl border border-border p-2"
-                  >
-                    <ParticipantChartFigure
-                      figure={participantChartFigure(schools, charts.scope, chart)}
-                      parts={parts}
-                    />
-                  </div>
+                    chart={chart}
+                    scope={charts.scope}
+                    schools={schools}
+                    parts={parts}
+                  />
                 ))}
           </div>
         </DialogBody>
@@ -157,4 +158,65 @@ function ParticipantChartDialog({
   );
 }
 
-export { ParticipantChartDialog };
+/**
+ * One figure in its frame, with **Unduh PNG** (#511) under it — none on a "Belum ada tanggapan"
+ * figure, which has nothing to report. The download is the figure as it stands, so the four
+ * checkboxes decide what is in the image exactly as on screen.
+ */
+function ChartPanel({
+  chart,
+  scope,
+  schools,
+  parts,
+}: {
+  chart: ParticipantChartData;
+  scope: ParticipantFeedbackScope;
+  schools: FeedbackSchoolOption[];
+  parts: ChartParts;
+}) {
+  const svg = useRef<SVGSVGElement>(null);
+  const [exporting, setExporting] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const figure = participantChartFigure(schools, scope, chart);
+
+  async function download() {
+    if (svg.current === null) return;
+    setExporting(true);
+    setFailed(false);
+    try {
+      await downloadChartPng(
+        svg.current,
+        chartPngFileName(schools, scope, chart.participantType, formatWibDate(new Date())),
+      );
+    } catch {
+      setFailed(true);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-border p-2">
+      <ParticipantChartFigure
+        ref={svg}
+        figure={figure}
+        parts={parts}
+      />
+      {!figure.empty && (
+        <div className="flex items-center justify-end gap-3 p-1">
+          {failed && <p className="text-sm text-destructive">Gagal membuat PNG. Coba lagi.</p>}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exporting}
+            onClick={download}
+          >
+            {exporting ? "Menyiapkan…" : "Unduh PNG"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export { ChartPanel, ParticipantChartDialog };

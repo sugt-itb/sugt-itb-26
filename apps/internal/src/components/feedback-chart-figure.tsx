@@ -5,7 +5,7 @@ import {
   type ChartFigure,
   type ChartParts,
 } from "-/components/feedback-chart";
-import { useId } from "react";
+import { type Ref, useId } from "react";
 
 /**
  * **One Lihat Grafik figure, hand-written SVG** (#510) — not shadcn's `chart`. Recharts draws the
@@ -16,8 +16,17 @@ import { useId } from "react";
  * It only draws `chartLayout`'s positions. Colours are the theme's tokens through `var(…)`, so on
  * screen it follows Mode Gelap. Each part the checkboxes hide carries a `data-part` naming it —
  * `title`, `legend`, `axes`, `values` — and the bars and the empty notice carry `bar` and `empty`.
+ * `ref` reaches the `<svg>` itself, which Unduh PNG (#511) serialises as it stands.
  */
-function ParticipantChartFigure({ figure, parts }: { figure: ChartFigure; parts: ChartParts }) {
+function ParticipantChartFigure({
+  figure,
+  parts,
+  ref,
+}: {
+  figure: ChartFigure;
+  parts: ChartParts;
+  ref?: Ref<SVGSVGElement>;
+}) {
   const layout = chartLayout(figure, parts);
   const titleId = useId();
   const muted = { fill: "var(--muted-foreground)" };
@@ -26,6 +35,7 @@ function ParticipantChartFigure({ figure, parts }: { figure: ChartFigure; parts:
 
   return (
     <svg
+      ref={ref}
       viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
       role="img"
       aria-labelledby={titleId}

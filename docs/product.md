@@ -889,6 +889,20 @@ a wide dialog of vertical bar charts:
 - Figures sit side by side when there is room and stack when there is not; the dialog's body
   scrolls, and it works at ~360px and in Mode Gelap. Each figure is one self-contained SVG, title
   and legend included, so it can be exported as an image.
+- **Unduh PNG** (#511) sits under every figure that has responses — a "Belum ada tanggapan" figure
+  has none — and downloads that figure alone. There is no "Unduh semua" and no SVG download.
+  - **What you see is what you get**: the four checkboxes decide what is in the image, exactly as
+    on screen.
+  - **Always light on white**, even in Mode Gelap, so the image sits cleanly on a white report
+    page; the screen keeps its own theme.
+  - **2400×1600 px** from a phone or a desktop alike: the figure is laid out at 1200×800 and drawn
+    at 2×.
+  - **The font is Montserrat where the machine has it installed, else Helvetica or Arial.** An
+    image cannot reach the app's web font, and the fallbacks are narrower, so nothing overflows.
+  - **Named** `grafik-peserta-<scope>-<siswa|gtk-ms>-<today>.png`. The scope is the School and
+    Sesi, slugified as the Ekspor CSV file names are, or `semua` with neither; then the figure's own
+    Tipe Peserta. Example: `grafik-peserta-sman-1-bontang-siswa-2026-10-20.png`. There is no
+    `tersaring`, because figures never follow the score filters.
 
 **Nothing asks them to rate themselves.** Comprehension, Participation and Readiness sit on the
 Class Record precisely because they are judgements about the room, and a room grading its own
