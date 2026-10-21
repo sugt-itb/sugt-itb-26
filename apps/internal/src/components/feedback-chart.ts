@@ -186,8 +186,8 @@ const PILL_GAP = 14;
 const PILL_LEADING = 68;
 /**
  * **Every donut is this size, in every figure and whatever the checkboxes hide**, so a Siswa and a
- * GTK-MS figure compare by eye (#514). Four fit across the view box with room between them and
- * under them for the longest label, Hands-on RBL. The ring is 36 wide; the hole holds the widest
+ * GTK-MS figure compare by eye (#514). Four fit across the view box with room between them for
+ * the widest name pill, Hands-on RBL's. The ring is 36 wide; the hole holds the widest
  * score, "10.0" in bold at `VALUE_SIZE` — about 115 units — with room to spare.
  */
 const DONUT_OUTER_RADIUS = 120;
@@ -199,21 +199,29 @@ const DONUT_INNER_RADIUS = 84;
 export const CHART_TRACK_STROKE = 2;
 const RING_EDGE = DONUT_OUTER_RADIUS + CHART_TRACK_STROKE / 2;
 const LABEL_SIZE = 30;
+/** From the ring's outer edge, outline included, to the top of its name's pill. */
 const LABEL_GAP = 20;
+/**
+ * **An Aspect's name pill** (#523): filled with its donut's colour, as wide as its own word plus
+ * this much either side. Smaller than the Tipe Peserta pill, so the title still reads first. The
+ * widest, `Hands-on RBL`, comes to 256 at the 0.6 em estimate — inside the four-donut figure's
+ * 276-wide slot.
+ */
+const LABEL_PILL_HEIGHT = 46;
+const LABEL_PILL_PAD_X = 20;
 const VALUE_SIZE = 48;
 /** From the title block's bottom to the ring's outer edge (#522). */
 const TITLE_GAP = 24;
 const NOTICE_SIZE = 36;
 
 /**
- * **The donuts' row, from the ring's outer edge down**: where the centre and the Aspect's name
- * fall, and how tall the row stands — to whichever reaches lower, the ring or the name's
- * descenders (the same em allowance the title's last line gets). A "Belum ada tanggapan" figure's
- * band is this tall too, so it matches a full figure.
+ * **The donuts' row, from the ring's outer edge down**: where the centre and the Aspect's name pill
+ * fall, and how tall the row stands — to whichever reaches lower, the ring or the pills. A "Belum
+ * ada tanggapan" figure's band is this tall too, so it matches a full figure.
  */
 const ROW_CENTRE = RING_EDGE;
-const ROW_LABEL_BASELINE = ROW_CENTRE + DONUT_OUTER_RADIUS + LABEL_GAP + LABEL_SIZE * 0.8;
-const ROW_HEIGHT = Math.max(ROW_CENTRE + RING_EDGE, ROW_LABEL_BASELINE + LABEL_SIZE * DESCENT);
+const ROW_PILL_TOP = ROW_CENTRE + RING_EDGE + LABEL_GAP;
+const ROW_HEIGHT = Math.max(ROW_CENTRE + RING_EDGE, ROW_PILL_TOP + LABEL_PILL_HEIGHT);
 
 /**
  * A text's width in view-box units, estimated: SVG cannot measure text without a DOM. 0.6 em per
@@ -284,6 +292,23 @@ function arc(centre: Point, value: number | null): ChartArc | null {
   };
 }
 
+/** An Aspect's name in its pill, the pill centred on `x` with its top at `top`. */
+function nameLabel(
+  text: string,
+  x: number,
+  top: number,
+): ChartLayout["slots"][number]["nameLabel"] {
+  const width = textWidth(text, LABEL_SIZE) + 2 * LABEL_PILL_PAD_X;
+  return {
+    text,
+    fontSize: LABEL_SIZE,
+    fontWeight: 600,
+    x,
+    y: top + LABEL_PILL_HEIGHT / 2 + LABEL_SIZE * MIDDLE,
+    pill: { x: x - width / 2, y: top, width, height: LABEL_PILL_HEIGHT },
+  };
+}
+
 /** Where every part of a figure sits. A part its checkbox hides is `null`. */
 export type ChartLayout = {
   title: {
@@ -323,8 +348,16 @@ export type ChartLayout = {
     arc: ChartArc | null;
     /** The score, centred in the hole: `y` is its baseline. */
     valueLabel: (Point & { text: string; fontSize: number }) | null;
-    /** The Aspect's name under the donut, always: `y` is its baseline. */
-    nameLabel: Point & { text: string; fontSize: number };
+    /**
+     * The Aspect's name under the donut, always, centred in its pill (#523): `y` is its baseline,
+     * `pill` the rect filled with the Aspect's colour, `x`/`y` its top left.
+     */
+    nameLabel: Point & {
+      text: string;
+      fontSize: number;
+      fontWeight: number;
+      pill: { x: number; y: number; width: number; height: number };
+    };
   }[];
   /** "Belum ada tanggapan", centred where the donuts would be, when the figure has no responses. */
   emptyNotice: (Point & { text: string; fontSize: number }) | null;
@@ -334,7 +367,8 @@ export type ChartLayout = {
 
 /**
  * **A figure's layout, and its height** (#522). Top to bottom: the title block (Judul), `TITLE_GAP`,
- * then one row of donuts, each with its score in its hole (Nilai) and its Aspect's name under it.
+ * then one row of donuts, each with its score in its hole (Nilai) and its Aspect's name in a pill
+ * of its colour under it (#523).
  * The topmost shape — the Tipe Peserta's pill, or with Judul off the ring's outline — touches y = 0,
  * and the bottommost touches `height`: no margin above or below. Hiding the title makes the figure
  * shorter, but **never changes a donut's size**; Nilai sits in the hole and never changes the height.
@@ -406,12 +440,7 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
                 y: centre.y + VALUE_SIZE * MIDDLE,
               }
             : null,
-          nameLabel: {
-            text: aspect.label,
-            fontSize: LABEL_SIZE,
-            x: centre.x,
-            y: rowTop + ROW_LABEL_BASELINE,
-          },
+          nameLabel: nameLabel(aspect.label, centre.x, rowTop + ROW_PILL_TOP),
         };
       });
 
