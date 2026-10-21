@@ -8,15 +8,16 @@ import {
 import { type Ref, useId } from "react";
 
 /**
- * **One Lihat Grafik figure, hand-written SVG** (#510) — not shadcn's `chart`. Recharts draws the
- * legend and title as HTML outside its `<svg>`, so exporting one would need a DOM-to-image library;
- * here the title, n line, legend, axes, bars and value labels all live inside **one `<svg>`** with a
- * fixed view box, which is what lets the PNG export (#511) serialise it whole.
+ * **One Lihat Grafik figure, hand-written SVG** (#510, #514) — not shadcn's `chart`. Recharts draws
+ * the legend and title as HTML outside its `<svg>`, so exporting one would need a DOM-to-image
+ * library; here the title, n line, legend, pies, their labels and scores all live inside **one
+ * `<svg>`** with a fixed view box, which is what lets the PNG export (#511) serialise it whole.
  *
  * It only draws `chartLayout`'s positions. Colours are the theme's tokens through `var(…)`, so on
  * screen it follows Mode Gelap. Each part the checkboxes hide carries a `data-part` naming it —
- * `title`, `legend`, `axes`, `values` — and the bars and the empty notice carry `bar` and `empty`.
- * `ref` reaches the `<svg>` itself, which Unduh PNG (#511) serialises as it stands.
+ * `title`, `legend`, `labels`, `values` — and each pie, its wedge and the empty notice carry `pie`,
+ * `wedge` and `empty`. `ref` reaches the `<svg>` itself, which Unduh PNG (#511) serialises as it
+ * stands.
  */
 function ParticipantChartFigure({
   figure,
@@ -31,7 +32,18 @@ function ParticipantChartFigure({
   const titleId = useId();
   const muted = { fill: "var(--muted-foreground)" };
   const text = { fill: "var(--foreground)" };
-  const axisLine = { stroke: "var(--muted-foreground)", strokeWidth: 2 };
+  // The whole circle, always: the track a wedge fills. The outline is what shows it in light mode,
+  // where --muted is nearly white.
+  const track = { fill: "var(--muted)", stroke: "var(--border)", strokeWidth: 2 };
+  // The score sits on the wedge's edge as often as not, so it is drawn over a thick halo of the
+  // background colour: legible on every wedge colour and on the track, without cutting the pie.
+  const score = {
+    fill: "var(--foreground)",
+    stroke: "var(--background)",
+    strokeWidth: 10,
+    paintOrder: "stroke",
+    strokeLinejoin: "round",
+  } as const;
 
   return (
     <svg
@@ -100,100 +112,55 @@ function ParticipantChartFigure({
         </g>
       )}
 
-      {layout.axes && (
-        <g data-part="axes">
-          <line
-            x1={layout.plot.left}
-            y1={layout.plot.top}
-            x2={layout.plot.left}
-            y2={layout.plot.bottom}
-            style={axisLine}
+      {layout.slots.map((slot) => (
+        <g
+          key={slot.aspect}
+          data-part="pie"
+          data-aspect={slot.aspect}
+        >
+          <circle
+            cx={slot.centre.x}
+            cy={slot.centre.y}
+            r={slot.radius}
+            style={track}
           />
-          <line
-            x1={layout.plot.left}
-            y1={layout.plot.bottom}
-            x2={layout.plot.right}
-            y2={layout.plot.bottom}
-            style={axisLine}
-          />
-          {layout.axes.yTicks.map((tick) => (
-            <g key={tick.label}>
-              <line
-                x1={layout.plot.left - layout.axes!.tickLength}
-                y1={tick.y}
-                x2={layout.plot.left}
-                y2={tick.y}
-                style={axisLine}
-              />
-              <text
-                x={layout.plot.left - layout.axes!.tickLength - 12}
-                y={tick.y + layout.axes!.fontSize * 0.35}
-                textAnchor="end"
-                fontSize={layout.axes!.fontSize}
-                style={muted}
-              >
-                {tick.label}
-              </text>
-            </g>
-          ))}
-          {layout.axes.xTicks.map((tick) => (
-            <g key={tick.label}>
-              <line
-                x1={tick.x}
-                y1={layout.plot.bottom}
-                x2={tick.x}
-                y2={layout.plot.bottom + layout.axes!.tickLength}
-                style={axisLine}
-              />
-              <text
-                x={tick.x}
-                y={layout.axes!.xTickBaseline}
-                textAnchor="middle"
-                fontSize={layout.axes!.fontSize}
-                style={text}
-              >
-                {tick.label}
-              </text>
-            </g>
-          ))}
-          <text
-            x={layout.axes.xTitle.x}
-            y={layout.axes.xTitle.y}
-            textAnchor="middle"
-            fontSize={layout.axes.fontSize}
-            fontWeight={600}
-            style={muted}
-          >
-            {layout.axes.xTitle.text}
-          </text>
-          <text
-            x={layout.axes.yTitle.x}
-            y={layout.axes.yTitle.y}
-            transform={`rotate(-90 ${layout.axes.yTitle.x} ${layout.axes.yTitle.y})`}
-            textAnchor="middle"
-            fontSize={layout.axes.fontSize}
-            fontWeight={600}
-            style={muted}
-          >
-            {layout.axes.yTitle.text}
-          </text>
-        </g>
-      )}
-
-      {layout.slots.map(
-        (slot) =>
-          slot.bar && (
-            <rect
-              key={slot.aspect}
-              data-part="bar"
-              data-aspect={slot.aspect}
-              x={slot.bar.x}
-              y={slot.bar.y}
-              width={slot.bar.width}
-              height={slot.bar.height}
+          {slot.wedge?.kind === "full" && (
+            <circle
+              data-part="wedge"
+              cx={slot.centre.x}
+              cy={slot.centre.y}
+              r={slot.radius}
               style={{ fill: `var(${slot.colour})` }}
             />
-          ),
+          )}
+          {slot.wedge?.kind === "sector" && (
+            <path
+              data-part="wedge"
+              d={slot.wedge.d}
+              style={{ fill: `var(${slot.colour})` }}
+            />
+          )}
+        </g>
+      ))}
+
+      {layout.slots.some((slot) => slot.nameLabel) && (
+        <g data-part="labels">
+          {layout.slots.map(
+            (slot) =>
+              slot.nameLabel && (
+                <text
+                  key={slot.aspect}
+                  x={slot.nameLabel.x}
+                  y={slot.nameLabel.y}
+                  textAnchor="middle"
+                  fontSize={slot.nameLabel.fontSize}
+                  style={text}
+                >
+                  {slot.nameLabel.text}
+                </text>
+              ),
+          )}
+        </g>
       )}
 
       {layout.slots.some((slot) => slot.valueLabel) && (
@@ -207,8 +174,8 @@ function ParticipantChartFigure({
                   y={slot.valueLabel.y}
                   textAnchor="middle"
                   fontSize={slot.valueLabel.fontSize}
-                  fontWeight={600}
-                  style={text}
+                  fontWeight={700}
+                  style={score}
                 >
                   {slot.valueLabel.text}
                 </text>

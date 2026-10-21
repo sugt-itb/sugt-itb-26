@@ -12,9 +12,9 @@ import {
 } from "@sugt/domain";
 
 /**
- * **The Lihat Grafik figures' pure rules** (#510): which figures a scope gets, which Aspects a Tipe
- * Peserta has, `null` → no bar, the title and n line, and where every part of a figure sits in its
- * fixed view box. Plain functions, tested without a DOM, the way `feedback-scope.ts` sits beside the
+ * **The Lihat Grafik figures' pure rules** (#510, #514): which figures a scope gets, which Aspects a
+ * Tipe Peserta has, `null` → no wedge, the title and n line, and where every part of a figure sits
+ * in its fixed view box. Plain functions, tested without a DOM, the way `feedback-scope.ts` sits beside the
  * tab; `feedback-chart-figure.tsx` only draws what `chartLayout` returns. Types only from
  * `@sugt/db/queries`, as in `feedback-view.tsx`.
  */
@@ -47,9 +47,14 @@ export function chartParticipantTypes(
 }
 
 /** The four checkboxes: which parts of every figure are drawn. All on to start. */
-export type ChartParts = { title: boolean; legend: boolean; axes: boolean; values: boolean };
+export type ChartParts = { title: boolean; legend: boolean; labels: boolean; values: boolean };
 
-export const ALL_CHART_PARTS: ChartParts = { title: true, legend: true, axes: true, values: true };
+export const ALL_CHART_PARTS: ChartParts = {
+  title: true,
+  legend: true,
+  labels: true,
+  values: true,
+};
 
 /** One Tipe Peserta's figures over the dialog's scope — what the Server Action returns. */
 export type ParticipantChartData = {
@@ -58,9 +63,9 @@ export type ParticipantChartData = {
 };
 
 /**
- * **Bar order is the average cards'**: Narasumber, Materi, Relevansi, Hands-on RBL. Each Aspect has
+ * **Pie order is the average cards'**: Narasumber, Materi, Relevansi, Hands-on RBL. Each Aspect has
  * one categorical colour token (`globals.css`), the same in every figure, which is what lets the
- * legend stand in for the x-axis labels when Sumbu is off. The tokens are named, not resolved, so
+ * legend stand in for the pies' labels when Label is off. The tokens are named, not resolved, so
  * the PNG export (#511) can swap in concrete values.
  */
 const CHART_ASPECTS: readonly {
@@ -74,8 +79,8 @@ const CHART_ASPECTS: readonly {
   { aspect: "hands_on_rbl", figure: "handsOnRbl", colour: "--chart-category-4" },
 ];
 
-/** One Aspect's bar. `value` is `null` when no response in scope Rated it: a slot with no bar. */
-export type ChartBar = {
+/** One Aspect's pie. `value` is `null` when no response in scope Rated it: a pie with no wedge. */
+export type ChartAspect = {
   aspect: ParticipantFeedbackAspect;
   label: string;
   value: number | null;
@@ -91,8 +96,8 @@ export type ChartFigure = {
   title: string;
   /** "n = 42 tanggapan" — indicative, not a census (ADR-0009), so a figure says what it stands on. */
   countLine: string;
-  bars: ChartBar[];
-  /** No response in scope: the frame shows "Belum ada tanggapan" in place of bars. */
+  aspects: ChartAspect[];
+  /** No response in scope: the frame shows "Belum ada tanggapan" in place of the pies. */
   empty: boolean;
 };
 
@@ -117,7 +122,7 @@ export function participantChartFigure(
     title: `Nilai rata-rata Peserta · ${covers}`,
     countLine: `n = ${figures.responseCount} tanggapan`,
     empty: figures.responseCount === 0,
-    bars: CHART_ASPECTS.filter(({ aspect }) => asked.has(aspect)).map(
+    aspects: CHART_ASPECTS.filter(({ aspect }) => asked.has(aspect)).map(
       ({ aspect, figure, colour }) => {
         const value = figures[figure];
         return {
@@ -146,16 +151,20 @@ const COUNT_SIZE = 32;
 const LEGEND_SIZE = 32;
 const LEGEND_SWATCH = 28;
 const LEGEND_ROW = 48;
-const TICK_SIZE = 30;
-const AXIS_TITLE_SIZE = 28;
-const VALUE_SIZE = 36;
-const TICK_LENGTH = 10;
+/**
+ * **Every pie is this size, in every figure and whatever the checkboxes hide**, so a Siswa and a
+ * GTK-MS figure compare by eye, as the fixed 0–10 axis let the bars. Four fit across the view box
+ * with room between them and under them for the longest label, Hands-on RBL.
+ */
+const PIE_RADIUS = 120;
+const LABEL_SIZE = 30;
+const LABEL_GAP = 20;
+const VALUE_SIZE = 48;
 
 /**
  * A text's width in view-box units, estimated: SVG cannot measure text without a DOM. 0.6 em per
  * character is an estimate, not a measurement. Checked in Chromium against Montserrat, a wrapped
- * long School title, the legend and the tick labels all stayed inside the view box without
- * overlapping (#510).
+ * long School title and the legend stayed inside the view box without overlapping (#510).
  */
 function textWidth(text: string, fontSize: number): number {
   return text.length * fontSize * 0.6;
@@ -177,6 +186,38 @@ function wrap(text: string, fontSize: number, width: number): string[] {
 
 type Point = { x: number; y: number };
 
+/**
+ * A pie's filled part: the whole circle at 10.0 — one SVG arc cannot draw 360°, so it is a circle —
+ * or a sector from 12 o'clock, apex at the centre, `d` its path.
+ */
+export type ChartWedge =
+  | { kind: "full" }
+  | { kind: "sector"; d: string; end: Point; largeArc: boolean };
+
+/** Two decimals is far below a pixel at any size the figure is drawn. */
+const round = (value: number) => Math.round(value * 100) / 100;
+
+/**
+ * **A wedge filled to `value / 10` of the circle, like a progress indicator.** It starts at 12
+ * o'clock and sweeps counter-clockwise, toward 9 o'clock first — SVG's sweep flag 0 on screen. 0.0
+ * fills nothing, so the pie is its bare track; `null` likewise, told apart only by its label.
+ */
+function wedge(centre: Point, radius: number, value: number | null): ChartWedge | null {
+  if (value === null || value <= 0) return null;
+  if (value >= 10) return { kind: "full" };
+  const angle = (value / 10) * 2 * Math.PI;
+  const end = { x: centre.x - radius * Math.sin(angle), y: centre.y - radius * Math.cos(angle) };
+  const largeArc = value > 5;
+  return {
+    kind: "sector",
+    d:
+      `M ${centre.x} ${centre.y} L ${centre.x} ${centre.y - radius} ` +
+      `A ${radius} ${radius} 0 ${largeArc ? 1 : 0} 0 ${round(end.x)} ${round(end.y)} Z`,
+    end,
+    largeArc,
+  };
+}
+
 /** Where every part of a figure sits. A part its checkbox hides is `null`. */
 export type ChartLayout = {
   title: {
@@ -192,35 +233,30 @@ export type ChartLayout = {
     swatch: number;
     items: { label: string; colour: string; swatch: Point; text: Point }[];
   } | null;
-  plot: { top: number; bottom: number; left: number; right: number };
-  axes: {
-    fontSize: number;
-    tickLength: number;
-    yTicks: { label: string; y: number }[];
-    xTicks: { label: string; x: number }[];
-    /** Baseline of the x tick labels. */
-    xTickBaseline: number;
-    xTitle: Point & { text: string };
-    /** The y title is rotated a quarter-turn anticlockwise about this point. */
-    yTitle: Point & { text: string };
-  } | null;
-  /** One per Aspect, in order — kept for an Aspect with no Rating, whose `bar` is `null`. */
+  /**
+   * One pie per Aspect, in order — kept for an Aspect with no Rating, whose `wedge` is `null` — and
+   * none at all when the figure has no responses.
+   */
   slots: {
     aspect: ParticipantFeedbackAspect;
     colour: string;
-    centre: number;
-    bar: { x: number; y: number; width: number; height: number } | null;
+    centre: Point;
+    radius: number;
+    wedge: ChartWedge | null;
+    /** The score, centred on the pie: `y` is its baseline. */
     valueLabel: (Point & { text: string; fontSize: number }) | null;
+    /** The Aspect's name under the pie: `y` is its baseline. */
+    nameLabel: (Point & { text: string; fontSize: number }) | null;
   }[];
-  /** "Belum ada tanggapan", centred in the plot, when the figure has no responses. */
+  /** "Belum ada tanggapan", centred where the pies would be, when the figure has no responses. */
   emptyNotice: (Point & { text: string }) | null;
 };
 
 /**
  * **A figure's layout in the fixed view box.** Top to bottom: the title and n line (Judul), the
- * legend (Legenda), the plot with its value labels (Nilai), then the x tick labels and axis title
- * (Sumbu); the y ticks and title sit to the plot's left. A hidden part gives its room to the bars.
- * **The value axis is 0–10, always**, so two figures compare by eye.
+ * legend (Legenda), then one row of pies, each with its score on its centre (Nilai) and its
+ * Aspect's name under it (Label). The row is centred in the room the parts above leave; a hidden
+ * part gives that room back, but **never changes a pie's size**.
  */
 export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout {
   const contentWidth = CHART_WIDTH - 2 * PAD;
@@ -246,9 +282,9 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
     // Each item is a swatch, a gap and its label; items run in centred rows, wrapping when full.
     const gap = 12;
     const between = 40;
-    const sized = figure.bars.map((bar) => ({
-      bar,
-      width: LEGEND_SWATCH + gap + textWidth(bar.label, LEGEND_SIZE),
+    const sized = figure.aspects.map((aspect) => ({
+      aspect,
+      width: LEGEND_SWATCH + gap + textWidth(aspect.label, LEGEND_SIZE),
     }));
     const rows: (typeof sized)[] = [];
     for (const item of sized) {
@@ -261,10 +297,10 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
       const top = cursor + index * LEGEND_ROW;
       const rowWidth = row.reduce((sum, item) => sum + item.width, 0) + between * (row.length - 1);
       let x = (CHART_WIDTH - rowWidth) / 2;
-      return row.map(({ bar, width }) => {
+      return row.map(({ aspect, width }) => {
         const item = {
-          label: bar.label,
-          colour: bar.colour,
+          label: aspect.label,
+          colour: aspect.colour,
           swatch: { x, y: top + (LEGEND_SIZE - LEGEND_SWATCH) / 2 + 2 },
           text: { x: x + LEGEND_SWATCH + gap, y: top + LEGEND_SIZE * 0.85 },
         };
@@ -276,61 +312,49 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
     cursor += rows.length * LEGEND_ROW;
   }
 
-  // Headroom above a 10 bar for its value label, and below the plot for the x tick labels and title.
-  const top = cursor + (parts.values ? VALUE_SIZE + 24 : 12);
-  const bottom =
-    CHART_HEIGHT - PAD - (parts.axes ? TICK_LENGTH + 12 + TICK_SIZE + 24 + AXIS_TITLE_SIZE : 0);
-  const left =
-    PAD + (parts.axes ? AXIS_TITLE_SIZE + 24 + textWidth("10", TICK_SIZE) + 12 + TICK_LENGTH : 0);
-  const right = CHART_WIDTH - PAD;
-  const plot = { top, bottom, left, right };
-  const plotHeight = bottom - top;
-  const slotWidth = (right - left) / figure.bars.length;
-  const barWidth = Math.min(slotWidth * 0.6, 180);
+  // The row — pies, then their labels — centred in what is left, or pinned to its top if a long
+  // title leaves less than that.
+  const top = cursor + 12;
+  const bottom = CHART_HEIGHT - PAD;
+  const rowHeight = 2 * PIE_RADIUS + (parts.labels ? LABEL_GAP + LABEL_SIZE : 0);
+  const centreY = Math.round(top + Math.max(0, (bottom - top - rowHeight) / 2) + PIE_RADIUS);
+  const slotWidth = contentWidth / figure.aspects.length;
 
-  const slots = figure.bars.map((bar, index) => {
-    const centre = left + slotWidth * (index + 0.5);
-    const height = bar.value === null ? 0 : (bar.value / 10) * plotHeight;
-    const drawn = !figure.empty && bar.value !== null;
-    return {
-      aspect: bar.aspect,
-      colour: bar.colour,
-      centre,
-      bar: drawn ? { x: centre - barWidth / 2, y: bottom - height, width: barWidth, height } : null,
-      valueLabel:
-        parts.values && !figure.empty
-          ? { text: bar.valueLabel, fontSize: VALUE_SIZE, x: centre, y: bottom - height - 14 }
-          : null,
-    };
-  });
-
-  const axes: ChartLayout["axes"] = parts.axes
-    ? {
-        fontSize: TICK_SIZE,
-        tickLength: TICK_LENGTH,
-        yTicks: [0, 2, 4, 6, 8, 10].map((value) => ({
-          label: String(value),
-          y: bottom - (value / 10) * plotHeight,
-        })),
-        xTicks: figure.bars.map((bar, index) => ({ label: bar.label, x: slots[index]!.centre })),
-        xTickBaseline: bottom + TICK_LENGTH + 12 + TICK_SIZE * 0.8,
-        xTitle: { text: "Aspek", x: (left + right) / 2, y: CHART_HEIGHT - PAD },
-        yTitle: {
-          text: "Nilai rata-rata (0–10)",
-          x: PAD + AXIS_TITLE_SIZE * 0.8,
-          y: (top + bottom) / 2,
-        },
-      }
-    : null;
+  const slots = figure.empty
+    ? []
+    : figure.aspects.map((aspect, index) => {
+        const centre = { x: PAD + slotWidth * (index + 0.5), y: centreY };
+        return {
+          aspect: aspect.aspect,
+          colour: aspect.colour,
+          centre,
+          radius: PIE_RADIUS,
+          wedge: wedge(centre, PIE_RADIUS, aspect.value),
+          valueLabel: parts.values
+            ? {
+                text: aspect.valueLabel,
+                fontSize: VALUE_SIZE,
+                x: centre.x,
+                y: centre.y + VALUE_SIZE * 0.35,
+              }
+            : null,
+          nameLabel: parts.labels
+            ? {
+                text: aspect.label,
+                fontSize: LABEL_SIZE,
+                x: centre.x,
+                y: centre.y + PIE_RADIUS + LABEL_GAP + LABEL_SIZE * 0.8,
+              }
+            : null,
+        };
+      });
 
   return {
     title,
     legend,
-    plot,
-    axes,
     slots,
     emptyNotice: figure.empty
-      ? { text: "Belum ada tanggapan", x: (left + right) / 2, y: (top + bottom) / 2 }
+      ? { text: "Belum ada tanggapan", x: CHART_WIDTH / 2, y: (top + bottom) / 2 }
       : null,
   };
 }

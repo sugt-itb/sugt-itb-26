@@ -32,7 +32,7 @@ import { useId, useRef, useState, useTransition } from "react";
 const PART_LABELS: Record<keyof ChartParts, string> = {
   title: "Judul",
   legend: "Legenda",
-  axes: "Sumbu",
+  labels: "Label",
   values: "Nilai",
 };
 

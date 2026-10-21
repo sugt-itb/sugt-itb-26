@@ -74,7 +74,10 @@ describe("exportChartSvg", () => {
     const markup = exportChartSvg(screenMarkup());
     expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--chart-category-1"]}`);
     expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--foreground"]}`);
-    expect(markup).toContain(`stroke:${CHART_EXPORT_COLOURS["--muted-foreground"]}`);
+    // The pies' track, its outline and the scores' halo (#514).
+    expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--muted"]}`);
+    expect(markup).toContain(`stroke:${CHART_EXPORT_COLOURS["--border"]}`);
+    expect(markup).toContain(`stroke:${CHART_EXPORT_COLOURS["--background"]}`);
   });
 
   it("is laid out at 1200×800 on a white background, in a named font stack", () => {
@@ -89,12 +92,12 @@ describe("exportChartSvg", () => {
     expect(markup).toMatch(/^<svg[^>]*><rect width="1200" height="800" fill="#ffffff"\/>/);
   });
 
-  it.each(["title", "legend", "axes", "values"] as const)(
+  it.each(["title", "legend", "labels", "values"] as const)(
     "leaves out exactly %s when its checkbox is off",
     (part) => {
       const markup = exportChartSvg(screenMarkup({ ...ALL_CHART_PARTS, [part]: false }));
       expect(markup).not.toContain(`data-part="${part}"`);
-      for (const other of ["title", "legend", "axes", "values"].filter((name) => name !== part)) {
+      for (const other of ["title", "legend", "labels", "values"].filter((name) => name !== part)) {
         expect(markup).toContain(`data-part="${other}"`);
       }
     },
@@ -102,10 +105,10 @@ describe("exportChartSvg", () => {
 
   it("keeps exactly the parts the checkboxes leave on", () => {
     const markup = exportChartSvg(
-      screenMarkup({ title: false, legend: true, axes: false, values: true }),
+      screenMarkup({ title: false, legend: true, labels: false, values: true }),
     );
     expect(markup).not.toContain('data-part="title"');
-    expect(markup).not.toContain('data-part="axes"');
+    expect(markup).not.toContain('data-part="labels"');
     expect(markup).toContain('data-part="legend"');
     expect(markup).toContain('data-part="values"');
   });
