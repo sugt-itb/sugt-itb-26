@@ -3,6 +3,8 @@
 import { loadParticipantFeedbackCharts } from "-/app/(app)/feedback/actions";
 import {
   ALL_CHART_PARTS,
+  CHART_WIDTH,
+  chartHeight,
   chartParticipantTypes,
   participantChartFigure,
   type ChartParts,
@@ -64,6 +66,8 @@ function ParticipantChartDialog({
   const latest = useRef(0);
   const idPrefix = useId();
   const figureCount = charts?.data.length ?? chartParticipantTypes(scope.participantType).length;
+  // The figures' own shape — their title over this scope, the checkboxes as they stand.
+  const skeletonHeight = chartHeight(schools, scope, parts);
 
   function openWith(snapshot: ParticipantFeedbackScope) {
     setCharts(null);
@@ -137,7 +141,8 @@ function ParticipantChartDialog({
               ? Array.from({ length: figureCount }, (_, index) => (
                   <Skeleton
                     key={index}
-                    className="aspect-[3/2] w-full"
+                    className="w-full"
+                    style={{ aspectRatio: `${CHART_WIDTH} / ${skeletonHeight}` }}
                   />
                 ))
               : charts.data.map((chart) => (

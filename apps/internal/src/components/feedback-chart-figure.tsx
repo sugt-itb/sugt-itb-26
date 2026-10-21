@@ -1,5 +1,5 @@
 import {
-  CHART_HEIGHT,
+  CHART_TRACK_STROKE,
   CHART_WIDTH,
   chartLayout,
   type ChartFigure,
@@ -11,8 +11,8 @@ import { type Ref, useId } from "react";
  * **One Lihat Grafik figure, hand-written SVG** (#510, #514, #516, #518) — not shadcn's `chart`.
  * Recharts draws the legend and title as HTML outside its `<svg>`, so exporting one would need a
  * DOM-to-image library; here the title block with its Tipe Peserta pill, the donuts, their names
- * and scores all live inside **one `<svg>`** with a fixed view box, which is what lets the PNG
- * export (#511) serialise it whole.
+ * and scores all live inside **one `<svg>`**, which is what lets the PNG export (#511) serialise it
+ * whole. Its view box is 1200 wide and as tall as `chartLayout` says its content is (#522).
  *
  * It only draws `chartLayout`'s positions. Colours are the theme's tokens through `var(…)`, so on
  * screen it follows Mode Gelap. Each part the checkboxes hide carries a `data-part` naming it —
@@ -35,12 +35,12 @@ function ParticipantChartFigure({
   const text = { fill: "var(--foreground)" };
   // The whole ring, always: the track an arc fills. The outline on both edges is what shows it in
   // light mode, where --muted is nearly white.
-  const track = { fill: "var(--muted)", stroke: "var(--border)", strokeWidth: 2 };
+  const track = { fill: "var(--muted)", stroke: "var(--border)", strokeWidth: CHART_TRACK_STROKE };
 
   return (
     <svg
       ref={ref}
-      viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+      viewBox={`0 0 ${CHART_WIDTH} ${layout.height}`}
       role="img"
       aria-labelledby={titleId}
       className="h-auto w-full"
@@ -167,7 +167,7 @@ function ParticipantChartFigure({
           x={layout.emptyNotice.x}
           y={layout.emptyNotice.y}
           textAnchor="middle"
-          fontSize={36}
+          fontSize={layout.emptyNotice.fontSize}
           style={muted}
         >
           {layout.emptyNotice.text}

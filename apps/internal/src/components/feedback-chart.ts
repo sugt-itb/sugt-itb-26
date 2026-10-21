@@ -13,8 +13,8 @@ import {
 
 /**
  * **The Lihat Grafik figures' pure rules** (#510, #514, #516, #518): which figures a scope gets,
- * which Aspects a Tipe Peserta has, `null` → no arc, the title block, and where every part of a
- * figure sits in its fixed view box. Plain functions, tested without a DOM, the way
+ * which Aspects a Tipe Peserta has, `null` → no arc, the title block, where every part of a figure
+ * sits in its view box, and how tall that is (#522). Plain functions, tested without a DOM, the way
  * `feedback-scope.ts` sits beside the tab; `feedback-chart-figure.tsx` only draws what
  * `chartLayout` returns. Types only from `@sugt/db/queries`, as in `feedback-view.tsx`.
  */
@@ -154,13 +154,22 @@ export function participantChartFigure(
 }
 
 /**
- * **The fixed view box.** Every figure is laid out at 1200×800 and scales to its container, so the
- * same markup serves the dialog and the 2400×1600 PNG (#511). Sizes below are in its units.
+ * **The view box: 1200 wide, and as tall as its content** (#522). Every figure scales to its
+ * container, so the same markup serves the dialog and the PNG (#511), drawn at 2×. Sizes below are
+ * in its units. `PAD` is the margin left and right; there is none above or below.
  */
 export const CHART_WIDTH = 1200;
-export const CHART_HEIGHT = 800;
 
 const PAD = 48;
+
+/**
+ * **Where a line of text reaches, in em from its baseline**, estimated as its width is: descenders
+ * about 0.3 em under it, and the middle of its capitals about 0.35 em over it — what centres a
+ * score in its hole, the pill on its word, and the empty notice in its band.
+ */
+const DESCENT = 0.3;
+const MIDDLE = 0.35;
+
 const TITLE_SIZE = 42;
 const TITLE_LEADING = 52;
 /**
@@ -183,9 +192,28 @@ const PILL_LEADING = 68;
  */
 const DONUT_OUTER_RADIUS = 120;
 const DONUT_INNER_RADIUS = 84;
+/**
+ * The track's outline, on both edges of the ring. Half of it sits outside `DONUT_OUTER_RADIUS`, so
+ * the ring's outer edge — what touches the top with Judul off — is that much further out.
+ */
+export const CHART_TRACK_STROKE = 2;
+const RING_EDGE = DONUT_OUTER_RADIUS + CHART_TRACK_STROKE / 2;
 const LABEL_SIZE = 30;
 const LABEL_GAP = 20;
 const VALUE_SIZE = 48;
+/** From the title block's bottom to the ring's outer edge (#522). */
+const TITLE_GAP = 24;
+const NOTICE_SIZE = 36;
+
+/**
+ * **The donuts' row, from the ring's outer edge down**: where the centre and the Aspect's name
+ * fall, and how tall the row stands — to whichever reaches lower, the ring or the name's
+ * descenders (the same em allowance the title's last line gets). A "Belum ada tanggapan" figure's
+ * band is this tall too, so it matches a full figure.
+ */
+const ROW_CENTRE = RING_EDGE;
+const ROW_LABEL_BASELINE = ROW_CENTRE + DONUT_OUTER_RADIUS + LABEL_GAP + LABEL_SIZE * 0.8;
+const ROW_HEIGHT = Math.max(ROW_CENTRE + RING_EDGE, ROW_LABEL_BASELINE + LABEL_SIZE * DESCENT);
 
 /**
  * A text's width in view-box units, estimated: SVG cannot measure text without a DOM. 0.6 em per
@@ -277,6 +305,8 @@ export type ChartLayout = {
     /** Each line's baseline, centred on `x`. */
     baselines: number[];
     x: number;
+    /** The block's bottom: its last line's descenders, rounded up to a whole unit. */
+    bottom: number;
   } | null;
   /**
    * One donut per Aspect, in order — kept for an Aspect with no Rating, whose `arc` is `null` — and
@@ -297,18 +327,22 @@ export type ChartLayout = {
     nameLabel: Point & { text: string; fontSize: number };
   }[];
   /** "Belum ada tanggapan", centred where the donuts would be, when the figure has no responses. */
-  emptyNotice: (Point & { text: string }) | null;
+  emptyNotice: (Point & { text: string; fontSize: number }) | null;
+  /** The view box's height: the bottommost shape's bottom edge. */
+  height: number;
 };
 
 /**
- * **A figure's layout in the fixed view box.** Top to bottom: the title block (Judul), then one row
- * of donuts, each with its score in its hole (Nilai) and its Aspect's name under it. The row is
- * centred in the room the title leaves; hiding it gives that room back, but **never changes a
- * donut's size**.
+ * **A figure's layout, and its height** (#522). Top to bottom: the title block (Judul), `TITLE_GAP`,
+ * then one row of donuts, each with its score in its hole (Nilai) and its Aspect's name under it.
+ * The topmost shape — the Tipe Peserta's pill, or with Judul off the ring's outline — touches y = 0,
+ * and the bottommost touches `height`: no margin above or below. Hiding the title makes the figure
+ * shorter, but **never changes a donut's size**; Nilai sits in the hole and never changes the height.
  */
 export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout {
   const contentWidth = CHART_WIDTH - 2 * PAD;
-  let cursor = PAD;
+  // The ring's outer edge, outline included: the top of the view box, or under the title block.
+  let rowTop = 0;
 
   let title: ChartLayout["title"] = null;
   if (parts.title) {
@@ -319,9 +353,13 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
     const pillWidth = textWidth(participantType, TITLE_SIZE) + 2 * PILL_PAD_X;
     const left = (CHART_WIDTH - headingWidth - PILL_GAP - pillWidth) / 2;
     const pillX = left + headingWidth + PILL_GAP;
-    const firstBaseline = cursor + TITLE_SIZE + 4;
-    // Capitals stand about 0.7 em over the baseline; the pill is centred on them.
-    const pillY = Math.round(firstBaseline - TITLE_SIZE * 0.35 - PILL_HEIGHT / 2);
+    // The pill is the topmost shape, standing taller than the heading's text. Capitals stand about
+    // 0.7 em over the baseline; the pill is centred on them — less a fraction of a unit, so every
+    // line's descenders land on a whole unit, and with them the figure's height: the 2× PNG never
+    // splits a pixel.
+    const pillY = 0;
+    const firstBaseline =
+      Math.floor(pillY + PILL_HEIGHT / 2 + TITLE_SIZE * (MIDDLE + DESCENT)) - TITLE_SIZE * DESCENT;
     const lines = scope.flatMap((line) => wrap(line, TITLE_SIZE, contentWidth));
     const baselines = lines.map((_, index) => firstBaseline + PILL_LEADING + index * TITLE_LEADING);
     title = {
@@ -339,19 +377,13 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
       lines,
       baselines,
       x: CHART_WIDTH / 2,
+      // Past the last line's descenders, and no further: no blank line under the block.
+      bottom: round(baselines.at(-1)! + TITLE_SIZE * DESCENT),
     };
-    // Past the last line's descenders, and no further: no blank line under the block.
-    cursor = baselines.at(-1)! + TITLE_SIZE * 0.3;
+    rowTop = title.bottom + TITLE_GAP;
   }
 
-  // The row — donuts, then their labels — centred in what is left, or pinned to its top if a long
-  // title leaves less than that.
-  const top = cursor + 12;
-  const bottom = CHART_HEIGHT - PAD;
-  const rowHeight = 2 * DONUT_OUTER_RADIUS + LABEL_GAP + LABEL_SIZE;
-  const centreY = Math.round(
-    top + Math.max(0, (bottom - top - rowHeight) / 2) + DONUT_OUTER_RADIUS,
-  );
+  const centreY = rowTop + ROW_CENTRE;
   const slotWidth = contentWidth / figure.aspects.length;
 
   const slots = figure.empty
@@ -371,14 +403,14 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
                 text: aspect.valueLabel,
                 fontSize: VALUE_SIZE,
                 x: centre.x,
-                y: centre.y + VALUE_SIZE * 0.35,
+                y: centre.y + VALUE_SIZE * MIDDLE,
               }
             : null,
           nameLabel: {
             text: aspect.label,
             fontSize: LABEL_SIZE,
             x: centre.x,
-            y: centre.y + DONUT_OUTER_RADIUS + LABEL_GAP + LABEL_SIZE * 0.8,
+            y: rowTop + ROW_LABEL_BASELINE,
           },
         };
       });
@@ -386,8 +418,38 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
   return {
     title,
     slots,
+    // Centred in the band the row would fill.
     emptyNotice: figure.empty
-      ? { text: "Belum ada tanggapan", x: CHART_WIDTH / 2, y: (top + bottom) / 2 }
+      ? {
+          text: "Belum ada tanggapan",
+          fontSize: NOTICE_SIZE,
+          x: CHART_WIDTH / 2,
+          y: rowTop + ROW_HEIGHT / 2 + NOTICE_SIZE * MIDDLE,
+        }
       : null,
+    height: rowTop + ROW_HEIGHT,
   };
+}
+
+/**
+ * **Every figure's height over a scope** (#522), before its figures land: the title is the scope's,
+ * both Tipe Peserta's pills are one height, and an empty figure is as tall as a full one. So the
+ * dialog's loading skeleton takes the figures' own shape and the dialog doesn't jump.
+ */
+export function chartHeight(
+  schools: readonly FeedbackSchoolOption[],
+  scope: ParticipantFeedbackScope,
+  parts: ChartParts,
+): number {
+  const noResponses = {
+    responseCount: 0,
+    instructor: null,
+    materials: null,
+    relevance: null,
+    handsOnRbl: null,
+  };
+  return chartLayout(
+    participantChartFigure(schools, scope, { participantType: "Siswa", figures: noResponses }),
+    parts,
+  ).height;
 }

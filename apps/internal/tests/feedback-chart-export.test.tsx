@@ -1,12 +1,12 @@
 import {
   ALL_CHART_PARTS,
+  chartLayout,
   participantChartFigure,
   type ChartParts,
 } from "-/components/feedback-chart";
 import {
   CHART_EXPORT_COLOURS,
-  CHART_EXPORT_HEIGHT,
-  CHART_EXPORT_WIDTH,
+  chartExportSize,
   chartPngFileName,
   exportChartSvg,
 } from "-/components/feedback-chart-export";
@@ -19,8 +19,8 @@ import { themeTokens } from "./support/theme-tokens";
 
 /**
  * **Unduh PNG's pure half** (#511): the on-screen figure's markup turned into a light-on-white SVG an
- * `<img>` can draw — no `var(…)`, no class, a fixed 1200×800 size, a named font stack — and the
- * file's name. The canvas step is the browser's; it draws exactly this.
+ * `<img>` can draw — no `var(…)`, no class, the figure's own size (#522), a named font stack — and
+ * the file's name. The canvas step is the browser's; it draws exactly this.
  */
 
 const schools: FeedbackSchoolOption[] = [
@@ -97,16 +97,40 @@ describe("exportChartSvg", () => {
     expect(new Set(Object.keys(CHART_EXPORT_COLOURS))).toEqual(used);
   });
 
-  it("is laid out at 1200×800 on a white background, in a named font stack", () => {
-    const markup = exportChartSvg(screenMarkup());
-    expect(CHART_EXPORT_WIDTH).toBe(2400);
-    expect(CHART_EXPORT_HEIGHT).toBe(1600);
-    const root = /^<svg[^>]*>/.exec(markup)![0];
-    expect(root).toContain('width="1200"');
-    expect(root).toContain('height="800"');
-    expect(root).toContain('xmlns="http://www.w3.org/2000/svg"');
-    expect(root).toMatch(/font-family="Montserrat, [^"]*sans-serif"/);
-    expect(markup).toMatch(/^<svg[^>]*><rect width="1200" height="800" fill="#ffffff"\/>/);
+  it.each([
+    ["Judul on", ALL_CHART_PARTS],
+    ["Judul off", { title: false, values: true }],
+  ] as const)(
+    "is the figure's own size, %s, on a white background, in a named font stack",
+    (_, parts) => {
+      const figure = participantChartFigure(schools, PROGRAMME, {
+        participantType: "Siswa",
+        figures: {
+          responseCount: 42,
+          instructor: 8.4,
+          materials: 7,
+          relevance: 9.1,
+          handsOnRbl: 6.5,
+        },
+      });
+      const { height } = chartLayout(figure, parts);
+      const markup = exportChartSvg(screenMarkup(parts));
+      const root = /^<svg[^>]*>/.exec(markup)![0];
+      expect(root).toContain(`viewBox="0 0 1200 ${height}"`);
+      expect(root).toContain('width="1200"');
+      expect(root).toContain(`height="${height}"`);
+      expect(root).toContain('xmlns="http://www.w3.org/2000/svg"');
+      expect(root).toMatch(/font-family="Montserrat, [^"]*sans-serif"/);
+      expect(markup).toMatch(
+        new RegExp(`^<svg[^>]*><rect width="1200" height="${height}" fill="#ffffff"/>`),
+      );
+      // The PNG: 2400 wide, twice the figure's height — no blank band above or below.
+      expect(chartExportSize(markup)).toEqual({ width: 2400, height: 2 * height });
+    },
+  );
+
+  it("refuses markup with no view box, rather than guess a size", () => {
+    expect(() => exportChartSvg("<svg><rect/></svg>")).toThrow("view box");
   });
 
   it.each(["title", "values"] as const)(
@@ -132,13 +156,14 @@ describe("exportChartSvg", () => {
 
   it("works on a browser's serialisation too — spaced style, xmlns already present", () => {
     const serialised =
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" class="h-auto w-full">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 444" class="h-auto w-full">' +
       '<rect style="fill: var(--chart-category-2);"/><text style="fill: var( --foreground )"/></svg>';
     const markup = exportChartSvg(serialised);
     expect(markup.match(/xmlns=/g)).toHaveLength(1);
     expect(markup).toContain(`fill: ${CHART_EXPORT_COLOURS["--chart-category-2"]};`);
     expect(markup).not.toContain("var(");
     expect(markup).not.toContain("class=");
+    expect(markup).toContain('height="444"');
   });
 
   it("refuses a token it has no light value for, rather than leave it unresolved", () => {

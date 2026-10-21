@@ -1,4 +1,3 @@
-import { CHART_HEIGHT, CHART_WIDTH } from "-/components/feedback-chart";
 import { participantScopeLabel } from "-/components/feedback-scope";
 import { slugify } from "-/lib/perjadin-name";
 import type {
@@ -47,16 +46,30 @@ export const CHART_EXPORT_COLOURS: Record<string, string> = {
  */
 export const CHART_EXPORT_FONT = "Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
-/** The PNG is the 1200×800 layout drawn at 2× density: 2400×1600 px from any screen. */
+/**
+ * The PNG is the figure drawn at 2× density from any screen: 2400 px wide, and twice the figure's
+ * own height (#522), so it has no blank band above or below.
+ */
 export const CHART_EXPORT_SCALE = 2;
-export const CHART_EXPORT_WIDTH = CHART_WIDTH * CHART_EXPORT_SCALE;
-export const CHART_EXPORT_HEIGHT = CHART_HEIGHT * CHART_EXPORT_SCALE;
+
+/** The root's view box, `0 0 <width> <height>` as the figure writes it. A root without one throws. */
+function viewBoxSize(markup: string): { width: number; height: number } {
+  const match = /^<svg[^>]*\sviewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(markup);
+  if (match === null) throw new Error("The figure's markup has no view box to size the image by");
+  return { width: Number(match[1]), height: Number(match[2]) };
+}
+
+/** The PNG's size in pixels: the figure's view box at `CHART_EXPORT_SCALE`. */
+export function chartExportSize(markup: string): { width: number; height: number } {
+  const { width, height } = viewBoxSize(markup);
+  return { width: width * CHART_EXPORT_SCALE, height: height * CHART_EXPORT_SCALE };
+}
 
 /**
  * **A figure's markup, made self-contained.** Every `var(--token)` becomes its light value — a token
- * with none throws, rather than leave the image to guess — the class goes, the root gets the fixed
- * 1200×800 size, the font stack and its namespace, and a white rectangle goes under everything.
- * Takes React's markup or a browser's `XMLSerializer` output alike.
+ * with none throws, rather than leave the image to guess — the class goes, the root gets its view
+ * box's own size, the font stack and its namespace, and a white rectangle that size goes under
+ * everything. Takes React's markup or a browser's `XMLSerializer` output alike.
  */
 export function exportChartSvg(markup: string): string {
   const painted = markup.replaceAll(/var\(\s*(--[\w-]+)\s*\)/g, (_, token: string) => {
@@ -64,14 +77,15 @@ export function exportChartSvg(markup: string): string {
     if (value === undefined) throw new Error(`No light value to export for ${token}`);
     return value;
   });
+  const { width, height } = viewBoxSize(painted);
   return painted.replace(/^<svg([^>]*)>/, (_, attributes: string) => {
     const kept = attributes
       .replaceAll(/\s(class|width|height|font-family|xmlns)="[^"]*"/g, "")
       .trimEnd();
     return (
-      `<svg xmlns="http://www.w3.org/2000/svg"${kept} width="${CHART_WIDTH}" height="${CHART_HEIGHT}"` +
+      `<svg xmlns="http://www.w3.org/2000/svg"${kept} width="${width}" height="${height}"` +
       ` font-family="${CHART_EXPORT_FONT}">` +
-      `<rect width="${CHART_WIDTH}" height="${CHART_HEIGHT}" fill="#ffffff"/>`
+      `<rect width="${width}" height="${height}" fill="#ffffff"/>`
     );
   });
 }
