@@ -28,21 +28,19 @@ import { Label } from "@sugt/ui/components/label";
 import { Skeleton } from "@sugt/ui/components/skeleton";
 import { useId, useRef, useState, useTransition } from "react";
 
-/** The four checkboxes, in order, with the part of every figure each one shows. */
+/** The two checkboxes, in order, with the part of every figure each one shows. */
 const PART_LABELS: Record<keyof ChartParts, string> = {
   title: "Judul",
-  legend: "Legenda",
-  labels: "Label",
   values: "Nilai",
 };
 
 /**
- * **Lihat Grafik** (#510, #514, #516): the Peserta tab's donut charts, one figure per Tipe Peserta,
- * in a wide dialog. It has **no pickers of its own** — it reads the tab's scope as it was when it
- * opened, and fetches its figures then, a skeleton standing in until they land. The score filters
- * never reach it, as they never reach the average cards.
+ * **Lihat Grafik** (#510, #514, #516, #518): the Peserta tab's donut charts, one figure per Tipe
+ * Peserta, in a wide dialog. It has **no pickers of its own** — it reads the tab's scope as it was
+ * when it opened, and fetches its figures then, a skeleton standing in until they land. The score
+ * filters never reach it, as they never reach the average cards.
  *
- * Mounted for as long as the tab is, so the four checkboxes' choice outlives closing the dialog;
+ * Mounted for as long as the tab is, so the two checkboxes' choice outlives closing the dialog;
  * switching tabs unmounts the tab and resets it, like every other `/feedback` choice.
  */
 function ParticipantChartDialog({
@@ -160,7 +158,7 @@ function ParticipantChartDialog({
 
 /**
  * One figure in its frame, with **Unduh PNG** (#511) under it — none on a "Belum ada tanggapan"
- * figure, which has nothing to report. The download is the figure as it stands, so the four
+ * figure, which has nothing to report. The download is the figure as it stands, so the two
  * checkboxes decide what is in the image exactly as on screen.
  */
 function ParticipantChartPanel({
