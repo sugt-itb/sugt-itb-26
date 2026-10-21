@@ -63,10 +63,10 @@ export async function loadParticipantFeedbackAverages(
 /**
  * **The Lihat Grafik figures for the dialog's scope** (#510): one per Tipe Peserta — or only the one
  * picked — each from `participantFeedbackFigures`, the read behind every Peserta average, called with
- * that Tipe Peserta. So a pie is the number its average card shows under the same scope, but raw: an
+ * that Tipe Peserta. So a donut is the number its average card shows under the same scope, but raw: an
  * Aspect with no Rating stays `null`, and `responseCount` says how many responses a figure stands
  * on. The cards' `participantFeedbackAverages` turns a missing Narasumber, Materi or Relevansi into
- * 0, a wedge a figure must never draw, and drops the count. The score filters are not an argument, as
+ * 0, an arc a figure must never draw, and drops the count. The score filters are not an argument, as
  * for the cards. Signed in, as its twins.
  */
 export async function loadParticipantFeedbackCharts(

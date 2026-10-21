@@ -74,10 +74,16 @@ describe("exportChartSvg", () => {
     const markup = exportChartSvg(screenMarkup());
     expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--chart-category-1"]}`);
     expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--foreground"]}`);
-    // The pies' track, its outline and the scores' halo (#514).
+    // The donuts' track and its two outlines (#516).
     expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--muted"]}`);
     expect(markup).toContain(`stroke:${CHART_EXPORT_COLOURS["--border"]}`);
-    expect(markup).toContain(`stroke:${CHART_EXPORT_COLOURS["--background"]}`);
+  });
+
+  it("holds exactly the tokens the figure paints with, no more", () => {
+    const used = new Set(
+      [...screenMarkup().matchAll(/var\((--[\w-]+)\)/g)].map((match) => match[1]!),
+    );
+    expect(new Set(Object.keys(CHART_EXPORT_COLOURS))).toEqual(used);
   });
 
   it("is laid out at 1200×800 on a white background, in a named font stack", () => {

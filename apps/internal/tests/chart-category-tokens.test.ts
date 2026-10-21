@@ -5,9 +5,9 @@ import { themeTokens as block } from "./support/theme-tokens";
 /**
  * **The four categorical chart tokens** (#510), read straight from the shared stylesheet: each has a
  * light and a dark value, and each reaches **3:1 against the background its figure sits on** in both
- * themes — WCAG's non-text contrast for a wedge or a legend swatch. The Lihat Grafik dialog is a
- * popover, so `--popover` is checked beside `--background`, and a wedge sits on its pie's `--muted`
- * track (#514).
+ * themes — WCAG's non-text contrast for an arc or a legend swatch. The Lihat Grafik dialog is a
+ * popover, so `--popover` is checked beside `--background`; an arc borders its donut's `--muted`
+ * track and the surface that shows through the hole (#516).
  */
 
 /** An opaque `oklch(L C h)` to its WCAG relative luminance, through linear sRGB (Ottosson's OKLab). */
@@ -50,7 +50,7 @@ describe("the categorical chart tokens", () => {
   });
 
   it.each([":root", ".dark"] as const)(
-    "reach 3:1 against the background, the popover and the pie's track in %s",
+    "reach 3:1 against the background, the popover and the donut's track in %s",
     (selector) => {
       const theme = block(selector);
       for (const token of TOKENS) {

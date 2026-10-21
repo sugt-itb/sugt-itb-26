@@ -37,7 +37,7 @@ const PART_LABELS: Record<keyof ChartParts, string> = {
 };
 
 /**
- * **Lihat Grafik** (#510, #514): the Peserta tab's pie charts, one figure per Tipe Peserta, in a wide
+ * **Lihat Grafik** (#510, #516): the Peserta tab's donut charts, one figure per Tipe Peserta, in a wide
  * dialog. It has **no pickers of its own** — it reads the tab's scope as it was when it opened, and
  * fetches its figures then, a skeleton standing in until they land. The score filters never reach
  * it, as they never reach the average cards.
@@ -55,7 +55,7 @@ function ParticipantChartDialog({
   const [open, setOpen] = useState(false);
   const [parts, setParts] = useState<ChartParts>(ALL_CHART_PARTS);
   // The figures and the scope they were read for travel together, so a title never names a scope
-  // its pies are not over. `null` while they load.
+  // its donuts are not over. `null` while they load.
   const [charts, setCharts] = useState<{
     data: ParticipantChartData[];
     scope: ParticipantFeedbackScope;

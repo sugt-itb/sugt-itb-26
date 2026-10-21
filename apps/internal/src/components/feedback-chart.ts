@@ -12,8 +12,8 @@ import {
 } from "@sugt/domain";
 
 /**
- * **The Lihat Grafik figures' pure rules** (#510, #514): which figures a scope gets, which Aspects a
- * Tipe Peserta has, `null` → no wedge, the title and n line, and where every part of a figure sits
+ * **The Lihat Grafik figures' pure rules** (#510, #516): which figures a scope gets, which Aspects a
+ * Tipe Peserta has, `null` → no arc, the title and n line, and where every part of a figure sits
  * in its fixed view box. Plain functions, tested without a DOM, the way `feedback-scope.ts` sits beside the
  * tab; `feedback-chart-figure.tsx` only draws what `chartLayout` returns. Types only from
  * `@sugt/db/queries`, as in `feedback-view.tsx`.
@@ -63,9 +63,9 @@ export type ParticipantChartData = {
 };
 
 /**
- * **Pie order is the average cards'**: Narasumber, Materi, Relevansi, Hands-on RBL. Each Aspect has
+ * **Donut order is the average cards'**: Narasumber, Materi, Relevansi, Hands-on RBL. Each Aspect has
  * one categorical colour token (`globals.css`), the same in every figure, which is what lets the
- * legend stand in for the pies' labels when Label is off. The tokens are named, not resolved, so
+ * legend stand in for the donuts' labels when Label is off. The tokens are named, not resolved, so
  * the PNG export (#511) can swap in concrete values.
  */
 const CHART_ASPECTS: readonly {
@@ -79,7 +79,7 @@ const CHART_ASPECTS: readonly {
   { aspect: "hands_on_rbl", figure: "handsOnRbl", colour: "--chart-category-4" },
 ];
 
-/** One Aspect's pie. `value` is `null` when no response in scope Rated it: a pie with no wedge. */
+/** One Aspect's donut. `value` is `null` when no response in scope Rated it: a donut with no arc. */
 export type ChartAspect = {
   aspect: ParticipantFeedbackAspect;
   label: string;
@@ -97,7 +97,7 @@ export type ChartFigure = {
   /** "n = 42 tanggapan" — indicative, not a census (ADR-0009), so a figure says what it stands on. */
   countLine: string;
   aspects: ChartAspect[];
-  /** No response in scope: the frame shows "Belum ada tanggapan" in place of the pies. */
+  /** No response in scope: the frame shows "Belum ada tanggapan" in place of the donuts. */
   empty: boolean;
 };
 
@@ -152,11 +152,13 @@ const LEGEND_SIZE = 32;
 const LEGEND_SWATCH = 28;
 const LEGEND_ROW = 48;
 /**
- * **Every pie is this size, in every figure and whatever the checkboxes hide**, so a Siswa and a
- * GTK-MS figure compare by eye (#514). Four fit across the view box with room between them and
- * under them for the longest label, Hands-on RBL.
+ * **Every donut is this size, in every figure and whatever the checkboxes hide**, so a Siswa and a
+ * GTK-MS figure compare by eye (#516). Four fit across the view box with room between them and
+ * under them for the longest label, Hands-on RBL. The ring is 36 wide; the hole holds the widest
+ * score, "10.0" in bold at `VALUE_SIZE` — about 115 units — with room to spare.
  */
-const PIE_RADIUS = 120;
+const DONUT_OUTER_RADIUS = 120;
+const DONUT_INNER_RADIUS = 84;
 const LABEL_SIZE = 30;
 const LABEL_GAP = 20;
 const VALUE_SIZE = 48;
@@ -187,29 +189,46 @@ function wrap(text: string, fontSize: number, width: number): string[] {
 type Point = { x: number; y: number };
 
 /**
- * A pie's filled part: the whole circle at 10.0 — one SVG arc cannot draw 360°, so it is a circle —
- * or a sector from 12 o'clock, apex at the centre, `d` its path.
+ * A donut's filled part, `d` its path: the whole ring at 10.0 — one SVG arc cannot draw 360°, so it
+ * is the track's own two circles — or a ring sector from 12 o'clock. Drawn with even-odd fill.
  */
-export type ChartWedge = { kind: "full" } | { kind: "sector"; d: string };
+export type ChartArc = { kind: "full" | "sector"; d: string };
 
 /** Two decimals is far below a pixel at any size the figure is drawn. */
 const round = (value: number) => Math.round(value * 100) / 100;
 
 /**
- * **A wedge filled to `value / 10` of the circle, like a progress indicator.** It starts at 12
- * o'clock and sweeps counter-clockwise, toward 9 o'clock first — SVG's sweep flag 0 on screen. 0.0
- * fills nothing, so the pie is its bare track; `null` likewise, told apart only by its label.
+ * **The whole ring**: the outer circle and the hole's, each as two half-arcs, so one path outlines
+ * both edges and even-odd fill leaves the hole empty.
  */
-function wedge(centre: Point, radius: number, value: number | null): ChartWedge | null {
+function ring(centre: Point): string {
+  const circle = (radius: number) =>
+    `M ${centre.x} ${centre.y - radius} ` +
+    `A ${radius} ${radius} 0 1 0 ${centre.x} ${centre.y + radius} ` +
+    `A ${radius} ${radius} 0 1 0 ${centre.x} ${centre.y - radius} Z`;
+  return `${circle(DONUT_OUTER_RADIUS)} ${circle(DONUT_INNER_RADIUS)}`;
+}
+
+/**
+ * **An arc filled to `value / 10` of the ring, like a progress indicator.** It starts at 12 o'clock
+ * and runs counter-clockwise, toward 9 o'clock first — SVG's sweep flag 0 on screen — along the
+ * outer edge, then a line in and back along the hole's edge. Its ends are flat: a rounded cap would
+ * reach past the true angle by half the ring's width, so 0.3 would read as 1.0. 0.0 fills nothing,
+ * so the donut is its bare track; `null` likewise, told apart only by its label.
+ */
+function arc(centre: Point, value: number | null): ChartArc | null {
   if (value === null || value <= 0) return null;
-  if (value >= 10) return { kind: "full" };
+  if (value >= 10) return { kind: "full", d: ring(centre) };
   const angle = (value / 10) * 2 * Math.PI;
-  const end = { x: centre.x - radius * Math.sin(angle), y: centre.y - radius * Math.cos(angle) };
+  const at = (radius: number) =>
+    `${round(centre.x - radius * Math.sin(angle))} ${round(centre.y - radius * Math.cos(angle))}`;
+  const large = value > 5 ? 1 : 0;
+  const [outer, inner] = [DONUT_OUTER_RADIUS, DONUT_INNER_RADIUS];
   return {
     kind: "sector",
     d:
-      `M ${centre.x} ${centre.y} L ${centre.x} ${centre.y - radius} ` +
-      `A ${radius} ${radius} 0 ${value > 5 ? 1 : 0} 0 ${round(end.x)} ${round(end.y)} Z`,
+      `M ${centre.x} ${centre.y - outer} A ${outer} ${outer} 0 ${large} 0 ${at(outer)} ` +
+      `L ${at(inner)} A ${inner} ${inner} 0 ${large} 1 ${centre.x} ${centre.y - inner} Z`,
   };
 }
 
@@ -229,29 +248,32 @@ export type ChartLayout = {
     items: { label: string; colour: string; swatch: Point; text: Point }[];
   } | null;
   /**
-   * One pie per Aspect, in order — kept for an Aspect with no Rating, whose `wedge` is `null` — and
+   * One donut per Aspect, in order — kept for an Aspect with no Rating, whose `arc` is `null` — and
    * none at all when the figure has no responses.
    */
   slots: {
     aspect: ParticipantFeedbackAspect;
     colour: string;
     centre: Point;
-    radius: number;
-    wedge: ChartWedge | null;
-    /** The score, centred on the pie: `y` is its baseline. */
+    outerRadius: number;
+    innerRadius: number;
+    /** The whole ring, always drawn: the track the arc fills. Even-odd fill. */
+    track: string;
+    arc: ChartArc | null;
+    /** The score, centred in the hole: `y` is its baseline. */
     valueLabel: (Point & { text: string; fontSize: number }) | null;
-    /** The Aspect's name under the pie: `y` is its baseline. */
+    /** The Aspect's name under the donut: `y` is its baseline. */
     nameLabel: (Point & { text: string; fontSize: number }) | null;
   }[];
-  /** "Belum ada tanggapan", centred where the pies would be, when the figure has no responses. */
+  /** "Belum ada tanggapan", centred where the donuts would be, when the figure has no responses. */
   emptyNotice: (Point & { text: string }) | null;
 };
 
 /**
  * **A figure's layout in the fixed view box.** Top to bottom: the title and n line (Judul), the
- * legend (Legenda), then one row of pies, each with its score on its centre (Nilai) and its
+ * legend (Legenda), then one row of donuts, each with its score in its hole (Nilai) and its
  * Aspect's name under it (Label). The row is centred in the room the parts above leave; a hidden
- * part gives that room back, but **never changes a pie's size**.
+ * part gives that room back, but **never changes a donut's size**.
  */
 export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout {
   const contentWidth = CHART_WIDTH - 2 * PAD;
@@ -307,12 +329,14 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
     cursor += rows.length * LEGEND_ROW;
   }
 
-  // The row — pies, then their labels — centred in what is left, or pinned to its top if a long
+  // The row — donuts, then their labels — centred in what is left, or pinned to its top if a long
   // title leaves less than that.
   const top = cursor + 12;
   const bottom = CHART_HEIGHT - PAD;
-  const rowHeight = 2 * PIE_RADIUS + (parts.labels ? LABEL_GAP + LABEL_SIZE : 0);
-  const centreY = Math.round(top + Math.max(0, (bottom - top - rowHeight) / 2) + PIE_RADIUS);
+  const rowHeight = 2 * DONUT_OUTER_RADIUS + (parts.labels ? LABEL_GAP + LABEL_SIZE : 0);
+  const centreY = Math.round(
+    top + Math.max(0, (bottom - top - rowHeight) / 2) + DONUT_OUTER_RADIUS,
+  );
   const slotWidth = contentWidth / figure.aspects.length;
 
   const slots = figure.empty
@@ -323,8 +347,10 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
           aspect: aspect.aspect,
           colour: aspect.colour,
           centre,
-          radius: PIE_RADIUS,
-          wedge: wedge(centre, PIE_RADIUS, aspect.value),
+          outerRadius: DONUT_OUTER_RADIUS,
+          innerRadius: DONUT_INNER_RADIUS,
+          track: ring(centre),
+          arc: arc(centre, aspect.value),
           valueLabel: parts.values
             ? {
                 text: aspect.valueLabel,
@@ -338,7 +364,7 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
                 text: aspect.label,
                 fontSize: LABEL_SIZE,
                 x: centre.x,
-                y: centre.y + PIE_RADIUS + LABEL_GAP + LABEL_SIZE * 0.8,
+                y: centre.y + DONUT_OUTER_RADIUS + LABEL_GAP + LABEL_SIZE * 0.8,
               }
             : null,
         };

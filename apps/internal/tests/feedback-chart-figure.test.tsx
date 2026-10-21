@@ -9,8 +9,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 /**
- * **A Lihat Grafik figure, rendered** (#510, #514): one self-contained `<svg>` holding the title, n
- * line, legend, one pie per Aspect with its label and centred score — the PNG export (#511)
+ * **A Lihat Grafik figure, rendered** (#510, #516): one self-contained `<svg>` holding the title, n
+ * line, legend, one donut per Aspect with its label and the score in its hole — the PNG export (#511)
  * serialises exactly that — and each of the four checkboxes removing exactly its own part.
  */
 
@@ -42,8 +42,8 @@ function render(
   );
 }
 
-const pies = (markup: string) => markup.match(/data-part="pie"/g)?.length ?? 0;
-const wedges = (markup: string) => markup.match(/data-part="wedge"/g)?.length ?? 0;
+const donuts = (markup: string) => markup.match(/data-part="donut"/g)?.length ?? 0;
+const arcs = (markup: string) => markup.match(/data-part="arc"/g)?.length ?? 0;
 const PARTS = ["title", "legend", "labels", "values"] as const;
 
 describe("ParticipantChartFigure", () => {
@@ -57,33 +57,44 @@ describe("ParticipantChartFigure", () => {
     }
   });
 
-  it("draws four pies for Siswa and three for GTK-MS, and no bars or axes", () => {
-    expect(pies(render())).toBe(4);
-    expect(pies(render({ handsOnRbl: null }, ALL_CHART_PARTS, "GTK-MS"))).toBe(3);
-    expect(render()).not.toMatch(/data-part="(bar|axes)"/);
+  it("draws four donuts for Siswa and three for GTK-MS, and no bars, axes, pies or wedges", () => {
+    expect(donuts(render())).toBe(4);
+    expect(donuts(render({ handsOnRbl: null }, ALL_CHART_PARTS, "GTK-MS"))).toBe(3);
+    expect(render()).not.toMatch(/data-part="(bar|axes|pie|wedge)"/);
     expect(render()).not.toContain("Nilai rata-rata (0–10)");
     expect(render()).not.toContain(">Aspek</text>");
   });
 
-  it("draws every pie's whole circle as a track under its wedge", () => {
+  it("draws every donut's whole ring as a track under its arc, outlined on both edges", () => {
     const markup = render();
-    expect(markup.match(/<circle[^>]*fill:var\(--muted\);stroke:var\(--border\)/g)).toHaveLength(4);
-    expect(wedges(markup)).toBe(4);
+    // One even-odd path of two circles: the outline strokes the outer edge and the hole's.
+    expect(
+      markup.match(
+        /<path d="M [^"]+ Z M [^"]+ Z" fill-rule="evenodd" style="fill:var\(--muted\);stroke:var\(--border\);stroke-width:2"><\/path>/g,
+      ),
+    ).toHaveLength(4);
+    expect(arcs(markup)).toBe(4);
+    // Nothing fills the hole: no other shape is drawn per donut.
+    expect(markup).not.toContain("<circle");
   });
 
-  it("draws a 10.0 wedge as a whole circle and a 0.0 one not at all", () => {
+  it("draws a 10.0 arc as the whole ring and a 0.0 one not at all", () => {
     const full = render({ instructor: 10 });
-    expect(full).toMatch(/<circle data-part="wedge"[^>]*fill:var\(--chart-category-1\)/);
+    expect(full).toMatch(
+      /<path data-part="arc" d="M [^"]+ Z M [^"]+ Z" fill-rule="evenodd" style="fill:var\(--chart-category-1\)"/,
+    );
     const bare = render({ instructor: 0 });
-    expect(wedges(bare)).toBe(3);
+    expect(arcs(bare)).toBe(3);
     expect(bare).toContain(">0.0</text>");
   });
 
-  it("halos the centred score in the background colour, under the text", () => {
+  it("writes the score in the hole in bold foreground at 48, with no halo", () => {
     const markup = render();
     expect(markup).toMatch(
-      /<text[^>]*style="fill:var\(--foreground\);stroke:var\(--background\);stroke-width:\d+;paint-order:stroke[^"]*"[^>]*>8\.4<\/text>/,
+      /<text [^>]*font-size="48" font-weight="700" style="fill:var\(--foreground\)">8\.4<\/text>/,
     );
+    expect(markup).not.toContain("paint-order");
+    expect(markup).not.toContain("--background");
   });
 
   it("draws the title and the n line", () => {
@@ -92,18 +103,18 @@ describe("ParticipantChartFigure", () => {
     expect(markup).toContain(">n = 42 tanggapan</text>");
   });
 
-  it("leaves an Aspect with no Rating its pie, the bare track labelled —", () => {
+  it("leaves an Aspect with no Rating its donut, the bare track labelled —", () => {
     const markup = render({ handsOnRbl: null });
-    expect(pies(markup)).toBe(4);
-    expect(wedges(markup)).toBe(3);
+    expect(donuts(markup)).toBe(4);
+    expect(arcs(markup)).toBe(3);
     expect(markup).toMatch(
-      /data-part="pie" data-aspect="hands_on_rbl"><circle[^>]*><\/circle><\/g>/,
+      /data-part="donut" data-aspect="hands_on_rbl"><path [^>]*><\/path><\/g>/,
     );
     expect(markup).toContain(">—</text>");
     expect(markup).toContain(">Hands-on RBL</text>");
   });
 
-  it("shows Belum ada tanggapan in place of the pies with no responses", () => {
+  it("shows Belum ada tanggapan in place of the donuts with no responses", () => {
     const markup = render({
       responseCount: 0,
       instructor: null,
@@ -111,7 +122,7 @@ describe("ParticipantChartFigure", () => {
       relevance: null,
       handsOnRbl: null,
     });
-    expect(pies(markup)).toBe(0);
+    expect(donuts(markup)).toBe(0);
     expect(markup).toContain(">Belum ada tanggapan</text>");
     expect(markup).not.toContain('data-part="values"');
   });
@@ -131,17 +142,17 @@ describe("ParticipantChartFigure", () => {
     for (const other of PARTS.filter((name) => name !== part)) {
       expect(markup).toContain(`data-part="${other}"`);
     }
-    expect(pies(markup)).toBe(4);
+    expect(donuts(markup)).toBe(4);
   });
 
-  it("names each pie under it, and in the legend, which stands in when Label is off", () => {
+  it("names each donut under it, and in the legend, which stands in when Label is off", () => {
     const markup = render();
     expect(markup.match(/>Narasumber<\/text>/g)).toHaveLength(2);
     const noLabels = render({}, { ...ALL_CHART_PARTS, labels: false });
     expect(noLabels.match(/>Narasumber<\/text>/g)).toHaveLength(1);
   });
 
-  it("colours each wedge and its legend swatch with the Aspect's token", () => {
+  it("colours each arc and its legend swatch with the Aspect's token", () => {
     const markup = render();
     expect(markup).toContain('data-aspect="instructor"');
     expect(markup.match(/fill:var\(--chart-category-1\)/g)).toHaveLength(2);
