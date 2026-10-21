@@ -20,15 +20,15 @@ import type {
  */
 
 /**
- * The light theme's value of every token the figure paints with, copied from `globals.css`'s
- * `:root` — `tests/feedback-chart-export.test.tsx` holds the two equal, so a theme change that
- * forgets this map fails the suite rather than the image. `oklch()` as written there: the browser
- * that draws the canvas is the one already rendering the theme in it.
+ * The light theme's value of every token the figure paints with, and of no other, copied from
+ * `globals.css`'s `:root` — `tests/feedback-chart-export.test.tsx` holds the two equal and the keys
+ * to exactly what the figure uses, so a theme change that forgets this map fails the suite rather
+ * than the image. `oklch()` as written there: the browser that draws the canvas is the one already
+ * rendering the theme in it.
  */
 export const CHART_EXPORT_COLOURS: Record<string, string> = {
   "--foreground": "oklch(0.145 0 0)",
   "--muted-foreground": "oklch(0.556 0 0)",
-  "--background": "oklch(1 0 0)",
   "--muted": "oklch(0.97 0 0)",
   "--border": "oklch(0.845 0 0)",
   "--chart-category-1": "oklch(0.546 0.245 262.881)",

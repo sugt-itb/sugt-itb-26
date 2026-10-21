@@ -17,8 +17,8 @@ import { describe, expect, it } from "vitest";
 
 /**
  * **The Lihat Grafik figures' rules, without a DOM** (#510): which figures a scope gets, which
- * Aspects a Tipe Peserta has and in what order, `null` → no wedge and "—", the title and n line, one
- * colour per Aspect, and each pie's wedge filled to its mean out of 10 (#514).
+ * Aspects a Tipe Peserta has and in what order, `null` → no arc and "—", the title and n line, one
+ * colour per Aspect, and each donut's arc filled to its mean out of 10 (#516).
  */
 
 const schools: FeedbackSchoolOption[] = [
@@ -167,22 +167,60 @@ describe("chartLayout", () => {
       figures: figures(over),
     });
 
-  /** A sector's arc, read back from its path: the large-arc flag and where it ends. */
-  const arc = (slot: ChartLayout["slots"][number]) => {
-    const wedge = slot.wedge;
-    if (wedge?.kind !== "sector") throw new Error("not a sector");
-    const [, large, x, y] = / A [\d.]+ [\d.]+ 0 ([01]) 0 (-?[\d.]+) (-?[\d.]+) Z$/.exec(wedge.d)!;
-    return { largeArc: large === "1", end: { x: Number(x), y: Number(y) } };
+  type Slot = ChartLayout["slots"][number];
+  const NUMBER = String.raw`(-?[\d.]+)`;
+  /**
+   * An arc's ring sector, read back from its path: outer arc from 12 o'clock, a line in, the inner
+   * arc back, closed — each arc's large-arc and sweep flags, and its four corners.
+   */
+  const sector = (slot: Slot) => {
+    const arc = slot.arc;
+    if (arc?.kind !== "sector") throw new Error("not a sector");
+    const match = new RegExp(
+      `^M ${NUMBER} ${NUMBER} A ${NUMBER} ${NUMBER} 0 ([01]) ([01]) ${NUMBER} ${NUMBER} ` +
+        `L ${NUMBER} ${NUMBER} A ${NUMBER} ${NUMBER} 0 ([01]) ([01]) ${NUMBER} ${NUMBER} Z$`,
+    ).exec(arc.d);
+    if (match === null) throw new Error(`not a ring sector: ${arc.d}`);
+    // Captures in path order: start, outer radii, outer flags, outer end, inner end, inner radii,
+    // inner flags, back to the hole's 12 o'clock.
+    const [
+      sx,
+      sy,
+      outerR,
+      ,
+      outerLarge,
+      outerSweep,
+      ox,
+      oy,
+      ix,
+      iy,
+      innerR,
+      ,
+      innerLarge,
+      innerSweep,
+      bx,
+      by,
+    ] = match.slice(1).map(Number) as number[];
+    return {
+      start: { x: sx!, y: sy! },
+      outer: { radius: outerR!, largeArc: outerLarge === 1, sweep: outerSweep! },
+      outerEnd: { x: ox!, y: oy! },
+      innerEnd: { x: ix!, y: iy! },
+      inner: { radius: innerR!, largeArc: innerLarge === 1, sweep: innerSweep! },
+      innerStart: { x: bx!, y: by! },
+    };
   };
+  const distance = (slot: Slot, point: { x: number; y: number }) =>
+    Math.hypot(point.x - slot.centre.x, point.y - slot.centre.y);
 
-  /** A wedge's end, as an angle from 12 o'clock counter-clockwise, in turns. */
-  const turns = (slot: ChartLayout["slots"][number]) => {
-    const { end } = arc(slot);
+  /** An arc's end, as an angle from 12 o'clock counter-clockwise, in turns. */
+  const turns = (slot: Slot) => {
+    const end = sector(slot).outerEnd;
     const angle = Math.atan2(-(end.x - slot.centre.x), -(end.y - slot.centre.y));
     return (angle < 0 ? angle + 2 * Math.PI : angle) / (2 * Math.PI);
   };
 
-  it("draws one pie per Aspect, the same diameter in a Siswa and a GTK-MS figure", () => {
+  it("draws one donut per Aspect, outer radius 120 and hole 84, in both figures", () => {
     const four = chartLayout(siswa(), ALL_CHART_PARTS);
     const three = chartLayout(
       participantChartFigure(schools, PROGRAMME, {
@@ -193,8 +231,10 @@ describe("chartLayout", () => {
     );
     expect(four.slots).toHaveLength(4);
     expect(three.slots).toHaveLength(3);
-    const radii = new Set([...four.slots, ...three.slots].map((slot) => slot.radius));
-    expect(radii.size).toBe(1);
+    for (const slot of [...four.slots, ...three.slots]) {
+      expect(slot.outerRadius).toBe(120);
+      expect(slot.innerRadius).toBe(84);
+    }
     // In one row, in the cards' order, left to right.
     expect(new Set(four.slots.map((slot) => slot.centre.y)).size).toBe(1);
     const xs = four.slots.map((slot) => slot.centre.x);
@@ -207,76 +247,102 @@ describe("chartLayout", () => {
     ]);
   });
 
-  it("keeps the diameter whatever the checkboxes hide, so figures compare by eye", () => {
-    const all = chartLayout(siswa(), ALL_CHART_PARTS);
+  it("keeps the size whatever the checkboxes hide, so figures compare by eye", () => {
     const none = chartLayout(siswa(), NO_PARTS);
-    expect(none.slots[0]!.radius).toBe(all.slots[0]!.radius);
+    expect(none.slots[0]!.outerRadius).toBe(120);
+    expect(none.slots[0]!.innerRadius).toBe(84);
   });
 
-  it("starts each wedge at 12 o'clock with its apex at the centre", () => {
-    const slot = chartLayout(siswa({ instructor: 2.5 }), ALL_CHART_PARTS).slots[0]!;
-    const wedge = slot.wedge;
-    expect(wedge?.kind).toBe("sector");
-    if (wedge?.kind !== "sector") return;
-    expect(wedge.d.startsWith(`M ${slot.centre.x} ${slot.centre.y} L ${slot.centre.x} `)).toBe(
-      true,
+  it("leaves a hole wide enough for the widest score, 10.0, at the score size", () => {
+    const slot = chartLayout(siswa({ instructor: 10 }), ALL_CHART_PARTS).slots[0]!;
+    expect(slot.valueLabel!.text).toBe("10.0");
+    // Bold Montserrat runs about 0.6 em a character, so 10.0 at 48 is about 115 units.
+    expect("10.0".length * slot.valueLabel!.fontSize * 0.6).toBeLessThan(2 * slot.innerRadius - 40);
+  });
+
+  it("draws the track as the whole ring, both edges, with an unfilled hole", () => {
+    const slot = chartLayout(siswa(), ALL_CHART_PARTS).slots[0]!;
+    const { x, y } = slot.centre;
+    // Two closed circles — the outer edge and the hole's — so even-odd fill leaves the hole empty.
+    expect(slot.track).toBe(
+      `M ${x} ${y - 120} A 120 120 0 1 0 ${x} ${y + 120} A 120 120 0 1 0 ${x} ${y - 120} Z ` +
+        `M ${x} ${y - 84} A 84 84 0 1 0 ${x} ${y + 84} A 84 84 0 1 0 ${x} ${y - 84} Z`,
     );
-    expect(wedge.d).toContain(` ${slot.centre.y - slot.radius} A `);
-    expect(wedge.d.endsWith(" Z")).toBe(true);
   });
 
-  it("sweeps counter-clockwise, toward 9 o'clock first, to mean / 10 of the circle", () => {
+  it("starts each arc at 12 o'clock and keeps it between the hole and the outer edge", () => {
+    const layout = chartLayout(siswa({ instructor: 2.5, materials: 7.8 }), ALL_CHART_PARTS);
+    for (const slot of layout.slots.slice(0, 2)) {
+      const ring = sector(slot);
+      expect(ring.start).toEqual({ x: slot.centre.x, y: slot.centre.y - 120 });
+      expect(ring.innerStart).toEqual({ x: slot.centre.x, y: slot.centre.y - 84 });
+      expect(ring.outer.radius).toBe(120);
+      expect(ring.inner.radius).toBe(84);
+      expect(distance(slot, ring.outerEnd)).toBeCloseTo(120, 1);
+      expect(distance(slot, ring.innerEnd)).toBeCloseTo(84, 1);
+    }
+  });
+
+  it("runs counter-clockwise, toward 9 o'clock first, to mean / 10 of the ring", () => {
     const quarter = chartLayout(siswa({ instructor: 2.5 }), ALL_CHART_PARTS).slots[0]!;
-    if (quarter.wedge?.kind !== "sector") throw new Error("not a sector");
-    // A quarter is 9 o'clock: left of the centre, level with it.
-    expect(arc(quarter).end.x).toBeCloseTo(quarter.centre.x - quarter.radius, 1);
-    expect(arc(quarter).end.y).toBeCloseTo(quarter.centre.y, 1);
-    expect(arc(quarter).largeArc).toBe(false);
-    // SVG's sweep flag 0 is counter-clockwise on screen.
-    expect(quarter.wedge.d).toMatch(/ A [\d.]+ [\d.]+ 0 0 0 /);
+    const ring = sector(quarter);
+    // A quarter is 9 o'clock: left of the centre, level with it, on both edges.
+    expect(ring.outerEnd.x).toBeCloseTo(quarter.centre.x - 120, 1);
+    expect(ring.outerEnd.y).toBeCloseTo(quarter.centre.y, 1);
+    expect(ring.innerEnd.x).toBeCloseTo(quarter.centre.x - 84, 1);
+    // SVG's sweep flag 0 is counter-clockwise on screen; the inner arc runs back, clockwise.
+    expect(ring.outer.sweep).toBe(0);
+    expect(ring.inner.sweep).toBe(1);
 
     const layout = chartLayout(siswa({ materials: 7.8, relevance: 4.2 }), ALL_CHART_PARTS);
     expect(turns(layout.slots[1]!)).toBeCloseTo(0.78, 3);
     expect(turns(layout.slots[2]!)).toBeCloseTo(0.42, 3);
-    expect(arc(layout.slots[1]!).largeArc).toBe(true);
-    expect(arc(layout.slots[2]!).largeArc).toBe(false);
   });
 
-  it("draws 10.0 as a full circle, which a single SVG arc cannot", () => {
+  it("sets the large-arc flag on both edges above 5 and on neither below", () => {
+    const layout = chartLayout(siswa({ materials: 7.8, relevance: 4.2 }), ALL_CHART_PARTS);
+    expect(sector(layout.slots[1]!).outer.largeArc).toBe(true);
+    expect(sector(layout.slots[1]!).inner.largeArc).toBe(true);
+    expect(sector(layout.slots[2]!).outer.largeArc).toBe(false);
+    expect(sector(layout.slots[2]!).inner.largeArc).toBe(false);
+  });
+
+  it("draws 10.0 as the full ring, which a single SVG arc cannot", () => {
     const slot = chartLayout(siswa({ instructor: 10 }), ALL_CHART_PARTS).slots[0]!;
-    expect(slot.wedge).toEqual({ kind: "full" });
+    expect(slot.arc).toEqual({ kind: "full", d: slot.track });
   });
 
   it("draws 0.0 as the bare track, labelled 0.0", () => {
     const slot = chartLayout(siswa({ instructor: 0 }), ALL_CHART_PARTS).slots[0]!;
-    expect(slot.wedge).toBeNull();
+    expect(slot.arc).toBeNull();
     expect(slot.valueLabel!.text).toBe("0.0");
   });
 
-  it("keeps an Aspect with no Rating's slot: the track, no wedge, and a — label", () => {
+  it("keeps an Aspect with no Rating's slot: the track, no arc, and a — label", () => {
     const layout = chartLayout(siswa({ handsOnRbl: null }), ALL_CHART_PARTS);
     expect(layout.slots).toHaveLength(4);
-    expect(layout.slots[3]!.wedge).toBeNull();
+    expect(layout.slots[3]!.arc).toBeNull();
     expect(layout.slots[3]!.valueLabel!.text).toBe("—");
     expect(layout.slots[3]!.nameLabel!.text).toBe("Hands-on RBL");
   });
 
-  it("centres the score on the pie and puts the Aspect's name under it", () => {
+  it("centres the score in the hole and puts the Aspect's name under the donut", () => {
     const slot = chartLayout(siswa(), ALL_CHART_PARTS).slots[0]!;
     expect(slot.valueLabel!.x).toBe(slot.centre.x);
     expect(slot.valueLabel!.text).toBe("8.4");
+    expect(slot.valueLabel!.fontSize).toBe(48);
     expect(slot.nameLabel!.x).toBe(slot.centre.x);
     expect(slot.nameLabel!.text).toBe("Narasumber");
-    expect(slot.nameLabel!.y).toBeGreaterThan(slot.centre.y + slot.radius);
+    expect(slot.nameLabel!.y).toBeGreaterThan(slot.centre.y + slot.outerRadius);
   });
 
-  it("drops each part when its checkbox is off, and keeps the pies", () => {
+  it("drops each part when its checkbox is off, and keeps the donuts", () => {
     const layout = chartLayout(siswa(), NO_PARTS);
     expect(layout.title).toBeNull();
     expect(layout.legend).toBeNull();
     expect(layout.slots.every((slot) => slot.valueLabel === null)).toBe(true);
     expect(layout.slots.every((slot) => slot.nameLabel === null)).toBe(true);
-    expect(layout.slots.every((slot) => slot.wedge !== null)).toBe(true);
+    expect(layout.slots.every((slot) => slot.arc !== null)).toBe(true);
   });
 
   it("wraps a long title onto lines that fit the figure", () => {
@@ -291,14 +357,16 @@ describe("chartLayout", () => {
     for (const line of layout.title!.lines) {
       expect(line.length * layout.title!.fontSize * 0.6).toBeLessThanOrEqual(CHART_WIDTH);
     }
-    // The pies sit below the title and the legend, never under them.
+    // The donuts sit below the title and the legend, never under them.
     const legendBottom = Math.max(...layout.legend!.items.map((item) => item.swatch.y));
-    const pie = layout.slots[0]!;
-    expect(pie.centre.y - pie.radius).toBeGreaterThan(legendBottom + layout.legend!.swatch);
-    expect(pie.nameLabel!.y).toBeLessThan(CHART_HEIGHT);
+    const donut = layout.slots[0]!;
+    expect(donut.centre.y - donut.outerRadius).toBeGreaterThan(
+      legendBottom + layout.legend!.swatch,
+    );
+    expect(donut.nameLabel!.y).toBeLessThan(CHART_HEIGHT);
   });
 
-  it("puts the empty notice in place of the pies", () => {
+  it("puts the empty notice in place of the donuts", () => {
     const empty = participantChartFigure(schools, PROGRAMME, {
       participantType: "Siswa",
       figures: {
@@ -314,16 +382,16 @@ describe("chartLayout", () => {
     expect(layout.slots).toEqual([]);
   });
 
-  it("keeps every pie and its label inside the fixed view box", () => {
+  it("keeps every donut and its label inside the fixed view box", () => {
     const layout = chartLayout(siswa(), ALL_CHART_PARTS);
     for (const slot of layout.slots) {
-      expect(slot.centre.x - slot.radius).toBeGreaterThan(0);
-      expect(slot.centre.x + slot.radius).toBeLessThan(CHART_WIDTH);
-      expect(slot.centre.y - slot.radius).toBeGreaterThan(0);
+      expect(slot.centre.x - slot.outerRadius).toBeGreaterThan(0);
+      expect(slot.centre.x + slot.outerRadius).toBeLessThan(CHART_WIDTH);
+      expect(slot.centre.y - slot.outerRadius).toBeGreaterThan(0);
       expect(slot.nameLabel!.y).toBeLessThan(CHART_HEIGHT);
     }
-    // Neighbouring pies never touch.
+    // Neighbouring donuts never touch.
     const [first, second] = layout.slots;
-    expect(second!.centre.x - first!.centre.x).toBeGreaterThan(2 * first!.radius);
+    expect(second!.centre.x - first!.centre.x).toBeGreaterThan(2 * first!.outerRadius);
   });
 });
