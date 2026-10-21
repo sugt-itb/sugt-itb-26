@@ -915,9 +915,9 @@ a wide dialog of donut charts (#514, #516, #518), one donut per Aspect:
   block included, so it can be exported as an image.
 - **A figure is as tall as its content** (#522), with no margin above or below: the pill (or, with
   Judul off, the donuts' rings) touches its top edge and the Aspects' names its bottom, with a small
-  fixed gap between the title block and the donuts. The margins left and right stay. A "Belum ada
+  fixed gap between the title block and the donuts. A "Belum ada
   tanggapan" figure is exactly as tall as a full one with the same title and checkboxes, so two
-  figures side by side line up.
+  figures side by side line up, and the dialog's loading placeholders take the same shape.
 - **Unduh PNG** (#511) sits under every figure that has responses — a "Belum ada tanggapan" figure
   has none — and downloads that figure alone. There is no "Unduh semua" and no SVG download.
   - **What you see is what you get**: the two checkboxes decide what is in the image, exactly as

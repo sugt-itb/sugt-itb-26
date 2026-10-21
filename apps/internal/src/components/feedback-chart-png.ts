@@ -2,10 +2,10 @@ import { chartExportSize, exportChartSvg } from "-/components/feedback-chart-exp
 
 /**
  * **Unduh PNG's browser half** (#511): serialise a figure's `<svg>`, make it self-contained with
- * `exportChartSvg`, draw it through an `<img>` onto a canvas 2400 wide and twice the figure's height
- * (#522) — the layout at 2×, whatever the screen — and hand back the PNG. The white comes from the SVG's own background
- * rectangle, so the canvas needs no fill of its own. No dependency: an SVG with no `foreignObject` draws
- * without tainting the canvas.
+ * `exportChartSvg`, draw it through an `<img>` onto a canvas 2400 wide and twice the figure's
+ * height (#522) — the layout at 2×, whatever the screen — and hand back the PNG. The white comes
+ * from the SVG's own background rectangle, so the canvas needs no fill of its own. No dependency:
+ * an SVG with no `foreignObject` draws without tainting the canvas.
  */
 export async function chartPng(svg: SVGSVGElement): Promise<Blob> {
   const markup = exportChartSvg(new XMLSerializer().serializeToString(svg));

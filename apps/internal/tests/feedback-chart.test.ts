@@ -2,6 +2,7 @@ import {
   ALL_CHART_PARTS,
   CHART_TRACK_STROKE,
   CHART_WIDTH,
+  chartHeight,
   chartLayout,
   chartParticipantTypes,
   participantChartFigure,
@@ -348,10 +349,8 @@ describe("chartLayout", () => {
     it.each(titles)("leaves 24 units from %s title block to the ring", (_, figure) => {
       const layout = chartLayout(figure, ALL_CHART_PARTS);
       const title = layout.title!;
-      // The block's bottom is its last line's descenders, rounded up to a whole unit.
-      const descenders = title.baselines.at(-1)! + title.fontSize * 0.3;
-      expect(title.bottom).toBeGreaterThanOrEqual(descenders);
-      expect(title.bottom).toBeLessThan(descenders + 1);
+      // The block's bottom is its last line's descenders.
+      expect(title.bottom).toBeCloseTo(title.baselines.at(-1)! + title.fontSize * 0.3, 9);
       for (const slot of layout.slots) expect(ringTop(slot) - title.bottom).toBe(24);
     });
 
@@ -377,6 +376,27 @@ describe("chartLayout", () => {
         1,
       );
     });
+
+    it.each([
+      ["no School", {}],
+      ["a School and Sesi", { schoolId: "bontang", sessionId: "sesi-1" }],
+    ] as const)(
+      "states every figure's height over %s before any loads, for the skeleton",
+      (_, scope) => {
+        for (const parts of [ALL_CHART_PARTS, NO_PARTS, { title: true, values: false }]) {
+          for (const participantType of ["Siswa", "GTK-MS"] as const) {
+            const figure = participantChartFigure(
+              schools,
+              { ...PROGRAMME, ...scope },
+              { participantType, figures: figures() },
+            );
+            expect(chartHeight(schools, { ...PROGRAMME, ...scope }, parts)).toBe(
+              chartLayout(figure, parts).height,
+            );
+          }
+        }
+      },
+    );
 
     it("makes an empty figure exactly as tall as a full one, so side-by-side figures line up", () => {
       for (const [, figure] of titles) {

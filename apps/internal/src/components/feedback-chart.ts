@@ -13,8 +13,8 @@ import {
 
 /**
  * **The Lihat Grafik figures' pure rules** (#510, #514, #516, #518): which figures a scope gets,
- * which Aspects a Tipe Peserta has, `null` → no arc, the title block, and where every part of a
- * figure sits in its view box, and how tall that is (#522). Plain functions, tested without a DOM, the way
+ * which Aspects a Tipe Peserta has, `null` → no arc, the title block, where every part of a figure
+ * sits in its view box, and how tall that is (#522). Plain functions, tested without a DOM, the way
  * `feedback-scope.ts` sits beside the tab; `feedback-chart-figure.tsx` only draws what
  * `chartLayout` returns. Types only from `@sugt/db/queries`, as in `feedback-view.tsx`.
  */
@@ -161,6 +161,15 @@ export function participantChartFigure(
 export const CHART_WIDTH = 1200;
 
 const PAD = 48;
+
+/**
+ * **Where a line of text reaches, in em from its baseline**, estimated as its width is: descenders
+ * about 0.3 em under it, and the middle of its capitals about 0.35 em over it — what centres a
+ * score in its hole, the pill on its word, and the empty notice in its band.
+ */
+const DESCENT = 0.3;
+const MIDDLE = 0.35;
+
 const TITLE_SIZE = 42;
 const TITLE_LEADING = 52;
 /**
@@ -204,7 +213,7 @@ const NOTICE_SIZE = 36;
  */
 const ROW_CENTRE = RING_EDGE;
 const ROW_LABEL_BASELINE = ROW_CENTRE + DONUT_OUTER_RADIUS + LABEL_GAP + LABEL_SIZE * 0.8;
-const ROW_HEIGHT = Math.max(ROW_CENTRE + RING_EDGE, ROW_LABEL_BASELINE + LABEL_SIZE * 0.3);
+const ROW_HEIGHT = Math.max(ROW_CENTRE + RING_EDGE, ROW_LABEL_BASELINE + LABEL_SIZE * DESCENT);
 
 /**
  * A text's width in view-box units, estimated: SVG cannot measure text without a DOM. 0.6 em per
@@ -345,9 +354,12 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
     const left = (CHART_WIDTH - headingWidth - PILL_GAP - pillWidth) / 2;
     const pillX = left + headingWidth + PILL_GAP;
     // The pill is the topmost shape, standing taller than the heading's text. Capitals stand about
-    // 0.7 em over the baseline; the pill is centred on them.
+    // 0.7 em over the baseline; the pill is centred on them — less a fraction of a unit, so every
+    // line's descenders land on a whole unit, and with them the figure's height: the 2× PNG never
+    // splits a pixel.
     const pillY = 0;
-    const firstBaseline = pillY + PILL_HEIGHT / 2 + TITLE_SIZE * 0.35;
+    const firstBaseline =
+      Math.floor(pillY + PILL_HEIGHT / 2 + TITLE_SIZE * (MIDDLE + DESCENT)) - TITLE_SIZE * DESCENT;
     const lines = scope.flatMap((line) => wrap(line, TITLE_SIZE, contentWidth));
     const baselines = lines.map((_, index) => firstBaseline + PILL_LEADING + index * TITLE_LEADING);
     title = {
@@ -365,9 +377,8 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
       lines,
       baselines,
       x: CHART_WIDTH / 2,
-      // Past the last line's descenders, and no further: no blank line under the block. Whole
-      // units, so the figure's height is too and the 2× PNG never splits a pixel.
-      bottom: Math.ceil(baselines.at(-1)! + TITLE_SIZE * 0.3),
+      // Past the last line's descenders, and no further: no blank line under the block.
+      bottom: round(baselines.at(-1)! + TITLE_SIZE * DESCENT),
     };
     rowTop = title.bottom + TITLE_GAP;
   }
@@ -392,7 +403,7 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
                 text: aspect.valueLabel,
                 fontSize: VALUE_SIZE,
                 x: centre.x,
-                y: centre.y + VALUE_SIZE * 0.35,
+                y: centre.y + VALUE_SIZE * MIDDLE,
               }
             : null,
           nameLabel: {
@@ -407,15 +418,38 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
   return {
     title,
     slots,
-    // Centred in the band the row would fill, its middle about 0.35 em over its baseline.
+    // Centred in the band the row would fill.
     emptyNotice: figure.empty
       ? {
           text: "Belum ada tanggapan",
           fontSize: NOTICE_SIZE,
           x: CHART_WIDTH / 2,
-          y: rowTop + ROW_HEIGHT / 2 + NOTICE_SIZE * 0.35,
+          y: rowTop + ROW_HEIGHT / 2 + NOTICE_SIZE * MIDDLE,
         }
       : null,
     height: rowTop + ROW_HEIGHT,
   };
+}
+
+/**
+ * **Every figure's height over a scope** (#522), before its figures land: the title is the scope's,
+ * both Tipe Peserta's pills are one height, and an empty figure is as tall as a full one. So the
+ * dialog's loading skeleton takes the figures' own shape and the dialog doesn't jump.
+ */
+export function chartHeight(
+  schools: readonly FeedbackSchoolOption[],
+  scope: ParticipantFeedbackScope,
+  parts: ChartParts,
+): number {
+  const noResponses = {
+    responseCount: 0,
+    instructor: null,
+    materials: null,
+    relevance: null,
+    handsOnRbl: null,
+  };
+  return chartLayout(
+    participantChartFigure(schools, scope, { participantType: "Siswa", figures: noResponses }),
+    parts,
+  ).height;
 }

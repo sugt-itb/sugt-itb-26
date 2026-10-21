@@ -4,7 +4,7 @@ import { loadParticipantFeedbackCharts } from "-/app/(app)/feedback/actions";
 import {
   ALL_CHART_PARTS,
   CHART_WIDTH,
-  chartLayout,
+  chartHeight,
   chartParticipantTypes,
   participantChartFigure,
   type ChartParts,
@@ -34,15 +34,6 @@ import { useId, useRef, useState, useTransition } from "react";
 const PART_LABELS: Record<keyof ChartParts, string> = {
   title: "Judul",
   values: "Nilai",
-};
-
-/** A figure with no responses: as tall as a full one (#522), so it sizes the skeleton. */
-const NO_RESPONSES = {
-  responseCount: 0,
-  instructor: null,
-  materials: null,
-  relevance: null,
-  handsOnRbl: null,
 };
 
 /**
@@ -75,12 +66,8 @@ function ParticipantChartDialog({
   const latest = useRef(0);
   const idPrefix = useId();
   const figureCount = charts?.data.length ?? chartParticipantTypes(scope.participantType).length;
-  // The skeleton takes the figures' own shape — their title over this scope, the checkboxes as they
-  // stand — so the dialog doesn't jump when they land. Both Tipe Peserta are one height.
-  const skeletonHeight = chartLayout(
-    participantChartFigure(schools, scope, { participantType: "Siswa", figures: NO_RESPONSES }),
-    parts,
-  ).height;
+  // The figures' own shape — their title over this scope, the checkboxes as they stand.
+  const skeletonHeight = chartHeight(schools, scope, parts);
 
   function openWith(snapshot: ParticipantFeedbackScope) {
     setCharts(null);
