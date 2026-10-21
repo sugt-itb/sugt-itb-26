@@ -168,7 +168,7 @@ describe("chartLayout", () => {
     });
 
   type Slot = ChartLayout["slots"][number];
-  const N = String.raw`(-?[\d.]+)`;
+  const NUMBER = String.raw`(-?[\d.]+)`;
   /**
    * An arc's ring sector, read back from its path: outer arc from 12 o'clock, a line in, the inner
    * arc back, closed — each arc's large-arc and sweep flags, and its four corners.
@@ -177,17 +177,37 @@ describe("chartLayout", () => {
     const arc = slot.arc;
     if (arc?.kind !== "sector") throw new Error("not a sector");
     const match = new RegExp(
-      `^M ${N} ${N} A ${N} ${N} 0 ([01]) ([01]) ${N} ${N} L ${N} ${N} A ${N} ${N} 0 ([01]) ([01]) ${N} ${N} Z$`,
+      `^M ${NUMBER} ${NUMBER} A ${NUMBER} ${NUMBER} 0 ([01]) ([01]) ${NUMBER} ${NUMBER} ` +
+        `L ${NUMBER} ${NUMBER} A ${NUMBER} ${NUMBER} 0 ([01]) ([01]) ${NUMBER} ${NUMBER} Z$`,
     ).exec(arc.d);
     if (match === null) throw new Error(`not a ring sector: ${arc.d}`);
-    const n = match.slice(1).map(Number);
+    // Captures in path order: start, outer radii, outer flags, outer end, inner end, inner radii,
+    // inner flags, back to the hole's 12 o'clock.
+    const [
+      sx,
+      sy,
+      outerR,
+      ,
+      outerLarge,
+      outerSweep,
+      ox,
+      oy,
+      ix,
+      iy,
+      innerR,
+      ,
+      innerLarge,
+      innerSweep,
+      bx,
+      by,
+    ] = match.slice(1).map(Number) as number[];
     return {
-      start: { x: n[0]!, y: n[1]! },
-      outer: { radius: n[2]!, largeArc: n[4] === 1, sweep: n[5]! },
-      outerEnd: { x: n[6]!, y: n[7]! },
-      innerEnd: { x: n[8]!, y: n[9]! },
-      inner: { radius: n[10]!, largeArc: n[12] === 1, sweep: n[13]! },
-      innerStart: { x: n[14]!, y: n[15]! },
+      start: { x: sx!, y: sy! },
+      outer: { radius: outerR!, largeArc: outerLarge === 1, sweep: outerSweep! },
+      outerEnd: { x: ox!, y: oy! },
+      innerEnd: { x: ix!, y: iy! },
+      inner: { radius: innerR!, largeArc: innerLarge === 1, sweep: innerSweep! },
+      innerStart: { x: bx!, y: by! },
     };
   };
   const distance = (slot: Slot, point: { x: number; y: number }) =>

@@ -863,7 +863,7 @@ pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengka
 
 **Lihat Grafik** (#510) sits beside **Ekspor CSV** above the Peserta list, for anyone who can read
 the page, and is enabled even when the scope has no responses. The Perjadin tab has none. It opens
-a wide dialog of donut charts (#516), one donut per Aspect:
+a wide dialog of donut charts (#514, #516), one donut per Aspect:
 
 - **One figure per Tipe Peserta in scope**: Siswa, then GTK-MS. With a Tipe Peserta picked, only
   that one shows. With no School picked the figures are programme-wide.

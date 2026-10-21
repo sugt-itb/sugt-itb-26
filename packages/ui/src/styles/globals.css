@@ -81,8 +81,9 @@
   --chart-5: oklch(0.444 0.177 26.899);
   /* Categorical, unlike the red ramp above, which is for ordered values: one hue per category, the
      same in every figure (#510). Blue, amber, teal, violet — no red, which already means concern.
-     Each is at least 3:1 against --background, --popover and --muted, the donuts' track (#516), in its
-     theme (WCAG non-text contrast); apps/internal/tests/chart-category-tokens.test.ts holds that. */
+     Each is at least 3:1 against --background, --popover and --muted, the donuts' track (#514,
+     #516), in its theme (WCAG non-text contrast); apps/internal/tests/chart-category-tokens.test.ts
+     holds that. */
   --chart-category-1: oklch(0.546 0.245 262.881);
   --chart-category-2: oklch(0.555 0.163 48.998);
   --chart-category-3: oklch(0.511 0.096 186.391);

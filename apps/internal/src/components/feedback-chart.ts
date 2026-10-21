@@ -12,11 +12,11 @@ import {
 } from "@sugt/domain";
 
 /**
- * **The Lihat Grafik figures' pure rules** (#510, #516): which figures a scope gets, which Aspects a
- * Tipe Peserta has, `null` → no arc, the title and n line, and where every part of a figure sits
- * in its fixed view box. Plain functions, tested without a DOM, the way `feedback-scope.ts` sits beside the
- * tab; `feedback-chart-figure.tsx` only draws what `chartLayout` returns. Types only from
- * `@sugt/db/queries`, as in `feedback-view.tsx`.
+ * **The Lihat Grafik figures' pure rules** (#510, #514, #516): which figures a scope gets, which
+ * Aspects a Tipe Peserta has, `null` → no arc, the title and n line, and where every part of a
+ * figure sits in its fixed view box. Plain functions, tested without a DOM, the way
+ * `feedback-scope.ts` sits beside the tab; `feedback-chart-figure.tsx` only draws what
+ * `chartLayout` returns. Types only from `@sugt/db/queries`, as in `feedback-view.tsx`.
  */
 
 /**
@@ -63,10 +63,10 @@ export type ParticipantChartData = {
 };
 
 /**
- * **Donut order is the average cards'**: Narasumber, Materi, Relevansi, Hands-on RBL. Each Aspect has
- * one categorical colour token (`globals.css`), the same in every figure, which is what lets the
- * legend stand in for the donuts' labels when Label is off. The tokens are named, not resolved, so
- * the PNG export (#511) can swap in concrete values.
+ * **Donut order is the average cards'**: Narasumber, Materi, Relevansi, Hands-on RBL. Each Aspect
+ * has one categorical colour token (`globals.css`), the same in every figure, which is what lets
+ * the legend stand in for the donuts' labels when Label is off. The tokens are named, not resolved,
+ * so the PNG export (#511) can swap in concrete values.
  */
 const CHART_ASPECTS: readonly {
   aspect: ParticipantFeedbackAspect;
@@ -79,7 +79,7 @@ const CHART_ASPECTS: readonly {
   { aspect: "hands_on_rbl", figure: "handsOnRbl", colour: "--chart-category-4" },
 ];
 
-/** One Aspect's donut. `value` is `null` when no response in scope Rated it: a donut with no arc. */
+/** One Aspect's donut. `value` is `null` when no response in scope Rated it: no arc. */
 export type ChartAspect = {
   aspect: ParticipantFeedbackAspect;
   label: string;
@@ -153,7 +153,7 @@ const LEGEND_SWATCH = 28;
 const LEGEND_ROW = 48;
 /**
  * **Every donut is this size, in every figure and whatever the checkboxes hide**, so a Siswa and a
- * GTK-MS figure compare by eye (#516). Four fit across the view box with room between them and
+ * GTK-MS figure compare by eye (#514). Four fit across the view box with room between them and
  * under them for the longest label, Hands-on RBL. The ring is 36 wide; the hole holds the widest
  * score, "10.0" in bold at `VALUE_SIZE` — about 115 units — with room to spare.
  */

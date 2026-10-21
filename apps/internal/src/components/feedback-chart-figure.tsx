@@ -8,16 +8,17 @@ import {
 import { type Ref, useId } from "react";
 
 /**
- * **One Lihat Grafik figure, hand-written SVG** (#510, #516) — not shadcn's `chart`. Recharts draws
- * the legend and title as HTML outside its `<svg>`, so exporting one would need a DOM-to-image
- * library; here the title, n line, legend, donuts, their labels and scores all live inside **one
- * `<svg>`** with a fixed view box, which is what lets the PNG export (#511) serialise it whole.
+ * **One Lihat Grafik figure, hand-written SVG** (#510, #514, #516) — not shadcn's `chart`. Recharts
+ * draws the legend and title as HTML outside its `<svg>`, so exporting one would need a
+ * DOM-to-image library; here the title, n line, legend, donuts, their labels and scores all live
+ * inside **one `<svg>`** with a fixed view box, which is what lets the PNG export (#511) serialise
+ * it whole.
  *
  * It only draws `chartLayout`'s positions. Colours are the theme's tokens through `var(…)`, so on
  * screen it follows Mode Gelap. Each part the checkboxes hide carries a `data-part` naming it —
  * `title`, `legend`, `labels`, `values` — and each donut, its arc and the empty notice carry
- * `donut`, `arc` and `empty`. `ref` reaches the `<svg>` itself, which Unduh PNG (#511) serialises as it
- * stands.
+ * `donut`, `arc` and `empty`. `ref` reaches the `<svg>` itself, which Unduh PNG (#511) serialises
+ * as it stands.
  */
 function ParticipantChartFigure({
   figure,

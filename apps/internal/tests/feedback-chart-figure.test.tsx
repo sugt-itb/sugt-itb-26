@@ -9,9 +9,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 /**
- * **A Lihat Grafik figure, rendered** (#510, #516): one self-contained `<svg>` holding the title, n
- * line, legend, one donut per Aspect with its label and the score in its hole — the PNG export (#511)
- * serialises exactly that — and each of the four checkboxes removing exactly its own part.
+ * **A Lihat Grafik figure, rendered** (#510, #514, #516): one self-contained `<svg>` holding the
+ * title, n line, legend, one donut per Aspect with its label and the score in its hole — the PNG
+ * export (#511) serialises exactly that — and each of the four checkboxes removing exactly its own
+ * part.
  */
 
 const PROGRAMME = { schoolId: null, sessionId: null, participantType: null };
