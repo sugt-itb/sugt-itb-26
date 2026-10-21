@@ -863,29 +863,36 @@ pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengka
 
 **Lihat Grafik** (#510) sits beside **Ekspor CSV** above the Peserta list, for anyone who can read
 the page, and is enabled even when the scope has no responses. The Perjadin tab has none. It opens
-a wide dialog of vertical bar charts:
+a wide dialog of pie charts (#514), one pie per Aspect:
 
 - **One figure per Tipe Peserta in scope**: Siswa, then GTK-MS. With a Tipe Peserta picked, only
   that one shows. With no School picked the figures are programme-wide.
 - **The dialog has no pickers of its own.** It shows the tab's Sekolah, Sesi and Tipe Peserta as
   they were when it opened, and fetches its figures then, a skeleton standing in while they load.
   To change the scope, close it, change the pickers and reopen.
-- **A bar is the mean Rating of one Aspect** over that Tipe Peserta's responses in scope, the same
+- **A pie is the mean Rating of one Aspect** over that Tipe Peserta's responses in scope, the same
   number its average card shows with that Tipe Peserta picked. Like the cards, the figures follow
-  the scope and **never the score filters**. Bars run in the cards' order — Narasumber, Materi,
-  Relevansi, Hands-on RBL — so a Siswa figure has four and a GTK-MS figure three. The value axis is
-  fixed at 0–10, so two figures compare by eye. Each Aspect has one colour in every figure.
-- **An Aspect with no Rating in scope** keeps its slot with no bar and a "—" value label, never a
-  0 bar — Hands-on RBL when every Siswa response in scope was filed before it existed. **A Tipe
-  Peserta with no responses in scope** shows its frame with "Belum ada tanggapan" in place of bars.
+  the scope and **never the score filters**. Pies run in one row in the cards' order — Narasumber,
+  Materi, Relevansi, Hands-on RBL — so a Siswa figure has four and a GTK-MS figure three. Every
+  pie is the same size in both figures, so two figures compare by eye. Each Aspect has one colour
+  in every figure.
+- **A pie fills like a progress indicator.** Its whole circle is always drawn as a grey track
+  with a thin outline; on top, a wedge in the Aspect's colour covers mean ÷ 10 of the circle,
+  starting at 12 o'clock and running counter-clockwise. 10.0 fills the whole circle, 0.0 leaves
+  the bare track.
+- **An Aspect with no Rating in scope** keeps its pie: the bare track with "—" on it, never
+  "0.0" — Hands-on RBL when every Siswa response in scope was filed before it existed. **A Tipe
+  Peserta with no responses in scope** shows its frame with "Belum ada tanggapan" in place of the
+  pies.
 - **Each figure states its n** under the title — "n = 42 tanggapan" — since Participant feedback is
   indicative, not a census.
 - **Four checkboxes**, all on to start, apply to every figure at once: **Judul** (the title —
   `Nilai rata-rata Peserta · SMAN 1 Bontang · Sesi 1 Luring · Siswa`, or
   `Nilai rata-rata Peserta · Siswa` programme-wide — and the n line), **Legenda** (which colour is
-  which Aspect), **Sumbu** (both axes' lines, ticks and labels, and the titles **Aspek** and
-  **Nilai rata-rata (0–10)**) and **Nilai** (each bar's mean above it, as the cards format it, or
-  "—"). Closing and reopening the dialog keeps the choice; switching tabs or reloading resets it.
+  which Aspect), **Label** (the Aspect's name under each pie; with it off, the legend names the
+  pies) and **Nilai** (each pie's mean on its centre, as the cards format it — `7.8` — or "—", in
+  the text colour over a halo of the background, so it reads on any wedge and on the track).
+  Closing and reopening the dialog keeps the choice; switching tabs or reloading resets it.
 - Figures sit side by side when there is room and stack when there is not; the dialog's body
   scrolls, and it works at ~360px and in Mode Gelap. Each figure is one self-contained SVG, title
   and legend included, so it can be exported as an image.
