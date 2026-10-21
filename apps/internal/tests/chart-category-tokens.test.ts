@@ -5,9 +5,9 @@ import { themeTokens as block } from "./support/theme-tokens";
 /**
  * **The four categorical chart tokens** (#510), read straight from the shared stylesheet: each has a
  * light and a dark value, and each reaches **3:1 against the background its figure sits on** in both
- * themes — WCAG's non-text contrast for an arc or a legend swatch. The Lihat Grafik dialog is a
- * popover, so `--popover` is checked beside `--background`; an arc borders its donut's `--muted`
- * track and the surface that shows through the hole (#516).
+ * themes — WCAG's non-text contrast for an arc. The Lihat Grafik dialog is a popover, so
+ * `--popover` is checked beside `--background`; an arc borders its donut's `--muted` track and the
+ * surface that shows through the hole (#516).
  */
 
 /** An opaque `oklch(L C h)` to its WCAG relative luminance, through linear sRGB (Ottosson's OKLab). */
@@ -64,20 +64,25 @@ describe("the categorical chart tokens", () => {
     },
   );
 
+  it("are four distinct colours in each theme", () => {
+    for (const selector of [":root", ".dark"] as const) {
+      expect(new Set(TOKENS.map((token) => block(selector).get(token))).size).toBe(4);
+    }
+  });
+});
+
+/**
+ * **The Tipe Peserta pill** (#518) is the one place a chart writes text on a filled shape, so it is
+ * held to WCAG's text contrast, 4.5:1, rather than the arcs' 3:1.
+ */
+describe("the Tipe Peserta pill", () => {
   it.each([":root", ".dark"] as const)(
-    "leave the Tipe Peserta pill's text readable — 4.5:1, --primary-foreground on --primary — in %s",
+    "keeps --primary-foreground on --primary at 4.5:1 in %s",
     (selector) => {
-      // The pill (#518) is the one place a chart writes text on a filled shape: WCAG's text contrast.
       const theme = block(selector);
       expect(
         contrast(theme.get("--primary-foreground")!, theme.get("--primary")!),
       ).toBeGreaterThanOrEqual(4.5);
     },
   );
-
-  it("are four distinct colours in each theme", () => {
-    for (const selector of [":root", ".dark"] as const) {
-      expect(new Set(TOKENS.map((token) => block(selector).get(token))).size).toBe(4);
-    }
-  });
 });

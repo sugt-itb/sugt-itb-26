@@ -26,6 +26,20 @@ export function withSchool(
 }
 
 /**
+ * The School and Session a scope picks, as every Peserta title names them — the School's name and
+ * the Session's short label, `Sesi 1 Luring` — each `null` when not picked. The average cards and
+ * the Lihat Grafik figures (#518) both read it, so a title and its PNG's file name never drift.
+ */
+export function participantScopeNames(
+  schools: readonly FeedbackSchoolOption[],
+  scope: ParticipantFeedbackScope,
+): { school: string | null; sesi: string | null } {
+  const school = schools.find((option) => option.id === scope.schoolId);
+  const session = school?.sessions.find((option) => option.id === scope.sessionId);
+  return { school: school?.name ?? null, sesi: session ? sesiShortLabel(session) : null };
+}
+
+/**
  * What the Peserta averages cover, for their titles: the School, then the Session, then the Tipe
  * Peserta — `SMAN 1 Bontang · Sesi 1 Luring · GTK-MS` — or `null`, programme-wide, with none picked.
  */
@@ -33,13 +47,8 @@ export function participantScopeLabel(
   schools: readonly FeedbackSchoolOption[],
   scope: ParticipantFeedbackScope,
 ): string | null {
-  const school = schools.find((option) => option.id === scope.schoolId);
-  const session = school?.sessions.find((option) => option.id === scope.sessionId);
-  const parts = [
-    school?.name ?? null,
-    session ? sesiShortLabel(session) : null,
-    scope.participantType,
-  ].filter((part) => part !== null);
+  const { school, sesi } = participantScopeNames(schools, scope);
+  const parts = [school, sesi, scope.participantType].filter((part) => part !== null);
   return parts.length === 0 ? null : parts.join(" · ");
 }
 

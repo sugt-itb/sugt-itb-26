@@ -60,7 +60,7 @@ function ParticipantChartFigure({
           >
             {layout.title.heading.text}
           </text>
-          {/* The Tipe Peserta has to stand out at a glance: the brand colour, never an Aspect's. */}
+          {/* The Tipe Peserta stands out at a glance: the brand colour, never an Aspect's. */}
           <g data-part="pill">
             <rect
               x={layout.title.pill.x}

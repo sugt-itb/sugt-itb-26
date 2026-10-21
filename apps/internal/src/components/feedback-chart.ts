@@ -1,4 +1,4 @@
-import { sesiShortLabel } from "-/components/session-labels";
+import { participantScopeNames } from "-/components/feedback-scope";
 import { PARTICIPANT_ASPECT_LABELS } from "-/lib/participant-feedback-copy";
 import type {
   FeedbackParticipantType,
@@ -95,7 +95,6 @@ export type ChartAspect = {
  */
 export type ChartTitle = {
   heading: string;
-  participantType: FeedbackParticipantType;
   /** The School's name or `Semua Sekolah`, then the Sesi's short label if one is picked. */
   scope: string[];
   /** Every line joined with ` · `: the figure's accessible name, whatever the checkboxes hide. */
@@ -127,16 +126,14 @@ export function participantChartFigure(
       (classKind) => PARTICIPANT_FEEDBACK_ASPECTS_BY_CLASS[classKind],
     ),
   );
-  const school = schools.find((option) => option.id === scope.schoolId);
-  const session = school?.sessions.find((option) => option.id === scope.sessionId);
+  const { school, sesi } = participantScopeNames(schools, scope);
   const heading = "Feedback Peserta ·";
-  const scopeLines = [school?.name ?? "Semua Sekolah"];
-  if (session) scopeLines.push(sesiShortLabel(session));
+  const scopeLines = [school ?? "Semua Sekolah"];
+  if (sesi !== null) scopeLines.push(sesi);
   return {
     participantType,
     title: {
       heading,
-      participantType,
       scope: scopeLines,
       name: [`${heading} ${participantType}`, ...scopeLines].join(" · "),
     },
@@ -316,7 +313,8 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
   let title: ChartLayout["title"] = null;
   if (parts.title) {
     // The first line — heading, gap, pill — is centred as a whole on the estimated widths.
-    const { heading, participantType, scope } = figure.title;
+    const { participantType } = figure;
+    const { heading, scope } = figure.title;
     const headingWidth = textWidth(heading, TITLE_SIZE);
     const pillWidth = textWidth(participantType, TITLE_SIZE) + 2 * PILL_PAD_X;
     const left = (CHART_WIDTH - headingWidth - PILL_GAP - pillWidth) / 2;

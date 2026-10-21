@@ -18,8 +18,8 @@ import { describe, expect, it } from "vitest";
 /**
  * **The Lihat Grafik figures' rules, without a DOM** (#510): which figures a scope gets, which
  * Aspects a Tipe Peserta has and in what order, `null` → no arc and "—", the title block and its
- * Tipe Peserta pill (#518), one colour per Aspect, and each donut's arc filled to its mean out of 10
- * (#516).
+ * Tipe Peserta pill (#518), one colour per Aspect, and each donut's arc filled to its mean out of
+ * 10 (#516).
  */
 
 const schools: FeedbackSchoolOption[] = [
@@ -141,7 +141,6 @@ describe("participantChartFigure", () => {
   it("titles a programme-wide figure Semua Sekolah, on two lines", () => {
     expect(titled({}, "Siswa")).toEqual({
       heading: "Feedback Peserta ·",
-      participantType: "Siswa",
       scope: ["Semua Sekolah"],
       name: "Feedback Peserta · Siswa · Semua Sekolah",
     });
@@ -166,10 +165,8 @@ describe("participantChartFigure", () => {
     ]);
   });
 
-  it("names its own Tipe Peserta, not the scope's, and never a count", () => {
-    const title = titled({ participantType: "GTK-MS" }, "GTK-MS");
-    expect(title.participantType).toBe("GTK-MS");
-    expect(title.name).not.toContain("tanggapan");
+  it("states no response count: the page does (#519)", () => {
+    expect(titled({ participantType: "GTK-MS" }, "GTK-MS").name).not.toContain("tanggapan");
   });
 
   it("gives every Aspect one colour, the same in every figure", () => {
@@ -426,14 +423,19 @@ describe("chartLayout", () => {
       expect(title.lines).toEqual(["Semua Sekolah"]);
     });
 
-    it("ends at its last line: no blank line under it", () => {
-      const two = chartLayout(scoped({ schoolId: "bontang" }), ALL_CHART_PARTS);
-      const three = chartLayout(
-        scoped({ schoolId: "bontang", sessionId: "sesi-1" }),
-        ALL_CHART_PARTS,
-      );
-      // The Sesi line costs the row one line's height, centred: half of it.
-      expect(three.slots[0]!.centre.y - two.slots[0]!.centre.y).toBeLessThan(40);
+    it.each([
+      ["two", {}],
+      ["three", { schoolId: "bontang", sessionId: "sesi-1" }],
+    ] as const)("ends at its last line, with %s lines: no blank line under it", (_, scope) => {
+      const layout = chartLayout(scoped(scope), ALL_CHART_PARTS);
+      const donut = layout.slots[0]!;
+      // The row is centred under the block, so the room above it — from the last line — is the
+      // room below its names less the bottom padding's head start. A blank line would move the
+      // row down half a line, leaving more room above than below.
+      const above = donut.centre.y - donut.outerRadius - layout.title!.baselines.at(-1)!;
+      const below = CHART_HEIGHT - donut.nameLabel.y;
+      expect(above).toBeLessThan(below);
+      expect(above).toBeGreaterThan(below - 45);
     });
 
     it.each(["Siswa", "GTK-MS"] as const)(

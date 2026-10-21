@@ -154,6 +154,10 @@ describe("ParticipantChartFigure", () => {
     expect(donuts(markup)).toBe(0);
     expect(markup).toContain(">Belum ada tanggapan</text>");
     expect(markup).not.toContain('data-part="values"');
+    // The frame keeps its title block, pill included, while Judul is on.
+    expect(markup).toContain('data-part="title"');
+    expect(markup).toContain('data-part="pill"');
+    expect(markup).toContain(">Semua Sekolah</tspan>");
   });
 
   it.each([

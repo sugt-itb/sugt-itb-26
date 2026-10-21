@@ -887,7 +887,7 @@ a wide dialog of donut charts (#514, #516, #518), one donut per Aspect:
 - **Each Aspect's name always sits under its donut.** There is no legend, so a donut without its
   name would name nothing.
 - **The title block** is three centred lines, with no blank line after it:
-  1. `Feedback Peserta · ` and the Tipe Peserta, `Siswa` or `GTK-MS`, in a highlight pill: a
+  1. `Feedback Peserta ·` and the Tipe Peserta, `Siswa` or `GTK-MS`, in a highlight pill: a
      filled rounded rect in the brand colour, the word in its foreground colour, so the Tipe Peserta
      stands out at a glance. It is never an Aspect's colour.
   2. The School's name, wrapping when long, or `Semua Sekolah` programme-wide.
