@@ -408,7 +408,11 @@ describe("the Perjadin tab's Perjadin and Peran pengisi", () => {
       { perjadinId: randomUUID(), role: null },
       { perjadinId: null, role: "Bendahara" as PerjadinEvaluationRole },
     ]) {
-      await expect(perjadinPage(person, scope)).resolves.toEqual({ rows: [], nextCursor: null, total: 0 });
+      await expect(perjadinPage(person, scope)).resolves.toEqual({
+        rows: [],
+        nextCursor: null,
+        total: 0,
+      });
       await expect(perjadinFeedbackAverages(person, scope)).resolves.toEqual(empty);
     }
   });
