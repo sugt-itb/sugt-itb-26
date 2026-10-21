@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
+
+import { themeTokens as block } from "./support/theme-tokens";
 
 /**
  * **The four categorical chart tokens** (#510), read straight from the shared stylesheet: each has a
@@ -8,20 +8,6 @@ import { describe, expect, it } from "vitest";
  * themes — WCAG's non-text contrast for a bar or a legend swatch. The Lihat Grafik dialog is a
  * popover, so `--popover` is checked beside `--background`.
  */
-
-const css = readFileSync(
-  new URL("../../../packages/ui/src/styles/globals.css", import.meta.url),
-  "utf8",
-);
-
-/** One theme block's custom properties — `:root` or `.dark` — as written. */
-function block(selector: string): Map<string, string> {
-  const start = css.indexOf(`${selector} {`);
-  const body = css.slice(start, css.indexOf("}", start));
-  return new Map(
-    [...body.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((match) => [match[1]!, match[2]!.trim()]),
-  );
-}
 
 /** An opaque `oklch(L C h)` to its WCAG relative luminance, through linear sRGB (Ottosson's OKLab). */
 function luminance(value: string): number {
@@ -49,7 +35,7 @@ function contrast(first: string, second: string): number {
 const TOKENS = [1, 2, 3, 4].map((index) => `--chart-category-${index}`);
 
 describe("the categorical chart tokens", () => {
-  it.each([":root", ".dark"])("are all declared in %s", (selector) => {
+  it.each([":root", ".dark"] as const)("are all declared in %s", (selector) => {
     const theme = block(selector);
     for (const token of TOKENS) {
       expect(theme.get(token)).toBeDefined();
@@ -62,7 +48,7 @@ describe("the categorical chart tokens", () => {
     }
   });
 
-  it.each([":root", ".dark"])(
+  it.each([":root", ".dark"] as const)(
     "reach 3:1 against the background and the popover in %s",
     (selector) => {
       const theme = block(selector);
@@ -78,7 +64,7 @@ describe("the categorical chart tokens", () => {
   );
 
   it("are four distinct colours in each theme", () => {
-    for (const selector of [":root", ".dark"]) {
+    for (const selector of [":root", ".dark"] as const) {
       expect(new Set(TOKENS.map((token) => block(selector).get(token))).size).toBe(4);
     }
   });
