@@ -28,6 +28,8 @@ import type {
  */
 export const CHART_EXPORT_COLOURS: Record<string, string> = {
   "--foreground": "oklch(0.145 0 0)",
+  "--primary": "oklch(0.527 0.16 26.893)",
+  "--primary-foreground": "oklch(0.971 0.013 17.38)",
   "--muted-foreground": "oklch(0.556 0 0)",
   "--muted": "oklch(0.97 0 0)",
   "--border": "oklch(0.845 0 0)",

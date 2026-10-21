@@ -863,7 +863,7 @@ pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengka
 
 **Lihat Grafik** (#510) sits beside **Ekspor CSV** above the Peserta list, for anyone who can read
 the page, and is enabled even when the scope has no responses. The Perjadin tab has none. It opens
-a wide dialog of donut charts (#514, #516), one donut per Aspect:
+a wide dialog of donut charts (#514, #516, #518), one donut per Aspect:
 
 - **One figure per Tipe Peserta in scope**: Siswa, then GTK-MS. With a Tipe Peserta picked, only
   that one shows. With no School picked the figures are programme-wide.
@@ -884,21 +884,31 @@ a wide dialog of donut charts (#514, #516), one donut per Aspect:
   middle, never "0.0" — Hands-on RBL when every Siswa response in scope was filed before it
   existed. **A Tipe Peserta with no responses in scope** shows its frame with "Belum ada
   tanggapan" in place of the donuts.
-- **Each figure states its n** under the title — "n = 42 tanggapan" — since Participant feedback is
-  indicative, not a census.
-- **Four checkboxes**, all on to start, apply to every figure at once: **Judul** (the title —
-  `Nilai rata-rata Peserta · SMAN 1 Bontang · Sesi 1 Luring · Siswa`, or
-  `Nilai rata-rata Peserta · Siswa` programme-wide — and the n line), **Legenda** (which colour is
-  which Aspect), **Label** (the Aspect's name under each donut; with it off, the legend names the
-  donuts) and **Nilai** (each donut's mean in its middle, in bold, as the cards format it — `7.8`
-  — or "—"; with it off, the hole is empty).
+- **Each Aspect's name always sits under its donut.** There is no legend, so a donut without its
+  name would name nothing.
+- **The title block** is three centred lines, with no blank line after it:
+  1. `Feedback Peserta · ` and the Tipe Peserta, `Siswa` or `GTK-MS`, in a highlight pill: a
+     filled rounded rect in the brand colour, the word in its foreground colour, so the Tipe Peserta
+     stands out at a glance. It is never an Aspect's colour.
+  2. The School's name, wrapping when long, or `Semua Sekolah` programme-wide.
+  3. The Sesi, only when one is picked, as the average cards write it: `Sesi 1 Luring`, or the dated
+     form for a cancelled Session. With no Sesi picked the line is left out, so with no School there
+     are two lines.
+
+  For example `Feedback Peserta · [Siswa]` / `SMAN 1 Bontang` / `Sesi 1 Luring`. The figure states
+  no response count; #519 puts it on the page.
+
+- **Two checkboxes**, both on to start, apply to every figure at once: **Judul** (the whole title
+  block, pill included) and **Nilai** (each donut's mean in its middle, in bold, as the cards
+  format it — `7.8` — or "—"; with it off, the hole is empty). Hiding the title gives its room to
+  the donuts' row, which stays centred, but never changes a donut's size.
   Closing and reopening the dialog keeps the choice; switching tabs or reloading resets it.
 - Figures sit side by side when there is room and stack when there is not; the dialog's body
   scrolls, and it works at ~360px and in Mode Gelap. Each figure is one self-contained SVG, title
-  and legend included, so it can be exported as an image.
+  block included, so it can be exported as an image.
 - **Unduh PNG** (#511) sits under every figure that has responses — a "Belum ada tanggapan" figure
   has none — and downloads that figure alone. There is no "Unduh semua" and no SVG download.
-  - **What you see is what you get**: the four checkboxes decide what is in the image, exactly as
+  - **What you see is what you get**: the two checkboxes decide what is in the image, exactly as
     on screen.
   - **Always light on white**, even in Mode Gelap, so the image sits cleanly on a white report
     page; the screen keeps its own theme.

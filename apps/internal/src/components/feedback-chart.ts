@@ -1,4 +1,4 @@
-import { participantScopeLabel } from "-/components/feedback-scope";
+import { sesiShortLabel } from "-/components/session-labels";
 import { PARTICIPANT_ASPECT_LABELS } from "-/lib/participant-feedback-copy";
 import type {
   FeedbackParticipantType,
@@ -12,8 +12,8 @@ import {
 } from "@sugt/domain";
 
 /**
- * **The Lihat Grafik figures' pure rules** (#510, #514, #516): which figures a scope gets, which
- * Aspects a Tipe Peserta has, `null` → no arc, the title and n line, and where every part of a
+ * **The Lihat Grafik figures' pure rules** (#510, #514, #516, #518): which figures a scope gets,
+ * which Aspects a Tipe Peserta has, `null` → no arc, the title block, and where every part of a
  * figure sits in its fixed view box. Plain functions, tested without a DOM, the way
  * `feedback-scope.ts` sits beside the tab; `feedback-chart-figure.tsx` only draws what
  * `chartLayout` returns. Types only from `@sugt/db/queries`, as in `feedback-view.tsx`.
@@ -46,15 +46,13 @@ export function chartParticipantTypes(
   );
 }
 
-/** The four checkboxes: which parts of every figure are drawn. All on to start. */
-export type ChartParts = { title: boolean; legend: boolean; labels: boolean; values: boolean };
+/**
+ * The two checkboxes: which parts of every figure are drawn. Both on to start. The Aspects' names
+ * are not one of them — with no legend (#518), a donut without its name would name nothing.
+ */
+export type ChartParts = { title: boolean; values: boolean };
 
-export const ALL_CHART_PARTS: ChartParts = {
-  title: true,
-  legend: true,
-  labels: true,
-  values: true,
-};
+export const ALL_CHART_PARTS: ChartParts = { title: true, values: true };
 
 /** One Tipe Peserta's figures over the dialog's scope — what the Server Action returns. */
 export type ParticipantChartData = {
@@ -64,9 +62,9 @@ export type ParticipantChartData = {
 
 /**
  * **Donut order is the average cards'**: Narasumber, Materi, Relevansi, Hands-on RBL. Each Aspect
- * has one categorical colour token (`globals.css`), the same in every figure, which is what lets
- * the legend stand in for the donuts' labels when Label is off. The tokens are named, not resolved,
- * so the PNG export (#511) can swap in concrete values.
+ * has one categorical colour token (`globals.css`), the same in every figure, so the same Aspect
+ * reads the same across two figures. The tokens are named, not resolved, so the PNG export (#511)
+ * can swap in concrete values.
  */
 const CHART_ASPECTS: readonly {
   aspect: ParticipantFeedbackAspect;
@@ -90,12 +88,24 @@ export type ChartAspect = {
   colour: string;
 };
 
+/**
+ * A figure's title block (#518), before layout: `Feedback Peserta ·` and the Tipe Peserta, in its
+ * pill, on the first line; then the School, or `Semua Sekolah`; then the Sesi, only when one is
+ * picked. No count — the page states it (#519).
+ */
+export type ChartTitle = {
+  heading: string;
+  participantType: FeedbackParticipantType;
+  /** The School's name or `Semua Sekolah`, then the Sesi's short label if one is picked. */
+  scope: string[];
+  /** Every line joined with ` · `: the figure's accessible name, whatever the checkboxes hide. */
+  name: string;
+};
+
 /** One Tipe Peserta's figure, before layout. */
 export type ChartFigure = {
   participantType: FeedbackParticipantType;
-  title: string;
-  /** "n = 42 tanggapan" — indicative, not a census (ADR-0009), so a figure says what it stands on. */
-  countLine: string;
+  title: ChartTitle;
   aspects: ChartAspect[];
   /** No response in scope: the frame shows "Belum ada tanggapan" in place of the donuts. */
   empty: boolean;
@@ -104,7 +114,8 @@ export type ChartFigure = {
 /**
  * One Tipe Peserta's figure: the Aspects its Classes are asked, in the cards' order, each the mean
  * Rating over the scope — the same number its average card shows with that Tipe Peserta picked. The
- * title is the scope as the cards name it, then the Tipe Peserta.
+ * title names the figure's own Tipe Peserta, then the School and Sesi as the cards name them. A
+ * Sesi is only ever picked with its School, so with no School there is no Sesi line.
  */
 export function participantChartFigure(
   schools: readonly FeedbackSchoolOption[],
@@ -116,11 +127,19 @@ export function participantChartFigure(
       (classKind) => PARTICIPANT_FEEDBACK_ASPECTS_BY_CLASS[classKind],
     ),
   );
-  const covers = participantScopeLabel(schools, { ...scope, participantType });
+  const school = schools.find((option) => option.id === scope.schoolId);
+  const session = school?.sessions.find((option) => option.id === scope.sessionId);
+  const heading = "Feedback Peserta ·";
+  const scopeLines = [school?.name ?? "Semua Sekolah"];
+  if (session) scopeLines.push(sesiShortLabel(session));
   return {
     participantType,
-    title: `Nilai rata-rata Peserta · ${covers}`,
-    countLine: `n = ${figures.responseCount} tanggapan`,
+    title: {
+      heading,
+      participantType,
+      scope: scopeLines,
+      name: [`${heading} ${participantType}`, ...scopeLines].join(" · "),
+    },
     empty: figures.responseCount === 0,
     aspects: CHART_ASPECTS.filter(({ aspect }) => asked.has(aspect)).map(
       ({ aspect, figure, colour }) => {
@@ -147,10 +166,18 @@ export const CHART_HEIGHT = 800;
 const PAD = 48;
 const TITLE_SIZE = 42;
 const TITLE_LEADING = 52;
-const COUNT_SIZE = 32;
-const LEGEND_SIZE = 32;
-const LEGEND_SWATCH = 28;
-const LEGEND_ROW = 48;
+/**
+ * **The Tipe Peserta's pill.** Its width is the word's estimated width plus this much either side,
+ * generous on purpose: the estimate is 0.6 em a character, but `GTK-MS` is all capitals, which run
+ * nearer 0.65 em in Montserrat and in the PNG's Helvetica or Arial alike. Centring the word in the
+ * pill splits whatever the estimate misses between its two ends.
+ */
+const PILL_PAD_X = 28;
+const PILL_HEIGHT = 60;
+/** Between the heading's end and the pill. */
+const PILL_GAP = 14;
+/** From the pill's line to the first scope line: the pill stands taller than the text. */
+const PILL_LEADING = 68;
 /**
  * **Every donut is this size, in every figure and whatever the checkboxes hide**, so a Siswa and a
  * GTK-MS figure compare by eye (#514). Four fit across the view box with room between them and
@@ -165,8 +192,8 @@ const VALUE_SIZE = 48;
 
 /**
  * A text's width in view-box units, estimated: SVG cannot measure text without a DOM. 0.6 em per
- * character is an estimate, not a measurement. Checked in Chromium against Montserrat, a wrapped
- * long School title and the legend stayed inside the view box without overlapping (#510).
+ * character is an estimate, not a measurement. Checked in Chromium against Montserrat: a wrapped
+ * long School name stayed inside the view box without overlapping (#510, #518).
  */
 function textWidth(text: string, fontSize: number): number {
   return text.length * fontSize * 0.6;
@@ -235,17 +262,24 @@ function arc(centre: Point, value: number | null): ChartArc | null {
 /** Where every part of a figure sits. A part its checkbox hides is `null`. */
 export type ChartLayout = {
   title: {
-    lines: string[];
     fontSize: number;
+    /** `Feedback Peserta ·`, ending at `x` — right-anchored, so it never runs into the pill. */
+    heading: Point & { text: string };
+    /** The Tipe Peserta's filled rect, `x`/`y` its top left; the word centred on `textX`. */
+    pill: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      text: string;
+      textX: number;
+      textY: number;
+    };
+    /** The School or `Semua Sekolah`, wrapped, then the Sesi if picked. */
+    lines: string[];
     /** Each line's baseline, centred on `x`. */
     baselines: number[];
     x: number;
-    count: Point & { text: string; fontSize: number };
-  } | null;
-  legend: {
-    fontSize: number;
-    swatch: number;
-    items: { label: string; colour: string; swatch: Point; text: Point }[];
   } | null;
   /**
    * One donut per Aspect, in order — kept for an Aspect with no Rating, whose `arc` is `null` — and
@@ -262,18 +296,18 @@ export type ChartLayout = {
     arc: ChartArc | null;
     /** The score, centred in the hole: `y` is its baseline. */
     valueLabel: (Point & { text: string; fontSize: number }) | null;
-    /** The Aspect's name under the donut: `y` is its baseline. */
-    nameLabel: (Point & { text: string; fontSize: number }) | null;
+    /** The Aspect's name under the donut, always: `y` is its baseline. */
+    nameLabel: Point & { text: string; fontSize: number };
   }[];
   /** "Belum ada tanggapan", centred where the donuts would be, when the figure has no responses. */
   emptyNotice: (Point & { text: string }) | null;
 };
 
 /**
- * **A figure's layout in the fixed view box.** Top to bottom: the title and n line (Judul), the
- * legend (Legenda), then one row of donuts, each with its score in its hole (Nilai) and its
- * Aspect's name under it (Label). The row is centred in the room the parts above leave; a hidden
- * part gives that room back, but **never changes a donut's size**.
+ * **A figure's layout in the fixed view box.** Top to bottom: the title block (Judul), then one row
+ * of donuts, each with its score in its hole (Nilai) and its Aspect's name under it. The row is
+ * centred in the room the title leaves; hiding it gives that room back, but **never changes a
+ * donut's size**.
  */
 export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout {
   const contentWidth = CHART_WIDTH - 2 * PAD;
@@ -281,59 +315,42 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
 
   let title: ChartLayout["title"] = null;
   if (parts.title) {
-    const lines = wrap(figure.title, TITLE_SIZE, contentWidth);
-    const baselines = lines.map((_, index) => cursor + TITLE_SIZE + index * TITLE_LEADING);
-    const countBaseline = baselines.at(-1)! + 16 + COUNT_SIZE;
+    // The first line — heading, gap, pill — is centred as a whole on the estimated widths.
+    const { heading, participantType, scope } = figure.title;
+    const headingWidth = textWidth(heading, TITLE_SIZE);
+    const pillWidth = textWidth(participantType, TITLE_SIZE) + 2 * PILL_PAD_X;
+    const left = (CHART_WIDTH - headingWidth - PILL_GAP - pillWidth) / 2;
+    const pillX = left + headingWidth + PILL_GAP;
+    const firstBaseline = cursor + TITLE_SIZE + 4;
+    // Capitals stand about 0.7 em over the baseline; the pill is centred on them.
+    const pillY = Math.round(firstBaseline - TITLE_SIZE * 0.35 - PILL_HEIGHT / 2);
+    const lines = scope.flatMap((line) => wrap(line, TITLE_SIZE, contentWidth));
+    const baselines = lines.map((_, index) => firstBaseline + PILL_LEADING + index * TITLE_LEADING);
     title = {
-      lines,
       fontSize: TITLE_SIZE,
+      heading: { text: heading, x: pillX - PILL_GAP, y: firstBaseline },
+      pill: {
+        x: pillX,
+        y: pillY,
+        width: pillWidth,
+        height: PILL_HEIGHT,
+        text: participantType,
+        textX: pillX + pillWidth / 2,
+        textY: firstBaseline,
+      },
+      lines,
       baselines,
       x: CHART_WIDTH / 2,
-      count: { text: figure.countLine, fontSize: COUNT_SIZE, x: CHART_WIDTH / 2, y: countBaseline },
     };
-    cursor = countBaseline + 28;
-  }
-
-  let legend: ChartLayout["legend"] = null;
-  if (parts.legend) {
-    // Each item is a swatch, a gap and its label; items run in centred rows, wrapping when full.
-    const gap = 12;
-    const between = 40;
-    const sized = figure.aspects.map((aspect) => ({
-      aspect,
-      width: LEGEND_SWATCH + gap + textWidth(aspect.label, LEGEND_SIZE),
-    }));
-    const rows: (typeof sized)[] = [];
-    for (const item of sized) {
-      const row = rows.at(-1);
-      const rowWidth = row?.reduce((sum, other) => sum + other.width + between, 0) ?? 0;
-      if (row !== undefined && rowWidth + item.width <= contentWidth) row.push(item);
-      else rows.push([item]);
-    }
-    const items = rows.flatMap((row, index) => {
-      const top = cursor + index * LEGEND_ROW;
-      const rowWidth = row.reduce((sum, item) => sum + item.width, 0) + between * (row.length - 1);
-      let x = (CHART_WIDTH - rowWidth) / 2;
-      return row.map(({ aspect, width }) => {
-        const item = {
-          label: aspect.label,
-          colour: aspect.colour,
-          swatch: { x, y: top + (LEGEND_SIZE - LEGEND_SWATCH) / 2 + 2 },
-          text: { x: x + LEGEND_SWATCH + gap, y: top + LEGEND_SIZE * 0.85 },
-        };
-        x += width + between;
-        return item;
-      });
-    });
-    legend = { fontSize: LEGEND_SIZE, swatch: LEGEND_SWATCH, items };
-    cursor += rows.length * LEGEND_ROW;
+    // Past the last line's descenders, and no further: no blank line under the block.
+    cursor = baselines.at(-1)! + TITLE_SIZE * 0.3;
   }
 
   // The row — donuts, then their labels — centred in what is left, or pinned to its top if a long
   // title leaves less than that.
   const top = cursor + 12;
   const bottom = CHART_HEIGHT - PAD;
-  const rowHeight = 2 * DONUT_OUTER_RADIUS + (parts.labels ? LABEL_GAP + LABEL_SIZE : 0);
+  const rowHeight = 2 * DONUT_OUTER_RADIUS + LABEL_GAP + LABEL_SIZE;
   const centreY = Math.round(
     top + Math.max(0, (bottom - top - rowHeight) / 2) + DONUT_OUTER_RADIUS,
   );
@@ -359,20 +376,17 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
                 y: centre.y + VALUE_SIZE * 0.35,
               }
             : null,
-          nameLabel: parts.labels
-            ? {
-                text: aspect.label,
-                fontSize: LABEL_SIZE,
-                x: centre.x,
-                y: centre.y + DONUT_OUTER_RADIUS + LABEL_GAP + LABEL_SIZE * 0.8,
-              }
-            : null,
+          nameLabel: {
+            text: aspect.label,
+            fontSize: LABEL_SIZE,
+            x: centre.x,
+            y: centre.y + DONUT_OUTER_RADIUS + LABEL_GAP + LABEL_SIZE * 0.8,
+          },
         };
       });
 
   return {
     title,
-    legend,
     slots,
     emptyNotice: figure.empty
       ? { text: "Belum ada tanggapan", x: CHART_WIDTH / 2, y: (top + bottom) / 2 }

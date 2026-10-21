@@ -9,10 +9,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 /**
- * **A Lihat Grafik figure, rendered** (#510, #514, #516): one self-contained `<svg>` holding the
- * title, n line, legend, one donut per Aspect with its label and the score in its hole — the PNG
- * export (#511) serialises exactly that — and each of the four checkboxes removing exactly its own
- * part.
+ * **A Lihat Grafik figure, rendered** (#510, #514, #516, #518): one self-contained `<svg>` holding
+ * the title block with its Tipe Peserta pill, one donut per Aspect with its name and the score in
+ * its hole — the PNG export (#511) serialises exactly that — and each of the two checkboxes
+ * removing exactly its own part.
  */
 
 const PROGRAMME = { schoolId: null, sessionId: null, participantType: null };
@@ -45,7 +45,7 @@ function render(
 
 const donuts = (markup: string) => markup.match(/data-part="donut"/g)?.length ?? 0;
 const arcs = (markup: string) => markup.match(/data-part="arc"/g)?.length ?? 0;
-const PARTS = ["title", "legend", "labels", "values"] as const;
+const PARTS = ["title", "values"] as const;
 
 describe("ParticipantChartFigure", () => {
   it("is one <svg> with every part inside it", () => {
@@ -53,7 +53,7 @@ describe("ParticipantChartFigure", () => {
     expect(markup.startsWith("<svg")).toBe(true);
     expect(markup.endsWith("</svg>")).toBe(true);
     expect(markup.match(/<svg/g)).toHaveLength(1);
-    for (const part of PARTS) {
+    for (const part of [...PARTS, "labels", "pill"]) {
       expect(markup).toContain(`data-part="${part}"`);
     }
   });
@@ -98,10 +98,38 @@ describe("ParticipantChartFigure", () => {
     expect(markup).not.toContain("--background");
   });
 
-  it("draws the title and the n line", () => {
+  it("draws the title block: the heading, the Tipe Peserta in its pill, then the scope", () => {
     const markup = render();
-    expect(markup).toContain(">Nilai rata-rata Peserta · Siswa</tspan>");
-    expect(markup).toContain(">n = 42 tanggapan</text>");
+    expect(markup).toContain(
+      'text-anchor="end" font-size="42" font-weight="600" style="fill:var(--foreground)">Feedback Peserta ·</text>',
+    );
+    expect(markup).toContain(">Semua Sekolah</tspan>");
+    expect(markup).not.toContain("Nilai rata-rata");
+  });
+
+  it.each(["Siswa", "GTK-MS"] as const)(
+    "puts %s in a --primary pill, the word in --primary-foreground",
+    (participantType) => {
+      const markup = render({ handsOnRbl: null }, ALL_CHART_PARTS, participantType);
+      expect(markup).toMatch(
+        new RegExp(
+          '<g data-part="pill"><rect [^>]*rx="30" style="fill:var\\(--primary\\)"></rect>' +
+            '<text [^>]*text-anchor="middle"[^>]*style="fill:var\\(--primary-foreground\\)">' +
+            `${participantType}</text></g>`,
+        ),
+      );
+      // Never an Aspect's colour: the pill must not read as another Aspect.
+      const pill = /<g data-part="pill">.*?<\/g>/.exec(markup)![0];
+      expect(pill).not.toContain("--chart-category");
+    },
+  );
+
+  it("draws no legend and no n line", () => {
+    const markup = render();
+    expect(markup).not.toContain('data-part="legend"');
+    expect(markup).not.toContain("tanggapan");
+    // The pill is the one rect: no legend swatches.
+    expect(markup.match(/<rect /g)).toHaveLength(1);
   });
 
   it("leaves an Aspect with no Rating its donut, the bare track labelled —", () => {
@@ -129,40 +157,45 @@ describe("ParticipantChartFigure", () => {
   });
 
   it.each([
-    ["title", "Nilai rata-rata Peserta · Siswa</tspan>"],
-    ["legend", 'data-part="legend"'],
-    ["labels", ">Narasumber</text>"],
+    ["title", ">Feedback Peserta ·</text>"],
     ["values", ">8.4</text>"],
   ] as const)("removes exactly its part with %s off", (part, marker) => {
     const markup = render({}, { ...ALL_CHART_PARTS, [part]: false });
     expect(markup).not.toContain(`data-part="${part}"`);
-    // Narasumber is also the legend's label, so look for it only once the legend is gone.
-    const checked =
-      part === "labels" ? render({}, { ...ALL_CHART_PARTS, labels: false, legend: false }) : markup;
-    expect(checked).not.toContain(marker);
+    expect(markup).not.toContain(marker);
     for (const other of PARTS.filter((name) => name !== part)) {
       expect(markup).toContain(`data-part="${other}"`);
     }
     expect(donuts(markup)).toBe(4);
   });
 
-  it("names each donut under it, and in the legend, which stands in when Label is off", () => {
-    const markup = render();
-    expect(markup.match(/>Narasumber<\/text>/g)).toHaveLength(2);
-    const noLabels = render({}, { ...ALL_CHART_PARTS, labels: false });
-    expect(noLabels.match(/>Narasumber<\/text>/g)).toHaveLength(1);
+  it("hides the whole title block with Judul off, pill included", () => {
+    const markup = render({}, { ...ALL_CHART_PARTS, title: false });
+    expect(markup).not.toContain('data-part="pill"');
+    expect(markup).not.toContain("--primary");
+    expect(markup).not.toContain(">Semua Sekolah</tspan>");
   });
 
-  it("colours each arc and its legend swatch with the Aspect's token", () => {
+  it("names each donut under it, whatever the checkboxes hide", () => {
+    for (const parts of [ALL_CHART_PARTS, { title: false, values: false }]) {
+      const markup = render({}, parts);
+      expect(markup).toContain('data-part="labels"');
+      for (const name of ["Narasumber", "Materi", "Relevansi", "Hands-on RBL"]) {
+        expect(markup.match(new RegExp(`>${name}</text>`, "g"))).toHaveLength(1);
+      }
+    }
+  });
+
+  it("colours each arc with the Aspect's token", () => {
     const markup = render();
     expect(markup).toContain('data-aspect="instructor"');
-    expect(markup.match(/fill:var\(--chart-category-1\)/g)).toHaveLength(2);
-    expect(markup.match(/fill:var\(--chart-category-4\)/g)).toHaveLength(2);
+    expect(markup.match(/fill:var\(--chart-category-1\)/g)).toHaveLength(1);
+    expect(markup.match(/fill:var\(--chart-category-4\)/g)).toHaveLength(1);
   });
 
-  it("keeps an accessible name naming the figure whatever is hidden", () => {
-    const markup = render({}, { title: false, legend: false, labels: false, values: false });
+  it("keeps an accessible name — the title block's lines — whatever is hidden", () => {
+    const markup = render({}, { title: false, values: false });
     expect(markup).toContain("<title");
-    expect(markup).toContain("Nilai rata-rata Peserta · Siswa (n = 42 tanggapan)</title>");
+    expect(markup).toContain(">Feedback Peserta · Siswa · Semua Sekolah</title>");
   });
 });

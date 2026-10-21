@@ -43,16 +43,21 @@ const schools: FeedbackSchoolOption[] = [
 
 const PROGRAMME = { schoolId: null, sessionId: null, participantType: null };
 
-function screenMarkup(parts: ChartParts = ALL_CHART_PARTS) {
+const NO_RESPONSES = {
+  responseCount: 0,
+  instructor: null,
+  materials: null,
+  relevance: null,
+  handsOnRbl: null,
+};
+
+function screenMarkup(parts: ChartParts = ALL_CHART_PARTS, responseCount = 42) {
   const figure = participantChartFigure(schools, PROGRAMME, {
     participantType: "Siswa",
-    figures: {
-      responseCount: 42,
-      instructor: 8.4,
-      materials: 7,
-      relevance: 9.1,
-      handsOnRbl: null,
-    },
+    figures:
+      responseCount === 0
+        ? NO_RESPONSES
+        : { responseCount, instructor: 8.4, materials: 7, relevance: 9.1, handsOnRbl: 6.5 },
   });
   return renderToStaticMarkup(
     <ParticipantChartFigure
@@ -77,11 +82,17 @@ describe("exportChartSvg", () => {
     // The donuts' track and its two outlines (#516).
     expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--muted"]}`);
     expect(markup).toContain(`stroke:${CHART_EXPORT_COLOURS["--border"]}`);
+    // The Tipe Peserta's pill (#518).
+    expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--primary"]}`);
+    expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--primary-foreground"]}`);
   });
 
   it("holds exactly the tokens the figure paints with, no more", () => {
+    // With and without responses: the empty notice paints with a token nothing else does.
     const used = new Set(
-      [...screenMarkup().matchAll(/var\((--[\w-]+)\)/g)].map((match) => match[1]!),
+      [screenMarkup(), screenMarkup(ALL_CHART_PARTS, 0)].flatMap((markup) =>
+        [...markup.matchAll(/var\((--[\w-]+)\)/g)].map((match) => match[1]!),
+      ),
     );
     expect(new Set(Object.keys(CHART_EXPORT_COLOURS))).toEqual(used);
   });
@@ -98,25 +109,25 @@ describe("exportChartSvg", () => {
     expect(markup).toMatch(/^<svg[^>]*><rect width="1200" height="800" fill="#ffffff"\/>/);
   });
 
-  it.each(["title", "legend", "labels", "values"] as const)(
+  it.each(["title", "values"] as const)(
     "leaves out exactly %s when its checkbox is off",
     (part) => {
       const markup = exportChartSvg(screenMarkup({ ...ALL_CHART_PARTS, [part]: false }));
       expect(markup).not.toContain(`data-part="${part}"`);
-      for (const other of ["title", "legend", "labels", "values"].filter((name) => name !== part)) {
+      for (const other of ["title", "values"].filter((name) => name !== part)) {
         expect(markup).toContain(`data-part="${other}"`);
       }
+      // The Aspects' names are in the image whatever the checkboxes hide.
+      expect(markup).toContain('data-part="labels"');
     },
   );
 
-  it("keeps exactly the parts the checkboxes leave on", () => {
-    const markup = exportChartSvg(
-      screenMarkup({ title: false, legend: true, labels: false, values: true }),
-    );
-    expect(markup).not.toContain('data-part="title"');
-    expect(markup).not.toContain('data-part="labels"');
-    expect(markup).toContain('data-part="legend"');
-    expect(markup).toContain('data-part="values"');
+  it("carries the title block and its pill, and no n line or legend", () => {
+    const markup = exportChartSvg(screenMarkup());
+    expect(markup).toContain('data-part="pill"');
+    expect(markup).toContain(">Siswa</text>");
+    expect(markup).not.toContain("tanggapan");
+    expect(markup).not.toContain('data-part="legend"');
   });
 
   it("works on a browser's serialisation too — spaced style, xmlns already present", () => {
@@ -131,8 +142,8 @@ describe("exportChartSvg", () => {
   });
 
   it("refuses a token it has no light value for, rather than leave it unresolved", () => {
-    expect(() => exportChartSvg('<svg><rect style="fill:var(--primary)"/></svg>')).toThrow(
-      "--primary",
+    expect(() => exportChartSvg('<svg><rect style="fill:var(--destructive)"/></svg>')).toThrow(
+      "--destructive",
     );
   });
 });

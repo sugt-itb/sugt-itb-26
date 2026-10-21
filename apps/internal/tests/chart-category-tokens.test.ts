@@ -64,6 +64,17 @@ describe("the categorical chart tokens", () => {
     },
   );
 
+  it.each([":root", ".dark"] as const)(
+    "leave the Tipe Peserta pill's text readable — 4.5:1, --primary-foreground on --primary — in %s",
+    (selector) => {
+      // The pill (#518) is the one place a chart writes text on a filled shape: WCAG's text contrast.
+      const theme = block(selector);
+      expect(
+        contrast(theme.get("--primary-foreground")!, theme.get("--primary")!),
+      ).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
   it("are four distinct colours in each theme", () => {
     for (const selector of [":root", ".dark"] as const) {
       expect(new Set(TOKENS.map((token) => block(selector).get(token))).size).toBe(4);
