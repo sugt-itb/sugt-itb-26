@@ -21,8 +21,8 @@ import { perjadinName, perjadinSchoolsLine } from "-/lib/perjadin-name";
 import type {
   FeedbackCursor,
   FeedbackFilters,
-  FeedbackPage,
   FeedbackFilterValue,
+  FeedbackPage,
   FeedbackParticipantType,
   FeedbackPerjadinOption,
   FeedbackSchoolOption,
@@ -1180,4 +1180,4 @@ function Comment({ text }: { text: string }) {
   );
 }
 
-export { FeedbackView, ResponseCount };
+export { FeedbackView, PerjadinTab, ResponseCount };

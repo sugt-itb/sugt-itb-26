@@ -27,8 +27,8 @@ import {
  * the "load more" button all call it: a filter or sort change sends the chosen filters and sort with
  * a `null` cursor and gets the first page back to REPLACE the list; "load more" sends the same
  * filters and sort with the current cursor (the OFFSET) and gets the next page to APPEND. One action
- * serves all three because they are the same query — only the cursor and sort differ. Every page
- * carries `total`, the tab's response count (#519); the client reads a first page's. The `scope`
+ * serves all three because they are the same query — only the cursor and sort differ. A page
+ * carries `total`, the tab's response count (#519); the client reads only a first page's. The `scope`
  * — the School, Session and Tipe Peserta picked (#466, #487) — travels with every call, and the
  * query validates it.
  *

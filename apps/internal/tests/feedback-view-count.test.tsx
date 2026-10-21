@@ -1,6 +1,6 @@
 import { feedbackList, withNextPage } from "-/components/feedback-list";
-import { FeedbackView, ResponseCount } from "-/components/feedback-view";
-import type { ParticipantFeedbackRow } from "@sugt/db/queries";
+import { FeedbackView, PerjadinTab, ResponseCount } from "-/components/feedback-view";
+import type { ParticipantFeedbackRow, PerjadinFeedbackRow } from "@sugt/db/queries";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -98,6 +98,62 @@ describe("the Peserta tab's response count", () => {
     const html = render([], 0);
     expect(html).toContain(">0 tanggapan</p>");
     expect(html).toContain("Tidak ada masukan Peserta untuk saringan ini.");
+  });
+});
+
+describe("the Perjadin tab's response count", () => {
+  const evaluation = (id: string): PerjadinFeedbackRow => ({
+    id,
+    filedByName: `Pengisi ${id}`,
+    filedByRole: "Pendamping",
+    subClusterName: "Kelompok 3",
+    perjadinId: "trip",
+    startsOn: "2026-10-12",
+    endsOn: "2026-10-13",
+    createdOn: "2026-10-14",
+    lodging: 9,
+    transport: 9,
+    meals: 9,
+    punctuality: 9,
+    pendampingSupport: null,
+    rowAverage: 9,
+    lodgingComment: null,
+    transportComment: null,
+    mealsComment: null,
+    punctualityComment: null,
+    pendampingSupportComment: null,
+  });
+
+  function renderPerjadin(rows: PerjadinFeedbackRow[], total: number) {
+    return renderToStaticMarkup(
+      <PerjadinTab
+        firstPage={{ rows, nextCursor: rows.length < total ? 10 : null, total }}
+        initialAverages={{
+          lodging: 8,
+          transport: 8,
+          meals: 8,
+          punctuality: 8,
+          pendampingSupport: null,
+        }}
+        trips={[]}
+      />,
+    );
+  }
+
+  it("shows every matching evaluation left of Ekspor CSV, not the cards loaded", () => {
+    const html = renderPerjadin(
+      Array.from({ length: 10 }, (_, index) => evaluation(`e${index}`)),
+      15,
+    );
+    expect(html).toContain(">15 tanggapan</p>");
+    expect(html.indexOf(">15 tanggapan<")).toBeLessThan(html.indexOf("Ekspor CSV"));
+    expect(html).toContain("Tampilkan lebih banyak");
+  });
+
+  it("reads 0 tanggapan beside the empty list's text", () => {
+    const html = renderPerjadin([], 0);
+    expect(html).toContain(">0 tanggapan</p>");
+    expect(html).toContain("Tidak ada evaluasi Perjadin untuk saringan ini.");
   });
 });
 

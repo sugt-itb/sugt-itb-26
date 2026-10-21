@@ -204,7 +204,9 @@ export type FeedbackCursor = number;
 
 /**
  * One page of either tab: its rows, the cursor for the next (`null` on the last), and `total`, how
- * many rows the tab's scope and filters match in all (#519).
+ * many rows the tab's scope and filters match in all (#519). A page with rows always carries the
+ * whole count; one past the last row has nothing to carry it on and reads 0, so read the count off a
+ * first page, as the client does.
  */
 export type FeedbackPage<Row, Cursor> = { rows: Row[]; nextCursor: Cursor | null; total: number };
 
@@ -217,7 +219,7 @@ export type FeedbackPage<Row, Cursor> = { rows: Row[]; nextCursor: Cursor | null
 const totalExpr = sql<number>`count(*) over ()`.mapWith(Number);
 
 /** Lift `totalExpr` off each row: the rows as the readers type them, and the count once. */
-function withTotal<Row extends { total: number }>(
+function rowsAndTotal<Row extends { total: number }>(
   found: Row[],
 ): { rows: Omit<Row, "total">[]; total: number } {
   return {
@@ -427,7 +429,7 @@ async function participantFeedbackRows(
     )
     .$dynamic();
 
-  return withTotal(await (window ? query.limit(window.limit).offset(window.offset) : query));
+  return rowsAndTotal(await (window ? query.limit(window.limit).offset(window.offset) : query));
 }
 
 /** The Peserta tab's four summary averages. Hands-on RBL's is `null` until any row has one. */
@@ -739,7 +741,7 @@ async function perjadinFeedbackRows(
     )
     .$dynamic();
 
-  return withTotal(await (window ? query.limit(window.limit).offset(window.offset) : query));
+  return rowsAndTotal(await (window ? query.limit(window.limit).offset(window.offset) : query));
 }
 
 /** The Perjadin tab's five summary averages. Pendamping Support's is `null` while no row has one. */

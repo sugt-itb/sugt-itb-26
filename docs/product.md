@@ -859,6 +859,7 @@ pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengka
   their titles say what they cover: `Nilai rata-rata · Narasumber · SMAN 1 Bontang`, or
   `… · SMAN 1 Bontang · Sesi 1 Luring · GTK-MS`. With none picked they are programme-wide. Under
   GTK-MS the Hands-on RBL card reads "—", since only Siswa are asked it.
+- The choice lives in the browser, not the URL, like the other filters; switching tabs resets it.
 - **`42 tanggapan` sits at the left of the row above the list** (#519), with Lihat Grafik and
   Ekspor CSV at the right. It counts every response the School, Sesi and Tipe Peserta **and** the
   score filters keep: the full total, the rows the CSV holds, not the cards loaded, so "Tampilkan
@@ -866,7 +867,6 @@ pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengka
   too, so it is plain muted text, not a card, and never reads as a score. While a change is
   loading the old number stays, dimmed, until the new first page lands. With nothing matching it
   reads `0 tanggapan` beside the empty-list text.
-- The choice lives in the browser, not the URL, like the other filters; switching tabs resets it.
 
 **Lihat Grafik** (#510) sits beside **Ekspor CSV** above the Peserta list, for anyone who can read
 the page, and is enabled even when the scope has no responses. The Perjadin tab has none. It opens
