@@ -1,5 +1,5 @@
 import { ALL_CHART_PARTS, type ParticipantChartData } from "-/components/feedback-chart";
-import { ChartPanel } from "-/components/feedback-chart-dialog";
+import { ParticipantChartPanel } from "-/components/feedback-chart-dialog";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -21,7 +21,7 @@ function render(responseCount: number) {
         : { responseCount, instructor: 8, materials: 7.5, relevance: 9, handsOnRbl: null },
   };
   return renderToStaticMarkup(
-    <ChartPanel
+    <ParticipantChartPanel
       chart={chart}
       scope={PROGRAMME}
       schools={[]}
@@ -30,7 +30,7 @@ function render(responseCount: number) {
   );
 }
 
-describe("ChartPanel", () => {
+describe("ParticipantChartPanel", () => {
   it("offers Unduh PNG under a figure with responses", () => {
     const html = render(12);
     expect(html).toContain(">Unduh PNG</button>");

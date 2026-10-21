@@ -143,7 +143,7 @@ function ParticipantChartDialog({
                   />
                 ))
               : charts.data.map((chart) => (
-                  <ChartPanel
+                  <ParticipantChartPanel
                     key={chart.participantType}
                     chart={chart}
                     scope={charts.scope}
@@ -163,7 +163,7 @@ function ParticipantChartDialog({
  * figure, which has nothing to report. The download is the figure as it stands, so the four
  * checkboxes decide what is in the image exactly as on screen.
  */
-function ChartPanel({
+function ParticipantChartPanel({
   chart,
   scope,
   schools,
@@ -188,7 +188,8 @@ function ChartPanel({
         svg.current,
         chartPngFileName(schools, scope, chart.participantType, formatWibDate(new Date())),
       );
-    } catch {
+    } catch (error) {
+      console.error("Unduh PNG failed", error);
       setFailed(true);
     } finally {
       setExporting(false);
@@ -219,4 +220,4 @@ function ChartPanel({
   );
 }
 
-export { ChartPanel, ParticipantChartDialog };
+export { ParticipantChartPanel, ParticipantChartDialog };

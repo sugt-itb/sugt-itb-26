@@ -7,7 +7,8 @@ import {
 /**
  * **Unduh PNG's browser half** (#511): serialise a figure's `<svg>`, make it self-contained with
  * `exportChartSvg`, draw it through an `<img>` onto a 2400×1600 canvas — the 1200×800 layout at 2×,
- * whatever the screen — and hand back the PNG. No dependency: an SVG with no `foreignObject` draws
+ * whatever the screen — and hand back the PNG. The white comes from the SVG's own background
+ * rectangle, so the canvas needs no fill of its own. No dependency: an SVG with no `foreignObject` draws
  * without tainting the canvas.
  */
 export async function chartPng(svg: SVGSVGElement): Promise<Blob> {
@@ -22,8 +23,6 @@ export async function chartPng(svg: SVGSVGElement): Promise<Blob> {
     canvas.height = CHART_EXPORT_HEIGHT;
     const context = canvas.getContext("2d");
     if (context === null) throw new Error("No 2D canvas context");
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
     const png = await new Promise<Blob | null>((resolve) => {
       canvas.toBlob(resolve, "image/png");
@@ -42,8 +41,9 @@ export async function downloadChartPng(svg: SVGSVGElement, fileName: string): Pr
   link.href = href;
   link.download = fileName;
   link.click();
-  // Revoked a tick later: some browsers cancel a download whose URL is revoked as it starts.
+  // Revoked well after the click, as FileSaver does: some browsers cancel a download whose URL is
+  // revoked while it is still being read.
   setTimeout(() => {
     URL.revokeObjectURL(href);
-  }, 0);
+  }, 40_000);
 }

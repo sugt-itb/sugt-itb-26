@@ -9,8 +9,8 @@ import type {
 
 /**
  * **Unduh PNG's pure half** (#511): the on-screen figure's markup made drawable on its own, and the
- * file's name. Plain functions, tested without a DOM; `feedback-chart-dialog.tsx` serialises the
- * `<svg>`, passes it through `exportChartSvg`, and draws the result to a canvas.
+ * file's name. Plain functions, tested without a DOM; the browser half, `feedback-chart-png.ts`,
+ * serialises the `<svg>`, passes it through `exportChartSvg`, and draws the result to a canvas.
  *
  * **Why the markup is rewritten.** An SVG drawn through an `<img>` sees neither the page's stylesheet
  * nor its web fonts, so a `var(--…)` resolves to nothing and a class to no style. The export is
@@ -54,7 +54,7 @@ export const CHART_EXPORT_HEIGHT = CHART_HEIGHT * CHART_EXPORT_SCALE;
  * Takes React's markup or a browser's `XMLSerializer` output alike.
  */
 export function exportChartSvg(markup: string): string {
-  const painted = markup.replaceAll(/var\((--[\w-]+)\)/g, (_, token: string) => {
+  const painted = markup.replaceAll(/var\(\s*(--[\w-]+)\s*\)/g, (_, token: string) => {
     const value = CHART_EXPORT_COLOURS[token];
     if (value === undefined) throw new Error(`No light value to export for ${token}`);
     return value;

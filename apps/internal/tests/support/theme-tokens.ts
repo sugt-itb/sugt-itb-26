@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 /** The shared stylesheet that declares every theme token, as written. */
-export const globalsCss = readFileSync(
+const globalsCss = readFileSync(
   new URL("../../../../packages/ui/src/styles/globals.css", import.meta.url),
   "utf8",
 );

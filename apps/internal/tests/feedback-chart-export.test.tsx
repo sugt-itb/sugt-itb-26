@@ -89,6 +89,17 @@ describe("exportChartSvg", () => {
     expect(markup).toMatch(/^<svg[^>]*><rect width="1200" height="800" fill="#ffffff"\/>/);
   });
 
+  it.each(["title", "legend", "axes", "values"] as const)(
+    "leaves out exactly %s when its checkbox is off",
+    (part) => {
+      const markup = exportChartSvg(screenMarkup({ ...ALL_CHART_PARTS, [part]: false }));
+      expect(markup).not.toContain(`data-part="${part}"`);
+      for (const other of ["title", "legend", "axes", "values"].filter((name) => name !== part)) {
+        expect(markup).toContain(`data-part="${other}"`);
+      }
+    },
+  );
+
   it("keeps exactly the parts the checkboxes leave on", () => {
     const markup = exportChartSvg(
       screenMarkup({ title: false, legend: true, axes: false, values: true }),
@@ -102,10 +113,11 @@ describe("exportChartSvg", () => {
   it("works on a browser's serialisation too — spaced style, xmlns already present", () => {
     const serialised =
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" class="h-auto w-full">' +
-      '<rect style="fill: var(--chart-category-2);"/></svg>';
+      '<rect style="fill: var(--chart-category-2);"/><text style="fill: var( --foreground )"/></svg>';
     const markup = exportChartSvg(serialised);
     expect(markup.match(/xmlns=/g)).toHaveLength(1);
     expect(markup).toContain(`fill: ${CHART_EXPORT_COLOURS["--chart-category-2"]};`);
+    expect(markup).not.toContain("var(");
     expect(markup).not.toContain("class=");
   });
 
