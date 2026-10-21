@@ -20,7 +20,8 @@ import { describe, expect, it } from "vitest";
  * **The Lihat Grafik figures' rules, without a DOM** (#510): which figures a scope gets, which
  * Aspects a Tipe Peserta has and in what order, `null` → no arc and "—", the title block and its
  * Tipe Peserta pill (#518), one colour per Aspect, each donut's arc filled to its mean out of
- * 10 (#516), and the figure's height fitted to its content (#522).
+ * 10 (#516), the figure's height fitted to its content (#522), and each Aspect's name in a pill of
+ * its donut's colour (#523).
  */
 
 const schools: FeedbackSchoolOption[] = [
@@ -249,7 +250,7 @@ describe("chartLayout", () => {
     Math.max(
       ...layout.slots.flatMap((slot) => [
         ringBottom(slot),
-        slot.nameLabel.y + slot.nameLabel.fontSize * 0.3,
+        slot.nameLabel.pill.y + slot.nameLabel.pill.height,
       ]),
     );
 
@@ -496,6 +497,75 @@ describe("chartLayout", () => {
     expect(slot.nameLabel.x).toBe(slot.centre.x);
     expect(slot.nameLabel.text).toBe("Narasumber");
     expect(slot.nameLabel.y).toBeGreaterThan(slot.centre.y + slot.outerRadius);
+  });
+
+  describe("each Aspect's name in its pill (#523)", () => {
+    const both = () => [
+      chartLayout(siswa(), ALL_CHART_PARTS),
+      chartLayout(
+        participantChartFigure(schools, PROGRAMME, {
+          participantType: "GTK-MS",
+          figures: figures({ handsOnRbl: null }),
+        }),
+        ALL_CHART_PARTS,
+      ),
+    ];
+
+    it("centres each pill under its donut, 20 units below the ring's outline", () => {
+      for (const layout of both()) {
+        for (const slot of layout.slots) {
+          const { pill } = slot.nameLabel;
+          expect(pill.x + pill.width / 2).toBe(slot.centre.x);
+          expect(pill.y - ringBottom(slot)).toBe(20);
+        }
+      }
+    });
+
+    it("sizes each pill to its own word, at 30 in weight 600, fully inside it", () => {
+      for (const layout of both()) {
+        for (const slot of layout.slots) {
+          const { pill, text, fontSize, fontWeight, x, y } = slot.nameLabel;
+          expect(fontSize).toBe(30);
+          expect(fontWeight).toBe(600);
+          // The word at the layout's 0.6 em estimate, with room either side for a wider font.
+          const half = (text.length * fontSize * 0.6) / 2;
+          expect(pill.x).toBeLessThanOrEqual(x - half - 16);
+          expect(pill.x + pill.width).toBeGreaterThanOrEqual(x + half + 16);
+          // Capitals stand about 0.7 em over the baseline, descenders 0.3 em under it.
+          expect(y - fontSize * 0.7).toBeGreaterThan(pill.y);
+          expect(y + fontSize * 0.3).toBeLessThanOrEqual(pill.y + pill.height);
+        }
+        // Each word's own width, not one width for all.
+        expect(new Set(layout.slots.map((slot) => slot.nameLabel.pill.width)).size).toBe(
+          layout.slots.length,
+        );
+      }
+    });
+
+    it("keeps every pill inside its slot, Hands-on RBL in the four-donut figure included", () => {
+      for (const layout of both()) {
+        const slotWidth = (CHART_WIDTH - 2 * 48) / layout.slots.length;
+        for (const slot of layout.slots) {
+          expect(slot.nameLabel.pill.width, slot.nameLabel.text).toBeLessThanOrEqual(slotWidth);
+        }
+      }
+    });
+
+    it("stays smaller than the Tipe Peserta pill, which reads first", () => {
+      const layout = chartLayout(siswa(), ALL_CHART_PARTS);
+      for (const slot of layout.slots) {
+        expect(slot.nameLabel.pill.height).toBeLessThan(layout.title!.pill.height);
+        expect(slot.nameLabel.fontSize).toBeLessThan(layout.title!.fontSize);
+      }
+    });
+
+    it("puts the pills' bottom on the figure's bottom edge", () => {
+      for (const layout of both()) {
+        for (const slot of layout.slots) {
+          expect(slot.nameLabel.pill.y + slot.nameLabel.pill.height).toBe(layout.height);
+        }
+      }
+    });
   });
 
   it("drops each part when its checkbox is off, and keeps the donuts and their names", () => {

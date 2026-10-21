@@ -5,10 +5,10 @@ import {
   type ChartFigure,
   type ChartParts,
 } from "-/components/feedback-chart";
-import { type Ref, useId } from "react";
+import { Fragment, type Ref, useId } from "react";
 
 /**
- * **One Lihat Grafik figure, hand-written SVG** (#510, #514, #516, #518) — not shadcn's `chart`.
+ * **One Lihat Grafik figure, hand-written SVG** (#510, #514, #516, #518, #523) — not shadcn's `chart`.
  * Recharts draws the legend and title as HTML outside its `<svg>`, so exporting one would need a
  * DOM-to-image library; here the title block with its Tipe Peserta pill, the donuts, their names
  * and scores all live inside **one `<svg>`**, which is what lets the PNG export (#511) serialise it
@@ -17,7 +17,8 @@ import { type Ref, useId } from "react";
  * It only draws `chartLayout`'s positions. Colours are the theme's tokens through `var(…)`, so on
  * screen it follows Mode Gelap. Each part the checkboxes hide carries a `data-part` naming it —
  * `title`, `values` — as do the Aspects' names, `labels`, which always show; each donut, its arc,
- * the pill and the empty notice carry `donut`, `arc`, `pill` and `empty`. `ref` reaches the `<svg>`
+ * the Tipe Peserta's pill, each name's pill and the empty notice carry `donut`, `arc`, `pill`,
+ * `label-pill` and `empty`. `ref` reaches the `<svg>`
  * itself, which Unduh PNG (#511) serialises as it stands.
  */
 function ParticipantChartFigure({
@@ -125,17 +126,29 @@ function ParticipantChartFigure({
 
       {layout.slots.length > 0 && (
         <g data-part="labels">
+          {/* Each name in a pill of its donut's colour (#523), so the two read together. */}
           {layout.slots.map((slot) => (
-            <text
-              key={slot.aspect}
-              x={slot.nameLabel.x}
-              y={slot.nameLabel.y}
-              textAnchor="middle"
-              fontSize={slot.nameLabel.fontSize}
-              style={text}
-            >
-              {slot.nameLabel.text}
-            </text>
+            <Fragment key={slot.aspect}>
+              <rect
+                data-part="label-pill"
+                x={slot.nameLabel.pill.x}
+                y={slot.nameLabel.pill.y}
+                width={slot.nameLabel.pill.width}
+                height={slot.nameLabel.pill.height}
+                rx={slot.nameLabel.pill.height / 2}
+                style={{ fill: `var(${slot.colour})` }}
+              />
+              <text
+                x={slot.nameLabel.x}
+                y={slot.nameLabel.y}
+                textAnchor="middle"
+                fontSize={slot.nameLabel.fontSize}
+                fontWeight={slot.nameLabel.fontWeight}
+                style={{ fill: "var(--chart-category-foreground)" }}
+              >
+                {slot.nameLabel.text}
+              </text>
+            </Fragment>
           ))}
         </g>
       )}

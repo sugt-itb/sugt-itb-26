@@ -128,8 +128,9 @@ describe("ParticipantChartFigure", () => {
     const markup = render();
     expect(markup).not.toContain('data-part="legend"');
     expect(markup).not.toContain("tanggapan");
-    // The pill is the one rect: no legend swatches.
-    expect(markup.match(/<rect /g)).toHaveLength(1);
+    // The Tipe Peserta's pill and the names' pills are the only rects: no legend swatches.
+    expect(markup.match(/<rect /g)).toHaveLength(1 + 4);
+    expect(markup.match(/<rect data-part="label-pill"/g)).toHaveLength(4);
   });
 
   it("leaves an Aspect with no Rating its donut, the bare track labelled —", () => {
@@ -190,12 +191,37 @@ describe("ParticipantChartFigure", () => {
     }
   });
 
-  it("colours each arc with the Aspect's token", () => {
+  it("colours each arc and its name's pill with the Aspect's token", () => {
     const markup = render();
     expect(markup).toContain('data-aspect="instructor"');
-    expect(markup.match(/fill:var\(--chart-category-1\)/g)).toHaveLength(1);
-    expect(markup.match(/fill:var\(--chart-category-4\)/g)).toHaveLength(1);
+    // One arc and one pill each.
+    expect(markup.match(/fill:var\(--chart-category-1\)/g)).toHaveLength(2);
+    expect(markup.match(/fill:var\(--chart-category-4\)/g)).toHaveLength(2);
   });
+
+  it.each(["Siswa", "GTK-MS"] as const)(
+    "puts each Aspect's name in a pill of its arc's colour, in %s (#523)",
+    (participantType) => {
+      const markup = render({}, ALL_CHART_PARTS, participantType);
+      const arcColours = [...markup.matchAll(/data-part="arc"[^>]*fill:var\((--[\w-]+)\)/g)].map(
+        (match) => match[1],
+      );
+      const pills = [
+        ...markup.matchAll(
+          /<rect data-part="label-pill"[^>]*rx="23"[^>]*style="fill:var\((--[\w-]+)\)"><\/rect><text[^>]*text-anchor="middle"[^>]*font-weight="600"[^>]*style="fill:var\(--chart-category-foreground\)">([^<]+)<\/text>/g,
+        ),
+      ];
+      expect(pills.map((match) => match[1])).toEqual(arcColours);
+      expect(pills.map((match) => match[2])).toEqual(
+        participantType === "Siswa"
+          ? ["Narasumber", "Materi", "Relevansi", "Hands-on RBL"]
+          : ["Narasumber", "Materi", "Relevansi"],
+      );
+      // Every pill sits inside the names' group.
+      const labels = /<g data-part="labels">([\s\S]*?)<\/g>/.exec(markup)![1]!;
+      expect(labels.match(/data-part="label-pill"/g)).toHaveLength(pills.length);
+    },
+  );
 
   it("keeps an accessible name — the title block's lines — whatever is hidden", () => {
     const markup = render({}, { title: false, values: false });

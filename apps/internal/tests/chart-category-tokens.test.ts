@@ -72,8 +72,8 @@ describe("the categorical chart tokens", () => {
 });
 
 /**
- * **The Tipe Peserta pill** (#518) is the one place a chart writes text on a filled shape, so it is
- * held to WCAG's text contrast, 4.5:1, rather than the arcs' 3:1.
+ * **The Tipe Peserta pill** (#518) and **the Aspects' name pills** (#523) are where a chart writes
+ * text on a filled shape, so they are held to WCAG's text contrast, 4.5:1, rather than the arcs' 3:1.
  */
 describe("the Tipe Peserta pill", () => {
   it.each([":root", ".dark"] as const)(
@@ -83,6 +83,23 @@ describe("the Tipe Peserta pill", () => {
       expect(
         contrast(theme.get("--primary-foreground")!, theme.get("--primary")!),
       ).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+});
+
+describe("the Aspects' name pills", () => {
+  it.each([":root", ".dark"] as const)(
+    "keep --chart-category-foreground on every category token at 4.5:1 in %s",
+    (selector) => {
+      const theme = block(selector);
+      const foreground = theme.get("--chart-category-foreground");
+      expect(foreground).toBeDefined();
+      for (const token of TOKENS) {
+        expect(
+          contrast(foreground!, theme.get(token)!),
+          `${selector} ${token}`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
     },
   );
 });

@@ -891,12 +891,14 @@ a wide dialog of donut charts (#514, #516, #518), one donut per Aspect:
   middle, never "0.0" — Hands-on RBL when every Siswa response in scope was filed before it
   existed. **A Tipe Peserta with no responses in scope** shows its frame with "Belum ada
   tanggapan" in place of the donuts.
-- **Each Aspect's name always sits under its donut.** There is no legend, so a donut without its
-  name would name nothing.
+- **Each Aspect's name always sits under its donut** (#523), in a pill filled with that Aspect's
+  colour, its text in a colour readable on all four Aspect colours in both themes. There is no
+  legend, so a donut without its name would name nothing.
 - **The title block** is three centred lines, with no blank line after it:
   1. `Feedback Peserta ·` and the Tipe Peserta, `Siswa` or `GTK-MS`, in a highlight pill: a
      filled rounded rect in the brand colour, the word in its foreground colour, so the Tipe Peserta
-     stands out at a glance. It is never an Aspect's colour.
+     stands out at a glance. It is never an Aspect's colour, and it is the larger of the two kinds
+     of pill.
   2. The School's name, wrapping when long, or `Semua Sekolah` programme-wide.
   3. The Sesi, only when one is picked, as the average cards write it: `Sesi 1 Luring`, or the dated
      form for a cancelled Session. With no Sesi picked the line is left out, so with no School there

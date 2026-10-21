@@ -36,6 +36,7 @@ export const CHART_EXPORT_COLOURS: Record<string, string> = {
   "--chart-category-2": "oklch(0.555 0.163 48.998)",
   "--chart-category-3": "oklch(0.511 0.096 186.391)",
   "--chart-category-4": "oklch(0.541 0.281 293.009)",
+  "--chart-category-foreground": "oklch(1 0 0)",
 };
 
 /**
