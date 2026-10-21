@@ -1,6 +1,6 @@
 import {
   ALL_CHART_PARTS,
-  CHART_HEIGHT,
+  CHART_TRACK_STROKE,
   CHART_WIDTH,
   chartLayout,
   chartParticipantTypes,
@@ -18,8 +18,8 @@ import { describe, expect, it } from "vitest";
 /**
  * **The Lihat Grafik figures' rules, without a DOM** (#510): which figures a scope gets, which
  * Aspects a Tipe Peserta has and in what order, `null` → no arc and "—", the title block and its
- * Tipe Peserta pill (#518), one colour per Aspect, and each donut's arc filled to its mean out of
- * 10 (#516).
+ * Tipe Peserta pill (#518), one colour per Aspect, each donut's arc filled to its mean out of
+ * 10 (#516), and the figure's height fitted to its content (#522).
  */
 
 const schools: FeedbackSchoolOption[] = [
@@ -238,6 +238,20 @@ describe("chartLayout", () => {
       innerStart: { x: bx!, y: by! },
     };
   };
+  /** The ring's outer edge, outline included: half the track's stroke sits outside the radius. */
+  const ringTop = (slot: Slot) => slot.centre.y - slot.outerRadius - CHART_TRACK_STROKE / 2;
+  const ringBottom = (slot: Slot) => slot.centre.y + slot.outerRadius + CHART_TRACK_STROKE / 2;
+  /** The topmost and bottommost drawn shapes' outer edges, as the figure draws them. */
+  const topmost = (layout: ChartLayout) =>
+    Math.min(...(layout.title ? [layout.title.pill.y] : []), ...layout.slots.map(ringTop));
+  const bottommost = (layout: ChartLayout) =>
+    Math.max(
+      ...layout.slots.flatMap((slot) => [
+        ringBottom(slot),
+        slot.nameLabel.y + slot.nameLabel.fontSize * 0.3,
+      ]),
+    );
+
   const distance = (slot: Slot, point: { x: number; y: number }) =>
     Math.hypot(point.x - slot.centre.x, point.y - slot.centre.y);
 
@@ -284,20 +298,101 @@ describe("chartLayout", () => {
     }
   });
 
-  it("centres the row in the room the title block leaves", () => {
-    const withTitle = chartLayout(siswa(), ALL_CHART_PARTS);
-    const without = chartLayout(siswa(), NO_PARTS);
-    const slot = without.slots[0]!;
-    // With no title the row is centred in the view box's padded height.
-    const rowTop = slot.centre.y - slot.outerRadius;
-    const rowBottom = slot.nameLabel.y;
-    expect(Math.abs(rowTop - (CHART_HEIGHT - rowBottom))).toBeLessThan(40);
-    // The title pushes it down, but never so far it leaves the space below empty.
-    expect(withTitle.slots[0]!.centre.y).toBeGreaterThan(slot.centre.y);
-    const titleBottom = withTitle.title!.baselines.at(-1)!;
-    const top = withTitle.slots[0]!.centre.y - 120;
-    const bottom = withTitle.slots[0]!.nameLabel.y;
-    expect(Math.abs(top - titleBottom - (CHART_HEIGHT - bottom))).toBeLessThan(60);
+  it("keeps every donut's x and size whatever the height does: the margins are 48 either side", () => {
+    const three = chartLayout(
+      participantChartFigure(schools, PROGRAMME, {
+        participantType: "GTK-MS",
+        figures: figures({ handsOnRbl: null }),
+      }),
+      ALL_CHART_PARTS,
+    );
+    for (const parts of [ALL_CHART_PARTS, NO_PARTS]) {
+      const four = chartLayout(siswa(), parts);
+      expect(four.slots.map((slot) => slot.centre.x)).toEqual([186, 462, 738, 1014]);
+      expect(four.slots.every((slot) => slot.outerRadius === 120)).toBe(true);
+    }
+    expect(three.slots.map((slot) => slot.centre.x)).toEqual([232, 600, 968]);
+  });
+
+  describe("fits its height to its content (#522)", () => {
+    const scoped = (scope: Partial<ParticipantFeedbackScope>, name = "SMAN 1 Bontang") =>
+      participantChartFigure(
+        [{ ...schools[0]!, name }],
+        { ...PROGRAMME, ...scope },
+        { participantType: "Siswa", figures: figures() },
+      );
+    const LONG = "SMA Negeri 1 Unggulan Kabupaten Kutai Kartanegara Tenggarong Seberang Timur";
+    const titles = [
+      ["a two-line", scoped({})],
+      ["a three-line", scoped({ schoolId: "bontang", sessionId: "sesi-1" })],
+      ["a wrapped long-School", scoped({ schoolId: "bontang", sessionId: "sesi-1" }, LONG)],
+    ] as const;
+
+    it.each([
+      ["Judul on", ALL_CHART_PARTS],
+      ["Judul off", NO_PARTS],
+      ["Judul on, Nilai off", { title: true, values: false }],
+    ] as const)("touches both edges with its shapes, %s: no margin above or below", (_, parts) => {
+      for (const [, figure] of titles) {
+        const layout = chartLayout(figure, parts);
+        expect(topmost(layout)).toBe(0);
+        expect(bottommost(layout)).toBe(layout.height);
+      }
+    });
+
+    it("starts at the pill with Judul on, and at the ring's outline with it off", () => {
+      expect(chartLayout(siswa(), ALL_CHART_PARTS).title!.pill.y).toBe(0);
+      for (const slot of chartLayout(siswa(), NO_PARTS).slots) expect(ringTop(slot)).toBe(0);
+    });
+
+    it.each(titles)("leaves 24 units from %s title block to the ring", (_, figure) => {
+      const layout = chartLayout(figure, ALL_CHART_PARTS);
+      const title = layout.title!;
+      // The block's bottom is its last line's descenders, rounded up to a whole unit.
+      const descenders = title.baselines.at(-1)! + title.fontSize * 0.3;
+      expect(title.bottom).toBeGreaterThanOrEqual(descenders);
+      expect(title.bottom).toBeLessThan(descenders + 1);
+      for (const slot of layout.slots) expect(ringTop(slot) - title.bottom).toBe(24);
+    });
+
+    it("is whole units tall, so the 2× PNG has no half pixel", () => {
+      for (const [, figure] of titles) {
+        for (const parts of [ALL_CHART_PARTS, NO_PARTS]) {
+          expect(Number.isInteger(chartLayout(figure, parts).height)).toBe(true);
+        }
+      }
+    });
+
+    it("never changes height with Nilai, and gets shorter with Judul off", () => {
+      for (const [, figure] of titles) {
+        const height = chartLayout(figure, ALL_CHART_PARTS).height;
+        expect(chartLayout(figure, { title: true, values: false }).height).toBe(height);
+        expect(chartLayout(figure, { title: false, values: true }).height).toBeLessThan(height);
+      }
+      // A longer title makes a taller figure, and with Judul off they are all one height.
+      const [two, three, long] = titles.map(([, figure]) => chartLayout(figure, ALL_CHART_PARTS));
+      expect(three!.height).toBeGreaterThan(two!.height);
+      expect(long!.height).toBeGreaterThan(three!.height);
+      expect(new Set(titles.map(([, figure]) => chartLayout(figure, NO_PARTS).height)).size).toBe(
+        1,
+      );
+    });
+
+    it("makes an empty figure exactly as tall as a full one, so side-by-side figures line up", () => {
+      for (const [, figure] of titles) {
+        for (const parts of [ALL_CHART_PARTS, NO_PARTS, { title: true, values: false }]) {
+          const empty = chartLayout({ ...figure, empty: true }, parts);
+          const full = chartLayout(figure, parts);
+          expect(empty.height).toBe(full.height);
+          expect(empty.title).toEqual(full.title);
+          // The notice is centred in the band the donuts' row would fill: ring, gap and names.
+          const notice = empty.emptyNotice!;
+          const bandTop = full.title === null ? 0 : full.title.bottom + 24;
+          const middle = notice.y - notice.fontSize * 0.35;
+          expect(middle).toBeCloseTo((bandTop + full.height) / 2, 5);
+        }
+      }
+    });
   });
 
   it("leaves a hole wide enough for the widest score, 10.0, at the score size", () => {
@@ -423,21 +518,6 @@ describe("chartLayout", () => {
       expect(title.lines).toEqual(["Semua Sekolah"]);
     });
 
-    it.each([
-      ["two", {}],
-      ["three", { schoolId: "bontang", sessionId: "sesi-1" }],
-    ] as const)("ends at its last line, with %s lines: no blank line under it", (_, scope) => {
-      const layout = chartLayout(scoped(scope), ALL_CHART_PARTS);
-      const donut = layout.slots[0]!;
-      // The row is centred under the block, so the room above it — from the last line — is the
-      // room below its names less the bottom padding's head start. A blank line would move the
-      // row down half a line, leaving more room above than below.
-      const above = donut.centre.y - donut.outerRadius - layout.title!.baselines.at(-1)!;
-      const below = CHART_HEIGHT - donut.nameLabel.y;
-      expect(above).toBeLessThan(below);
-      expect(above).toBeGreaterThan(below - 45);
-    });
-
     it.each(["Siswa", "GTK-MS"] as const)(
       "encloses %s in its pill with room to spare, centred on it",
       (participantType) => {
@@ -477,10 +557,8 @@ describe("chartLayout", () => {
       }
       // The donuts sit below the last line's descenders, and their names inside the view box.
       const donut = layout.slots[0]!;
-      expect(donut.centre.y - donut.outerRadius).toBeGreaterThan(
-        title.baselines.at(-1)! + title.fontSize * 0.3,
-      );
-      expect(donut.nameLabel.y).toBeLessThan(CHART_HEIGHT);
+      expect(ringTop(donut)).toBeGreaterThan(title.baselines.at(-1)! + title.fontSize * 0.3);
+      expect(donut.nameLabel.y).toBeLessThan(layout.height);
     });
   });
 
@@ -500,13 +578,13 @@ describe("chartLayout", () => {
     expect(layout.slots).toEqual([]);
   });
 
-  it("keeps every donut and its label inside the fixed view box", () => {
+  it("keeps every donut and its label inside the view box", () => {
     const layout = chartLayout(siswa(), ALL_CHART_PARTS);
     for (const slot of layout.slots) {
       expect(slot.centre.x - slot.outerRadius).toBeGreaterThan(0);
       expect(slot.centre.x + slot.outerRadius).toBeLessThan(CHART_WIDTH);
-      expect(slot.centre.y - slot.outerRadius).toBeGreaterThan(0);
-      expect(slot.nameLabel.y).toBeLessThan(CHART_HEIGHT);
+      expect(ringTop(slot)).toBeGreaterThanOrEqual(0);
+      expect(slot.nameLabel.y).toBeLessThan(layout.height);
     }
     // Neighbouring donuts never touch.
     const [first, second] = layout.slots;

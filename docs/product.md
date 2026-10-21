@@ -907,20 +907,26 @@ a wide dialog of donut charts (#514, #516, #518), one donut per Aspect:
 
 - **Two checkboxes**, both on to start, apply to every figure at once: **Judul** (the whole title
   block, pill included) and **Nilai** (each donut's mean in its middle, in bold, as the cards
-  format it — `7.8` — or "—"; with it off, the hole is empty). Hiding the title gives its room to
-  the donuts' row, which stays centred, but never changes a donut's size.
+  format it — `7.8` — or "—"; with it off, the hole is empty). Hiding the title makes the figure
+  shorter, and never changes a donut's size; hiding the scores never changes its height.
   Closing and reopening the dialog keeps the choice; switching tabs or reloading resets it.
 - Figures sit side by side when there is room and stack when there is not; the dialog's body
   scrolls, and it works at ~360px and in Mode Gelap. Each figure is one self-contained SVG, title
   block included, so it can be exported as an image.
+- **A figure is as tall as its content** (#522), with no margin above or below: the pill (or, with
+  Judul off, the donuts' rings) touches its top edge and the Aspects' names its bottom, with a small
+  fixed gap between the title block and the donuts. The margins left and right stay. A "Belum ada
+  tanggapan" figure is exactly as tall as a full one with the same title and checkboxes, so two
+  figures side by side line up.
 - **Unduh PNG** (#511) sits under every figure that has responses — a "Belum ada tanggapan" figure
   has none — and downloads that figure alone. There is no "Unduh semua" and no SVG download.
   - **What you see is what you get**: the two checkboxes decide what is in the image, exactly as
     on screen.
   - **Always light on white**, even in Mode Gelap, so the image sits cleanly on a white report
     page; the screen keeps its own theme.
-  - **2400×1600 px** from a phone or a desktop alike: the figure is laid out at 1200×800 and drawn
-    at 2×.
+  - **2400 px wide** from a phone or a desktop alike, and as tall as the figure's content at 2×:
+    the figure is laid out 1200 wide and drawn at 2×, with no margin above or below. The left and
+    right margins stay.
   - **The font is Montserrat where the machine has it installed, else Helvetica or Arial.** An
     image cannot reach the app's web font, and the fallbacks are narrower, so nothing overflows.
   - **Named** `grafik-peserta-<scope>-<siswa|gtk-ms>-<today>.png`. The scope is the School and

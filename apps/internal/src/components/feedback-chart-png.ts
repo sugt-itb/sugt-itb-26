@@ -1,13 +1,9 @@
-import {
-  CHART_EXPORT_HEIGHT,
-  CHART_EXPORT_WIDTH,
-  exportChartSvg,
-} from "-/components/feedback-chart-export";
+import { chartExportSize, exportChartSvg } from "-/components/feedback-chart-export";
 
 /**
  * **Unduh PNG's browser half** (#511): serialise a figure's `<svg>`, make it self-contained with
- * `exportChartSvg`, draw it through an `<img>` onto a 2400×1600 canvas — the 1200×800 layout at 2×,
- * whatever the screen — and hand back the PNG. The white comes from the SVG's own background
+ * `exportChartSvg`, draw it through an `<img>` onto a canvas 2400 wide and twice the figure's height
+ * (#522) — the layout at 2×, whatever the screen — and hand back the PNG. The white comes from the SVG's own background
  * rectangle, so the canvas needs no fill of its own. No dependency: an SVG with no `foreignObject` draws
  * without tainting the canvas.
  */
@@ -19,8 +15,9 @@ export async function chartPng(svg: SVGSVGElement): Promise<Blob> {
     image.src = source;
     await image.decode();
     const canvas = document.createElement("canvas");
-    canvas.width = CHART_EXPORT_WIDTH;
-    canvas.height = CHART_EXPORT_HEIGHT;
+    const size = chartExportSize(markup);
+    canvas.width = size.width;
+    canvas.height = size.height;
     const context = canvas.getContext("2d");
     if (context === null) throw new Error("No 2D canvas context");
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
