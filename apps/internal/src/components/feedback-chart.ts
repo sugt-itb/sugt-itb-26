@@ -199,6 +199,7 @@ const DONUT_INNER_RADIUS = 84;
 export const CHART_TRACK_STROKE = 2;
 const RING_EDGE = DONUT_OUTER_RADIUS + CHART_TRACK_STROKE / 2;
 const LABEL_SIZE = 30;
+const LABEL_WEIGHT = 600;
 /** From the ring's outer edge, outline included, to the top of its name's pill. */
 const LABEL_GAP = 20;
 /**
@@ -247,6 +248,13 @@ function wrap(text: string, fontSize: number, width: number): string[] {
 }
 
 type Point = { x: number; y: number };
+/** A filled rect, `x`/`y` its top left. */
+type Rect = Point & { width: number; height: number };
+
+/** **A pill's width**: its word's estimated width, plus `padX` either side. Both kinds of pill. */
+function pillWidth(text: string, fontSize: number, padX: number): number {
+  return textWidth(text, fontSize) + 2 * padX;
+}
 
 /**
  * A donut's filled part, `d` its path: the whole ring at 10.0 — one SVG arc cannot draw 360°, so it
@@ -298,11 +306,11 @@ function nameLabel(
   x: number,
   top: number,
 ): ChartLayout["slots"][number]["nameLabel"] {
-  const width = textWidth(text, LABEL_SIZE) + 2 * LABEL_PILL_PAD_X;
+  const width = pillWidth(text, LABEL_SIZE, LABEL_PILL_PAD_X);
   return {
     text,
     fontSize: LABEL_SIZE,
-    fontWeight: 600,
+    fontWeight: LABEL_WEIGHT,
     x,
     y: top + LABEL_PILL_HEIGHT / 2 + LABEL_SIZE * MIDDLE,
     pill: { x: x - width / 2, y: top, width, height: LABEL_PILL_HEIGHT },
@@ -315,16 +323,8 @@ export type ChartLayout = {
     fontSize: number;
     /** `Feedback Peserta ·`, ending at `x` — right-anchored, so it never runs into the pill. */
     heading: Point & { text: string };
-    /** The Tipe Peserta's filled rect, `x`/`y` its top left; the word centred on `textX`. */
-    pill: {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      text: string;
-      textX: number;
-      textY: number;
-    };
+    /** The Tipe Peserta's filled rect; the word centred on `textX`, `textY` its baseline. */
+    pill: Rect & { text: string; textX: number; textY: number };
     /** The School or `Semua Sekolah`, wrapped, then the Sesi if picked. */
     lines: string[];
     /** Each line's baseline, centred on `x`. */
@@ -349,15 +349,10 @@ export type ChartLayout = {
     /** The score, centred in the hole: `y` is its baseline. */
     valueLabel: (Point & { text: string; fontSize: number }) | null;
     /**
-     * The Aspect's name under the donut, always, centred in its pill (#523): `y` is its baseline,
-     * `pill` the rect filled with the Aspect's colour, `x`/`y` its top left.
+     * The Aspect's name under the donut, always, centred in its pill (#523): the text's `y` is its
+     * baseline; `pill` is the rect filled with the Aspect's colour.
      */
-    nameLabel: Point & {
-      text: string;
-      fontSize: number;
-      fontWeight: number;
-      pill: { x: number; y: number; width: number; height: number };
-    };
+    nameLabel: Point & { text: string; fontSize: number; fontWeight: number; pill: Rect };
   }[];
   /** "Belum ada tanggapan", centred where the donuts would be, when the figure has no responses. */
   emptyNotice: (Point & { text: string; fontSize: number }) | null;
@@ -384,8 +379,8 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
     const { participantType } = figure;
     const { heading, scope } = figure.title;
     const headingWidth = textWidth(heading, TITLE_SIZE);
-    const pillWidth = textWidth(participantType, TITLE_SIZE) + 2 * PILL_PAD_X;
-    const left = (CHART_WIDTH - headingWidth - PILL_GAP - pillWidth) / 2;
+    const width = pillWidth(participantType, TITLE_SIZE, PILL_PAD_X);
+    const left = (CHART_WIDTH - headingWidth - PILL_GAP - width) / 2;
     const pillX = left + headingWidth + PILL_GAP;
     // The pill is the topmost shape, standing taller than the heading's text. Capitals stand about
     // 0.7 em over the baseline; the pill is centred on them — less a fraction of a unit, so every
@@ -402,10 +397,10 @@ export function chartLayout(figure: ChartFigure, parts: ChartParts): ChartLayout
       pill: {
         x: pillX,
         y: pillY,
-        width: pillWidth,
+        width,
         height: PILL_HEIGHT,
         text: participantType,
-        textX: pillX + pillWidth / 2,
+        textX: pillX + width / 2,
         textY: firstBaseline,
       },
       lines,

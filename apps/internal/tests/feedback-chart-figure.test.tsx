@@ -208,7 +208,7 @@ describe("ParticipantChartFigure", () => {
       );
       const pills = [
         ...markup.matchAll(
-          /<rect data-part="label-pill"[^>]*rx="23"[^>]*style="fill:var\((--[\w-]+)\)"><\/rect><text[^>]*font-weight="600"[^>]*style="fill:var\(--chart-category-foreground\)">([^<]+)<\/text>/g,
+          /<rect data-part="label-pill"[^>]*rx="23"[^>]*style="fill:var\((--[\w-]+)\)"><\/rect><text[^>]*text-anchor="middle"[^>]*font-weight="600"[^>]*style="fill:var\(--chart-category-foreground\)">([^<]+)<\/text>/g,
         ),
       ];
       expect(pills.map((match) => match[1])).toEqual(arcColours);
