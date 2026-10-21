@@ -72,12 +72,10 @@ const schools: FeedbackSchoolOption[] = [
 function render(rows: ParticipantFeedbackRow[]) {
   return renderToStaticMarkup(
     <FeedbackView
-      participantInitialRows={rows}
-      participantInitialCursor={null}
+      participantFirstPage={{ rows, nextCursor: null, total: rows.length }}
       participantAverages={{ handsOnRbl: null, instructor: 8, materials: 8, relevance: 8 }}
       participantSchools={schools}
-      perjadinInitialRows={[]}
-      perjadinInitialCursor={null}
+      perjadinFirstPage={{ rows: [], nextCursor: null, total: 0 }}
       perjadinAverages={{
         lodging: 0,
         transport: 0,

@@ -113,6 +113,7 @@ export {
   type FeedbackCursor,
   type FeedbackFilters,
   type FeedbackFilterValue,
+  type FeedbackPage,
   type FeedbackParticipantType,
   type FeedbackPerjadinOption,
   type FeedbackSchoolOption,
