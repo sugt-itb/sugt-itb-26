@@ -167,11 +167,18 @@ describe("chartLayout", () => {
       figures: figures(over),
     });
 
-  /** A wedge's end, as an angle from 12 o'clock counter-clockwise, in turns. */
-  const turns = (slot: ChartLayout["slots"][number]) => {
+  /** A sector's arc, read back from its path: the large-arc flag and where it ends. */
+  const arc = (slot: ChartLayout["slots"][number]) => {
     const wedge = slot.wedge;
     if (wedge?.kind !== "sector") throw new Error("not a sector");
-    const angle = Math.atan2(-(wedge.end.x - slot.centre.x), -(wedge.end.y - slot.centre.y));
+    const [, large, x, y] = / A [\d.]+ [\d.]+ 0 ([01]) 0 (-?[\d.]+) (-?[\d.]+) Z$/.exec(wedge.d)!;
+    return { largeArc: large === "1", end: { x: Number(x), y: Number(y) } };
+  };
+
+  /** A wedge's end, as an angle from 12 o'clock counter-clockwise, in turns. */
+  const turns = (slot: ChartLayout["slots"][number]) => {
+    const { end } = arc(slot);
+    const angle = Math.atan2(-(end.x - slot.centre.x), -(end.y - slot.centre.y));
     return (angle < 0 ? angle + 2 * Math.PI : angle) / (2 * Math.PI);
   };
 
@@ -222,17 +229,17 @@ describe("chartLayout", () => {
     const quarter = chartLayout(siswa({ instructor: 2.5 }), ALL_CHART_PARTS).slots[0]!;
     if (quarter.wedge?.kind !== "sector") throw new Error("not a sector");
     // A quarter is 9 o'clock: left of the centre, level with it.
-    expect(quarter.wedge.end.x).toBeCloseTo(quarter.centre.x - quarter.radius, 5);
-    expect(quarter.wedge.end.y).toBeCloseTo(quarter.centre.y, 5);
-    expect(quarter.wedge.largeArc).toBe(false);
+    expect(arc(quarter).end.x).toBeCloseTo(quarter.centre.x - quarter.radius, 1);
+    expect(arc(quarter).end.y).toBeCloseTo(quarter.centre.y, 1);
+    expect(arc(quarter).largeArc).toBe(false);
     // SVG's sweep flag 0 is counter-clockwise on screen.
     expect(quarter.wedge.d).toMatch(/ A [\d.]+ [\d.]+ 0 0 0 /);
 
     const layout = chartLayout(siswa({ materials: 7.8, relevance: 4.2 }), ALL_CHART_PARTS);
-    expect(turns(layout.slots[1]!)).toBeCloseTo(0.78, 5);
-    expect(turns(layout.slots[2]!)).toBeCloseTo(0.42, 5);
-    expect(layout.slots[1]!.wedge).toMatchObject({ largeArc: true });
-    expect(layout.slots[2]!.wedge).toMatchObject({ largeArc: false });
+    expect(turns(layout.slots[1]!)).toBeCloseTo(0.78, 3);
+    expect(turns(layout.slots[2]!)).toBeCloseTo(0.42, 3);
+    expect(arc(layout.slots[1]!).largeArc).toBe(true);
+    expect(arc(layout.slots[2]!).largeArc).toBe(false);
   });
 
   it("draws 10.0 as a full circle, which a single SVG arc cannot", () => {

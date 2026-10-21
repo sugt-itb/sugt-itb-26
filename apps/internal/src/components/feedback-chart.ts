@@ -153,8 +153,8 @@ const LEGEND_SWATCH = 28;
 const LEGEND_ROW = 48;
 /**
  * **Every pie is this size, in every figure and whatever the checkboxes hide**, so a Siswa and a
- * GTK-MS figure compare by eye, as the fixed 0–10 axis let the bars. Four fit across the view box
- * with room between them and under them for the longest label, Hands-on RBL.
+ * GTK-MS figure compare by eye (#514). Four fit across the view box with room between them and
+ * under them for the longest label, Hands-on RBL.
  */
 const PIE_RADIUS = 120;
 const LABEL_SIZE = 30;
@@ -190,9 +190,7 @@ type Point = { x: number; y: number };
  * A pie's filled part: the whole circle at 10.0 — one SVG arc cannot draw 360°, so it is a circle —
  * or a sector from 12 o'clock, apex at the centre, `d` its path.
  */
-export type ChartWedge =
-  | { kind: "full" }
-  | { kind: "sector"; d: string; end: Point; largeArc: boolean };
+export type ChartWedge = { kind: "full" } | { kind: "sector"; d: string };
 
 /** Two decimals is far below a pixel at any size the figure is drawn. */
 const round = (value: number) => Math.round(value * 100) / 100;
@@ -207,14 +205,11 @@ function wedge(centre: Point, radius: number, value: number | null): ChartWedge 
   if (value >= 10) return { kind: "full" };
   const angle = (value / 10) * 2 * Math.PI;
   const end = { x: centre.x - radius * Math.sin(angle), y: centre.y - radius * Math.cos(angle) };
-  const largeArc = value > 5;
   return {
     kind: "sector",
     d:
       `M ${centre.x} ${centre.y} L ${centre.x} ${centre.y - radius} ` +
-      `A ${radius} ${radius} 0 ${largeArc ? 1 : 0} 0 ${round(end.x)} ${round(end.y)} Z`,
-    end,
-    largeArc,
+      `A ${radius} ${radius} 0 ${value > 5 ? 1 : 0} 0 ${round(end.x)} ${round(end.y)} Z`,
   };
 }
 
