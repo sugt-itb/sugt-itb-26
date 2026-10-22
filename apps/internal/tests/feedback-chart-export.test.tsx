@@ -1,0 +1,214 @@
+import {
+  ALL_CHART_PARTS,
+  chartLayout,
+  participantChartFigure,
+  type ChartParts,
+} from "-/components/feedback-chart";
+import {
+  CHART_EXPORT_COLOURS,
+  chartExportSize,
+  chartPngFileName,
+  exportChartSvg,
+} from "-/components/feedback-chart-export";
+import { ParticipantChartFigure } from "-/components/feedback-chart-figure";
+import type { FeedbackSchoolOption } from "@sugt/db/queries";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+
+import { themeTokens } from "./support/theme-tokens";
+
+/**
+ * **Unduh PNG's pure half** (#511): the on-screen figure's markup turned into a light-on-white SVG an
+ * `<img>` can draw — no `var(…)`, no class, the figure's own size (#522), a named font stack — and
+ * the file's name. The canvas step is the browser's; it draws exactly this.
+ */
+
+const schools: FeedbackSchoolOption[] = [
+  {
+    id: "bontang",
+    name: "SMAN 1 Bontang",
+    kabupatenKota: "Kota Bontang",
+    sessions: [
+      {
+        id: "sesi-1",
+        mode: "offline",
+        sesi: 1,
+        heldOn: "2026-10-12",
+        startsAt: "08:00:00",
+        timeZone: "WITA",
+      },
+    ],
+  },
+];
+
+const PROGRAMME = { schoolId: null, sessionId: null, participantType: null };
+
+const NO_RESPONSES = {
+  responseCount: 0,
+  instructor: null,
+  materials: null,
+  relevance: null,
+  handsOnRbl: null,
+};
+
+function screenMarkup(parts: ChartParts = ALL_CHART_PARTS, responseCount = 42) {
+  const figure = participantChartFigure(schools, PROGRAMME, {
+    participantType: "Siswa",
+    figures:
+      responseCount === 0
+        ? NO_RESPONSES
+        : { responseCount, instructor: 8.4, materials: 7, relevance: 9.1, handsOnRbl: 6.5 },
+  });
+  return renderToStaticMarkup(
+    <ParticipantChartFigure
+      figure={figure}
+      parts={parts}
+    />,
+  );
+}
+
+describe("exportChartSvg", () => {
+  it("leaves no var(…) and no class, so nothing depends on the page's stylesheet", () => {
+    const markup = exportChartSvg(screenMarkup());
+    expect(screenMarkup()).toContain("var(");
+    expect(markup).not.toContain("var(");
+    expect(markup).not.toMatch(/\sclass=/);
+  });
+
+  it("paints every token with its light-theme value, whatever theme the screen is in", () => {
+    const markup = exportChartSvg(screenMarkup());
+    expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--chart-category-1"]}`);
+    expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--foreground"]}`);
+    // The donuts' track and its two outlines (#516).
+    expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--muted"]}`);
+    expect(markup).toContain(`stroke:${CHART_EXPORT_COLOURS["--border"]}`);
+    // The Tipe Peserta's pill (#518).
+    expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--primary"]}`);
+    expect(markup).toContain(`fill:${CHART_EXPORT_COLOURS["--primary-foreground"]}`);
+  });
+
+  it("holds exactly the tokens the figure paints with, no more", () => {
+    // With and without responses: the empty notice paints with a token nothing else does.
+    const used = new Set(
+      [screenMarkup(), screenMarkup(ALL_CHART_PARTS, 0)].flatMap((markup) =>
+        [...markup.matchAll(/var\((--[\w-]+)\)/g)].map((match) => match[1]!),
+      ),
+    );
+    expect(new Set(Object.keys(CHART_EXPORT_COLOURS))).toEqual(used);
+  });
+
+  it.each([
+    ["Judul on", ALL_CHART_PARTS],
+    ["Judul off", { title: false, values: true }],
+  ] as const)(
+    "is the figure's own size, %s, on a white background, in a named font stack",
+    (_, parts) => {
+      const figure = participantChartFigure(schools, PROGRAMME, {
+        participantType: "Siswa",
+        figures: {
+          responseCount: 42,
+          instructor: 8.4,
+          materials: 7,
+          relevance: 9.1,
+          handsOnRbl: 6.5,
+        },
+      });
+      const { height } = chartLayout(figure, parts);
+      const markup = exportChartSvg(screenMarkup(parts));
+      const root = /^<svg[^>]*>/.exec(markup)![0];
+      expect(root).toContain(`viewBox="0 0 1200 ${height}"`);
+      expect(root).toContain('width="1200"');
+      expect(root).toContain(`height="${height}"`);
+      expect(root).toContain('xmlns="http://www.w3.org/2000/svg"');
+      expect(root).toMatch(/font-family="Montserrat, [^"]*sans-serif"/);
+      expect(markup).toMatch(
+        new RegExp(`^<svg[^>]*><rect width="1200" height="${height}" fill="#ffffff"/>`),
+      );
+      // The PNG: 2400 wide, twice the figure's height — no blank band above or below.
+      expect(chartExportSize(markup)).toEqual({ width: 2400, height: 2 * height });
+    },
+  );
+
+  it("refuses markup with no view box, rather than guess a size", () => {
+    expect(() => exportChartSvg("<svg><rect/></svg>")).toThrow("view box");
+  });
+
+  it.each(["title", "values"] as const)(
+    "leaves out exactly %s when its checkbox is off",
+    (part) => {
+      const markup = exportChartSvg(screenMarkup({ ...ALL_CHART_PARTS, [part]: false }));
+      expect(markup).not.toContain(`data-part="${part}"`);
+      for (const other of ["title", "values"].filter((name) => name !== part)) {
+        expect(markup).toContain(`data-part="${other}"`);
+      }
+      // The Aspects' names are in the image whatever the checkboxes hide.
+      expect(markup).toContain('data-part="labels"');
+    },
+  );
+
+  it("carries the title block and its pill, and no n line or legend", () => {
+    const markup = exportChartSvg(screenMarkup());
+    expect(markup).toContain('data-part="pill"');
+    expect(markup).toContain(">Siswa</text>");
+    expect(markup).not.toContain("tanggapan");
+    expect(markup).not.toContain('data-part="legend"');
+  });
+
+  it("works on a browser's serialisation too — spaced style, xmlns already present", () => {
+    const serialised =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 444" class="h-auto w-full">' +
+      '<rect style="fill: var(--chart-category-2);"/><text style="fill: var( --foreground )"/></svg>';
+    const markup = exportChartSvg(serialised);
+    expect(markup.match(/xmlns=/g)).toHaveLength(1);
+    expect(markup).toContain(`fill: ${CHART_EXPORT_COLOURS["--chart-category-2"]};`);
+    expect(markup).not.toContain("var(");
+    expect(markup).not.toContain("class=");
+    expect(markup).toContain('height="444"');
+  });
+
+  it("refuses a token it has no light value for, rather than leave it unresolved", () => {
+    expect(() => exportChartSvg('<svg><rect style="fill:var(--destructive)"/></svg>')).toThrow(
+      "--destructive",
+    );
+  });
+});
+
+describe("CHART_EXPORT_COLOURS", () => {
+  it("is the light theme's value of each token, as globals.css declares it", () => {
+    const light = themeTokens(":root");
+    for (const [token, value] of Object.entries(CHART_EXPORT_COLOURS)) {
+      expect(value, token).toBe(light.get(token));
+    }
+  });
+});
+
+describe("chartPngFileName", () => {
+  const today = "2026-10-20";
+
+  it("names a programme-wide figure semua", () => {
+    expect(chartPngFileName(schools, PROGRAMME, "Siswa", today)).toBe(
+      "grafik-peserta-semua-siswa-2026-10-20.png",
+    );
+  });
+
+  it("names a School's figure by the School, slugified as Ekspor CSV does", () => {
+    expect(chartPngFileName(schools, { ...PROGRAMME, schoolId: "bontang" }, "Siswa", today)).toBe(
+      "grafik-peserta-sman-1-bontang-siswa-2026-10-20.png",
+    );
+  });
+
+  it("names a School and Sesi figure by both, then its own Tipe Peserta", () => {
+    expect(
+      chartPngFileName(
+        schools,
+        { schoolId: "bontang", sessionId: "sesi-1", participantType: "GTK-MS" },
+        "GTK-MS",
+        today,
+      ),
+    ).toBe("grafik-peserta-sman-1-bontang-sesi-1-luring-gtk-ms-2026-10-20.png");
+  });
+
+  it("never says tersaring: figures never follow the score filters", () => {
+    expect(chartPngFileName(schools, PROGRAMME, "GTK-MS", today)).not.toContain("tersaring");
+  });
+});

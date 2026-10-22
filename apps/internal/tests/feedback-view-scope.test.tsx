@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("-/app/(app)/feedback/actions", () => ({
   loadParticipantFeedback: vi.fn(),
   loadParticipantFeedbackAverages: vi.fn(),
+  loadParticipantFeedbackCharts: vi.fn(),
   loadPerjadinFeedback: vi.fn(),
   loadPerjadinFeedbackAverages: vi.fn(),
 }));
@@ -71,12 +72,10 @@ const schools: FeedbackSchoolOption[] = [
 function render(rows: ParticipantFeedbackRow[]) {
   return renderToStaticMarkup(
     <FeedbackView
-      participantInitialRows={rows}
-      participantInitialCursor={null}
+      participantFirstPage={{ rows, nextCursor: null, total: rows.length }}
       participantAverages={{ handsOnRbl: null, instructor: 8, materials: 8, relevance: 8 }}
       participantSchools={schools}
-      perjadinInitialRows={[]}
-      perjadinInitialCursor={null}
+      perjadinFirstPage={{ rows: [], nextCursor: null, total: 0 }}
       perjadinAverages={{
         lodging: 0,
         transport: 0,
@@ -162,6 +161,21 @@ describe("Ekspor CSV (#490)", () => {
 
     expect(html).toContain('href="/feedback/ekspor/peserta"');
     expect(html).toContain(">Ekspor CSV<");
+  });
+});
+
+describe("Lihat Grafik (#510)", () => {
+  it("sits before Ekspor CSV on the Peserta tab, enabled even with no responses", () => {
+    const html = render([]);
+
+    const button = /<button[^>]*>Lihat Grafik<\/button>/.exec(html)?.[0] ?? "";
+    expect(button).not.toBe("");
+    expect(button).not.toMatch(/ disabled=""/);
+    expect(html.indexOf(">Lihat Grafik<")).toBeLessThan(html.indexOf(">Ekspor CSV<"));
+  });
+
+  it("draws no figure until the dialog opens", () => {
+    expect(render([row({})])).not.toContain('role="img"');
   });
 });
 

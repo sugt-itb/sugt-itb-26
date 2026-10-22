@@ -69,12 +69,10 @@ export default async function Page() {
       </header>
 
       <FeedbackView
-        participantInitialRows={participantFirstPage.rows}
-        participantInitialCursor={participantFirstPage.nextCursor}
+        participantFirstPage={participantFirstPage}
         participantAverages={participantAverages}
         participantSchools={participantSchools}
-        perjadinInitialRows={perjadinFirstPage.rows}
-        perjadinInitialCursor={perjadinFirstPage.nextCursor}
+        perjadinFirstPage={perjadinFirstPage}
         perjadinAverages={perjadinAverages}
         perjadinTrips={perjadinTrips}
       />

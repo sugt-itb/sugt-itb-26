@@ -202,6 +202,32 @@ async function sesiNumbers(schoolIds: string[]): Promise<Map<string, number>> {
  */
 export type FeedbackCursor = number;
 
+/**
+ * One page of either tab: its rows, the cursor for the next (`null` on the last), and `total`, how
+ * many rows the tab's scope and filters match in all (#519). A page with rows always carries the
+ * whole count; one past the last row has nothing to carry it on and reads 0, so read the count off a
+ * first page, as the client does.
+ */
+export type FeedbackPage<Row, Cursor> = { rows: Row[]; nextCursor: Cursor | null; total: number };
+
+/**
+ * **How many rows the WHERE matches, on every row of the read** (#519). A window function runs
+ * before LIMIT and OFFSET, so a page's rows each carry the whole filtered count — the count comes
+ * from the very query that pages the list, not from a second one that could drift from it. A page
+ * past the last row returns none, and so no count; only the first page's is read.
+ */
+const totalExpr = sql<number>`count(*) over ()`.mapWith(Number);
+
+/** Lift `totalExpr` off each row: the rows as the readers type them, and the count once. */
+function rowsAndTotal<Row extends { total: number }>(
+  found: Row[],
+): { rows: Omit<Row, "total">[]; total: number } {
+  return {
+    rows: found.map(({ total: _total, ...row }) => row),
+    total: found[0]?.total ?? 0,
+  };
+}
+
 /** One Participant's submission, as the card renders it. */
 export type ParticipantFeedbackRow = {
   id: string;
@@ -284,6 +310,10 @@ function bound(value: FeedbackFilterValue, expr: SQLWrapper): SQL | null {
  * **Fetch one more than the batch to know whether there is a next page.** The query asks for
  * `BATCH + 1` rows; if it gets them, the extra one proves a next page exists — so the extra is
  * dropped and the cursor advances by `BATCH`. The 11th row never leaves this function.
+ *
+ * **`total` is every row the scope and filters match** (#519) — what the CSV holds, not the batch
+ * returned — counted by the same read as the rows, so the count, the list and the file never
+ * disagree. The sort cannot move it.
  */
 export async function participantFeedbackPage(
   _caller: Person,
@@ -293,15 +323,19 @@ export async function participantFeedbackPage(
     cursor: FeedbackCursor | null;
     sort: FeedbackSort;
   },
-): Promise<{ rows: ParticipantFeedbackRow[]; nextCursor: FeedbackCursor | null }> {
+): Promise<FeedbackPage<ParticipantFeedbackRow, FeedbackCursor>> {
   const { cursor } = args;
-  const rows = await participantFeedbackRows(args, { limit: BATCH + 1, offset: cursor ?? 0 });
+  const { rows, total } = await participantFeedbackRows(args, {
+    limit: BATCH + 1,
+    offset: cursor ?? 0,
+  });
 
   // The (BATCH + 1)th row is the proof a next page exists, never a row to show. Drop it and advance
   // the cursor by one batch; short of a full-plus-one batch there is no next page.
   return {
     rows: await withSesi(rows.slice(0, BATCH)),
     nextCursor: rows.length > BATCH ? (cursor ?? 0) + BATCH : null,
+    total,
   };
 }
 
@@ -314,7 +348,7 @@ export async function participantFeedbackExport(
   _caller: Person,
   args: { filters: FeedbackFilters; scope: ParticipantFeedbackScope; sort: FeedbackSort },
 ): Promise<ParticipantFeedbackRow[]> {
-  return withSesi(await participantFeedbackRows(args, null));
+  return withSesi((await participantFeedbackRows(args, null)).rows);
 }
 
 /** Each row with its Session's Sesi, read once for the Schools the rows are at. */
@@ -327,12 +361,13 @@ async function withSesi(
 
 /**
  * The Peserta rows the scope and score filters match, in the sort's order — a window of them for a
- * page, or all of them (`window` null) for the export. Both readers go through here.
+ * page, or all of them (`window` null) for the export — and how many match in all. Both readers go
+ * through here.
  */
 async function participantFeedbackRows(
   args: { filters: FeedbackFilters; scope: ParticipantFeedbackScope; sort: FeedbackSort },
   window: { limit: number; offset: number } | null,
-): Promise<Omit<ParticipantFeedbackRow, "sesi">[]> {
+): Promise<{ rows: Omit<ParticipantFeedbackRow, "sesi">[]; total: number }> {
   const { filters, scope, sort } = args;
 
   // Each `all` filter yields `null` and is filtered out below; the active ones are conjoined by a
@@ -377,6 +412,7 @@ async function participantFeedbackRows(
       // mirroring how the Perjadin tab renders `createdOn`.
       submittedOn: sql<string>`to_char(${participantFeedback.submittedAt}, 'YYYY-MM-DD')`,
       submittedAt: participantFeedback.submittedAt,
+      total: totalExpr,
     })
     .from(participantFeedback)
     .innerJoin(session, eq(session.id, participantFeedback.sessionId))
@@ -393,7 +429,7 @@ async function participantFeedbackRows(
     )
     .$dynamic();
 
-  return window ? query.limit(window.limit).offset(window.offset) : query;
+  return rowsAndTotal(await (window ? query.limit(window.limit).offset(window.offset) : query));
 }
 
 /** The Peserta tab's four summary averages. Hands-on RBL's is `null` until any row has one. */
@@ -605,7 +641,8 @@ const perjadinRowAverageExpr = sql<number>`(${perjadinEvaluation.transport} + ${
  * order total. **Paging is OFFSET/LIMIT, not keyset**, for the same reason as the Peserta tab: the
  * cursor is the count of rows already loaded, passed as the OFFSET, and the total order means OFFSET
  * drops or duplicates nothing. Fetch `BATCH + 1` to learn whether a next page exists; drop the
- * sentinel and advance the cursor by one batch.
+ * sentinel and advance the cursor by one batch. `total` is every row the choices match (#519), as
+ * on the Peserta tab.
  */
 export async function perjadinFeedbackPage(
   _caller: Person,
@@ -615,16 +652,19 @@ export async function perjadinFeedbackPage(
     cursor: PerjadinFeedbackCursor | null;
     sort: FeedbackSort;
   },
-): Promise<{ rows: PerjadinFeedbackRow[]; nextCursor: PerjadinFeedbackCursor | null }> {
+): Promise<FeedbackPage<PerjadinFeedbackRow, PerjadinFeedbackCursor>> {
   const { cursor } = args;
-  const rows = await perjadinFeedbackRows(args, { limit: BATCH + 1, offset: cursor ?? 0 });
+  const { rows, total } = await perjadinFeedbackRows(args, {
+    limit: BATCH + 1,
+    offset: cursor ?? 0,
+  });
 
   // The (BATCH + 1)th row proves a next page exists; it is never shown. Drop it and advance the
   // cursor by one batch; short of a full-plus-one batch there is no next page.
   if (rows.length > BATCH) {
-    return { rows: rows.slice(0, BATCH), nextCursor: (cursor ?? 0) + BATCH };
+    return { rows: rows.slice(0, BATCH), nextCursor: (cursor ?? 0) + BATCH, total };
   }
-  return { rows, nextCursor: null };
+  return { rows, nextCursor: null, total };
 }
 
 /**
@@ -636,16 +676,17 @@ export async function perjadinFeedbackExport(
   _caller: Person,
   args: { filters: PerjadinFeedbackFilters; scope: PerjadinFeedbackScope; sort: FeedbackSort },
 ): Promise<PerjadinFeedbackRow[]> {
-  return perjadinFeedbackRows(args, null);
+  return (await perjadinFeedbackRows(args, null)).rows;
 }
 
 /**
- * The Perjadin rows the choices match, in order — a page's window, or all of them for the export.
+ * The Perjadin rows the choices match, in order — a page's window, or all of them for the export —
+ * and how many match in all.
  */
 async function perjadinFeedbackRows(
   args: { filters: PerjadinFeedbackFilters; scope: PerjadinFeedbackScope; sort: FeedbackSort },
   window: { limit: number; offset: number } | null,
-): Promise<PerjadinFeedbackRow[]> {
+): Promise<{ rows: PerjadinFeedbackRow[]; total: number }> {
   const { filters, scope, sort } = args;
 
   const conditions: (SQL | null | undefined)[] = [
@@ -686,6 +727,7 @@ async function perjadinFeedbackRows(
       mealsComment: perjadinEvaluation.mealsComment,
       punctualityComment: perjadinEvaluation.punctualityComment,
       pendampingSupportComment: perjadinEvaluation.pendampingSupportComment,
+      total: totalExpr,
     })
     .from(perjadinEvaluation)
     .innerJoin(perjadin, eq(perjadin.id, perjadinEvaluation.perjadinId))
@@ -699,7 +741,7 @@ async function perjadinFeedbackRows(
     )
     .$dynamic();
 
-  return window ? query.limit(window.limit).offset(window.offset) : query;
+  return rowsAndTotal(await (window ? query.limit(window.limit).offset(window.offset) : query));
 }
 
 /** The Perjadin tab's five summary averages. Pendamping Support's is `null` while no row has one. */
