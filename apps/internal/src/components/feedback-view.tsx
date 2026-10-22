@@ -7,6 +7,8 @@ import {
   loadPerjadinFeedbackAverages,
 } from "-/app/(app)/feedback/actions";
 import { participantExportHref, perjadinExportHref } from "-/app/(app)/feedback/feedback-params";
+import { ParticipantChartDialog } from "-/components/feedback-chart-dialog";
+import { feedbackList, withNextPage } from "-/components/feedback-list";
 import { participantScopeLabel, perjadinScopeLabel, withSchool } from "-/components/feedback-scope";
 import { sesiLabel } from "-/components/session-labels";
 import { SingleSelectCombobox } from "-/components/single-select-combobox";
@@ -20,6 +22,7 @@ import type {
   FeedbackCursor,
   FeedbackFilters,
   FeedbackFilterValue,
+  FeedbackPage,
   FeedbackParticipantType,
   FeedbackPerjadinOption,
   FeedbackSchoolOption,
@@ -50,6 +53,7 @@ import {
   SelectValue,
 } from "@sugt/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@sugt/ui/components/tabs";
+import { cn } from "@sugt/ui/lib/utils";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 
@@ -191,22 +195,18 @@ const PUNCTUALITY_OPTIONS = aspectOptions("Ketepatan Waktu");
 const PENDAMPING_SUPPORT_OPTIONS = aspectOptions("Bantuan Pendamping");
 
 function FeedbackView({
-  participantInitialRows,
-  participantInitialCursor,
+  participantFirstPage,
   participantAverages,
   participantSchools,
-  perjadinInitialRows,
-  perjadinInitialCursor,
+  perjadinFirstPage,
   perjadinAverages,
   perjadinTrips,
 }: {
-  participantInitialRows: ParticipantFeedbackRow[];
-  participantInitialCursor: FeedbackCursor | null;
+  participantFirstPage: FeedbackPage<ParticipantFeedbackRow, FeedbackCursor>;
   participantAverages: ParticipantFeedbackAverages;
   /** The Sekolah and Sesi pickers' options: the Schools and Sessions with responses (#466). */
   participantSchools: FeedbackSchoolOption[];
-  perjadinInitialRows: PerjadinFeedbackRow[];
-  perjadinInitialCursor: PerjadinFeedbackCursor | null;
+  perjadinFirstPage: FeedbackPage<PerjadinFeedbackRow, PerjadinFeedbackCursor>;
   perjadinAverages: PerjadinFeedbackAverages;
   /** The Perjadin picker's options: the trips with evaluations (#466). */
   perjadinTrips: FeedbackPerjadinOption[];
@@ -232,15 +232,13 @@ function FeedbackView({
           what resets its filters and paging to defaults. */}
       {tab === "peserta" ? (
         <ParticipantTab
-          initialRows={participantInitialRows}
-          initialCursor={participantInitialCursor}
+          firstPage={participantFirstPage}
           initialAverages={participantAverages}
           schools={participantSchools}
         />
       ) : (
         <PerjadinTab
-          initialRows={perjadinInitialRows}
-          initialCursor={perjadinInitialCursor}
+          firstPage={perjadinFirstPage}
           initialAverages={perjadinAverages}
           trips={perjadinTrips}
         />
@@ -256,21 +254,20 @@ function FeedbackView({
  * A scope, filter or sort change refetches the first page (cursor `null`) and REPLACES the list; a
  * scope change refetches the averages with it. "Load more" carries the current scope, filters, sort
  * and cursor and APPENDS what comes back. The pending state covers each round trip so a second change
- * cannot race the first.
+ * cannot race the first. The response count (#519) is replaced with the first page and kept on "load
+ * more"; `recounting` dims it while a first page is on its way.
  */
 function ParticipantTab({
-  initialRows,
-  initialCursor,
+  firstPage,
   initialAverages,
   schools,
 }: {
-  initialRows: ParticipantFeedbackRow[];
-  initialCursor: FeedbackCursor | null;
+  firstPage: FeedbackPage<ParticipantFeedbackRow, FeedbackCursor>;
   initialAverages: ParticipantFeedbackAverages;
   schools: FeedbackSchoolOption[];
 }) {
-  const [rows, setRows] = useState(initialRows);
-  const [cursor, setCursor] = useState(initialCursor);
+  const [list, setList] = useState(() => feedbackList(firstPage));
+  const [recounting, setRecounting] = useState(false);
   const [scope, setScope] = useState<ParticipantFeedbackScope>(ALL_PARTICIPANT_SCOPE);
   // The averages and the scope they were read for travel together, so a card's title never names a
   // scope its number is not yet over.
@@ -299,13 +296,14 @@ function ParticipantTab({
 
   function changeScope(next: ParticipantFeedbackScope) {
     setScope(next);
+    setRecounting(true);
     startTransition(async () => {
       const [page, values] = await Promise.all([
         loadParticipantFeedback(filters, next, null, sort),
         loadParticipantFeedbackAverages(next),
       ]);
-      setRows(page.rows);
-      setCursor(page.nextCursor);
+      setList(feedbackList(page));
+      setRecounting(false);
       setAverages({ values, scope: next });
     });
   }
@@ -313,28 +311,30 @@ function ParticipantTab({
   function changeFilter(key: keyof FeedbackFilters, value: FeedbackFilterValue) {
     const next = { ...filters, [key]: value };
     setFilters(next);
+    setRecounting(true);
     startTransition(async () => {
       const page = await loadParticipantFeedback(next, scope, null, sort);
-      setRows(page.rows);
-      setCursor(page.nextCursor);
+      setList(feedbackList(page));
+      setRecounting(false);
     });
   }
 
   function changeSort(next: FeedbackSort) {
     setSort(next);
+    setRecounting(true);
     startTransition(async () => {
       const page = await loadParticipantFeedback(filters, scope, null, next);
-      setRows(page.rows);
-      setCursor(page.nextCursor);
+      setList(feedbackList(page));
+      setRecounting(false);
     });
   }
 
   function loadMore() {
+    const { cursor } = list;
     if (cursor === null) return;
     startTransition(async () => {
       const page = await loadParticipantFeedback(filters, scope, cursor, sort);
-      setRows((previous) => [...previous, ...page.rows]);
-      setCursor(page.nextCursor);
+      setList((previous) => withNextPage(previous, page));
     });
   }
 
@@ -476,15 +476,29 @@ function ParticipantTab({
         />
       </div>
 
-      <ExportLink href={participantExportHref({ scope, filters, sort })} />
+      {/* The count on the left (#519); Lihat Grafik (#510) beside Ekspor CSV on the right — the
+          figures follow the scope, never the filters. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <ResponseCount
+          total={list.total}
+          recounting={recounting}
+        />
+        <div className="ml-auto flex flex-wrap justify-end gap-2">
+          <ParticipantChartDialog
+            scope={scope}
+            schools={schools}
+          />
+          <ExportLink href={participantExportHref({ scope, filters, sort })} />
+        </div>
+      </div>
 
-      {rows.length === 0 ? (
+      {list.rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Tidak ada masukan Peserta untuk saringan ini.
         </p>
       ) : (
         <ul className="space-y-3">
-          {rows.map((row) => (
+          {list.rows.map((row) => (
             <li key={row.id}>
               <ParticipantCard row={row} />
             </li>
@@ -492,7 +506,7 @@ function ParticipantTab({
         </ul>
       )}
 
-      {cursor !== null && (
+      {list.cursor !== null && (
         <LoadMore
           pending={pending}
           onClick={loadMore}
@@ -505,21 +519,19 @@ function ParticipantTab({
 /**
  * The Perjadin tab: five summary cards, six server-side filters, two sort dropdowns, and an
  * OFFSET-paged card list. The shape is the Peserta tab's — one Aspect more — so the filter, sort and
- * paging machinery is identical, just over `loadPerjadinFeedback`.
+ * paging machinery is identical, just over `loadPerjadinFeedback`, and so is its response count.
  */
 function PerjadinTab({
-  initialRows,
-  initialCursor,
+  firstPage,
   initialAverages,
   trips,
 }: {
-  initialRows: PerjadinFeedbackRow[];
-  initialCursor: PerjadinFeedbackCursor | null;
+  firstPage: FeedbackPage<PerjadinFeedbackRow, PerjadinFeedbackCursor>;
   initialAverages: PerjadinFeedbackAverages;
   trips: FeedbackPerjadinOption[];
 }) {
-  const [rows, setRows] = useState(initialRows);
-  const [cursor, setCursor] = useState(initialCursor);
+  const [list, setList] = useState(() => feedbackList(firstPage));
+  const [recounting, setRecounting] = useState(false);
   const [scope, setScope] = useState<PerjadinFeedbackScope>(ALL_PERJADIN_SCOPE);
   const [averages, setAverages] = useState({ values: initialAverages, scope: ALL_PERJADIN_SCOPE });
   const [filters, setFilters] = useState<PerjadinFeedbackFilters>(ALL_PERJADIN_FILTERS);
@@ -540,13 +552,14 @@ function PerjadinTab({
 
   function changeScope(next: PerjadinFeedbackScope) {
     setScope(next);
+    setRecounting(true);
     startTransition(async () => {
       const [page, values] = await Promise.all([
         loadPerjadinFeedback(filters, next, null, sort),
         loadPerjadinFeedbackAverages(next),
       ]);
-      setRows(page.rows);
-      setCursor(page.nextCursor);
+      setList(feedbackList(page));
+      setRecounting(false);
       setAverages({ values, scope: next });
     });
   }
@@ -554,28 +567,30 @@ function PerjadinTab({
   function changeFilter(key: keyof PerjadinFeedbackFilters, value: FeedbackFilterValue) {
     const next = { ...filters, [key]: value };
     setFilters(next);
+    setRecounting(true);
     startTransition(async () => {
       const page = await loadPerjadinFeedback(next, scope, null, sort);
-      setRows(page.rows);
-      setCursor(page.nextCursor);
+      setList(feedbackList(page));
+      setRecounting(false);
     });
   }
 
   function changeSort(next: FeedbackSort) {
     setSort(next);
+    setRecounting(true);
     startTransition(async () => {
       const page = await loadPerjadinFeedback(filters, scope, null, next);
-      setRows(page.rows);
-      setCursor(page.nextCursor);
+      setList(feedbackList(page));
+      setRecounting(false);
     });
   }
 
   function loadMore() {
+    const { cursor } = list;
     if (cursor === null) return;
     startTransition(async () => {
       const page = await loadPerjadinFeedback(filters, scope, cursor, sort);
-      setRows((previous) => [...previous, ...page.rows]);
-      setCursor(page.nextCursor);
+      setList((previous) => withNextPage(previous, page));
     });
   }
 
@@ -719,15 +734,23 @@ function PerjadinTab({
         />
       </div>
 
-      <ExportLink href={perjadinExportHref({ scope, filters, sort })} />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <ResponseCount
+          total={list.total}
+          recounting={recounting}
+        />
+        <div className="ml-auto">
+          <ExportLink href={perjadinExportHref({ scope, filters, sort })} />
+        </div>
+      </div>
 
-      {rows.length === 0 ? (
+      {list.rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Tidak ada evaluasi Perjadin untuk saringan ini.
         </p>
       ) : (
         <ul className="space-y-3">
-          {rows.map((row) => (
+          {list.rows.map((row) => (
             <li key={row.id}>
               <PerjadinCard row={row} />
             </li>
@@ -735,7 +758,7 @@ function PerjadinTab({
         </ul>
       )}
 
-      {cursor !== null && (
+      {list.cursor !== null && (
         <LoadMore
           pending={pending}
           onClick={loadMore}
@@ -753,15 +776,32 @@ function PerjadinTab({
  */
 function ExportLink({ href }: { href: string }) {
   return (
-    <div className="mb-3 flex justify-end">
-      <LinkButton
-        variant="outline"
-        size="sm"
-        render={<a href={href} />}
-      >
-        Ekspor CSV
-      </LinkButton>
-    </div>
+    <LinkButton
+      variant="outline"
+      size="sm"
+      render={<a href={href} />}
+    >
+      Ekspor CSV
+    </LinkButton>
+  );
+}
+
+/**
+ * **How many responses the tab's choices match** (#519), shared by both tabs: every row the scope
+ * and all the filters keep — the CSV's rows, not the cards loaded — so it never moves on "load
+ * more". Muted text and no card, so nobody reads it as another score: the averages above follow the
+ * scope alone, this follows the filters too. Dimmed while a change's first page is on its way, so it
+ * never stands for filters that have not loaded.
+ */
+function ResponseCount({ total, recounting }: { total: number; recounting: boolean }) {
+  return (
+    <p
+      aria-live="polite"
+      aria-busy={recounting}
+      className={cn("text-sm text-muted-foreground transition-opacity", recounting && "opacity-50")}
+    >
+      {total} tanggapan
+    </p>
   );
 }
 
@@ -1140,4 +1180,4 @@ function Comment({ text }: { text: string }) {
   );
 }
 
-export { FeedbackView };
+export { FeedbackView, PerjadinTab, ResponseCount };

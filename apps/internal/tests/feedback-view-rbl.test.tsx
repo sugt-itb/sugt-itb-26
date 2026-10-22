@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("-/app/(app)/feedback/actions", () => ({
   loadParticipantFeedback: vi.fn(),
   loadParticipantFeedbackAverages: vi.fn(),
+  loadParticipantFeedbackCharts: vi.fn(),
   loadPerjadinFeedback: vi.fn(),
   loadPerjadinFeedbackAverages: vi.fn(),
 }));
@@ -46,12 +47,10 @@ const base: ParticipantFeedbackRow = {
 function render(rows: ParticipantFeedbackRow[], handsOnRbl: number | null) {
   return renderToStaticMarkup(
     <FeedbackView
-      participantInitialRows={rows}
-      participantInitialCursor={null}
+      participantFirstPage={{ rows, nextCursor: null, total: rows.length }}
       participantAverages={{ handsOnRbl, instructor: 8, materials: 8, relevance: 8 }}
       participantSchools={[]}
-      perjadinInitialRows={[]}
-      perjadinInitialCursor={null}
+      perjadinFirstPage={{ rows: [], nextCursor: null, total: 0 }}
       perjadinAverages={{
         lodging: 0,
         transport: 0,

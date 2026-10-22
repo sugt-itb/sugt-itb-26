@@ -1,13 +1,16 @@
 "use server";
 
+import { chartParticipantTypes, type ParticipantChartData } from "-/components/feedback-chart";
 import { requirePerson } from "-/lib/person";
 import {
   participantFeedbackAverages,
+  participantFeedbackFigures,
   participantFeedbackPage,
   perjadinFeedbackAverages,
   perjadinFeedbackPage,
   type FeedbackCursor,
   type FeedbackFilters,
+  type FeedbackPage,
   type FeedbackSort,
   type ParticipantFeedbackAverages,
   type ParticipantFeedbackRow,
@@ -24,7 +27,8 @@ import {
  * the "load more" button all call it: a filter or sort change sends the chosen filters and sort with
  * a `null` cursor and gets the first page back to REPLACE the list; "load more" sends the same
  * filters and sort with the current cursor (the OFFSET) and gets the next page to APPEND. One action
- * serves all three because they are the same query — only the cursor and sort differ. The `scope`
+ * serves all three because they are the same query — only the cursor and sort differ. A page
+ * carries `total`, the tab's response count (#519); the client reads only a first page's. The `scope`
  * — the School, Session and Tipe Peserta picked (#466, #487) — travels with every call, and the
  * query validates it.
  *
@@ -41,7 +45,7 @@ export async function loadParticipantFeedback(
   scope: ParticipantFeedbackScope,
   cursor: FeedbackCursor | null,
   sort: FeedbackSort,
-): Promise<{ rows: ParticipantFeedbackRow[]; nextCursor: FeedbackCursor | null }> {
+): Promise<FeedbackPage<ParticipantFeedbackRow, FeedbackCursor>> {
   const person = await requirePerson();
   return participantFeedbackPage(person, { filters, scope, cursor, sort });
 }
@@ -59,6 +63,27 @@ export async function loadParticipantFeedbackAverages(
 }
 
 /**
+ * **The Lihat Grafik figures for the dialog's scope** (#510): one per Tipe Peserta — or only the
+ * one picked — each from `participantFeedbackFigures`, the read behind every Peserta average,
+ * called with that Tipe Peserta. So a donut is the number its average card shows under the same
+ * scope, but raw: an Aspect with no Rating stays `null`, and `responseCount` says how many
+ * responses a figure stands on. The cards' `participantFeedbackAverages` turns a missing
+ * Narasumber, Materi or Relevansi into 0, an arc a figure must never draw, and drops the count. The
+ * score filters are not an argument, as for the cards. Signed in, as its twins.
+ */
+export async function loadParticipantFeedbackCharts(
+  scope: ParticipantFeedbackScope,
+): Promise<ParticipantChartData[]> {
+  const person = await requirePerson();
+  return Promise.all(
+    chartParticipantTypes(scope.participantType).map(async (participantType) => ({
+      participantType,
+      figures: await participantFeedbackFigures(person, { ...scope, participantType }),
+    })),
+  );
+}
+
+/**
  * **The Perjadin tab's one read**, the twin of `loadParticipantFeedback` over `perjadin_evaluation`
  * (#169). Both tabs' filter changes, sort changes and "load more" buttons drive their own action;
  * the two share nothing but the shape, so a mistaken cursor from one can never reach the other's
@@ -72,7 +97,7 @@ export async function loadPerjadinFeedback(
   scope: PerjadinFeedbackScope,
   cursor: PerjadinFeedbackCursor | null,
   sort: FeedbackSort,
-): Promise<{ rows: PerjadinFeedbackRow[]; nextCursor: PerjadinFeedbackCursor | null }> {
+): Promise<FeedbackPage<PerjadinFeedbackRow, PerjadinFeedbackCursor>> {
   const person = await requirePerson();
   return perjadinFeedbackPage(person, { filters, scope, cursor, sort });
 }

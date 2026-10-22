@@ -860,6 +860,81 @@ pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengka
   `… · SMAN 1 Bontang · Sesi 1 Luring · GTK-MS`. With none picked they are programme-wide. Under
   GTK-MS the Hands-on RBL card reads "—", since only Siswa are asked it.
 - The choice lives in the browser, not the URL, like the other filters; switching tabs resets it.
+- **`42 tanggapan` sits at the left of the row above the list** (#519), with Lihat Grafik and
+  Ekspor CSV at the right. It counts every response the School, Sesi and Tipe Peserta **and** the
+  score filters keep: the full total, the rows the CSV holds, not the cards loaded, so "Tampilkan
+  lebih banyak" never moves it and nor does sorting. Unlike the averages it follows the filters
+  too, so it is plain muted text, not a card, and never reads as a score. While a change is
+  loading the old number stays, dimmed, until the new first page lands. With nothing matching it
+  reads `0 tanggapan` beside the empty-list text.
+
+**Lihat Grafik** (#510) sits beside **Ekspor CSV** above the Peserta list, for anyone who can read
+the page, and is enabled even when the scope has no responses. The Perjadin tab has none. It opens
+a wide dialog of donut charts (#514, #516, #518), one donut per Aspect:
+
+- **One figure per Tipe Peserta in scope**: Siswa, then GTK-MS. With a Tipe Peserta picked, only
+  that one shows. With no School picked the figures are programme-wide.
+- **The dialog has no pickers of its own.** It shows the tab's Sekolah, Sesi and Tipe Peserta as
+  they were when it opened, and fetches its figures then, a skeleton standing in while they load.
+  To change the scope, close it, change the pickers and reopen.
+- **A donut is the mean Rating of one Aspect** over that Tipe Peserta's responses in scope, the
+  same number its average card shows with that Tipe Peserta picked. Like the cards, the figures
+  follow the scope and **never the score filters**. Donuts run in one row in the cards' order —
+  Narasumber, Materi, Relevansi, Hands-on RBL — so a Siswa figure has four and a GTK-MS figure
+  three. Every donut is the same size in both figures, so two figures compare by eye. Each Aspect
+  has one colour in every figure.
+- **A donut is a ring with an empty hole.** Its whole ring is always drawn as a grey track,
+  outlined thinly on both its outer and inner edges; on top, an arc in the Aspect's colour covers
+  mean ÷ 10 of the ring, starting at 12 o'clock and running counter-clockwise, with flat ends.
+  10.0 fills the whole ring, 0.0 leaves the bare track.
+- **An Aspect with no Rating in scope** keeps its donut: the bare track ring with "—" in the
+  middle, never "0.0" — Hands-on RBL when every Siswa response in scope was filed before it
+  existed. **A Tipe Peserta with no responses in scope** shows its frame with "Belum ada
+  tanggapan" in place of the donuts.
+- **Each Aspect's name always sits under its donut** (#523), in a pill filled with that Aspect's
+  colour, its text in a colour readable on all four Aspect colours in both themes. There is no
+  legend, so a donut without its name would name nothing.
+- **The title block** is three centred lines, with no blank line after it:
+  1. `Feedback Peserta ·` and the Tipe Peserta, `Siswa` or `GTK-MS`, in a highlight pill: a
+     filled rounded rect in the brand colour, the word in its foreground colour, so the Tipe Peserta
+     stands out at a glance. It is never an Aspect's colour, and it is the larger of the two kinds
+     of pill.
+  2. The School's name, wrapping when long, or `Semua Sekolah` programme-wide.
+  3. The Sesi, only when one is picked, as the average cards write it: `Sesi 1 Luring`, or the dated
+     form for a cancelled Session. With no Sesi picked the line is left out, so with no School there
+     are two lines.
+
+  For example `Feedback Peserta · [Siswa]` / `SMAN 1 Bontang` / `Sesi 1 Luring`. The figure states
+  no response count; #519 puts it on the page.
+
+- **Two checkboxes**, both on to start, apply to every figure at once: **Judul** (the whole title
+  block, pill included) and **Nilai** (each donut's mean in its middle, in bold, as the cards
+  format it — `7.8` — or "—"; with it off, the hole is empty). Hiding the title makes the figure
+  shorter, and never changes a donut's size; hiding the scores never changes its height.
+  Closing and reopening the dialog keeps the choice; switching tabs or reloading resets it.
+- Figures sit side by side when there is room and stack when there is not; the dialog's body
+  scrolls, and it works at ~360px and in Mode Gelap. Each figure is one self-contained SVG, title
+  block included, so it can be exported as an image.
+- **A figure is as tall as its content** (#522), with no margin above or below: the pill (or, with
+  Judul off, the donuts' rings) touches its top edge and the Aspects' names its bottom, with a small
+  fixed gap between the title block and the donuts. A "Belum ada
+  tanggapan" figure is exactly as tall as a full one with the same title and checkboxes, so two
+  figures side by side line up, and the dialog's loading placeholders take the same shape.
+- **Unduh PNG** (#511) sits under every figure that has responses — a "Belum ada tanggapan" figure
+  has none — and downloads that figure alone. There is no "Unduh semua" and no SVG download.
+  - **What you see is what you get**: the two checkboxes decide what is in the image, exactly as
+    on screen.
+  - **Always light on white**, even in Mode Gelap, so the image sits cleanly on a white report
+    page; the screen keeps its own theme.
+  - **2400 px wide** from a phone or a desktop alike, and as tall as the figure's content at 2×:
+    the figure is laid out 1200 wide and drawn at 2×, with no margin above or below. The left and
+    right margins stay.
+  - **The font is Montserrat where the machine has it installed, else Helvetica or Arial.** An
+    image cannot reach the app's web font, and the fallbacks are narrower, so nothing overflows.
+  - **Named** `grafik-peserta-<scope>-<siswa|gtk-ms>-<today>.png`. The scope is the School and
+    Sesi, slugified as the Ekspor CSV file names are, or `semua` with neither; then the figure's own
+    Tipe Peserta. Example: `grafik-peserta-sman-1-bontang-siswa-2026-10-20.png`. There is no
+    `tersaring`, because figures never follow the score filters.
 
 **Nothing asks them to rate themselves.** Comprehension, Participation and Readiness sit on the
 Class Record precisely because they are judgements about the room, and a room grading its own
@@ -933,6 +1008,11 @@ anyway would produce an invented one.
 - There is no School filter; the Perjadin picker finds a trip by its Schools.
 - As on the Peserta tab, both AND with the score filters, and the five averages follow them — never
   the score filters — with titles naming the trip and the Peran.
+- **`15 tanggapan` sits at the left of the row above the list** (#519), with Ekspor CSV at the
+  right, as on the Peserta tab: every evaluation the trip, the Peran pengisi **and** the six score
+  filters keep, not the cards loaded, unmoved by sorting and "Tampilkan lebih banyak". Plain muted
+  text, not a card, since it is a count and not an average; dimmed while a change loads, and
+  `0 tanggapan` beside the empty-list text.
 
 **Bantuan Pendamping has its own average card and its own filter** on the Perjadin tab (#482), after
 Ketepatan Waktu. As with Hands-on RBL on the Peserta tab, its average is over the rows that have

@@ -316,7 +316,7 @@ describe("the Peserta tab's Sekolah and Sesi", () => {
       // A Tipe Peserta that names nothing, as a forged Server Action call could send (#487).
       { ...NO_PARTICIPANT_FEEDBACK_SCOPE, participantType: "Guru" as FeedbackParticipantType },
     ]) {
-      await expect(page(person, scope)).resolves.toEqual({ rows: [], nextCursor: null });
+      await expect(page(person, scope)).resolves.toEqual({ rows: [], nextCursor: null, total: 0 });
       await expect(participantFeedbackAverages(person, scope)).resolves.toEqual(empty);
     }
   });
@@ -408,7 +408,11 @@ describe("the Perjadin tab's Perjadin and Peran pengisi", () => {
       { perjadinId: randomUUID(), role: null },
       { perjadinId: null, role: "Bendahara" as PerjadinEvaluationRole },
     ]) {
-      await expect(perjadinPage(person, scope)).resolves.toEqual({ rows: [], nextCursor: null });
+      await expect(perjadinPage(person, scope)).resolves.toEqual({
+        rows: [],
+        nextCursor: null,
+        total: 0,
+      });
       await expect(perjadinFeedbackAverages(person, scope)).resolves.toEqual(empty);
     }
   });
