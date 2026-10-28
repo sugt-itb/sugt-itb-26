@@ -234,7 +234,7 @@ What one Participant says about the Class they sat in: a Rating of **Materials**
 _Avoid_: review, survey, evaluation (unqualified), Class Record, Session Record
 
 **Unified Dashboard**:
-The company-wide dashboard **outside this tool** that shows company leadership a summary of this Programme, among others. It reads one machine-to-machine route, `/api/unified-dashboard/summary`, with a short-lived token its backend signs. The route returns aggregate figures only, each the same number the **Dashboard** shows, with a _Lihat Detail_ link per figure back into this tool ([ADR-0057](./docs/adr/0057-the-unified-dashboard-is-a-third-reader.md)). It is a third reader, alongside a signed-in Person and the public site, and it reads no money, no narrative and no name.
+The company-wide dashboard **outside this tool** that shows company leadership a summary of this Programme, among others. It reads one machine-to-machine route, `/api/unified-dashboard/summary`, with a short-lived token its backend signs. The route returns aggregate figures, each the same number the **Dashboard** shows, with a _Lihat Detail_ link per figure back into this tool, plus the School list with each School's Province, which the public site already publishes ([ADR-0057](./docs/adr/0057-the-unified-dashboard-is-a-third-reader.md)). It is a third reader, alongside a signed-in Person and the public site, and it reads no money, no narrative, no person's name and no per-School figure.
 _Avoid_: Dashboard (that is `/`, inside this tool), the aggregates (that is what the public site reads)
 
 **Final Project**:

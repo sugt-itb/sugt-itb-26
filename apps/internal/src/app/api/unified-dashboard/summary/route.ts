@@ -7,12 +7,13 @@ import {
   participantFeedbackFigures,
   perjadinFeedbackFigures,
   programmeDelivery,
+  programmeSchools,
 } from "@sugt/db/queries";
 import { NextResponse } from "next/server";
 
 /**
  * **The Unified Dashboard's summary route** (#503, ADR-0057) — this Programme's summary for company
- * leadership, delivery progress and the two feedback averages (#504), read by the company's
+ * leadership, delivery progress, the two feedback averages (#504) and the School list (#528), read by the company's
  * Unified Dashboard from its backend. Behind an HS256 JWT, not a session and not
  * `AGGREGATES_SECRET`; programme-wide, with no query parameters.
  *
@@ -31,16 +32,18 @@ export async function GET(request: Request) {
   }
 
   // Programme-wide: the feedback figures are read unscoped, as `/feedback` opens (#504).
-  const [delivery, completions, participant, perjadin] = await Promise.all([
+  const [delivery, completions, participant, perjadin, schools] = await Promise.all([
     programmeDelivery(caller),
     assessmentCompletions(caller),
     participantFeedbackFigures(caller, NO_PARTICIPANT_FEEDBACK_SCOPE),
     perjadinFeedbackFigures(caller, NO_PERJADIN_FEEDBACK_SCOPE),
+    programmeSchools(caller),
   ]);
 
   const payload = toSummaryPayload(
     deriveProgress(delivery, completions),
     { participant, perjadin },
+    schools,
     new Date(),
   );
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });

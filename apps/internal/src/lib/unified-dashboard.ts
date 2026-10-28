@@ -3,6 +3,7 @@ import type { ProgrammeProgress } from "-/lib/programme-progress";
 import type {
   ParticipantFeedbackFigures,
   PerjadinFeedbackFigures,
+  ProgrammeSchool,
   UnifiedDashboardCaller,
 } from "@sugt/db/queries";
 import { jwtVerify } from "jose";
@@ -141,6 +142,11 @@ export type SummaryPayload = {
     /** Pendamping Support — asked of Narasumber and Pimpinan filers only (ADR-0054). */
     bantuanPendamping: Average;
   };
+  /**
+   * Every School, ordered by name, with its Province (#528) — reference data the public site already
+   * publishes. Never a per-School figure.
+   */
+  schools: ProgrammeSchool[];
 };
 
 /** The two feedback tables' figures, read programme-wide, that the summary carries. */
@@ -151,8 +157,9 @@ export type FeedbackFigures = {
 
 /**
  * Lay the shared figures out in the contract's shape. **Nothing is computed here** — every progress
- * number is one `deriveProgress` produced for `/` as well, and every average is the one the read
- * behind `/feedback`'s cards rounded — so this only renames, and builds each Lihat Detail link.
+ * number is one `deriveProgress` produced for `/` as well, every average is the one the read
+ * behind `/feedback`'s cards rounded, and the School list passes through as `programmeSchools`
+ * read it — so this only renames, and builds each Lihat Detail link.
  *
  * The links are built from **`BETTER_AUTH_URL`**, this app's own address, never a hard-coded host —
  * so a staging deploy links to staging. Pretest and Posttest point at `/`, whose Pelaksanaan tab has
@@ -162,6 +169,7 @@ export type FeedbackFigures = {
 export function toSummaryPayload(
   progress: ProgrammeProgress,
   feedback: FeedbackFigures,
+  schools: ProgrammeSchool[],
   generatedAt: Date,
 ): SummaryPayload {
   const base = requireEnv("BETTER_AUTH_URL");
@@ -208,5 +216,6 @@ export function toSummaryPayload(
       ketepatanWaktu: perjadin.punctuality,
       bantuanPendamping: perjadin.pendampingSupport,
     },
+    schools,
   };
 }
