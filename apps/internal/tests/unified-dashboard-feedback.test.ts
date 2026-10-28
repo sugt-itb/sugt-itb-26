@@ -91,6 +91,7 @@ describe("the feedback sections", () => {
       "sessions",
       "participantFeedback",
       "perjadinFeedback",
+      "schools",
     ]);
     expect(Object.keys(payload.participantFeedback)).toEqual([
       "detailUrl",

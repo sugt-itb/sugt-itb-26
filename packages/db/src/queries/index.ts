@@ -506,3 +506,4 @@ export {
   type SubClusterSchool,
   type SubClusterWithSchools,
 } from "./sub-clusters";
+export { programmeSchools, type ProgrammeSchool } from "./unified-dashboard";

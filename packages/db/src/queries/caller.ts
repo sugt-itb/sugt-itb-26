@@ -86,8 +86,9 @@ export type ServiceCaller = {
  * reading what anybody may see. This reader is behind the company's own login and reads the
  * aggregate Participant Feedback averages (#504), which ADR-0001 keeps away from the public site. One
  * arm for both would let a query opened to the Unified Dashboard open to the public site too, so it
- * gets its own, and a query it may read names it in its signature. It reads aggregates only: no
- * money, no narrative, no comment and no name.
+ * gets its own, and a query it may read names it in its signature. It reads aggregates, plus the
+ * School list with Provinces the public site already publishes (#528): no money, no narrative, no
+ * comment, no person's name and no per-School figure.
  */
 export type UnifiedDashboardCaller = {
   /** Named so the type is not structurally empty, and so a log line says who called. */
