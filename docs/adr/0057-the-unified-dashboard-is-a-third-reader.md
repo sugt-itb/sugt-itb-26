@@ -5,8 +5,8 @@ company's **Unified Dashboard**, which shows this Programme's summary to company
 ([#503](https://github.com/sugt-itb/sugt-itb-26/issues/503)). It calls one route,
 `GET /api/unified-dashboard/summary`, from its own backend, with a JWT it signs using a secret both
 sides hold. It is not the public site's `ServiceCaller`. It gets its own arm in the `Caller` union,
-`UnifiedDashboardCaller`, and reads aggregates, plus the School list the public site already
-publishes (#528). Settled in a grilling session with the product owner when the ticket was written.
+`UnifiedDashboardCaller`, and reads aggregates only. Settled in a grilling session with the product
+owner when the ticket was written.
 
 ## Why it is not the public site's reader
 
@@ -25,22 +25,15 @@ in its signature**, which is how every other read right in `@sugt/db` is held.
 
 ## What it may read
 
-- **Aggregates.** Programme-wide counts and percentages, each the same number the Dashboard
+- **Aggregates only.** Programme-wide counts and percentages, each the same number the Dashboard
   (`/`) shows, from the same rows and the same derivation, so the two cannot disagree. The figures
   are shared, not reimplemented. The Dashboard's reads were split so that the money-free half,
   `programmeDelivery`, takes either caller, while the budget sum stays behind `monitoringData`,
   which takes a `Person` only.
 - **No money.** The Dashboard's budget figure is not in the payload, and the arm cannot reach the
   query that reads it.
-- **No narrative, no people's names, no per-response rows.** No Story, no Session Record, no
-  comment and no Participant. #504's averages are aggregates in the same sense.
-- **Reference data the public site already publishes** (amended by
-  [#528](https://github.com/sugt-itb/sugt-itb-26/issues/528)). The School list, each School with
-  its Province, is on the public site through `/api/aggregates/scope`, so leadership seeing it leaks
-  nothing ADR-0001 protects. It is read by its own query, `programmeSchools`, which names
-  `UnifiedDashboardCaller`; the public site's `scope` read is not reused or widened, which would
-  join the two readers' rights. **Per-School figures are still out**: no progress, feedback or any
-  other number per School.
+- **No narrative, no names, no per-response rows.** No Story, no Session Record, no comment and no
+  Participant. #504's averages are aggregates in the same sense.
 
 ## How it authenticates
 

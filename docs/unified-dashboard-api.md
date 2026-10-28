@@ -98,19 +98,6 @@ const token = await new SignJWT({})
     "ketepatanWaktu": 8,
     "bantuanPendamping": 9.1,
   },
-  "schools": [
-    {
-      "slug": "man-2-kota-bandung",
-      "name": "MAN 2 Kota Bandung",
-      "province": { "code": "JB", "name": "Jawa Barat" },
-    },
-    {
-      "slug": "sman-1-semarang",
-      "name": "SMAN 1 Semarang",
-      "province": { "code": "JT", "name": "Jawa Tengah" },
-    },
-    // … every School
-  ],
 }
 ```
 
@@ -131,10 +118,6 @@ Schools at all, every count, total and percentage is `0`.
 | `sessions.online`               | `delivered` online Sessions over `total`, which is Schools × 6. Reproduces `progress.daring`.                                                                                       |
 | `sessions.pretest` / `posttest` | Ticked boxes, `completed`, over Schools × 4. Named `completed` rather than `delivered` because a Pretest is not a Session. Reproduces `progress.pretest` / `progress.posttest`.     |
 | `detailUrl` (every one)         | Where **Lihat Detail** goes, built from the internal app's own address, so staging links to staging.                                                                                |
-| `schools`                       | Every School the Programme reaches, flat and ordered by School name. Not grouped by Province. `[]` when there are no Schools. See [The School list](#the-school-list).              |
-| `schools[].slug`                | The School's stable identifier. Use it, not the name, to key a School.                                                                                                              |
-| `schools[].name`                | The School's name.                                                                                                                                                                  |
-| `schools[].province`            | The Province the School sits in: `code` (e.g. `JB`) and `name` (e.g. `Jawa Barat`).                                                                                                 |
 
 A Pretest unit in `kegiatanTerlaksana` counts only when **all four** of a School's Pretest boxes are
 ticked. The `pretest` percentage counts **boxes**. A School with three of four boxes ticked adds 3 to
@@ -169,22 +152,14 @@ A conditional Aspect is averaged over the responses that have it. A GTK Class's 
 RBL, a skipped Lodging and a Pendamping's missing Pendamping Support are left out of their averages.
 None of them counts as a zero.
 
-### The School list
-
-`schools` is reference data the public site already publishes: which Schools the Programme reaches,
-and where. It carries only `slug`, `name` and `province`. Kabupaten/Kota and Cluster are left out.
-It carries **no figures per School**: every number in this payload is programme-wide.
-
-The payload carries **no money**, **no people's names**, **no comments**, **no per-School figures**
-and **no per-Session or per-response rows**. The School list is the one list in it, and it holds
-only the published School and Province names.
+The payload carries **no money**, **no names**, **no comments** and **no per-School, per-Session
+or per-response rows**.
 
 ### Versions
 
 `version` changes only when a field is **removed or retyped**. **Adding a field does not change
 it.** The two feedback sections ([#504](https://github.com/sugt-itb/sugt-itb-26/issues/504))
-arrived as new fields at version 1, and so did `schools`
-([#528](https://github.com/sugt-itb/sugt-itb-26/issues/528)). Therefore:
+arrived as new fields at version 1. Therefore:
 
 - **Refuse a version you do not know** rather than render half a payload.
 - **Ignore fields you do not know.**
@@ -195,7 +170,7 @@ arrived as new fields at version 1, and so did `schools`
 for every Aspect while a section has no responses, when `responseCount` is `0`. It also happens for
 a conditional Aspect whose filers have not rated it yet, for example `handsOnRbl` while only GTK
 and MS Classes have filed. **Render `null` as "—", never as 0.** A `0.0` would read as a real,
-terrible score. No other field is ever `null`: an empty `schools` is `[]`.
+terrible score. No other field is ever `null`.
 
 ## Lihat Detail
 
