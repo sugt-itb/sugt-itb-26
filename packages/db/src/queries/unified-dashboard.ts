@@ -17,8 +17,10 @@ export type ProgrammeSchool = {
  * Province.
  *
  * Reference data the public site already publishes through `scope`, so leadership seeing it leaks
- * nothing ADR-0001 protects. **But it is its own read, naming `UnifiedDashboardCaller` only**: reusing
- * or widening `scope`, which takes `ServiceCaller`, would join the two readers' rights (ADR-0057).
+ * nothing ADR-0001 protects. **But it is its own read, naming `UnifiedDashboardCaller` only**:
+ * reusing or widening `scope`, which takes `ServiceCaller`, would join the two readers' rights
+ * (ADR-0057). The join and order repeat `scope`'s School half on purpose rather than through a
+ * shared helper: the two lists answer different readers, and either may change its fields alone.
  * It carries only the four fields the contract documents — every field added is one that cannot be
  * removed without a version bump — and no per-School figure.
  */

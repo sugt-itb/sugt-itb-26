@@ -331,28 +331,41 @@ describe("the School list (#528)", () => {
     await addProvince("JB", "Jawa Barat");
     await addProvince("JT", "Jawa Tengah");
     const alpha = await addCluster({ slug: "alpha", name: "Cluster Alpha" });
-    // Inserted out of name order, across two Provinces, so neither insertion order nor a Province
-    // grouping could pass for "ordered by name".
+    // Inserted out of name order, across two Provinces, with slugs that sort differently again —
+    // so neither insertion order, a Province grouping nor slug order could pass for "ordered by name".
     await addSchool({
-      slug: "smkn-3",
+      slug: "semarang-smkn-3",
       name: "SMKN 3 Semarang",
       clusterId: alpha.id,
       provinceCode: "JT",
     });
     await addSchool({
-      slug: "sman-1",
+      slug: "bandung-sman-1",
       name: "SMAN 1 Bandung",
       clusterId: alpha.id,
       provinceCode: "JB",
     });
-    await addSchool({ slug: "man-2", name: "MAN 2 Solo", clusterId: alpha.id, provinceCode: "JT" });
+    await addSchool({
+      slug: "solo-man-2",
+      name: "MAN 2 Solo",
+      clusterId: alpha.id,
+      provinceCode: "JT",
+    });
 
     const { schools } = await summary(await sign());
 
     expect(schools).toEqual([
-      { slug: "man-2", name: "MAN 2 Solo", province: { code: "JT", name: "Jawa Tengah" } },
-      { slug: "sman-1", name: "SMAN 1 Bandung", province: { code: "JB", name: "Jawa Barat" } },
-      { slug: "smkn-3", name: "SMKN 3 Semarang", province: { code: "JT", name: "Jawa Tengah" } },
+      { slug: "solo-man-2", name: "MAN 2 Solo", province: { code: "JT", name: "Jawa Tengah" } },
+      {
+        slug: "bandung-sman-1",
+        name: "SMAN 1 Bandung",
+        province: { code: "JB", name: "Jawa Barat" },
+      },
+      {
+        slug: "semarang-smkn-3",
+        name: "SMKN 3 Semarang",
+        province: { code: "JT", name: "Jawa Tengah" },
+      },
     ]);
   });
 

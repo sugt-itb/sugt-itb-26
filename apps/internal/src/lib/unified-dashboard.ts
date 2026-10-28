@@ -143,11 +143,17 @@ export type SummaryPayload = {
     bantuanPendamping: Average;
   };
   /**
-   * Every School, ordered by name, with its Province (#528) — reference data the public site already
-   * publishes. Never a per-School figure.
+   * Every School, ordered by name, with its Province (#528) — reference data the public site
+   * already publishes. Never a per-School figure.
    */
-  schools: ProgrammeSchool[];
+  schools: SummarySchool[];
 };
+
+/**
+ * A School as it travels. Declared here, not borrowed from `ProgrammeSchool`, so the contract is
+ * owned in one place: a field added to the read does not reach the wire until it is mapped below.
+ */
+type SummarySchool = { slug: string; name: string; province: { code: string; name: string } };
 
 /** The two feedback tables' figures, read programme-wide, that the summary carries. */
 export type FeedbackFigures = {
@@ -158,8 +164,8 @@ export type FeedbackFigures = {
 /**
  * Lay the shared figures out in the contract's shape. **Nothing is computed here** — every progress
  * number is one `deriveProgress` produced for `/` as well, every average is the one the read
- * behind `/feedback`'s cards rounded, and the School list passes through as `programmeSchools`
- * read it — so this only renames, and builds each Lihat Detail link.
+ * behind `/feedback`'s cards rounded, and the School list is `programmeSchools`'s, field by
+ * field — so this only renames, and builds each Lihat Detail link.
  *
  * The links are built from **`BETTER_AUTH_URL`**, this app's own address, never a hard-coded host —
  * so a staging deploy links to staging. Pretest and Posttest point at `/`, whose Pelaksanaan tab has
@@ -216,6 +222,10 @@ export function toSummaryPayload(
       ketepatanWaktu: perjadin.punctuality,
       bantuanPendamping: perjadin.pendampingSupport,
     },
-    schools,
+    schools: schools.map(({ slug, name, province }) => ({
+      slug,
+      name,
+      province: { code: province.code, name: province.name },
+    })),
   };
 }

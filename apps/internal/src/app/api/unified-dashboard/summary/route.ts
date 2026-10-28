@@ -13,8 +13,8 @@ import { NextResponse } from "next/server";
 
 /**
  * **The Unified Dashboard's summary route** (#503, ADR-0057) — this Programme's summary for company
- * leadership, delivery progress, the two feedback averages (#504) and the School list (#528), read by the company's
- * Unified Dashboard from its backend. Behind an HS256 JWT, not a session and not
+ * leadership, delivery progress, the two feedback averages (#504) and the School list (#528), read
+ * by the company's Unified Dashboard from its backend. Behind an HS256 JWT, not a session and not
  * `AGGREGATES_SECRET`; programme-wide, with no query parameters.
  *
  * **Fresh on every request (`no-store`).** Every progress figure is the number `/` shows, from the
