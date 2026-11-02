@@ -35,14 +35,8 @@ only because no Perjadin has been filed and the table is empty everywhere; it fa
 rather than guessing a value if that ever stops being true.
 
 The partial `person_email_key` and the four hand-declared
-`better_auth` tables are applied, by migrations `0002` and `0003`. So is
-`session_one_online_per_school_per_day`, by migration `0004`, which
-[#27](https://github.com/mafiefa02/sugt/issues/27) wrote because Jadwalkan Sesi daring is the
-screen that makes it necessary. The claim this list held against that index — _"the new partial
-index actually rejecting a second online Session for one School on one day"_ — was checked
-rather than assumed: `apps/internal/tests/arrange-online-session.test.ts` drives it at the
-database, in both the ways it is partial and in both directions. All three were checked against
-a real Postgres the way the rest of this document was.
+`better_auth` tables are applied, by migrations `0002` and `0003`. Both were checked against a real
+Postgres the way the rest of this document was.
 
 The blocks are ordered for reading, by topic, **not** in dependency order — `session`
 appears before the `perjadin` it references. Migrations need reordering: reference data,
@@ -414,10 +408,6 @@ create table session (
   check (ends_at is null or ends_at > starts_at)
 );
 
-create unique index session_one_online_per_school_per_day
-  on session (school_id, held_on)
-  where perjadin_id is null and status <> 'cancelled';
-
 create unique index session_no_duplicate_offline_per_school
   on session (school_id, held_on, starts_at)
   where status <> 'cancelled' and perjadin_id is not null;
@@ -433,14 +423,12 @@ there is nothing to record. Migration `0032` drops `stream` with `session_stream
 `session_offline_stream_not_null`, discarding the values. Stream survives where it does describe
 something — `group_member`, `assessment_completion`, `story` — just not on `session`.
 
-**The online index keys on `(school_id, held_on)`**
-([ADR-0034](./adr/0034-online-sessions-are-no-longer-single-stream.md), superseding ADR-0022). Online
-Sessions are arranged one at a time, so "the same School twice on the same day" is a mis-click away;
-the index makes the rule the plain one — **one online Session per School per day**, whatever the hour.
-It dropped `stream` from the key when Stream was dropped from online delivery. It stays partial on
-`perjadin_id is null`, so it touches online Sessions only; offline ones are untouched because their
-`perjadin_id` is not null. Partial the usual way besides: cancelled rows accumulate and must not
-collide with their replacements.
+**Online Sessions have no uniqueness index**
+([ADR-0058](./adr/0058-a-school-may-hold-several-online-sessions-on-one-day.md), amending
+[ADR-0034](./adr/0034-online-sessions-are-no-longer-single-stream.md)). A School may hold several on
+one day, even at one exact start time, because it really can. Migration `0055` dropped
+`session_one_online_per_school_per_day`, which had keyed on `(school_id, held_on)`. Nothing stops an
+accidental duplicate: it counts as delivered until the hard delete removes it.
 
 **Two offline-Session indexes were dropped, and a per-trip one replaced them — itself replaced by
 the cross-trip index below since #408

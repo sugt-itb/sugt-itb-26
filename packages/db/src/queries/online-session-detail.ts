@@ -165,12 +165,6 @@ export type UpdateOnlineSessionResult =
   | { outcome: "updated" }
   /** A cancelled Session is a dead row — its fields are settled, so the edit is refused. */
   | { outcome: "cancelled" }
-  /**
-   * The School already has an online Session on this date that still stands (#284: one per day), so
-   * the unique index refuses the edit. The row being edited is excluded automatically — an `UPDATE`
-   * that leaves the keys where they are conflicts with no other row.
-   */
-  | { outcome: "collided"; constraint: "session_one_online_per_school_per_day" }
   /** A blank Siswa or GTK-MS Pengajar name — both required (#318). */
   | { outcome: "pengajar-required" }
   | { outcome: "end-time-required" }
@@ -194,12 +188,8 @@ function wibToday(): string {
  * Offered on an `arranged` **or** `delivered` Session; a `cancelled` one is a dead row and refuses
  * the edit.
  *
- * **Any change to School or date re-checks the unique index**
- * `session_one_online_per_school_per_day` on `(school_id, held_on)` — the same rule
- * `arrangeOnlineSession` and `moveSessionDate` meet — so a School holds at most one still-standing
- * online Session on a date. The index is left to refuse the write rather than pre-read: a pre-read is
- * a race and the index is not. It is caught **by name**, because this row satisfies several CHECKs,
- * and swallowing one as "that date is taken" would report a bug as a user state.
+ * **A date the School already holds a Session on is not a refusal** (#531, ADR-0058): a School may
+ * hold several online Sessions on one day, so a database error here is a bug and simply throws.
  *
  * A missing or **offline** id **throws** rather than returning a value: Detail Sesi daring 404s an
  * unknown id and redirects an offline one before offering any write, so an id that reaches here naming
@@ -227,42 +217,34 @@ export async function updateOnlineSession(
   const today = wibToday();
   if (input.heldOn > today) return { outcome: "future-date", today };
 
-  try {
-    return await db.transaction(async (tx) => {
-      const [row] = await tx
-        .select({ status: session.status, mode: session.mode })
-        .from(session)
-        .where(eq(session.id, sessionId))
-        .for("update");
-      if (!row || row.mode !== "online") {
-        throw new Error(
-          `No online Session has id ${sessionId}. Detail Sesi daring 404s an unknown id and ` +
-            "redirects an offline one before offering a write, so this is a bug or a hand-edited request.",
-        );
-      }
-      if (row.status === "cancelled") return { outcome: "cancelled" };
-
-      await tx
-        .update(session)
-        .set({
-          schoolId: input.schoolId,
-          heldOn: input.heldOn,
-          startsAt: input.startsAt,
-          endsAt: input.endsAt,
-          pengajarSiswaName,
-          pengajarGtkMsName,
-        })
-        .where(eq(session.id, sessionId));
-
-      return { outcome: "updated" };
-    });
-  } catch (error) {
-    const constraint = (error as { cause?: { constraint_name?: string } }).cause?.constraint_name;
-    if (constraint === "session_one_online_per_school_per_day") {
-      return { outcome: "collided", constraint };
+  return await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({ status: session.status, mode: session.mode })
+      .from(session)
+      .where(eq(session.id, sessionId))
+      .for("update");
+    if (!row || row.mode !== "online") {
+      throw new Error(
+        `No online Session has id ${sessionId}. Detail Sesi daring 404s an unknown id and ` +
+          "redirects an offline one before offering a write, so this is a bug or a hand-edited request.",
+      );
     }
-    throw error;
-  }
+    if (row.status === "cancelled") return { outcome: "cancelled" };
+
+    await tx
+      .update(session)
+      .set({
+        schoolId: input.schoolId,
+        heldOn: input.heldOn,
+        startsAt: input.startsAt,
+        endsAt: input.endsAt,
+        pengajarSiswaName,
+        pengajarGtkMsName,
+      })
+      .where(eq(session.id, sessionId));
+
+    return { outcome: "updated" };
+  });
 }
 
 export type DeleteOnlineSessionResult =
