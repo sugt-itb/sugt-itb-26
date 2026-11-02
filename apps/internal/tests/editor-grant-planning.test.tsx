@@ -40,7 +40,7 @@ import {
 /**
  * **Planning a Perjadin needs Perjadin Editor; online Sessions need Daring Editor** (#438, ADR-0047,
  * split by ADR-0052, #469). One block per group of cells:
- * - a Staff member with no Grant, or with only Dashboard Viewer, Dashboard Editor or Keuangan, is
+ * - a Staff member with no Grant, or with only Dashboard Viewer or Dashboard Editor, is
  *   refused by every guarded query (`NotGrantedError`), gets a 403 on the two form pages, and is
  *   shown none of the controls;
  * - a Perjadin Editor plans but records no online Session, and a Daring Editor the reverse;
@@ -83,7 +83,7 @@ async function staffWith(grants: Grant[], email: string): Promise<Person> {
 }
 
 /**
- * Rina (no Grant), Dewi (Dashboard Viewer), Eka (Dashboard Editor), Kiki (Keuangan), Budi (Perjadin
+ * Rina (no Grant), Dewi (Dashboard Viewer), Eka (Dashboard Editor), Budi (Perjadin
  * Editor), Dina (Daring Editor), Sari (Administrator), Pak Hadi (Pimpinan).
  */
 async function people() {
@@ -91,7 +91,6 @@ async function people() {
     rina: await staffWith([], "rina@itb.ac.id"),
     dewi: await staffWith(["Dashboard Viewer"], "dewi@itb.ac.id"),
     eka: await staffWith(["Dashboard Editor"], "eka@itb.ac.id"),
-    kiki: await staffWith(["Keuangan"], "kiki@itb.ac.id"),
     budi: await staffWith(["Perjadin Editor"], "budi@itb.ac.id"),
     dina: await staffWith(["Daring Editor"], "dina@itb.ac.id"),
     sari: await staffWith(["Administrator"], "sari@itb.ac.id"),
@@ -188,11 +187,11 @@ function guarded(caller: Person, where: Awaited<ReturnType<typeof place>>) {
 }
 
 describe("the guarded queries", () => {
-  it("refuse a Staff member with no Grant, or with only Dashboard Viewer, Dashboard Editor or Keuangan, with NotGrantedError", async () => {
-    const { rina, dewi, eka, kiki } = await people();
+  it("refuse a Staff member with no Grant, or with only Dashboard Viewer or Dashboard Editor, with NotGrantedError", async () => {
+    const { rina, dewi, eka } = await people();
     const where = await place();
 
-    for (const caller of [rina, dewi, eka, kiki]) {
+    for (const caller of [rina, dewi, eka]) {
       for (const [name, call] of Object.entries(guarded(caller, where))) {
         expect(isNotGrantedError(await refusalOf(call)), `${caller.email} ${name}`).toBe(true);
       }
@@ -253,20 +252,20 @@ describe("the guarded queries", () => {
 
 describe("the pages", () => {
   it("answer 403 on /perjadin/baru without Perjadin Editor, and on /sesi-daring/baru without Daring Editor", async () => {
-    const { rina, dewi, eka, kiki, budi, dina } = await people();
+    const { rina, dewi, eka, budi, dina } = await people();
 
-    for (const person of [rina, dewi, eka, kiki, dina]) {
+    for (const person of [rina, dewi, eka, dina]) {
       vi.mocked(requirePerson).mockResolvedValue(person);
       await expect(digestOf(PerjadinBaruPage()), person.email).resolves.toBe(FORBIDDEN);
     }
-    for (const person of [rina, dewi, eka, kiki, budi]) {
+    for (const person of [rina, dewi, eka, budi]) {
       vi.mocked(requirePerson).mockResolvedValue(person);
       await expect(digestOf(SesiDaringBaruPage()), person.email).resolves.toBe(FORBIDDEN);
     }
   });
 
   it("show Rencanakan Perjadin, Catat Sesi Daring and the online edit/delete only with the Grant, and read the same for everyone", async () => {
-    const { rina, dewi, eka, kiki, budi, dina, sari, hadi } = await people();
+    const { rina, dewi, eka, budi, dina, sari, hadi } = await people();
     const where = await place();
     await addPerjadin({
       picPersonId: budi.id,
@@ -289,7 +288,6 @@ describe("the pages", () => {
       [rina, false, false],
       [dewi, false, false],
       [eka, false, false],
-      [kiki, false, false],
       [hadi, false, false],
       [budi, true, false],
       [dina, false, true],

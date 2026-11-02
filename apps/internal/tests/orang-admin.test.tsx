@@ -1,6 +1,6 @@
 import { addPersonAction, revokePersonAction } from "-/app/(app)/orang/actions";
 import OrangPage from "-/app/(app)/orang/page";
-import { keepLocked } from "-/components/multi-select-combobox";
+import { keepLocked, MultiSelectCombobox } from "-/components/multi-select-combobox";
 import { GRANT_OPTIONS } from "-/components/orang-roster";
 import { requirePerson } from "-/lib/person";
 import { db, schema } from "@sugt/db";
@@ -41,7 +41,7 @@ async function person(fullName: string, email: string, role: Role, grants: Grant
 async function people() {
   return {
     sari: await person("Sari", "sari@itb.ac.id", "Staff", ["Administrator"]),
-    rina: await person("Rina", "rina@itb.ac.id", "Staff", ["Administrator", "Keuangan"]),
+    rina: await person("Rina", "rina@itb.ac.id", "Staff", ["Administrator", "Daring Editor"]),
     budi: await person("Budi", "budi@itb.ac.id", "Staff"),
     hadi: await person("Pak Hadi", "hadi@itb.ac.id", "Pimpinan"),
   };
@@ -64,7 +64,10 @@ async function digestOf(call: Promise<unknown>) {
 describe("reading /orang", () => {
   it("forbids everyone but an Administrator: plain Staff, a Grant holder and a Pimpinan", async () => {
     const who = await people();
-    const editor = await person("Ed", "ed@itb.ac.id", "Staff", ["Perjadin Editor", "Keuangan"]);
+    const editor = await person("Ed", "ed@itb.ac.id", "Staff", [
+      "Perjadin Editor",
+      "Daring Editor",
+    ]);
 
     for (const viewer of [who.budi, editor, who.hadi]) {
       expect(await digestOf(render(viewer)), viewer.email).toBe(FORBIDDEN);
@@ -109,7 +112,7 @@ describe("reading /orang", () => {
     // Another Administrator's chip can be removed, and only stored Grants are chips.
     expect(chips("Rina")).toEqual([
       ["Administrator", true],
-      ["Keuangan", true],
+      ["Daring Editor", true],
     ]);
   });
 });
@@ -142,10 +145,9 @@ describe("the roster's writes", () => {
 });
 
 describe("the Grant picker's options and lock", () => {
-  it("offers the six Grants in order, each with the line saying what it gates", () => {
+  it("offers the five Grants in order, each with the line saying what it gates", () => {
     expect(GRANT_OPTIONS.map((option) => [option.value, option.description])).toEqual([
       ["Administrator", "semua akses"],
-      ["Keuangan", "tabel dan ekspor semua transaksi"],
       ["Perjadin Editor", "merencanakan dan menulis setiap Perjadin"],
       ["Daring Editor", "Sesi daring dan Pretest"],
       ["Dashboard Editor", "termasuk Dashboard Viewer"],
@@ -153,22 +155,36 @@ describe("the Grant picker's options and lock", () => {
     ]);
   });
 
+  /** Code deploys before migration 0056 (#533), so `/orang` can briefly read a retired Grant's row. */
+  it("renders a stored Grant it no longer offers without a chip, and without failing", () => {
+    const html = renderToStaticMarkup(
+      <MultiSelectCombobox
+        options={GRANT_OPTIONS}
+        value={["Keuangan", "Daring Editor"]}
+        onValueChange={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("Daring Editor");
+    expect(html).not.toContain("Keuangan");
+  });
+
   it("puts back a locked value a change dropped, and leaves every other change alone", () => {
-    const held = ["Administrator", "Keuangan"];
+    const held = ["Administrator", "Daring Editor"];
 
     // A Backspace, or a click on the locked row, drops Administrator: it comes back.
-    expect(keepLocked(["Keuangan"], held, ["Administrator"])).toEqual([
-      "Keuangan",
+    expect(keepLocked(["Daring Editor"], held, ["Administrator"])).toEqual([
+      "Daring Editor",
       "Administrator",
     ]);
     // Removing another chip, or adding one, goes through.
     expect(keepLocked(["Administrator"], held, ["Administrator"])).toEqual(["Administrator"]);
-    expect(keepLocked([...held, "Daring Editor"], held, ["Administrator"])).toEqual([
+    expect(keepLocked([...held, "Perjadin Editor"], held, ["Administrator"])).toEqual([
       ...held,
-      "Daring Editor",
+      "Perjadin Editor",
     ]);
     // Nothing locked, or a locked value never chosen, changes nothing.
-    expect(keepLocked(["Keuangan"], held, [])).toEqual(["Keuangan"]);
+    expect(keepLocked(["Daring Editor"], held, [])).toEqual(["Daring Editor"]);
     expect(keepLocked([], [], ["Administrator"])).toEqual([]);
   });
 });

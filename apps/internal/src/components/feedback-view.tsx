@@ -771,8 +771,7 @@ function PerjadinTab({
 /**
  * **Ekspor CSV** (#490), shared by both tabs: a plain link to the tab's export, carrying its
  * current scope, filters and sort, so the file holds every matching row — not just the pages
- * loaded — in the order on screen. A plain `<a>`, as `/keuangan`'s, since the response is a
- * download.
+ * loaded — in the order on screen. A plain `<a>`, since the response is a download.
  */
 function ExportLink({ href }: { href: string }) {
   return (

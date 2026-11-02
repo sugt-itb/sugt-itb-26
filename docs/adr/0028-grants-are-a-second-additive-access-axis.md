@@ -139,3 +139,9 @@ An Administrator **cannot revoke their own Administrator Grant** (`revokeGrant` 
 access; only another Administrator can, which keeps the bootstrap above a one-off in practice. (Two
 Administrators revoking each other at the same moment could still leave none — the seed then
 restores one.) On `/orang` the Grants are now a searchable multi-select with chips, not checkboxes.
+
+## Amendment (2026-11-03): Keuangan is retired
+
+The Grant set is now five: Administrator, Perjadin Editor, Daring Editor, Dashboard Editor and Dashboard
+Viewer ([ADR-0059](./0059-programme-wide-money-is-not-in-the-app.md), #533). The migration deleted every
+Keuangan row, including the record of who held it.

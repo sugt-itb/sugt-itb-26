@@ -141,8 +141,8 @@ overall" at a glance.
 **Reading it needs a grant.** The Dashboard (`/`) is the overview surface for leadership and
 for the Staff who steer the Programme: a **Pimpinan** reaches it by role, and a **Staff** Person
 by holding **Dashboard Viewer** or **Dashboard Editor** (an **Administrator** implies both). Any
-other Staff Person — a grant-less one, or one holding only **Perjadin Editor**, **Daring Editor** or
-**Keuangan** — is sent to their own landing screen, `/pendamping`, instead — the mirror
+other Staff Person — a grant-less one, or one holding only **Perjadin Editor** or **Daring Editor** —
+is sent to their own landing screen, `/pendamping`, instead — the mirror
 of the redirect a Pimpinan gets from `/pendamping`. See
 [ADR-0037](./adr/0037-dashboard-read-is-gated-by-a-grant.md).
 
@@ -850,7 +850,7 @@ pengetahuan"** and **"Saran dan masukan"**, clamped like the comments ("selengka
   matrix and the planning note give it. An online Session's time is in WIB. Picking another School resets it to "Semua Sesi".
 - **Tipe Peserta** reads "Semua Tipe Peserta", then **Siswa** or **GTK-MS**: Siswa keeps the
   Student Class's responses, GTK-MS the GTK and MS Classes' together — the same split as the Daftar
-  Hadir Peserta sheets and `/keuangan`. A Participant still picks GTK, MS or Siswa on the form.
+  Hadir Peserta sheets. A Participant still picks GTK, MS or Siswa on the form.
   Picking a School leaves it as it is.
 - **Each response card carries the same line**, linking to the Session.
 - All three AND with each other and with the score filters, each change goes back to the first
@@ -1030,16 +1030,17 @@ the page. It downloads that tab's own file:
 
 - **Every row the tab's choices match**, across all pages, not just those loaded: the scope (Sekolah,
   Sesi and Tipe Peserta; Perjadin and Peran pengisi) and every score filter. Rows come **in the
-  tab's current sort**, lowest average first by default, so the file reads as the screen does —
-  unlike `/keuangan`, which always exports oldest first.
+  tab's current sort**, lowest average first by default, so the file reads as the screen does.
 - **Peserta:** Tanggal (the day it was filed), Sekolah, Sesi (the card's line), Tipe Peserta (GTK, MS
   or Siswa), Nama, then Materi, Narasumber, Relevansi and Hands-on RBL each with its Komentar, the two
   written answers, and Rata-rata. **Perjadin:** Tanggal, Perjadin (its name), Peran, Nama, then
   Penginapan, Transportasi, Konsumsi, Ketepatan Waktu and Bantuan Pendamping each with its Komentar,
   and Rata-rata.
 - **A Rating that was not given is an empty cell, never 0**; Rata-rata is the row's average over the
-  Ratings present, to one decimal, as on its card. The file is written as `/keuangan`'s is — a BOM,
-  every field quoted — so comments with commas, quotes or line breaks open intact in Excel.
+  Ratings present, to one decimal, as on its card. The file is written as the Laporan's is — a BOM,
+  every field quoted — so comments with commas, quotes or line breaks open intact in Excel. A text
+  cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'`, so a spreadsheet
+  shows it as text rather than running it.
 - Named `feedback-peserta-<filter>-<today>.csv` or `feedback-perjadin-<filter>-<today>.csv`: what the
   scope covers, then `tersaring` when a score filter is on, or `semua` with neither.
 - The screen keeps its choices in the browser, so the button's link carries them as query
@@ -1141,9 +1142,8 @@ says only an Administrator reads the roster, adds people and deactivates them.
   gets a 403, and nothing is written.
 - **An Administrator cannot Nonaktifkan themselves**: their own row has no button, and the write
   refuses it. Deactivating another Administrator is allowed.
-- **Akses** is a column of Grants. Each active Staff row has a searchable multi-select of the six
-  Grants, held ones as chips; adding or removing a chip assigns or revokes at once. Each option carries a line saying what it gates — Administrator "semua akses", Keuangan
-  "tabel dan ekspor semua transaksi", Perjadin Editor "merencanakan dan menulis setiap Perjadin", Daring Editor "Sesi
+- **Akses** is a column of Grants. Each active Staff row has a searchable multi-select of the five
+  Grants, held ones as chips; adding or removing a chip assigns or revokes at once. Each option carries a line saying what it gates — Administrator "semua akses", Perjadin Editor "merencanakan dan menulis setiap Perjadin", Daring Editor "Sesi
   daring dan Pretest", Dashboard Editor "termasuk Dashboard Viewer", Dashboard Viewer "membaca
   Dashboard". Only Grants actually held are chips: choosing Dashboard Editor shows Dashboard Editor
   alone. A Pimpinan or deactivated row shows "—".
@@ -1300,33 +1300,6 @@ A table, newest first, 50 rows a page:
 They combine, and **all of them are in the URL**, with the page number, so a view can be bookmarked.
 Below the table are the number of entries that match and the page links. The page does not update
 itself: new entries appear on the next load or filter change.
-
-### Keuangan — every transaction, for finance
-
-`/keuangan` (#472, [ADR-0053](./adr/0053-the-programme-wide-transaction-table-is-keuangan-only.md))
-is one table of every money transaction across every Perjadin. **Only a Keuangan holder or an
-Administrator opens it**; anyone else, a Pimpinan included, gets the 403 from the page and from the
-export, and has no **Keuangan** link. The link sits after Pendamping and before Perjadin, and keeps that
-place when Pendamping moves to the top. Each Perjadin's own Laporan stays open to everyone signed in.
-
-- **Filters**, all optional and ANDed: a searchable **Perjadin** picker ("Semua Perjadin"), listing only
-  trips with transactions, earliest first; and **Dari / Sampai** on the Perjadin's **start date**, both
-  ends inclusive, either end open. A Dari after Sampai applies neither date and says so.
-- **Columns**: Tanggal Transaksi, Kategori, Keterangan, Perjadin (its name, linking to its Laporan),
-  Tipe Peserta, Jumlah (Rp), and Link Bukti 1–5 — "Buka ↗" to each receipt in Drive, in upload order,
-  blank past the last. A line whose receipts are not yet in place carries "belum tersinkron".
-- **Sort**: newest Tanggal Transaksi first. Every column but the receipts sorts both ways; a new column
-  starts descending and a second click flips it. Ties break by entry time, then id, so a row never moves
-  between pages.
-- **50 a page**, Sebelumnya / Berikutnya. Above the table, "123 transaksi · Rp45.600.000" counts and
-  totals the whole filtered set, not the page. The filter, sort and page are all in the URL.
-- **Ekspor CSV** downloads every row of the current filter, oldest first whatever the page's sort, as
-  `keuangan-<filter>-<today>.csv`: Tanggal Transaksi, Kategori, Keterangan, Tipe Peserta, Jumlah (Rp)
-  as plain digits, and Link Bukti 1–5 as full Drive URLs. There is no Perjadin column and no total row.
-  It is written as the Laporan export is — a BOM, every field quoted — and both now prefix a `'` to any
-  text that starts like a spreadsheet formula.
-- **On a phone** the filters stack and the table scrolls sideways inside its own box; the page itself
-  does not.
 
 ### Pengaturan Perjadin — the Preparation Checklist
 

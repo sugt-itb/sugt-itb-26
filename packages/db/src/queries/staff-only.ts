@@ -15,9 +15,7 @@ import type { Executor } from "./preparation-checklist";
  *
  * **What passes through here is writes, not money reads.** Money READS are now open to any
  * signed-in Person — a Pimpinan reads all money (the acquittal, the CSV export, the trip money
- * strip), so `perjadinAcquittal` no longer opens with this guard. The
- * one money read gated again is `/keuangan`'s programme-wide table (ADR-0053), and by a Grant through
- * `requireGrant` below, not by this Staff line.
+ * strip), so `perjadinAcquittal` no longer opens with this guard.
  * What this choke point guards is money **WRITES** — recording, attaching and deleting a
  * transaction or a receipt — and delivery-*arranging* writes: Jadwalkan Sesi daring
  * and Rencanakan Perjadin are Staff-only because [#9](https://github.com/mafiefa02/sugt/issues/9)
@@ -217,7 +215,7 @@ export function requireGrant(person: Person, grant: Grant): void {
  *   (ADR-0025).
  * - **A `Staff` reads it by holding `Dashboard Viewer`**. `hasGrant` folds in that Administrator
  *   and Dashboard Editor both satisfy it (ADR-0052), so this one call covers all three. Perjadin
- *   Editor, Daring Editor and Keuangan do not.
+ *   Editor and Daring Editor do not.
  *
  * A grant-less Staff Person falls through to `false` and is redirected to `/pendamping` — the mirror
  * of the `/pendamping → /` redirect a Pimpinan gets. This is the documented exception to "reading is
