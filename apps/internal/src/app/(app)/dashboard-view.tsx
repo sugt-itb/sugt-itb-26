@@ -27,8 +27,8 @@ import type { PivotTable, ProgressSummary } from "./dashboard-derive";
  *
  * The tab reads, top to bottom (#313): the Kegiatan terlaksana card, a row of four progress summary
  * cards, the two pivoted delivery tables, then the two assessment tables — every one a Klaster-row
- * `"X/Y"` pivot. It shows no money (#532, ADR-0059). The Peringatan section that once lived here has moved to
- * `DashboardWarnings`, rendered above the tabs so it shows on both (#235); this view is
+ * `"X/Y"` pivot. It shows no money (#532, ADR-0059). The Peringatan section that once lived here has
+ * moved to `DashboardWarnings`, rendered above the tabs so it shows on both (#235); this view is
  * warnings-free now.
  */
 export function DashboardView({

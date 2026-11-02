@@ -2503,7 +2503,7 @@ argument applies one layer up.
 ([ADR-0057](./adr/0057-the-unified-dashboard-is-a-third-reader.md)). `ServiceCaller` means the
 public site, and the Unified Dashboard reads for company leadership, behind its own login. One arm
 for both would open to the public site whatever is opened to leadership. It reads
-`programmeDelivery` and `assessmentCompletions`, the money-free half of what `/` reads, and
+`programmeDelivery` and `assessmentCompletions`, the same rows `/` reads, and
 `participantFeedbackFigures` and `perjadinFeedbackFigures`, the read behind `/feedback`'s average
 cards (#504). Nothing it reads returns money, a comment, a name or a row.
 

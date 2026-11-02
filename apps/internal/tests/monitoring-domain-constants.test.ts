@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 /**
  * **The programme facts `/monitoring` will be wired against** (#195). These are constants, not
  * behaviour, but they are load-bearing: the offline count feeds every "delivered / N" denominator
- * app-wide, and the budget + Luring windows are what #196's queries consume. Pinning them here means
+ * app-wide, and the Luring windows are what #196's queries consume. Pinning them here means
  * flipping offline back to four, or nudging a window date, fails a test rather than silently shifting
  * every readout.
  */

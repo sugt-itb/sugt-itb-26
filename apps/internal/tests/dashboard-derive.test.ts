@@ -281,8 +281,6 @@ describe("deriveDashboard", () => {
     expect(derived.daring.rows).toHaveLength(CLUSTERS.length);
     // 2 delivered units (no assessment units) of 3 Schools × 10 = 30 possible → 6.67 rounds to 7%.
     expect(derived.activitiesPercent).toBe(7);
-    // No programme-wide money on the Dashboard (#532, ADR-0059).
-    expect(derived).not.toHaveProperty("budget");
     // Summary percentages: no completions → 0% pretest and posttest; 1 delivered online of 18 → 6%,
     // 1 delivered offline of 6 → 17%.
     expect(derived.summary).toEqual({ pretest: 0, daring: 6, luring: 17, posttest: 0 });

@@ -316,8 +316,10 @@ describe("the Dashboard's tabs", () => {
       expect(html, reader.role).toContain("Kegiatan Terlaksana");
       expect(html, reader.role).not.toMatch(/anggaran/i);
       expect(html, reader.role).not.toContain("Rp");
-      const beforeTheCard = html.slice(0, html.indexOf("Kegiatan Terlaksana"));
-      expect(beforeTheCard, reader.role).not.toContain("md:grid-cols-2");
+      // The card sits directly in the tab's column, with no grid around it to give it half a row.
+      expect(html, reader.role).toMatch(
+        /px-4 py-6 sm:px-7"><div data-slot="card"[^>]*><div data-slot="card-header"[^>]*><div data-slot="card-description"[^>]*>Kegiatan Terlaksana/,
+      );
     }
   });
 

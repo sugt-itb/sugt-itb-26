@@ -35,8 +35,8 @@ export const metadata: Metadata = { title: "Dashboard" };
  * redirected to `/pendamping`, the mirror of the `/pendamping → /` Pimpinan redirect. The predicate
  * is `canViewDashboard`, shared with the sidebar so a link is shown exactly when the page renders.
  *
- * The server's decision is today's date. `today` is the **WIB** calendar date — the Programme's zone, the one Session times are
- * stored in — not UTC: an overdue warning or a completed step turns over at local midnight, and a
+ * The server's decision is today's date. `today` is the **WIB** calendar date — the Programme's zone,
+ * the one Session times are stored in — not UTC: an overdue warning or a completed step turns over at local midnight, and a
  * UTC date would flip it up to seven hours early against `LURING_SESI_WINDOWS`, which are WIB dates.
  *
  * **Persiapan Luring** (#423) reads the week `?minggu=` names, or today's week (a Sunday's being the

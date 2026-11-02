@@ -1,6 +1,6 @@
 # Programme-wide money is not in the app
 
-The internal app no longer has a programme-wide money view, and that is intended. The **Penyerapan
+The internal app is to have no programme-wide money view, and that is intended. The **Penyerapan
 Anggaran** card leaves the Dashboard
 ([#532](https://github.com/sugt-itb/sugt-itb-26/issues/532)), and `/keuangan` and the **Keuangan**
 Grant go with it ([#533](https://github.com/sugt-itb/sugt-itb-26/issues/533)). This narrows the app's
@@ -21,5 +21,8 @@ Finance reconciles and reports outside the app, so programme-wide money views du
 - **Each Perjadin's money is untouched.** The trip page, its Laporan and CSV, and the `/pendamping` card
   still show **Uang Perjalanan Terpakai**, and [ADR-0026](./0026-money-is-open-to-read-and-staff-only-to-write.md)'s
   read and write rules still govern them.
+- **One of ADR-0026's reasons is gone.** It justified open money reads partly by leadership watching
+  budget spend on the Dashboard. A Pimpinan no longer has that view, but still reads every Perjadin's
+  money, so its read and write rules do not change.
 - **Transactions are still recorded.** Only the programme-wide views of them go.
 - **Until #533 lands, `/keuangan` still exists.** The two tickets ship separately, this one first.
