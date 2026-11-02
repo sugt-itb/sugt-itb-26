@@ -1,5 +1,5 @@
 /**
- * **The pieces the app's lenient URL parsers share** — `/log`, `/keuangan` and Pengaturan Perjadin's
+ * **The pieces the app's lenient URL parsers share** — `/log`, `/feedback` and Pengaturan Perjadin's
  * level. Each parser drops anything malformed rather than refusing it; these say what malformed is.
  */
 

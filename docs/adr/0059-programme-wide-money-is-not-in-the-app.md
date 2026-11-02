@@ -1,6 +1,6 @@
 # Programme-wide money is not in the app
 
-The internal app is to have no programme-wide money view, and that is intended. The **Penyerapan
+The internal app has no programme-wide money view, and that is intended. The **Penyerapan
 Anggaran** card leaves the Dashboard
 ([#532](https://github.com/sugt-itb/sugt-itb-26/issues/532)), and `/keuangan` and the **Keuangan**
 Grant go with it ([#533](https://github.com/sugt-itb/sugt-itb-26/issues/533)). This narrows the app's
@@ -25,4 +25,6 @@ Finance reconciles and reports outside the app, so programme-wide money views du
   budget spend on the Dashboard. A Pimpinan no longer has that view, but still reads every Perjadin's
   money, so its read and write rules do not change.
 - **Transactions are still recorded.** Only the programme-wide views of them go.
-- **Until #533 lands, `/keuangan` still exists.** The two tickets ship separately, this one first.
+- **The Keuangan Grant is gone, and so is the record of who held it.** `/keuangan` was all it unlocked.
+  Someone who held only this Grant becomes grant-less Staff and lands on `/pendamping`. `/keuangan` and
+  `/keuangan/ekspor` show the normal 404, with no redirect, and git history is the way back.

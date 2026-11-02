@@ -127,7 +127,7 @@ describe("assigning and revoking Grants", () => {
       role: "Pimpinan",
     });
 
-    await expect(assignGrant(admin, pimpinan.id, "Keuangan")).resolves.toEqual({
+    await expect(assignGrant(admin, pimpinan.id, "Daring Editor")).resolves.toEqual({
       outcome: "not-staff-target",
     });
     await expect(personGrants(admin, pimpinan.id)).resolves.toEqual([]);
@@ -184,16 +184,21 @@ describe("assigning and revoking Grants", () => {
 
   it("refuses an Administrator revoking their own Administrator Grant, and nothing else of theirs (#470)", async () => {
     const admin = await anAdministrator();
-    await assignGrant(admin, admin.id, "Keuangan");
+    await assignGrant(admin, admin.id, "Daring Editor");
     const other = await resolved("Staff", "sari@ditsama.itb.ac.id", ["Administrator"]);
 
     await expect(revokeGrant(admin, admin.id, "Administrator")).resolves.toEqual({
       outcome: "own-administrator",
     });
-    await expect(personGrants(admin, admin.id)).resolves.toEqual(["Administrator", "Keuangan"]);
+    await expect(personGrants(admin, admin.id)).resolves.toEqual([
+      "Administrator",
+      "Daring Editor",
+    ]);
 
     // Another Grant of their own, and another Administrator's Administrator, are theirs to revoke.
-    await expect(revokeGrant(admin, admin.id, "Keuangan")).resolves.toEqual({ outcome: "revoked" });
+    await expect(revokeGrant(admin, admin.id, "Daring Editor")).resolves.toEqual({
+      outcome: "revoked",
+    });
     await expect(revokeGrant(admin, other.id, "Administrator")).resolves.toEqual({
       outcome: "revoked",
     });

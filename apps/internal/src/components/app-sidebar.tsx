@@ -28,14 +28,12 @@ function isActive(pathname: string, href: string) {
 function AppSidebarNav({
   role,
   canEditDaring,
-  canViewKeuangan,
   canViewDashboard,
   canAdminister,
   driveNeedsAttention,
 }: {
   role: Role;
   canEditDaring: boolean;
-  canViewKeuangan: boolean;
   canViewDashboard: boolean;
   canAdminister: boolean;
   driveNeedsAttention: boolean;
@@ -44,7 +42,6 @@ function AppSidebarNav({
   const visible = sidebarItems({
     role,
     canEditDaring,
-    canViewKeuangan,
     canViewDashboard,
     canAdminister,
     driveNeedsAttention,

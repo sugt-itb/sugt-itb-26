@@ -1,5 +1,8 @@
 # The programme-wide transaction table is Keuangan only
 
+> **Superseded by [ADR-0059](./0059-programme-wide-money-is-not-in-the-app.md).** `/keuangan` and the
+> Keuangan Grant are gone (#533). The shared CSV writer's formula guard, decided here, stays.
+
 `/keuangan` ([#472](https://github.com/sugt-itb/sugt-itb-26/issues/472)) lists every money
 Transaction across every Perjadin in one table, with filters, sorting and a CSV export. It is readable
 only by a Staff Person holding the **Keuangan** Grant or **Administrator**

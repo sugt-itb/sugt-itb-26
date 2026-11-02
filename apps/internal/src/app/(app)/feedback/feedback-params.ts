@@ -12,11 +12,10 @@ import { PERJADIN_EVALUATION_ROLES, type PerjadinEvaluationRole } from "@sugt/do
 
 /**
  * **The `/feedback` export's query string** (#490). The screen keeps its choices in the browser,
- * not in its URL, so each tab's **Ekspor CSV** link carries them to a plain GET download, the way
- * `/keuangan`'s export reads its filter from query parameters. One module builds the link and
- * parses it, so the two cannot drift.
+ * not in its URL, so each tab's **Ekspor CSV** link carries them to a plain GET download. One module
+ * builds the link and parses it, so the two cannot drift.
  *
- * **Lenient, like every parser here** (`/keuangan`, `/log`): a missing or malformed value is the
+ * **Lenient, like every parser here** (`/log`): a missing or malformed value is the
  * default — no scope, a filter off, the default sort — rather than an error. Only what differs from
  * the default is written.
  *

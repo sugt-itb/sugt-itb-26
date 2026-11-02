@@ -373,7 +373,7 @@ describe("Preparation Card writes are Dashboard Editor-guarded", () => {
     expect(isNotGrantedError(refusal)).toBe(true);
   });
 
-  it.each(["Dashboard Viewer", "Perjadin Editor", "Daring Editor", "Keuangan"] as const)(
+  it.each(["Dashboard Viewer", "Perjadin Editor", "Daring Editor"] as const)(
     "refuses a Staff Person holding only %s — reading the Dashboard is not writing it (ADR-0052)",
     async (grant) => {
       const refusal = await createPreparationCard(caller([grant]), A_CARD).catch(

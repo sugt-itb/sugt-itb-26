@@ -2,6 +2,8 @@ import type { PerjadinAcquittal } from "@sugt/db/queries";
 import { describe, expect, it } from "vitest";
 
 import { csvOf } from "../src/app/(app)/perjadin/[id]/laporan/ekspor/csv";
+import { csvDocument } from "../src/lib/csv";
+import { parseCsv } from "./support/csv";
 
 /**
  * **The acquittal export, tested with no database and no HTTP.**
@@ -111,5 +113,36 @@ describe("the acquittal CSV", () => {
     expect(csv).not.toContain('"Terpakai"');
     expect(csv).not.toContain("Diterima");
     expect(csv).not.toContain("Sisa");
+  });
+});
+
+/** The app's one CSV writer guards what a spreadsheet would run (ADR-0053's decision, kept by ADR-0059). */
+describe("the shared writer's formula guard", () => {
+  const RISKY = ["=1+1", "+62 812", "-5 diskon", "@SUM(A1)", "\tTab", "\rCR"];
+
+  it("guards a Keterangan that starts like a formula", () => {
+    const csv = csvOf(
+      acquittal({
+        transactions: RISKY.map((description, index) => ({
+          id: String(index),
+          spentOn: "2026-10-12",
+          description,
+          amountIdr: 1_000,
+          category: "Konsumsi",
+          participantType: "Siswa",
+          driveFolderId: null,
+          driveSyncedAt: null,
+          evidence: [],
+        })),
+      } as Partial<PerjadinAcquittal>),
+    );
+
+    for (const text of RISKY) expect(csv).toContain(`"'${text}"`);
+  });
+
+  it("leaves numbers and ordinary text alone", () => {
+    expect(parseCsv(csvDocument([[-5, 1_000, "2026-10-12", "Hotel", "a=b"]]))).toEqual([
+      ["-5", "1000", "2026-10-12", "Hotel", "a=b"],
+    ]);
   });
 });

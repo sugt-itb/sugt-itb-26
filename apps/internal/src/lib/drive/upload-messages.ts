@@ -39,8 +39,7 @@ export function driveRefusalText(result: DriveRefusal): string {
 export const STALE_PAGE = "Halaman ini sudah tidak sesuai. Muat ulang untuk melihat keadaannya.";
 
 /**
- * The tooltip on a transaction whose receipts the reconcile has not put in place yet — on the Laporan
- * and on `/keuangan` (#472) alike.
+ * The tooltip on a transaction whose receipts the reconcile has not put in place yet, on the Laporan.
  */
 export const RECEIPTS_UNSYNCED_TOOLTIP =
   "Bukti belum tersinkron ke Google Drive — Administrator dapat menyelesaikannya lewat Periksa koneksi.";

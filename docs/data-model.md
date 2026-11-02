@@ -211,12 +211,15 @@ historical reference to that person.
 
 **Grants live in `person_grant`, a second access axis** ([ADR-0028](./adr/0028-grants-are-a-second-additive-access-axis.md)):
 a row is a capability a Staff Person holds, its `grant` column CHECKed against the closed set
-`in ('Administrator', 'Keuangan', 'Perjadin Editor', 'Daring Editor', 'Dashboard Editor', 'Dashboard Viewer')`,
+`in ('Administrator', 'Perjadin Editor', 'Daring Editor', 'Dashboard Editor', 'Dashboard Viewer')`,
 character-for-character `GRANTS` in `@sugt/domain`. Migration `0051`
 ([#469](https://github.com/sugt-itb/sugt-itb-26/issues/469),
 [ADR-0052](./adr/0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md)) split `'Editor'`
-into the three Editors, giving every Editor all three, and added `'Keuangan'`, by the drop-and-re-add
-CHECK pattern `0018`/`0025`/`0031` use with the rows moved between the drop and the add. No Grant
+into the three Editors, giving every Editor all three, by the drop-and-re-add CHECK pattern
+`0018`/`0025`/`0031` use with the rows moved between the drop and the add. Migration `0056`
+([#533](https://github.com/sugt-itb/sugt-itb-26/issues/533),
+[ADR-0059](./adr/0059-programme-wide-money-is-not-in-the-app.md)) retired `'Keuangan'` the same way,
+deleting its rows and with them the record of who held it. No Grant
 implies another except `Administrator` (all of them) and `Dashboard Editor` (`Dashboard Viewer`), a
 rule `hasGrant` holds, not the database. The
 `Dashboard Viewer` grant is what [#322](https://github.com/sugt-itb/sugt-itb-26/issues/322)/[ADR-0037](./adr/0037-dashboard-read-is-gated-by-a-grant.md)

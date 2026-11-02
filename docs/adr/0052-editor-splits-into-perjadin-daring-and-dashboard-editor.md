@@ -66,3 +66,9 @@ programme-wide transaction table and its CSV export, and its sidebar link
 ([ADR-0053](./0053-the-programme-wide-transaction-table-is-keuangan-only.md),
 [#472](https://github.com/sugt-itb/sugt-itb-26/issues/472)). Administrator still implies it, and it
 still does not read `/`.
+
+## Amendment (2026-11-03): Keuangan is retired
+
+The Keuangan row above no longer applies, and five Grants exist. `/keuangan`, the only thing it unlocked,
+is gone ([ADR-0059](./0059-programme-wide-money-is-not-in-the-app.md),
+[#533](https://github.com/sugt-itb/sugt-itb-26/issues/533)).

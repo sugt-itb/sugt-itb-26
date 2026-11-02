@@ -104,3 +104,9 @@ open to everyone signed in.
 
 The `/monitoring` budget card is gone, so a Pimpinan no longer reads a programme-wide figure there
 ([ADR-0059](./0059-programme-wide-money-is-not-in-the-app.md), #532). The read/write split is unchanged.
+
+## Amendment (2026-11-03): `/keuangan` is gone
+
+`/keuangan` and its Grant are gone ([ADR-0059](./0059-programme-wide-money-is-not-in-the-app.md), #533), so no
+money read is gated by a Grant. What remains to read is each Perjadin's own money, open to everyone
+signed in.
