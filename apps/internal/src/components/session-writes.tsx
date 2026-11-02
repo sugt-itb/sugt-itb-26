@@ -240,9 +240,7 @@ function MoveDate({ session }: { session: SessionDetail }) {
       }
       if (result.outcome === "collided") {
         setRefusal(
-          result.constraint === "session_one_online_per_school_per_day"
-            ? "Sekolah ini sudah punya Sesi daring pada tanggal tersebut."
-            : "Sekolah ini sudah punya Sesi luring pada tanggal dan jam tersebut di Perjadin ini.",
+          "Sekolah ini sudah punya Sesi luring pada tanggal dan jam tersebut di Perjadin ini.",
         );
       } else if (result.outcome === "school-booked-on-another-perjadin") {
         setRefusal(<SchoolBookedElsewhere refusal={result} />);

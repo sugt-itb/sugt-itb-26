@@ -25,27 +25,6 @@ import { school } from "./reference";
 import { perjadin, perjadinTeacher } from "./travel";
 
 /**
- * Which rows `session_one_online_per_school_per_day` covers: an online Session that has
- * not been cancelled.
- *
- * **Exported because a second place has to say the same thing, character for character.**
- * `arrangeOnlineSession` names this index as its `on conflict` arbiter and has to repeat
- * the predicate to do so — and Postgres refuses to infer an index whose predicate does not
- * match, which fails at runtime rather than at typecheck. Two copies of it are two chances
- * to find that out in production.
- *
- * Column names are unqualified deliberately. A `create index … where` clause may not carry
- * a qualified reference, so the form that works in the index is the form that has to be
- * shared.
- *
- * `./index.ts` re-exports this file with `export *`, so this is on the public
- * `@sugt/db/schema` surface rather than schema-internal. That is intended — the query
- * layer is its one consumer and is a separate subpath — but it does mean the fragment is
- * as public as the table it belongs to.
- */
-export const ONLINE_SESSION_STILL_STANDS = sql`perjadin_id is null and status <> 'cancelled'`;
-
-/**
  * Delivery: Sessions, and the free-text names of who taught them.
  *
  * A Session exists only once **arranged** — never before — so there are no planned
@@ -137,22 +116,6 @@ export const session = pgTable(
       "session_ends_after_starts_check",
       sql`${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`,
     ),
-    // The gap the online index below cannot close. It keys on `perjadin_id`, which is NULL for
-    // every online Session, and Postgres treats NULLs in a unique index as distinct — so
-    // nothing stopped two online Sessions for one School on one day. Jadwalkan Sesi
-    // daring arranges them from Coverage in a batch, one date across a multi-selection,
-    // which moves that from theoretical to one mis-click away.
-    //
-    // **Keyed on `(school_id, held_on)` only (#284, superseding ADR-0022):** online Sessions are no
-    // longer single-Stream, so the rule is the plain one — **one online Session per School per day**,
-    // whatever else. It dropped `stream` from the key when Stream was dropped from online delivery.
-    //
-    // Partial in both the ways it always was, and for the same two reasons:
-    // cancelled rows accumulate and must not collide with the Session that replaced
-    // them, and offline Sessions are untouched because their `perjadin_id` is not null.
-    uniqueIndex("session_one_online_per_school_per_day")
-      .on(t.schoolId, t.heldOn)
-      .where(ONLINE_SESSION_STILL_STANDS),
     // **One live offline Session per School per moment, across every Perjadin (#408, ADR-0043;
     // #342, ADR-0038).** A School's participants are still too many for one room, so a period still
     // splits into parallel rooms — but those rooms are recorded as **one** Session whose Teaching

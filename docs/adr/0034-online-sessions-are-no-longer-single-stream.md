@@ -6,6 +6,10 @@ is now **required for offline only** — an online row leaves it null — and th
 **one online Session per School per day**, whatever else. Stream (STEM/Research) is unchanged for
 **offline** Sessions.
 
+> **Amended.** The uniqueness rule is gone: a School may hold several online Sessions on one day. See
+> [ADR-0058](./0058-a-school-may-hold-several-online-sessions-on-one-day.md). The rest of this ADR
+> stands.
+
 This **supersedes the single-Stream half of [ADR-0022](./0022-online-sessions-carry-a-stream-and-name-teachers-as-session-scoped-names.md)**.
 The session-scoped free-text `session_teacher_name` teachers that ADR-0022 also introduced are
 unaffected and stay.

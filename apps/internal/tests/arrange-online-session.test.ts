@@ -5,7 +5,7 @@ import {
   arrangeOnlineSessionForm,
   isNotStaffError,
 } from "@sugt/db/queries";
-import type { Role } from "@sugt/domain";
+import { rankBySchool, type Role } from "@sugt/domain";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -25,10 +25,9 @@ import {
  * write is the substance: exactly one Session, `mode: 'online'`, **`status: 'delivered'`**, its own
  * date, start and end time, and **two cohort-named Pengajar** — one Siswa professor and one GTK-MS
  * professor, one name each, both required — as columns on the row (no side table). **No PIC and no
- * Stream (#284):** a third-party LMS runs online delivery. A collision on
- * `session_one_online_per_school_per_day` comes back as a value; the index keys on `(school_id,
- * held_on)`, so it is **one online Session per School per day** whatever the hour. A future date is
- * refused — an online Session is logged after it happened.
+ * Stream (#284):** a third-party LMS runs online delivery. **A School may hold several on one day,
+ * even at one start time (#531, ADR-0058)**; an accidental duplicate is corrected by hard delete. A
+ * future date is refused — an online Session is logged after it happened.
  */
 
 /**
@@ -83,6 +82,7 @@ async function sessionsAt(schoolId: string) {
   return db
     .select({
       id: schema.session.id,
+      schoolId: schema.session.schoolId,
       mode: schema.session.mode,
       heldOn: schema.session.heldOn,
       startsAt: schema.session.startsAt,
@@ -213,7 +213,7 @@ describe("arrangeOnlineSession", () => {
     expect(refusal).toBe("session_online_pengajar_not_null");
   });
 
-  it("refuses a second online Session on the same day, whatever the hour (#284: one per day)", async () => {
+  it("records a second online Session on the same day at a different hour (#531)", async () => {
     const staff = await staffCaller();
     const school = await oneSchool();
     await addSession({ schoolId: school.id, heldOn: PAST, startsAt: "09:00" });
@@ -223,9 +223,45 @@ describe("arrangeOnlineSession", () => {
       payload(school.id, { heldOn: PAST, startsAt: "15:00", endsAt: "16:30" }),
     );
 
-    expect(result).toEqual({ outcome: "collided", heldOn: PAST });
-    // Still just the one pre-existing Session — nothing was written.
-    expect(await sessionsAt(school.id)).toHaveLength(1);
+    expect(result.outcome).toBe("recorded");
+    expect(await sessionsAt(school.id)).toHaveLength(2);
+  });
+
+  it("records a second online Session on the same day at the same start time (#531)", async () => {
+    const staff = await staffCaller();
+    const school = await oneSchool();
+
+    const first = await arrangeOnlineSession(staff, payload(school.id));
+    const second = await arrangeOnlineSession(staff, payload(school.id));
+
+    expect(first.outcome).toBe("recorded");
+    expect(second.outcome).toBe("recorded");
+    const rows = await sessionsAt(school.id);
+    expect(new Set(rows.map((row) => row.id)).size).toBe(2);
+    expect(rows.map((row) => `${row.heldOn} ${row.startsAt}`)).toEqual([
+      `${PAST} 09:30:00`,
+      `${PAST} 09:30:00`,
+    ]);
+  });
+
+  /** The rank is computed over what was stored (ADR-0027), so the rows come back from Postgres. */
+  it("gives same-day Sessions at one School consecutive Sesi numbers, in start-time order (#531)", async () => {
+    const staff = await staffCaller();
+    const school = await oneSchool();
+    await arrangeOnlineSession(staff, payload(school.id, { startsAt: "15:00", endsAt: "16:30" }));
+    await arrangeOnlineSession(staff, payload(school.id, { startsAt: "09:30", endsAt: "11:00" }));
+    await arrangeOnlineSession(
+      staff,
+      payload(school.id, { heldOn: "2026-01-14", startsAt: "16:00", endsAt: "17:00" }),
+    );
+
+    const ranked = rankBySchool(await sessionsAt(school.id)).get(school.id) ?? [];
+
+    expect(ranked.map((row) => `${row.heldOn} ${row.startsAt}`)).toEqual([
+      "2026-01-14 16:00:00",
+      `${PAST} 09:30:00`,
+      `${PAST} 15:00:00`,
+    ]);
   });
 
   it("lets two different Schools share the same date and time (online has no shared-slot rule)", async () => {
@@ -246,20 +282,6 @@ describe("arrangeOnlineSession", () => {
     expect(second.outcome).toBe("recorded");
     expect(await sessionsAt(melati.id)).toHaveLength(1);
     expect(await sessionsAt(mawar.id)).toHaveLength(1);
-  });
-
-  it("does not collide with a cancelled Session on that day", async () => {
-    const staff = await staffCaller();
-    const school = await oneSchool();
-    await addSession({ schoolId: school.id, heldOn: PAST, status: "cancelled" });
-
-    const result = await arrangeOnlineSession(staff, payload(school.id, { heldOn: PAST }));
-
-    expect(result.outcome).toBe("recorded");
-    // The cancelled row plus the new one.
-    const rows = await sessionsAt(school.id);
-    expect(rows).toHaveLength(2);
-    expect(rows.filter((row) => row.status === "delivered")).toHaveLength(1);
   });
 
   it("throws NotStaffError for a non-Staff caller", async () => {

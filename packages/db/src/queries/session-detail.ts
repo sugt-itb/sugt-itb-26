@@ -254,16 +254,11 @@ export type MoveSessionDateResult =
   | { outcome: "moved" }
   | { outcome: "not-arranged"; status: PastArranged }
   /**
-   * The new slot is taken. Online: the School already has an online Session that still stands on the
-   * new date. Offline: the trip already has a live Session at this School on the new date and time
-   * (ADR-0038). `constraint` says which, so the screen can word the sentence for the mode.
+   * The new slot is taken: the trip already has a live Session at this School on the new date and
+   * time (ADR-0038). Offline only — a School may hold several online Sessions on one day (#531,
+   * ADR-0058).
    */
-  | {
-      outcome: "collided";
-      constraint:
-        | "session_one_online_per_school_per_day"
-        | "session_no_duplicate_offline_per_school";
-    }
+  | { outcome: "collided"; constraint: "session_no_duplicate_offline_per_school" }
   /** Offline: another trip has a live Session at this School on the new date and time (#408). */
   | SchoolBookedOnAnotherPerjadin
   /** An arranged offline Session may not leave the trip it happens on. */
@@ -399,28 +394,26 @@ function shiftTime(end: string, newStart: string, oldStart: string): string {
  * Move an arranged Session's date. **A slipped date is not a cancellation** — it demands
  * no reason and leaves no dead row on the School's list.
  *
- * Cancel-and-re-arrange was the alternative and the schema does permit it, both partial
- * unique indexes being predicated on `status <> 'cancelled'` for exactly that. It was
- * rejected for cost rather than for feasibility.
+ * Cancel-and-re-arrange was the alternative and the schema does permit it, the offline unique
+ * index being predicated on `status <> 'cancelled'` for exactly that. It was rejected for cost
+ * rather than for feasibility.
  *
- * The two modes are refused by different rules, and both are checked:
+ * The two modes differ:
  *
- * - **Online** — the new date must not collide with another online Session for the same
- *   School. That is `session_one_online_per_school_per_day`, and it is left to refuse the
- *   write rather than pre-read: a pre-read is a race, and the index is not.
+ * - **Online** — any date will do. A School may hold several online Sessions on one day (#531,
+ *   ADR-0058), so no slot can be taken.
  * - **Offline** — the new date must stay inside the Perjadin's window. No CHECK can carry
  *   that, since the range sits on another table, so it is held here beside the write. And the
  *   new date and time must not land on another live Session at the same School — on the trip,
- *   `session_no_duplicate_offline_per_school` (ADR-0038) is left to refuse the write for the same
- *   race-free reason as the online index; on **another** trip it is read first (#408,
- *   `bookedOnAnotherPerjadin`), so the refusal can name that trip, and a race past the read is named
- *   the same way.
+ *   `session_no_duplicate_offline_per_school` (ADR-0038) is left to refuse the write rather than
+ *   pre-read, since a pre-read is a race and the index is not; on **another** trip it is read first
+ *   (#408, `bookedOnAnotherPerjadin`), so the refusal can name that trip, and a race past the read
+ *   is named the same way.
  *
  * **The start time moves with the date, in the same write** ([#72](https://github.com/mafiefa02/sugt/issues/72)):
  * moving a Session is one act, and a dialog that changed the date while silently keeping a
- * time nobody can see would be a trap. The online index keys on `(school_id, held_on)`, not
- * `starts_at`, so the online collision rule is unaffected by carrying the time; the offline one
- * keys on the time as well, so there the carried time is part of what collides.
+ * time nobody can see would be a trap. The offline index keys on the time as well as the date, so
+ * there the carried time is part of what collides.
  *
  * **`ends_at` (#283) moves with the start, preserving the Session's duration.** Offline Sessions
  * hold no end time (it is an online-only field), so this is a no-op for them — but the query is not
@@ -492,15 +485,12 @@ export async function moveSessionDate(
       return { outcome: "moved" };
     });
   } catch (error) {
-    // Named rather than caught wholesale: this row satisfies several CHECKs, and swallowing any of
-    // those as "that date is taken" would report a bug as a user state. (The `session` table has no
-    // composite foreign keys any more — the online PIC one was dropped in #284.)
-    const constraint = (error as { cause?: { constraint_name?: string } }).cause?.constraint_name;
-    if (constraint === "session_one_online_per_school_per_day") {
-      return { outcome: "collided", constraint };
-    }
     if (!moving) throw error;
-    // A race past the read above is named the same way; on this same trip it is `collided`.
+    // Named rather than caught wholesale: this row satisfies several CHECKs, and swallowing any of
+    // those as "that date is taken" would report a bug as a user state, so `slotViolationRefusal`
+    // rethrows whatever is not the offline index. (The `session` table has no composite foreign keys
+    // any more — the online PIC one was dropped in #284.) A race past the read above is named the
+    // same way; on this same trip it is `collided`.
     const raced = await slotViolationRefusal(
       error,
       [{ schoolId: moving.schoolId, heldOn, startsAt }],

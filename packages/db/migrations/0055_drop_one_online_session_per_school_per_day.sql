@@ -1,0 +1,1 @@
+DROP INDEX "session_one_online_per_school_per_day";

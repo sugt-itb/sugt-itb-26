@@ -386,6 +386,13 @@
       "when": 1791843136376,
       "tag": "0054_session_pimpinan",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1793638056619,
+      "tag": "0055_drop_one_online_session_per_school_per_day",
+      "breakpoints": true
     }
   ]
 }
