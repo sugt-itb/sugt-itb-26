@@ -29,7 +29,7 @@ import { useId, useState, useTransition } from "react";
  * third-party LMS runs online delivery, and both cohorts are always taught.
  *
  * One dialog for all of them, not one each, because they are one row and one write —
- * `updateOnlineSession` sets them together and re-checks the unique index on School/date. An online
+ * `updateOnlineSession` sets them together. An online
  * Session is born `delivered` now (#318), so the edit is offered on a `delivered` Session too — it is
  * the correction path that replaced the old teacher-list editor; only a `cancelled` legacy Session is
  * settled and offers none. Read for everyone (no money); the "Ubah" trigger appears only for a

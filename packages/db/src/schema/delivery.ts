@@ -141,8 +141,8 @@ export const session = pgTable(
     uniqueIndex("session_no_duplicate_offline_per_school")
       .on(t.schoolId, t.heldOn, t.startsAt)
       .where(sql`status <> 'cancelled' and perjadin_id is not null`),
-    // The two partial-unique indexes above both carry a `WHERE` predicate, so the planner cannot use
-    // either for a general equality lookup — a `perjadin_id =` or `school_id =` filter that must also
+    // The partial-unique index above carries a `WHERE` predicate, so the planner cannot use it for a
+    // general equality lookup — a `perjadin_id =` or `school_id =` filter that must also
     // see cancelled rows falls through to a seq scan. These two plain indexes serve those paths:
     // `perjadin_id` for a trip's offline Sessions (`perjadin-detail.ts`), `school_id` for a School's
     // Sessions (`school-detail.ts`, `monitoring.ts`). Neither column is otherwise served — the

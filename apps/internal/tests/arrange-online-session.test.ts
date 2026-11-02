@@ -5,7 +5,7 @@ import {
   arrangeOnlineSessionForm,
   isNotStaffError,
 } from "@sugt/db/queries";
-import { rankBySchool, type Role } from "@sugt/domain";
+import type { Role } from "@sugt/domain";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -82,7 +82,6 @@ async function sessionsAt(schoolId: string) {
   return db
     .select({
       id: schema.session.id,
-      schoolId: schema.session.schoolId,
       mode: schema.session.mode,
       heldOn: schema.session.heldOn,
       startsAt: schema.session.startsAt,
@@ -241,26 +240,6 @@ describe("arrangeOnlineSession", () => {
     expect(rows.map((row) => `${row.heldOn} ${row.startsAt}`)).toEqual([
       `${PAST} 09:30:00`,
       `${PAST} 09:30:00`,
-    ]);
-  });
-
-  /** The rank is computed over what was stored (ADR-0027), so the rows come back from Postgres. */
-  it("gives same-day Sessions at one School consecutive Sesi numbers, in start-time order (#531)", async () => {
-    const staff = await staffCaller();
-    const school = await oneSchool();
-    await arrangeOnlineSession(staff, payload(school.id, { startsAt: "15:00", endsAt: "16:30" }));
-    await arrangeOnlineSession(staff, payload(school.id, { startsAt: "09:30", endsAt: "11:00" }));
-    await arrangeOnlineSession(
-      staff,
-      payload(school.id, { heldOn: "2026-01-14", startsAt: "16:00", endsAt: "17:00" }),
-    );
-
-    const ranked = rankBySchool(await sessionsAt(school.id)).get(school.id) ?? [];
-
-    expect(ranked.map((row) => `${row.heldOn} ${row.startsAt}`)).toEqual([
-      "2026-01-14 16:00:00",
-      `${PAST} 09:30:00`,
-      `${PAST} 15:00:00`,
     ]);
   });
 

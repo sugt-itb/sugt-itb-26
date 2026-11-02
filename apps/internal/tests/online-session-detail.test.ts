@@ -26,7 +26,7 @@ import {
  * **Detail Sesi daring** (#152, #318) — the online-only detail surface's read and its writes: editing
  * the Session's School, date, times and two cohort-named Pengajar, and hard-deleting it. Every block
  * drives the query function against a real Postgres, because every rule here is about *state* — the
- * unique index, the born-`delivered` field edit, the cancelled-is-settled guard, the hard delete —
+ * born-`delivered` field edit, the cancelled-is-settled guard, the hard delete —
  * that a test through the form would pass against a function checking none of them.
  */
 

@@ -464,6 +464,23 @@ describe("moving a date", () => {
     expect(row?.heldOn).toBe("2026-09-17");
   });
 
+  /**
+   * With no online refusal left, a database failure on an online move is a bug and must not read as
+   * a user state. A two-hour Session moved to 23:30 carries its end to 25:30, which `time` rejects.
+   */
+  it("throws when an online move fails in the database (#531)", async () => {
+    const pic = await staff();
+    const school = await oneSchool();
+    const moving = await addSession({
+      schoolId: school.id,
+      heldOn: "2026-09-10",
+      startsAt: "09:00",
+      endsAt: "11:00",
+    });
+
+    await expect(moveSessionDate(pic, moving.id, "2026-09-17", "23:30")).rejects.toThrow();
+  });
+
   it("refuses to move a delivered Session", async () => {
     const pic = await staff();
     const school = await oneSchool();

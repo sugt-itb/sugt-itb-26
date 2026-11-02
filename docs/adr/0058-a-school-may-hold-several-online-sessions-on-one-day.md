@@ -5,7 +5,7 @@ The database no longer limits how many online **Sessions** a School holds on one
 `session_one_online_per_school_per_day` is dropped, and with it the refusal on every screen that
 records, edits or moves an online Session. Two online Sessions at one School may now share a date and
 even an exact start time. This amends the uniqueness decision in
-[ADR-0034](./0034-online-sessions-are-no-longer-single-stream.md); the rest of that ADR stands.
+[ADR-0034](./0034-online-sessions-are-no-longer-single-stream.md); its decision on Stream stands.
 
 ## Why
 
@@ -16,8 +16,7 @@ of asynchronous Sessions already hits it at 3 Schools in production.
 ## The alternative that was rejected
 
 Narrowing the index to `(school_id, held_on, starts_at)`, the rule offline Sessions keep. It was
-rejected in favour of removing the rule completely, so the tool makes no claim about which same-day
-online Sessions are legitimate.
+considered and rejected in favour of removing the rule completely.
 
 ## Consequences
 
