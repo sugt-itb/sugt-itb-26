@@ -1,6 +1,5 @@
 "use client";
 
-import { formatRupiah } from "@sugt/domain";
 import {
   Card,
   CardContent,
@@ -23,29 +22,24 @@ import type { PivotTable, ProgressSummary } from "./dashboard-derive";
 /**
  * The Dashboard view — the presentational half of the screen, now fed **real** figures. Every
  * number is derived on the server by `deriveDashboard` (`./dashboard-derive.ts`) from the rows
- * `monitoringData` reads, and handed down as props; this component only lays them out — it holds no
+ * `programmeDelivery` reads, and handed down as props; this component only lays them out — it holds no
  * client state of its own now.
  *
- * The tab reads, top to bottom (#313): the two KPI cards (Kegiatan terlaksana + the budget), a row
- * of four progress summary cards, the two pivoted delivery tables, then the two assessment tables —
- * every one a Klaster-row `"X/Y"` pivot. `showBudget` gates the money card (money reads are open,
- * ADR-0026), decided on the server. The Peringatan section that once lived here has moved to
- * `DashboardWarnings`, rendered above the tabs so it shows on both (#235); this view is
+ * The tab reads, top to bottom (#313): the Kegiatan terlaksana card, a row of four progress summary
+ * cards, the two pivoted delivery tables, then the two assessment tables — every one a Klaster-row
+ * `"X/Y"` pivot. It shows no money (#532, ADR-0059). The Peringatan section that once lived here has
+ * moved to `DashboardWarnings`, rendered above the tabs so it shows on both (#235); this view is
  * warnings-free now.
  */
 export function DashboardView({
-  showBudget,
   activitiesPercent,
-  budget,
   summary,
   luring,
   daring,
   pretestTable,
   postestTable,
 }: {
-  showBudget: boolean;
   activitiesPercent: number;
-  budget: { usedIdr: number; totalIdr: number; percent: number };
   summary: ProgressSummary;
   luring: PivotTable;
   daring: PivotTable;
@@ -54,51 +48,15 @@ export function DashboardView({
 }) {
   return (
     <div className="flex flex-col gap-6 px-4 py-6 sm:px-7">
-      {/* KPI cards. Both are equal-height flex columns (the grid stretches them), each with a
-          label-only header; the value text pins to the top of the content and the progress bar to the
-          bottom (`justify-between`). So the two cards' value rows line up and their bars line up, even
-          though the budget card's value block is taller than the activities card's single percentage
-          (#329) — earlier the activities `%` sat in a two-row header and the two cards' bars diverged. */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardDescription>Kegiatan Terlaksana</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col justify-between gap-4">
-            <div className="font-heading text-3xl tabular-nums">{activitiesPercent}%</div>
-            <Progress value={activitiesPercent} />
-          </CardContent>
-        </Card>
-
-        {showBudget && (
-          <Card className="flex flex-col">
-            <CardHeader>
-              <CardDescription>Penyerapan Anggaran</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col justify-between gap-4">
-              {/* Stacked on a narrow phone (long rupiah figures collide side-by-side at ~320px),
-                  side-by-side from `sm:` up. `min-w-0` lets a long value shrink rather than force
-                  overflow; the number steps down to `text-lg` on mobile and the right block only
-                  right-aligns once it is a row. Figures stay full and exact — a money surface. */}
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-                <div className="min-w-0">
-                  <div className="font-heading text-lg tabular-nums sm:text-2xl">
-                    {formatRupiah(budget.usedIdr)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Anggaran terpakai</div>
-                </div>
-                <div className="min-w-0 sm:text-right">
-                  <div className="font-heading text-lg tabular-nums sm:text-2xl">
-                    {formatRupiah(budget.totalIdr)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Total anggaran</div>
-                </div>
-              </div>
-              <Progress value={budget.percent} />
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardDescription>Kegiatan Terlaksana</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="font-heading text-3xl tabular-nums">{activitiesPercent}%</div>
+          <Progress value={activitiesPercent} />
+        </CardContent>
+      </Card>
 
       {/* Four progress summary cards, left→right (#313): two-up on a phone, four across on `md`. */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">

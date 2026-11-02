@@ -6,7 +6,7 @@ import { GET as storiesRoute } from "-/app/api/aggregates/stories/route";
 import { GET as summaryRoute } from "-/app/api/unified-dashboard/summary/route";
 import { config as proxyConfig } from "-/proxy";
 import { db, schema } from "@sugt/db";
-import { assessmentCompletions, monitoringData, type Person } from "@sugt/db/queries";
+import { assessmentCompletions, programmeDelivery, type Person } from "@sugt/db/queries";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -266,7 +266,7 @@ describe("the summary figures", () => {
 
     const payload = await summary(await sign());
     const dashboard = deriveDashboard(
-      await monitoringData(person),
+      await programmeDelivery(person),
       "2026-10-14",
       await assessmentCompletions(person),
     );

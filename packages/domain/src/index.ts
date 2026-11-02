@@ -391,12 +391,6 @@ export const TOTAL_SESSIONS_PER_SCHOOL = SESSIONS_PER_SCHOOL.offline + SESSIONS_
 export const KEGIATAN_UNITS_PER_SCHOOL = TOTAL_SESSIONS_PER_SCHOOL + ASSESSMENT_KINDS.length;
 
 /**
- * **The programme's total budget, in whole rupiah** (#195). A single constant — there is no schema
- * for it — that `/monitoring` reconciles spend against. Whole IDR, like every money column.
- */
-export const PROGRAMME_BUDGET_IDR = 15_000_000_000;
-
-/**
  * **The planned period of each Luring (offline) Sesi** (#195). Two windows, one per offline Sesi,
  * as inclusive `YYYY-MM-DD` date ranges in 2026.
  *

@@ -1,32 +1,23 @@
 import type { SessionMode, SessionStatus } from "@sugt/domain";
-import { asc, eq, ne, sql } from "drizzle-orm";
+import { asc, eq, ne } from "drizzle-orm";
 
 import { db } from "../client";
 import { session } from "../schema/delivery";
 import { cluster, school } from "../schema/reference";
-import { transaction } from "../schema/travel";
 import type { Person, UnifiedDashboardCaller } from "./caller";
 
 /**
- * **The Dashboard's one round trip** — the four raw shapes the screen's overview (`/`) reads from,
- * and nothing derived. **Rank, percentages and warnings are computed in TypeScript**, not here
+ * **The Dashboard's one round trip** — the raw shapes the screen's overview (`/`) reads from, and
+ * nothing derived. **Rank, percentages and warnings are computed in TypeScript**, not here
  * (`apps/internal/.../dashboard-derive.ts`, ADR-0027): a Session's Sesi is its
  * per-School date **rank**, and keeping that in a pure function is what makes it unit-testable
- * against hand-built fixtures rather than a live database. So this module returns rows and one sum,
- * and the seam above turns them into the matrix.
+ * against hand-built fixtures rather than a live database. So this module returns rows, and the seam
+ * above turns them into the matrix.
  *
- * **No Staff choke point.** The budget figure is a money **read**, and money reads are open to any
- * signed-in Person since ADR-0026 (#180) reversed ADR-0004's read half — so `monitoringData` takes
- * a `Person` for the convention's sake (every query says who is asking) but asks no role of them —
- * it only hands the caller on to `programmeDelivery`, whose `_caller` prefix marks it unread,
- * exactly as the other open reads here do. Writing money stays Staff-only, enforced in each
- * money-write query, not by this read.
- *
- * **Two reads, because there are two readers (#503).** `programmeDelivery` is the money-free part —
- * Clusters, Schools and Sessions — and is open to the Unified Dashboard as well as to a Person, so
- * its summary figures come from the same rows `/` folds. `monitoringData` adds the budget sum, and
- * takes a `Person` only: the Unified Dashboard reads no money (ADR-0057), and naming the arm in the
- * signature is what keeps it that way.
+ * **No Staff choke point, and no money** (#532, ADR-0059). `programmeDelivery` takes a caller for the
+ * convention's sake (every query says who is asking) but asks nothing of them, which its `_caller`
+ * prefix marks. Two kinds of reader use it: a `Person` on `/`, and the Unified Dashboard (#503,
+ * ADR-0057), so its summary figures come from the same rows `/` folds.
  */
 
 /** One Session as `/monitoring` ranks it: enough to place it in a School's per-mode ordering and to
@@ -58,15 +49,6 @@ export type ProgrammeDelivery = {
    * next Session take rank 1, exactly as the Sesi labelling means it (ADR-0027).
    */
   sessions: MonitoringSession[];
-};
-
-/**
- * The raw inputs the derive seam folds into the view. **Every figure is a row or a plain sum** —
- * the delivery rows above, and the programme-wide spend.
- */
-export type MonitoringData = ProgrammeDelivery & {
-  /** `SUM(transaction.amount_idr)` over every transaction, programme-wide. Coalesced to 0. */
-  budgetUsedIdr: number;
 };
 
 /**
@@ -104,24 +86,4 @@ export async function programmeDelivery(
     .where(ne(session.status, "cancelled"));
 
   return { clusters, schools, sessions };
-}
-
-/**
- * The delivery lists plus the budget, for `/`. The budget is a single scalar over the whole
- * `transaction` table, and a money read: a `Person` only.
- */
-export async function monitoringData(caller: Person): Promise<MonitoringData> {
-  const [delivery, budget] = await Promise.all([programmeDelivery(caller), budgetUsedIdr()]);
-  return { ...delivery, budgetUsedIdr: budget };
-}
-
-/** `SUM(transaction.amount_idr)`, coalesced to 0. */
-async function budgetUsedIdr(): Promise<number> {
-  const [budget] = await db
-    .select({
-      budgetUsedIdr: sql<number>`coalesce(sum(${transaction.amountIdr}), 0)`.mapWith(Number),
-    })
-    .from(transaction);
-
-  return budget?.budgetUsedIdr ?? 0;
 }

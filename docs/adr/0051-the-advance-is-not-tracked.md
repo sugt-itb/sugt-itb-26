@@ -6,6 +6,9 @@ goes, and so do the trip page's Isi/Ubah Uang Perjalanan dialog and the figures 
 **Diterima**, **Sisa**, the `/pendamping` card's **Tersisa** and its progress bar. What is left is
 one figure, **Uang Perjalanan Terpakai**, the sum of every transaction on the trip.
 
+> **Amended.** The Dashboard no longer shows a budget, so Penyerapan Anggaran is gone. See
+> [ADR-0059](./0059-programme-wide-money-is-not-in-the-app.md). The rest of this ADR stands.
+
 This **supersedes [ADR-0029](./0029-advance-is-a-travel-float-only-some-categories-draw-it-down.md)**:
 with no Advance there is no float to draw down. Settled with the product owner when the ticket was
 written, on 2026-10-11.

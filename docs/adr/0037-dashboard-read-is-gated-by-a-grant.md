@@ -12,6 +12,10 @@ A **grant-less Staff** Person who visits `/` is **redirected to `/pendamping`** 
 [ADR-0026](./0026-money-is-open-to-read-and-staff-only-to-write.md) drew: the Dashboard is now the
 **documented exception** where a read needs a grant.
 
+> **Amended.** The Dashboard no longer shows a budget, so "budget" below describes what it held when
+> this was written. See [ADR-0059](./0059-programme-wide-money-is-not-in-the-app.md). The gate is not
+> about money and stays as decided here.
+
 ## Why
 
 The Dashboard is the Programme overview — delivery progress and budget across every Cluster. It is

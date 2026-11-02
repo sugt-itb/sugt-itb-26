@@ -2,7 +2,6 @@ import {
   dismissWarning,
   initialWarningState,
   restoreWarning,
-  showBudget,
   type Warning,
 } from "-/app/(app)/dashboard-state";
 import { describe, expect, it } from "vitest";
@@ -11,25 +10,10 @@ import { describe, expect, it } from "vitest";
  * **The pure Dashboard (`/`) logic, tested with no database and no DOM.**
  *
  * Like `theme-cycle.test.ts` and `toolbar-state.test.ts`, this file touches neither Postgres nor a
- * browser — it asserts on `showBudget` (a pure `Role → boolean`) and the warning reducer (a pure
- * `(state, id) → state`). The Dashboard view is mock-only and never rendered by any test in this
- * repo; the moving parts are extracted into `dashboard-state.ts` precisely so they can be checked
- * here. It sits with the rest of the suite only because `pnpm --filter @sugt/internal test` is one
+ * browser — it asserts on the warning reducer (a pure `(state, id) → state`). That moving part is
+ * extracted into `dashboard-state.ts` precisely so it can be checked here. It sits with the rest of the suite only because `pnpm --filter @sugt/internal test` is one
  * Vitest project today; whoever later splits the pure tests off can lift it out untouched.
  */
-
-describe("showBudget", () => {
-  it("shows the budget to Staff", () => {
-    expect(showBudget("Staff")).toBe(true);
-  });
-
-  it("shows the budget to a Pimpinan too — money is open to any signed-in Person to read (#180)", () => {
-    // ADR-0004 reversed by ADR-0026 (#180): money reads are open to any signed-in Person, so the
-    // read-only Pimpinan sees the budget card too. Writing money stays Staff-only, enforced
-    // server-side and not by this gate. `Pimpinan` is a real `Role` now, so no cast.
-    expect(showBudget("Pimpinan")).toBe(true);
-  });
-});
 
 describe("dismissWarning", () => {
   const w1: Warning = { id: "w1", message: "satu" };

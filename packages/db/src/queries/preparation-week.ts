@@ -22,7 +22,7 @@ import { preparationChecklists, type PreparationItem } from "./preparation-check
  * Seven selects whatever the week holds: the trips, `preparationChecklists`'s five, and the items'
  * own wording.
  *
- * Gated by the Dashboard page (`canViewDashboard`), like `monitoringData` and `preparationCards`
+ * Gated by the Dashboard page (`canViewDashboard`), like `programmeDelivery` and `preparationCards`
  * beside it; it reads no money.
  */
 
