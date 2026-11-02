@@ -164,7 +164,7 @@ screen instead of inside the form you launched from it. Since one Sub-Cluster ma
 ([ADR-0043](./adr/0043-a-sub-cluster-may-be-covered-by-several-perjadins.md)), the reading is per
 School: _which Schools are next_, and the trip is planned around the Sub-Cluster they share.
 
-**The Dashboard has three tabs**, left to right: **Pelaksanaan** (delivery and budget, the default),
+**The Dashboard has three tabs**, left to right: **Pelaksanaan** (delivery, the default),
 **Persiapan Program** (the free-standing Preparation Cards, named Persiapan until #423) and
 **Persiapan Luring**.
 

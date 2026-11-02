@@ -130,13 +130,7 @@ export {
   type PerjadinFeedbackRow,
   type PerjadinFeedbackScope,
 } from "./feedback";
-export {
-  monitoringData,
-  programmeDelivery,
-  type MonitoringData,
-  type MonitoringSession,
-  type ProgrammeDelivery,
-} from "./monitoring";
+export { programmeDelivery, type MonitoringSession, type ProgrammeDelivery } from "./monitoring";
 export {
   assessmentCompletions,
   setAssessmentCompletion,

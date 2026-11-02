@@ -2505,8 +2505,7 @@ public site, and the Unified Dashboard reads for company leadership, behind its 
 for both would open to the public site whatever is opened to leadership. It reads
 `programmeDelivery` and `assessmentCompletions`, the money-free half of what `/` reads, and
 `participantFeedbackFigures` and `perjadinFeedbackFigures`, the read behind `/feedback`'s average
-cards (#504). The budget sum stays in `monitoringData`, which takes a `Person` only, and nothing
-it reads returns a comment, a name or a row.
+cards (#504). Nothing it reads returns money, a comment, a name or a row.
 
 **A person on two overlapping Perjadins.** Genuinely preventable with `btree_gist` and an
 exclusion constraint, and genuinely useful — but it would mean denormalising the date range

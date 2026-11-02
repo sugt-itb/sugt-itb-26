@@ -12,7 +12,7 @@ import {
   deliveryProgress,
   kegiatanTerlaksana,
 } from "-/lib/programme-progress";
-import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
+import type { AssessmentCompletion, MonitoringSession, ProgrammeDelivery } from "@sugt/db/queries";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -262,15 +262,14 @@ describe("overdueWarnings", () => {
 });
 
 describe("deriveDashboard", () => {
-  it("assembles the whole view — matrices, budget percent, and delivered percent — from raw data", () => {
-    const data: MonitoringData = {
+  it("assembles the whole view — matrices and delivered percent — from raw data", () => {
+    const data: ProgrammeDelivery = {
       clusters: CLUSTERS,
       schools: SCHOOLS,
       sessions: [
         sess({ schoolId: "s1", mode: "offline", status: "delivered" }),
         sess({ schoolId: "s2", mode: "online", status: "delivered" }),
       ],
-      budgetUsedIdr: 29_560_000,
     };
 
     const derived = deriveDashboard(data, "2026-09-01", []);
@@ -282,10 +281,8 @@ describe("deriveDashboard", () => {
     expect(derived.daring.rows).toHaveLength(CLUSTERS.length);
     // 2 delivered units (no assessment units) of 3 Schools × 10 = 30 possible → 6.67 rounds to 7%.
     expect(derived.activitiesPercent).toBe(7);
-    // The budget total is the programme budget; the tiny fraction is 0.2.
-    expect(derived.budget.totalIdr).toBe(15_000_000_000);
-    expect(derived.budget.usedIdr).toBe(29_560_000);
-    expect(derived.budget.percent).toBe(0.2);
+    // No programme-wide money on the Dashboard (#532, ADR-0059).
+    expect(derived).not.toHaveProperty("budget");
     // Summary percentages: no completions → 0% pretest and posttest; 1 delivered online of 18 → 6%,
     // 1 delivered offline of 6 → 17%.
     expect(derived.summary).toEqual({ pretest: 0, daring: 6, luring: 17, posttest: 0 });
@@ -304,11 +301,10 @@ describe("deriveDashboard", () => {
       { schoolId: "s1", stream: "Research", participantType: "Siswa", kind: "pretest" },
       { schoolId: "s1", stream: "Research", participantType: "GTK-MS", kind: "pretest" },
     ];
-    const data: MonitoringData = {
+    const data: ProgrammeDelivery = {
       clusters: CLUSTERS,
       schools: SCHOOLS,
       sessions: [],
-      budgetUsedIdr: 0,
     };
     expect(deriveDashboard(data, "2026-09-01", s1FullPretest).activitiesPercent).toBe(3);
   });

@@ -3,15 +3,14 @@ import {
   assessmentCompletions,
   canViewDashboard,
   hasGrant,
-  monitoringData,
   preparationCards,
   preparationWeek,
+  programmeDelivery,
 } from "@sugt/db/queries";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { deriveDashboard } from "./dashboard-derive";
-import { showBudget } from "./dashboard-state";
 import { DashboardTabs } from "./dashboard-tabs";
 import { DashboardView } from "./dashboard-view";
 import { DashboardWarnings } from "./dashboard-warnings";
@@ -23,9 +22,9 @@ import { preparationWarnings } from "./preparation-derive";
 export const metadata: Metadata = { title: "Dashboard" };
 
 /**
- * **Dashboard** (`/`) — a one-screen overview of how far Session delivery has got and how much of the
- * Programme budget has been spent, across every Cluster. It now reads **real data** (#196): the
- * mock module is gone. `monitoringData` fetches the raw rows in one round trip and
+ * **Dashboard** (`/`) — a one-screen overview of how far Session delivery has got across every
+ * Cluster. It shows no money (#532, ADR-0059). It reads **real data** (#196): the mock module is
+ * gone. `programmeDelivery` fetches the raw rows in one round trip and
  * `deriveDashboard` (the pure, tested seam in `./dashboard-derive.ts`) folds them — ranking each
  * School's Sessions into Sesi, building the two matrices, the timeline and the overdue warnings —
  * against the programme constants in `@sugt/domain`. It is the landing surface for a Pimpinan and
@@ -36,10 +35,7 @@ export const metadata: Metadata = { title: "Dashboard" };
  * redirected to `/pendamping`, the mirror of the `/pendamping → /` Pimpinan redirect. The predicate
  * is `canViewDashboard`, shared with the sidebar so a link is shown exactly when the page renders.
  *
- * The server's decisions are the money gate and today's date. `showBudget(person.role)` returns
- * `true` for both signed-in roles — Staff and the read-only Pimpinan — because money is open to any
- * signed-in Person to READ (ADR-0004 reversed by ADR-0026, #180); writing money stays Staff-only
- * elsewhere. `today` is the **WIB** calendar date — the Programme's zone, the one Session times are
+ * The server's decision is today's date. `today` is the **WIB** calendar date — the Programme's zone, the one Session times are
  * stored in — not UTC: an overdue warning or a completed step turns over at local midnight, and a
  * UTC date would flip it up to seven hours early against `LURING_SESI_WINDOWS`, which are WIB dates.
  *
@@ -64,7 +60,7 @@ export default async function Page({ searchParams }: PageProps<"/">) {
   // `Promise.all` convention (#269). The destructured order matches the reads below.
   const [data, cards, completions, week] = await Promise.all([
     // The raw Pelaksanaan rows in one round trip, folded below by `deriveDashboard`.
-    monitoringData(person),
+    programmeDelivery(person),
     // The Persiapan Program tab's cards (#221). Reading is open to any signed-in Person; `canEdit` — the
     // Dashboard Editor Grant — gates the tab's editor controls. The Grant is re-checked in every write, so
     // this only hides controls a non-holder could not use anyway. An Administrator implies the
@@ -91,9 +87,7 @@ export default async function Page({ searchParams }: PageProps<"/">) {
         initialTab={minggu === undefined ? "pelaksanaan" : "persiapan-luring"}
         pelaksanaan={
           <DashboardView
-            showBudget={showBudget(person.role)}
             activitiesPercent={derived.activitiesPercent}
-            budget={derived.budget}
             summary={derived.summary}
             luring={derived.luring}
             daring={derived.daring}
