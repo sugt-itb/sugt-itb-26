@@ -20,8 +20,9 @@
  *    money — and since #180 money **reads** are open, so the guard is not about reading money
  *    either: **writing** money is Staff-only (ADR-0026 reversed ADR-0004's read half), and
  *    **arranging delivery** is Staff-only by the surface list. One guard, two reasons — see
- *    `./staff-only.ts`. One read is gated after all, by a Grant: the Dashboard, which shows no money
- *    (ADR-0037, by its page through `canViewDashboard`; ADR-0059).
+ *    `./staff-only.ts`. Some reads are gated after all, each by a Grant, and none for its money: the
+ *    Dashboard (ADR-0037, by its page through `canViewDashboard`; ADR-0059), and the Administrator's
+ *    roster and Activity Log (by their queries through `requireGrant`).
  * 5. **A write function owns its own transaction.** Several writes are
  *    multi-statement: Rencanakan Perjadin writes `perjadin`, `group_member` and N
  *    `session` rows; a Group is replaced wholesale. The boundary belongs in the function

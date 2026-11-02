@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
 
-import { canViewDashboard, type Person } from "@sugt/db/queries";
+import { canViewDashboard } from "@sugt/db/queries";
+import type { Grant } from "@sugt/domain";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -37,7 +37,11 @@ async function seed() {
       insert into person_grant (person_id, "grant") values
         (${ONLY}, 'Keuangan'),
         (${BOTH}, 'Keuangan'),
+        (${BOTH}, 'Administrator'),
+        (${BOTH}, 'Perjadin Editor'),
         (${BOTH}, 'Daring Editor'),
+        (${BOTH}, 'Dashboard Editor'),
+        (${BOTH}, 'Dashboard Viewer'),
         (${OTHER}, 'Perjadin Editor')`,
   );
 }
@@ -58,24 +62,31 @@ describe("migration 0056", () => {
     await applyRemainingMigrations(scratch.url);
 
     await expect(grantsOf(ONLY)).resolves.toEqual([]);
-    await expect(grantsOf(BOTH)).resolves.toEqual(["Daring Editor"]);
+    await expect(grantsOf(BOTH)).resolves.toEqual([
+      "Administrator",
+      "Daring Editor",
+      "Dashboard Editor",
+      "Dashboard Viewer",
+      "Perjadin Editor",
+    ]);
     await expect(grantsOf(OTHER)).resolves.toEqual(["Perjadin Editor"]);
   });
 
-  it("makes someone who held only Keuangan a Staff Person who does not read the Dashboard", async () => {
+  it("leaves someone who held only Keuangan unable to read the Dashboard, so on /pendamping", async () => {
     await seed();
 
     await applyRemainingMigrations(scratch.url);
 
-    const person: Person = {
-      id: ONLY,
-      fullName: "Kiki",
-      email: "kiki@itb.ac.id",
-      role: "Staff",
-      grants: [],
-    };
-    await expect(grantsOf(ONLY)).resolves.toEqual(person.grants);
-    expect(canViewDashboard(person)).toBe(false);
+    const grants = (await grantsOf(ONLY)) as Grant[];
+    expect(
+      canViewDashboard({
+        id: ONLY,
+        fullName: "Kiki",
+        email: "kiki@itb.ac.id",
+        role: "Staff",
+        grants,
+      }),
+    ).toBe(false);
   });
 
   it("makes the constraint refuse Keuangan and still accept the five Grants", async () => {
@@ -107,11 +118,5 @@ describe("migration 0056", () => {
       );
     }
     await expect(grantsOf(ONLY)).resolves.toHaveLength(5);
-  });
-});
-
-describe("the route", () => {
-  it("is gone, so /keuangan and /keuangan/ekspor are the normal 404 (#533)", () => {
-    expect(existsSync(new URL("../src/app/(app)/keuangan", import.meta.url))).toBe(false);
   });
 });

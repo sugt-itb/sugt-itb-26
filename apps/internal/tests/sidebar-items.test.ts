@@ -1,3 +1,6 @@
+import { readdirSync } from "node:fs";
+import { sep } from "node:path";
+
 import { sidebarItems } from "-/components/sidebar-items";
 import { canViewDashboard, hasGrant, type Person } from "@sugt/db/queries";
 import type { Grant, Role } from "@sugt/domain";
@@ -38,6 +41,16 @@ describe("sidebarItems", () => {
     const ADMIN = [...FULL, "/orang", "/log", "/pengaturan"];
     expect(hrefsFor("Staff", ["Administrator"])).toEqual(ADMIN);
     expect(hrefsFor("Staff", ["Administrator", "Dashboard Viewer"])).toEqual(ADMIN);
+  });
+
+  it("leaves no keuangan route anywhere in the app, so the old links are the normal 404 (#533)", () => {
+    const app = new URL("../src/app", import.meta.url);
+    const segments = readdirSync(app, { recursive: true, encoding: "utf8" }).flatMap((entry) =>
+      entry.split(sep),
+    );
+
+    expect(segments).toContain("perjadin");
+    expect(segments.filter((segment) => segment.includes("keuangan"))).toEqual([]);
   });
 
   it("shows no Keuangan link to anyone, an Administrator included (#533)", () => {

@@ -215,8 +215,8 @@ a row is a capability a Staff Person holds, its `grant` column CHECKed against t
 character-for-character `GRANTS` in `@sugt/domain`. Migration `0051`
 ([#469](https://github.com/sugt-itb/sugt-itb-26/issues/469),
 [ADR-0052](./adr/0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md)) split `'Editor'`
-into the three Editors, giving every Editor all three, by the drop-and-re-add CHECK pattern
-`0018`/`0025`/`0031` use with the rows moved between the drop and the add. Migration `0056`
+into the three Editors, giving every Editor all three, and added `'Keuangan'`, by the drop-and-re-add
+CHECK pattern `0018`/`0025`/`0031` use with the rows moved between the drop and the add. Migration `0056`
 ([#533](https://github.com/sugt-itb/sugt-itb-26/issues/533),
 [ADR-0059](./adr/0059-programme-wide-money-is-not-in-the-app.md)) retired `'Keuangan'` the same way,
 deleting its rows and with them the record of who held it. No Grant

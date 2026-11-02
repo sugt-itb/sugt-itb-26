@@ -116,7 +116,7 @@ describe("the acquittal CSV", () => {
   });
 });
 
-/** The app's one CSV writer guards what a spreadsheet would run (ADR-0053's decision, kept by ADR-0059). */
+/** The app's one CSV writer guards what a spreadsheet would run (ADR-0053's decision, which stands). */
 describe("the shared writer's formula guard", () => {
   const RISKY = ["=1+1", "+62 812", "-5 diskon", "@SUM(A1)", "\tTab", "\rCR"];
 

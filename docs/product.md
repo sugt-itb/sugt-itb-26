@@ -1038,7 +1038,9 @@ the page. It downloads that tab's own file:
   and Rata-rata.
 - **A Rating that was not given is an empty cell, never 0**; Rata-rata is the row's average over the
   Ratings present, to one decimal, as on its card. The file is written as the Laporan's is — a BOM,
-  every field quoted — so comments with commas, quotes or line breaks open intact in Excel.
+  every field quoted — so comments with commas, quotes or line breaks open intact in Excel. A text
+  cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'`, so a spreadsheet
+  shows it as text rather than running it.
 - Named `feedback-peserta-<filter>-<today>.csv` or `feedback-perjadin-<filter>-<today>.csv`: what the
   scope covers, then `tersaring` when a score filter is on, or `semua` with neither.
 - The screen keeps its choices in the browser, so the button's link carries them as query
@@ -1140,7 +1142,7 @@ says only an Administrator reads the roster, adds people and deactivates them.
   gets a 403, and nothing is written.
 - **An Administrator cannot Nonaktifkan themselves**: their own row has no button, and the write
   refuses it. Deactivating another Administrator is allowed.
-- **Akses** is a column of Grants. Each active Staff row has a searchable multi-select of the six
+- **Akses** is a column of Grants. Each active Staff row has a searchable multi-select of the five
   Grants, held ones as chips; adding or removing a chip assigns or revokes at once. Each option carries a line saying what it gates — Administrator "semua akses", Perjadin Editor "merencanakan dan menulis setiap Perjadin", Daring Editor "Sesi
   daring dan Pretest", Dashboard Editor "termasuk Dashboard Viewer", Dashboard Viewer "membaca
   Dashboard". Only Grants actually held are chips: choosing Dashboard Editor shows Dashboard Editor
