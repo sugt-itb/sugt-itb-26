@@ -26,7 +26,7 @@ import {
  * **Detail Sesi daring** (#152, #318) — the online-only detail surface's read and its writes: editing
  * the Session's School, date, times and two cohort-named Pengajar, and hard-deleting it. Every block
  * drives the query function against a real Postgres, because every rule here is about *state* — the
- * unique index, the born-`delivered` field edit, the cancelled-is-settled guard, the hard delete —
+ * born-`delivered` field edit, the cancelled-is-settled guard, the hard delete —
  * that a test through the form would pass against a function checking none of them.
  */
 
@@ -227,12 +227,8 @@ describe("Detail Sesi daring — editing the fields", () => {
     expect(row?.pengajarSiswaName).toBe("Nama Baru");
   });
 
-  /**
-   * The unique index the criterion names, asserted **by name** — this row satisfies several CHECKs,
-   * so a test that only knew it was refused could pass against the wrong rule. One online Session per
-   * School per day now (#284), whatever the hour.
-   */
-  it("is refused by session_one_online_per_school_per_day when the School holds a Session that day", async () => {
+  /** A School may hold several online Sessions on one day (#531, ADR-0058). */
+  it("edits a Session onto a date where the School already holds another", async () => {
     const pic = await staff();
     const { first } = await twoSchools();
     const standing = await addSession({ schoolId: first.id, heldOn: "2026-01-17" });
@@ -244,18 +240,13 @@ describe("Detail Sesi daring — editing the fields", () => {
       editInput(first.id, { heldOn: "2026-01-17" }),
     );
 
-    expect(result).toEqual({
-      outcome: "collided",
-      constraint: "session_one_online_per_school_per_day",
-    });
-    // Unmoved: a refused edit writes nothing.
-    expect((await sessionRow(moving.id))?.heldOn).toBe("2026-01-10");
-    // The standing Session is untouched too.
+    expect(result).toEqual({ outcome: "updated" });
+    expect((await sessionRow(moving.id))?.heldOn).toBe("2026-01-17");
+    // The Session already there is untouched.
     expect((await sessionRow(standing.id))?.heldOn).toBe("2026-01-17");
   });
 
-  /** The row being edited is excluded, so re-saving a Session onto its own slot is not a self-collision. */
-  it("excludes the Session being edited from the collision check", async () => {
+  it("changes a Session's time while leaving it on its own date", async () => {
     const pic = await staff();
     const { first } = await twoSchools();
     const session = await addSession({

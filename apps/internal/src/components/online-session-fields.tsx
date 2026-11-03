@@ -29,7 +29,7 @@ import { useId, useState, useTransition } from "react";
  * third-party LMS runs online delivery, and both cohorts are always taught.
  *
  * One dialog for all of them, not one each, because they are one row and one write —
- * `updateOnlineSession` sets them together and re-checks the unique index on School/date. An online
+ * `updateOnlineSession` sets them together. An online
  * Session is born `delivered` now (#318), so the edit is offered on a `delivered` Session too — it is
  * the correction path that replaced the old teacher-list editor; only a `cancelled` legacy Session is
  * settled and offers none. Read for everyone (no money); the "Ubah" trigger appears only for a
@@ -86,9 +86,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 /**
  * The edit dialog, seeded from the Session's current values. On save it hands the fields to
- * `updateOnlineSession`, which refuses a collision with another still-standing online Session at the
- * same School on the same date — surfaced here beside the fields — a future date, and a Session that
- * was cancelled.
+ * `updateOnlineSession`, which refuses a future date and a Session that was cancelled — surfaced here
+ * beside the fields.
  */
 function EditDialog({ session }: { session: OnlineSessionDetail }) {
   const [open, setOpen] = useState(false);
@@ -136,15 +135,13 @@ function EditDialog({ session }: { session: OnlineSessionDetail }) {
         return;
       }
       setRefusal(
-        result.outcome === "collided"
-          ? "Sekolah ini sudah punya Sesi daring pada tanggal tersebut. Ubah tanggalnya."
-          : result.outcome === "future-date"
-            ? "Tanggal tidak boleh di masa depan."
-            : result.outcome === "end-before-start"
-              ? "Jam selesai harus setelah jam mulai."
-              : result.outcome === "cancelled"
-                ? "Sesi ini sudah dibatalkan dan tidak bisa diubah. Muat ulang halaman."
-                : "Sesi belum tersimpan. Periksa isian, lalu simpan lagi.",
+        result.outcome === "future-date"
+          ? "Tanggal tidak boleh di masa depan."
+          : result.outcome === "end-before-start"
+            ? "Jam selesai harus setelah jam mulai."
+            : result.outcome === "cancelled"
+              ? "Sesi ini sudah dibatalkan dan tidak bisa diubah. Muat ulang halaman."
+              : "Sesi belum tersimpan. Periksa isian, lalu simpan lagi.",
       );
     });
   }

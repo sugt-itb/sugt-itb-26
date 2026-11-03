@@ -44,7 +44,7 @@ describe("canViewDashboard", () => {
     expect(canViewDashboard(editor)).toBe(true);
   });
 
-  it.each(["Perjadin Editor", "Daring Editor", "Keuangan"] as const)(
+  it.each(["Perjadin Editor", "Daring Editor"] as const)(
     "refuses a Staff holding only %s — no other Grant reads the Dashboard (ADR-0052)",
     async (grant) => {
       const staff = await resolved("Staff", "only@ditsama.itb.ac.id", [grant]);

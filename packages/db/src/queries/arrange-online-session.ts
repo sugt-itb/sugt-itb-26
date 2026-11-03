@@ -1,7 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "../client";
-import { ONLINE_SESSION_STILL_STANDS, session } from "../schema/delivery";
+import { session } from "../schema/delivery";
 import { province, school } from "../schema/reference";
 import type { Person } from "./caller";
 import type { SelectedSchool } from "./rosters";
@@ -64,14 +64,13 @@ export type ArrangeOnlineSessionInput = {
 /**
  * Why an online Session was not recorded.
  *
- * A collision is a **user state**, not a bug, so it comes back as a value rather than a throw
- * ([#12](https://github.com/mafiefa02/sugt/issues/12)): two Staff recording the same School's day is
- * exactly that. `NotStaffError` and `NotGrantedError` are the opposite case and still throw.
+ * A refusal is a **user state**, not a bug, so it comes back as a value rather than a throw
+ * ([#12](https://github.com/mafiefa02/sugt/issues/12)). `NotStaffError` and `NotGrantedError` are the
+ * opposite case and still throw. **A date already holding a Session is not a refusal** (#531,
+ * ADR-0058): a School may hold several online Sessions on one day, even at one start time.
  */
 export type ArrangeOnlineSessionResult =
   | { outcome: "recorded"; sessionId: string }
-  /** This School already has an online Session on this date that was not cancelled (#284: one per day). */
-  | { outcome: "collided"; heldOn: string }
   /**
    * A blank Siswa or GTK-MS Pengajar name. Both are required (#318); the not-null-for-online rule
    * lives at this layer (`session_online_pengajar_not_null` backstops it), so this is where a
@@ -96,14 +95,8 @@ function wibToday(): string {
 
 /**
  * Record one delivered online Session. A single insert now (#318) — no side table to write, so no
- * transaction: the two Pengajar are columns on the row.
- *
- * `on conflict do nothing` names `session_one_online_per_school_per_day` as its arbiter and repeats
- * its predicate verbatim from `ONLINE_SESSION_STILL_STANDS` — Postgres refuses to infer an index
- * whose predicate does not match, which is a runtime failure. With no target it would also swallow a
- * violation of the primary key, which is not a user state. The index keys on `(school_id, held_on)`,
- * so a returned collision means the day is taken, whatever the hour — one online Session per School
- * per day.
+ * transaction: the two Pengajar are columns on the row. Nothing guards against an accidental
+ * duplicate (#531, ADR-0058); it counts as delivered until `deleteOnlineSession` removes it.
  */
 export async function arrangeOnlineSession(
   caller: Person,
@@ -144,15 +137,9 @@ export async function arrangeOnlineSession(
       pengajarSiswaName,
       pengajarGtkMsName,
     })
-    .onConflictDoNothing({
-      target: [session.schoolId, session.heldOn],
-      where: ONLINE_SESSION_STILL_STANDS,
-    })
     .returning({ id: session.id });
 
-  if (!created) return { outcome: "collided", heldOn: input.heldOn };
-
-  return { outcome: "recorded", sessionId: created.id };
+  return { outcome: "recorded", sessionId: created!.id };
 }
 
 /** A School the screen can arrange a Session at, as a picker or a heading names it. */

@@ -159,7 +159,7 @@ describe("setAssessmentCompletion is Daring Editor-guarded", () => {
     expect(isNotGrantedError(refusal)).toBe(true);
   });
 
-  it.each(["Perjadin Editor", "Dashboard Editor", "Dashboard Viewer", "Keuangan"] as const)(
+  it.each(["Perjadin Editor", "Dashboard Editor", "Dashboard Viewer"] as const)(
     "refuses a Staff Person holding only %s — Pretest is the Daring Editor's (ADR-0052)",
     async (grant) => {
       const schoolId = await aSchool();

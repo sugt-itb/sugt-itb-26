@@ -305,6 +305,24 @@ describe("the Dashboard's tabs", () => {
     return row;
   }
 
+  /** Programme-wide money is not in the app (#532, ADR-0059), whoever is reading. */
+  it("shows no budget to any reader, with Kegiatan Terlaksana taking its whole row (#532)", async () => {
+    const leader = await pimpinan();
+    const staff = await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" });
+    for (const reader of [leader, { ...staff, grants: ["Dashboard Viewer"] } as Person]) {
+      vi.mocked(requirePerson).mockResolvedValue(reader);
+      const html = await render();
+
+      expect(html, reader.role).toContain("Kegiatan Terlaksana");
+      expect(html, reader.role).not.toMatch(/anggaran/i);
+      expect(html, reader.role).not.toContain("Rp");
+      // The card sits directly in the tab's column, with no grid around it to give it half a row.
+      expect(html, reader.role).toMatch(
+        /px-4 py-6 sm:px-7"><div data-slot="card"[^>]*><div data-slot="card-header"[^>]*><div data-slot="card-description"[^>]*>Kegiatan Terlaksana/,
+      );
+    }
+  });
+
   it("reads Pelaksanaan · Persiapan Program · Persiapan Luring, opening on Pelaksanaan", async () => {
     await pimpinan();
     const html = await render();

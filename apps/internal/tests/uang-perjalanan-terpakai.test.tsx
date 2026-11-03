@@ -4,7 +4,7 @@ import LaporanPage from "-/app/(app)/perjadin/[id]/laporan/page";
 import PerjadinDetailPage from "-/app/(app)/perjadin/[id]/page";
 import { TripMoney } from "-/components/my-perjadin-section";
 import { requirePerson } from "-/lib/person";
-import { monitoringData, myPerjadin, perjadinAcquittal, type Person } from "@sugt/db/queries";
+import { myPerjadin, perjadinAcquittal, type Person } from "@sugt/db/queries";
 import { formatRupiah } from "@sugt/domain";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -116,8 +116,6 @@ describe("Uang Perjalanan Terpakai is one number on every screen", () => {
       expect(html, name).not.toMatch(/>Terpakai</);
     }
     expect(csv).toContain('"Uang Perjalanan Terpakai","","","","1950000",""');
-    // Penyerapan Anggaran never read the Advance, and still sums every category.
-    expect((await monitoringData(rina)).budgetUsedIdr).toBe(1_950_000);
   });
 
   it("keeps the Laporan's Total Siswa and Total GTK-MS", async () => {

@@ -26,7 +26,7 @@ export type Fraction = { count: number; total: number; percent: number };
 /**
  * **The Programme's progress figures — the one derivation `/` and the Unified Dashboard share
  * (#503).** Every percentage the Pelaksanaan tab shows, each with the count and denominator behind
- * it. Nothing here reads money, so the Unified Dashboard can be handed it without the budget.
+ * it. Nothing here reads money.
  */
 export type ProgrammeProgress = {
   /** Kegiatan terlaksana — delivered Sessions plus all-or-nothing assessment units, over Schools × 10. */

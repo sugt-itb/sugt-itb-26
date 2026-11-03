@@ -1,10 +1,9 @@
 import { deriveProgress } from "-/lib/programme-progress";
-import type { AssessmentCompletion, MonitoringData, MonitoringSession } from "@sugt/db/queries";
+import type { AssessmentCompletion, MonitoringSession, ProgrammeDelivery } from "@sugt/db/queries";
 import {
   type AssessmentKind,
   LURING_SESI_WINDOWS,
   PRETEST_PARTICIPANT_TYPES,
-  PROGRAMME_BUDGET_IDR,
   rankBySchool,
   SESSIONS_PER_SCHOOL,
   STREAMS,
@@ -23,7 +22,7 @@ import {
 /**
  * **The pure core of the Dashboard (`/`)**, with no React, no DOM and no database — the seam the suite
  * drives directly, the same way `dashboard-state.ts`'s reducer is tested. It takes the raw rows
- * `monitoringData` reads (`@sugt/db/queries`) plus today's date and the programme constants, and
+ * `programmeDelivery` reads (`@sugt/db/queries`) plus today's date and the programme constants, and
  * returns exactly the props the view renders. Nothing here queries; everything is a fold over its
  * arguments, so a hand-built fixture is a complete test.
  *
@@ -37,9 +36,9 @@ import {
  */
 
 /** A Cluster column — id keys the fold, name is the header the view prints. */
-type Cluster = MonitoringData["clusters"][number];
+type Cluster = ProgrammeDelivery["clusters"][number];
 /** A School with the Cluster that owns it; the per-Cluster count is a cell's denominator. */
-type School = MonitoringData["schools"][number];
+type School = ProgrammeDelivery["schools"][number];
 
 /** One matrix row: a Sesi label and one `"X/Y"` cell per Cluster, in the Clusters' order. */
 export type MatrixRow = { session: string; cells: string[] };
@@ -78,7 +77,6 @@ type SesiWindow = { sesi: number; startsOn: string; endsOn: string };
 /** Everything the Dashboard view renders, assembled from the raw data by `deriveDashboard`. */
 export type DerivedDashboard = {
   activitiesPercent: number;
-  budget: { usedIdr: number; totalIdr: number; percent: number };
   summary: ProgressSummary;
   luring: PivotTable;
   daring: PivotTable;
@@ -238,13 +236,12 @@ export function overdueWarnings(
 /**
  * Assemble the whole view from the raw data, today's date and the assessment completion rows (#313).
  * Kegiatan terlaksana and the four summary percentages are `deriveProgress`'s — the figures the
- * Unified Dashboard reads too (#503). The budget percent is spend against `PROGRAMME_BUDGET_IDR` to
- * one decimal — the same tiny fraction the scaffold showed as `0.2`. The two delivery tables are the
+ * Unified Dashboard reads too (#503). The two delivery tables are the
  * ranked matrices pivoted to Klaster rows; the two assessment tables count ticked boxes per Cluster.
  * The overdue warnings still fold the Sesi-indexed Luring matrix, before it is pivoted for the view.
  */
 export function deriveDashboard(
-  data: MonitoringData,
+  data: ProgrammeDelivery,
   today: string,
   completions: AssessmentCompletion[],
 ): DerivedDashboard {
@@ -263,11 +260,8 @@ export function deriveDashboard(
     "online",
     SESSIONS_PER_SCHOOL.online,
   );
-  const usedIdr = data.budgetUsedIdr;
-  const totalIdr = PROGRAMME_BUDGET_IDR;
   return {
     activitiesPercent: progress.kegiatan.percent,
-    budget: { usedIdr, totalIdr, percent: Math.round((usedIdr / totalIdr) * 1000) / 10 },
     summary: {
       pretest: progress.pretest.percent,
       daring: progress.online.percent,

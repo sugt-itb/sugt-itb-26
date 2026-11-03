@@ -1,3 +1,6 @@
+import { readdirSync } from "node:fs";
+import { sep } from "node:path";
+
 import { sidebarItems } from "-/components/sidebar-items";
 import { canViewDashboard, hasGrant, type Person } from "@sugt/db/queries";
 import type { Grant, Role } from "@sugt/domain";
@@ -14,7 +17,6 @@ function hrefsFor(role: Role, grants: Grant[]) {
   return sidebarItems({
     role,
     canEditDaring: hasGrant(person, "Daring Editor"),
-    canViewKeuangan: hasGrant(person, "Keuangan"),
     canViewDashboard: canViewDashboard(person),
     canAdminister: hasGrant(person, "Administrator"),
     driveNeedsAttention: false,
@@ -35,35 +37,26 @@ const FULL = [
 ];
 
 describe("sidebarItems", () => {
-  /** `FULL` with Keuangan in its place, right after Pendamping and before Perjadin (#472). */
-  const WITH_KEUANGAN = FULL.flatMap((href) =>
-    href === "/pendamping" ? [href, "/keuangan"] : [href],
-  );
-
-  it("gives a Staff Administrator every link, Keuangan after Pendamping, and Orang, Log then Pengaturan last", () => {
-    const ADMIN = [...WITH_KEUANGAN, "/orang", "/log", "/pengaturan"];
+  it("gives a Staff Administrator every link, with Orang, Log then Pengaturan last", () => {
+    const ADMIN = [...FULL, "/orang", "/log", "/pengaturan"];
     expect(hrefsFor("Staff", ["Administrator"])).toEqual(ADMIN);
     expect(hrefsFor("Staff", ["Administrator", "Dashboard Viewer"])).toEqual(ADMIN);
-    expect(WITH_KEUANGAN.slice(3, 6)).toEqual(["/pendamping", "/keuangan", "/perjadin"]);
   });
 
-  it("keeps Keuangan in its place when Pendamping moves to the top for a Keuangan-only Staff (#472)", () => {
-    expect(hrefsFor("Staff", ["Keuangan"])).toEqual([
-      "/pendamping",
-      "/kalender",
-      "/keuangan",
-      "/perjadin",
-      "/sesi-daring",
-      "/feedback",
-      "/cerita",
-      "/sekolah",
-      "/kelompok-sekolah",
-    ]);
+  it("leaves no keuangan route anywhere in the app, so the old links are the normal 404 (#533)", () => {
+    const app = new URL("../src/app", import.meta.url);
+    const segments = readdirSync(app, { recursive: true, encoding: "utf8" }).flatMap((entry) =>
+      entry.split(sep),
+    );
+
+    expect(segments).toContain("perjadin");
+    expect(segments.filter((segment) => segment.includes("keuangan"))).toEqual([]);
   });
 
-  it("shows no Keuangan link without the Grant, nor to a Pimpinan", () => {
+  it("shows no Keuangan link to anyone, an Administrator included (#533)", () => {
     for (const grants of [
       [],
+      ["Administrator"],
       ["Perjadin Editor"],
       ["Dashboard Editor", "Daring Editor"],
     ] as const) {
@@ -76,7 +69,6 @@ describe("sidebarItems", () => {
     expect(hrefsFor("Staff", ["Administrator"])).toContain("/orang");
     for (const grants of [
       [],
-      ["Keuangan"],
       ["Perjadin Editor"],
       ["Daring Editor", "Dashboard Editor", "Dashboard Viewer"],
     ] as const) {
@@ -162,7 +154,6 @@ describe("sidebarItems", () => {
       sidebarItems({
         role: "Staff",
         canEditDaring: true,
-        canViewKeuangan: true,
         canViewDashboard: true,
         canAdminister: hasGrant(admin, "Administrator"),
         driveNeedsAttention,

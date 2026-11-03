@@ -214,10 +214,9 @@ function Cancel({ session }: { session: SessionDetail }) {
  * Moving the date. **A slipped date is not a cancellation**, so this asks for no reason
  * and leaves no dead row on the School's list.
  *
- * Three things can refuse it, and they are different sentences: another online Session for
- * this School already stands on that day, another live offline Session on the trip already
- * holds this School at that date and time (ADR-0038), or an offline Session was moved outside
- * the trip it happens on.
+ * Two things can refuse it, both offline, and they are different sentences: another live offline
+ * Session on the trip already holds this School at that date and time (ADR-0038), or the Session
+ * was moved outside the trip it happens on.
  */
 function MoveDate({ session }: { session: SessionDetail }) {
   const [open, setOpen] = useState(false);
@@ -240,9 +239,7 @@ function MoveDate({ session }: { session: SessionDetail }) {
       }
       if (result.outcome === "collided") {
         setRefusal(
-          result.constraint === "session_one_online_per_school_per_day"
-            ? "Sekolah ini sudah punya Sesi daring pada tanggal tersebut."
-            : "Sekolah ini sudah punya Sesi luring pada tanggal dan jam tersebut di Perjadin ini.",
+          "Sekolah ini sudah punya Sesi luring pada tanggal dan jam tersebut di Perjadin ini.",
         );
       } else if (result.outcome === "school-booked-on-another-perjadin") {
         setRefusal(<SchoolBookedElsewhere refusal={result} />);
