@@ -444,12 +444,8 @@ describe("moving a date", () => {
     expect(after).toEqual({ heldOn: "2026-09-17", startsAt: "13:30:00" });
   });
 
-  /**
-   * The per-day index the criterion names, asserted **by name**. Some constraint firing
-   * would prove nothing: this row satisfies five CHECKs and a composite foreign key, so
-   * a test that only knew it was refused could pass against the wrong rule.
-   */
-  it("is refused by session_one_online_per_school_per_day when the School is taken that day", async () => {
+  /** A School may hold several online Sessions on one day (#531, ADR-0058). */
+  it("moves an online Session onto a date where the School already holds another", async () => {
     const pic = await staff();
     const school = await oneSchool();
     const moving = await addSession({
@@ -460,33 +456,29 @@ describe("moving a date", () => {
 
     const result = await moveSessionDate(pic, moving.id, "2026-09-17", "09:00");
 
-    expect(result).toEqual({
-      outcome: "collided",
-      constraint: "session_one_online_per_school_per_day",
-    });
-    // Unmoved, and still arranged — a refused move is not a cancellation.
+    expect(result).toEqual({ outcome: "moved" });
     const [row] = await db
       .select({ heldOn: schema.session.heldOn })
       .from(schema.session)
       .where(eq(schema.session.id, moving.id));
-    expect(row?.heldOn).toBe("2026-09-10");
+    expect(row?.heldOn).toBe("2026-09-17");
   });
 
-  /** The index is partial on `status <> 'cancelled'`, so a cancelled row is not in the way. */
-  it("moves onto a date whose only other Session was cancelled", async () => {
+  /**
+   * With no online refusal left, a database failure on an online move is a bug and must not read as
+   * a user state. A two-hour Session moved to 23:30 carries its end to 25:30, which `time` rejects.
+   */
+  it("throws when an online move fails in the database (#531)", async () => {
     const pic = await staff();
     const school = await oneSchool();
     const moving = await addSession({
       schoolId: school.id,
       heldOn: "2026-09-10",
-    });
-    await addSession({
-      schoolId: school.id,
-      heldOn: "2026-09-17",
-      status: "cancelled",
+      startsAt: "09:00",
+      endsAt: "11:00",
     });
 
-    expect((await moveSessionDate(pic, moving.id, "2026-09-17", "09:00")).outcome).toBe("moved");
+    await expect(moveSessionDate(pic, moving.id, "2026-09-17", "23:30")).rejects.toThrow();
   });
 
   it("refuses to move a delivered Session", async () => {

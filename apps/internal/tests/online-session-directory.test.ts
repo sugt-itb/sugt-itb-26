@@ -36,8 +36,7 @@ async function oneSchool() {
   });
 }
 
-/** Two Schools in one Cluster — the ordering test needs two, since one School may hold only one
- * online Session per day (`session_one_online_per_school_per_day`, by day not time). */
+/** Two Schools in one Cluster. */
 async function twoSchools() {
   await addProvince("JB", "Jawa Barat");
   const cluster = await addCluster({ slug: "alpha", name: "Cluster Alpha" });
@@ -62,8 +61,8 @@ describe("onlineSessionDirectory", () => {
   it("lists online Sessions newest-first, by held-on then start time", async () => {
     const pic = await staff();
     const { a, b } = await twoSchools();
-    // Insert out of order; the query is what sorts them. The two 09-12 Sessions are at different
-    // Schools, since one School may hold only one online Session per day.
+    // Insert out of order; the query is what sorts them. The 09-12 Sessions include two at one
+    // School, which may hold several online Sessions on a day (#531).
     await addSession({
       schoolId: a.id,
       heldOn: "2026-09-10",
@@ -79,11 +78,17 @@ describe("onlineSessionDirectory", () => {
       heldOn: "2026-09-12",
       startsAt: "13:00",
     });
+    await addSession({
+      schoolId: a.id,
+      heldOn: "2026-09-12",
+      startsAt: "10:00",
+    });
 
     const rows = await onlineSessionDirectory(pic);
 
     expect(rows.map((row) => `${row.heldOn} ${row.startsAt}`)).toEqual([
       "2026-09-12 13:00:00",
+      "2026-09-12 10:00:00",
       "2026-09-12 08:00:00",
       "2026-09-10 09:00:00",
     ]);

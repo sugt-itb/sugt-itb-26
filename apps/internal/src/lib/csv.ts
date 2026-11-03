@@ -1,6 +1,6 @@
 /**
- * **The app's one CSV writer** (#472), shared by the Laporan export and `/keuangan`'s, so the two files
- * open the same way in a spreadsheet.
+ * **The app's one CSV writer** (#472), shared by the Laporan and `/feedback` exports, so the files open
+ * the same way in a spreadsheet.
  *
  * - **A leading UTF-8 BOM**, because the reader is Excel, and Excel reads a UTF-8 CSV as the system
  *   code page without one. That mangles every Indonesian category name.

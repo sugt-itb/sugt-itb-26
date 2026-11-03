@@ -182,6 +182,34 @@ describe("the Sesi number (ADR-0027)", () => {
     expect(ranked.get("s1")?.map((row) => row.id)).toEqual(["a", "b"]);
     expect(ranked.get("s2")?.map((row) => row.id)).toEqual(["c"]);
   });
+
+  /** Ids run against the start times, so only the start time can put these in order. */
+  it("numbers same-day online Sessions at one School consecutively, in start-time order (#531)", () => {
+    const ranked = rankBySchool([
+      { id: "a", schoolId: "s1", heldOn: "2026-10-13", startsAt: "15:00:00" },
+      { id: "b", schoolId: "s1", heldOn: "2026-10-13", startsAt: "09:30:00" },
+      { id: "c", schoolId: "s1", heldOn: "2026-10-12", startsAt: "16:00:00" },
+    ]);
+
+    expect(ranked.get("s1")?.map((row, index) => [row.id, index + 1])).toEqual([
+      ["c", 1],
+      ["b", 2],
+      ["a", 3],
+    ]);
+  });
+
+  /** An exact duplicate is allowed (ADR-0058), and the id still gives each its own number. */
+  it("numbers two online Sessions at one School and start time distinctly (#531)", () => {
+    const ranked = rankBySchool([
+      { id: "b", schoolId: "s1", heldOn: "2026-10-13", startsAt: "09:30:00" },
+      { id: "a", schoolId: "s1", heldOn: "2026-10-13", startsAt: "09:30:00" },
+    ]);
+
+    expect(ranked.get("s1")?.map((row, index) => [row.id, index + 1])).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
+  });
 });
 
 describe("the note", () => {

@@ -19,8 +19,8 @@ import {
  * - **It re-checks nothing the query checks.** `arrangeOnlineSession` opens with `requireStaff`
  *   and `requireGrant(…, "Daring Editor")` (ADR-0047), which are what actually close this path: the signed-in layout does not run before a Server
  *   Action, so a check written here and not there would protect nothing.
- * - **It does not turn a collision (or a future date) into an error.** Both are user states and come
- *   back as values, which the form renders beside the fields that caused them.
+ * - **It does not turn a refusal (a future date, say) into an error.** Refusals are user states and
+ *   come back as values, which the form renders beside the fields that caused them.
  *
  * `staffSurface` turns `@sugt/db`'s typed refusal into a **403** server-side rather than a crash.
  *

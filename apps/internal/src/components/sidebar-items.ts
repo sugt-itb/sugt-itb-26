@@ -4,7 +4,6 @@ import {
   CalendarDays,
   ClipboardCheck,
   Gauge,
-  Landmark,
   LayoutDashboard,
   ListVideo,
   type LucideIcon,
@@ -25,8 +24,6 @@ export type NavItem = {
   staffOnly: boolean;
   /** Shown only to a Daring Editor / Administrator. Absent means "no Grant gate". */
   daringEditorOnly?: boolean;
-  /** Shown only to a Keuangan holder / Administrator (#472). Absent means "no Grant gate". */
-  keuanganOnly?: boolean;
   /** Shown only to a Person who may read the Dashboard (`canViewDashboard`). Absent means "no gate". */
   dashboardView?: boolean;
   /** Shown only to an Administrator. Absent means "no gate". */
@@ -76,11 +73,7 @@ export type VisibleNavItem = NavItem & { badge: boolean };
  * exactly the callers it would bounce. The shell computes `canViewDashboard` once (the one predicate
  * the page guard shares) and passes the boolean down.
  *
- * `keuanganOnly` is a fourth (#472): **Keuangan** is gated the same way, on the Keuangan Grant (an Administrator
- * implies it), since its page `forbidden()`s everyone else. It sits after Pendamping and keeps that
- * place when Pendamping moves to the top.
- *
- * `administratorOnly` is a fifth (#372): **Pengaturan** is shown only to an Administrator, because
+ * `administratorOnly` is a fourth (#372): **Pengaturan** is shown only to an Administrator, because
  * its page `forbidden()`s everyone else — the same "worse than no link" rule once more. **Log**,
  * the Activity Log (#395), carries it for the same reason, and so does **Orang** (#488), whose
  * roster only an Administrator reads.
@@ -100,7 +93,6 @@ const NAV: NavItem[] = [
     daringEditorOnly: true,
   },
   { href: "/pendamping", label: "Pendamping", icon: LayoutDashboard, staffOnly: true },
-  { href: "/keuangan", label: "Keuangan", icon: Landmark, staffOnly: true, keuanganOnly: true },
   { href: "/perjadin", label: "Perjadin", icon: Plane, staffOnly: false },
   { href: "/sesi-daring", label: "Sesi Daring", icon: ListVideo, staffOnly: false },
   { href: "/feedback", label: "Feedback", icon: MessageSquare, staffOnly: false },
@@ -127,14 +119,12 @@ const NAV: NavItem[] = [
 export function sidebarItems({
   role,
   canEditDaring,
-  canViewKeuangan,
   canViewDashboard,
   canAdminister,
   driveNeedsAttention,
 }: {
   role: Role;
   canEditDaring: boolean;
-  canViewKeuangan: boolean;
   canViewDashboard: boolean;
   canAdminister: boolean;
   /** Receipts cannot be uploaded until an Administrator fixes the Drive connection. */
@@ -144,7 +134,6 @@ export function sidebarItems({
     (item) =>
       (!item.staffOnly || role === "Staff") &&
       (!item.daringEditorOnly || canEditDaring) &&
-      (!item.keuanganOnly || canViewKeuangan) &&
       (!item.dashboardView || canViewDashboard) &&
       (!item.administratorOnly || canAdminister),
   ).map((item) => ({ ...item, badge: Boolean(item.driveBadge) && driveNeedsAttention }));

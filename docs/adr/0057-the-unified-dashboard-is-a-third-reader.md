@@ -1,5 +1,9 @@
 # The Unified Dashboard is a third reader, behind a short-lived JWT
 
+> **Amended.** The Dashboard no longer shows a budget, so `monitoringData` and the budget sum are gone
+> and both readers use `programmeDelivery`. See
+> [ADR-0059](./0059-programme-wide-money-is-not-in-the-app.md). The rest of this ADR stands.
+
 The internal app now has a third kind of reader besides a signed-in Person and the public site: the
 company's **Unified Dashboard**, which shows this Programme's summary to company leadership
 ([#503](https://github.com/sugt-itb/sugt-itb-26/issues/503)). It calls one route,

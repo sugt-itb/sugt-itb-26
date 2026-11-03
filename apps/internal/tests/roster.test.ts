@@ -327,7 +327,7 @@ describe("roster", () => {
       email: "diberi@ditsama.itb.ac.id",
       role: "Staff",
     });
-    await addGrant(granted.id, "Keuangan");
+    await addGrant(granted.id, "Daring Editor");
     await addGrant(granted.id, "Administrator");
     await seedPerson({ fullName: "Tanpa", email: "tanpa@ditsama.itb.ac.id", role: "Staff" });
 
@@ -335,7 +335,7 @@ describe("roster", () => {
     // array_agg orders on the grant, so the row's list is stable regardless of insert order.
     expect(byEmail(list, "diberi@ditsama.itb.ac.id")?.grants).toEqual([
       "Administrator",
-      "Keuangan",
+      "Daring Editor",
     ]);
     expect(byEmail(list, "tanpa@ditsama.itb.ac.id")?.grants).toEqual([]);
   });

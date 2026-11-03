@@ -4,13 +4,13 @@ import { Tabs, TabsList, TabsTrigger } from "@sugt/ui/components/tabs";
 import { type ReactNode, useState } from "react";
 
 /**
- * **The Dashboard (`/`) tab switch.** Three tabs, left to right — Pelaksanaan (the delivery-and-budget
- * overview that has always been this screen), Persiapan Program (the free-standing Preparation
+ * **The Dashboard (`/`) tab switch.** Three tabs, left to right — Pelaksanaan (the delivery overview
+ * that has always been this screen), Persiapan Program (the free-standing Preparation
  * Cards, #221, named Persiapan until #423) and Persiapan Luring (one week's Perjadin Preparation
  * Checklists, #423) — with Pelaksanaan the default and first.
  *
  * **A thin client shell, so the tabs stay server-composed.** Every panel is built in the server
- * `page.tsx` — from `monitoringData`, `preparationCards` and `preparationWeek` — and handed in as
+ * `page.tsx` — from `programmeDelivery`, `preparationCards` and `preparationWeek` — and handed in as
  * ready nodes; this only chooses which to show. Only the active node is rendered, mirroring
  * `feedback-view.tsx`.
  *

@@ -11,7 +11,7 @@ import { addGrant, addPerjadin, addPerson, resetDatabase } from "./support/fixtu
 
 /**
  * **Each Grant's reach, on the pages** (#469, ADR-0052): Editor split into Perjadin, Daring and
- * Dashboard Editor, and Keuangan added. No Grant implies another but Administrator, and Dashboard
+ * Dashboard Editor. No Grant implies another but Administrator, and Dashboard
  * Editor → Dashboard Viewer — so only those read `/`; Pretest is the Daring Editor's; Pengaturan
  * Perjadin stays the Administrator's; and a trip off one's Group is the Perjadin Editor's to write.
  */
@@ -64,7 +64,7 @@ function persiapanProgramCanEdit(node: unknown): boolean | undefined {
 }
 
 describe("the Dashboard (/)", () => {
-  it.each(["Perjadin Editor", "Daring Editor", "Keuangan"] as const)(
+  it.each(["Perjadin Editor", "Daring Editor"] as const)(
     "redirects a Staff member holding only %s to /pendamping",
     async (grant) => {
       signIn(await staffWith([grant], "only@itb.ac.id"));
@@ -124,12 +124,7 @@ describe("writing a Perjadin off one's Group", () => {
     await expect(
       requirePerjadinWriter(await staffWith(["Perjadin Editor"], "budi@itb.ac.id"), trip.id),
     ).resolves.toBeUndefined();
-    for (const grant of [
-      "Daring Editor",
-      "Dashboard Editor",
-      "Dashboard Viewer",
-      "Keuangan",
-    ] as const) {
+    for (const grant of ["Daring Editor", "Dashboard Editor", "Dashboard Viewer"] as const) {
       const other = await staffWith([grant], `${grant.replace(" ", "-").toLowerCase()}@itb.ac.id`);
       const refusal = await requirePerjadinWriter(other, trip.id).catch((error: unknown) => error);
       expect(isNotOnPerjadinError(refusal), grant).toBe(true);

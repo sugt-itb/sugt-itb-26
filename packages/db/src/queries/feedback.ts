@@ -110,8 +110,8 @@ export const NO_FEEDBACK_FILTERS: FeedbackFilters = {
 };
 
 /**
- * **The Peserta tab's Tipe Peserta** (#487): the two-way split of the Daftar Hadir Peserta sheets and
- * `/keuangan`. `Siswa` is the Student Class; `GTK-MS` is the GTK and MS Classes together. A filter
+ * **The Peserta tab's Tipe Peserta** (#487): the two-way split of the Daftar Hadir Peserta sheets.
+ * `Siswa` is the Student Class; `GTK-MS` is the GTK and MS Classes together. A filter
  * value, not a stored one — a Participant still picks GTK, MS or Siswa — so it lives beside the query
  * rather than in `@sugt/domain`, whose sets are glossary terms or the values a column holds.
  */

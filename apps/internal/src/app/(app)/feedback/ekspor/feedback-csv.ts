@@ -22,7 +22,7 @@ import { anyFilterOn } from "../feedback-params";
 /**
  * **`/feedback`'s two exports, as pure text** (#490): one row per submission or evaluation, in the
  * order the query hands them over — the tab's own sort — written by the shared `csvDocument`, so
- * the files open in Excel as `/keuangan`'s and the Laporan's do. A Rating is a number cell; **one
+ * the files open in Excel as the Laporan's does. A Rating is a number cell; **one
  * that was not given is an empty cell, never 0** — Hands-on RBL outside Siswa, Penginapan on a day
  * trip, Bantuan Pendamping from a Pendamping or before #481. Rata-rata is the row's average over
  * the Ratings present, rounded to one decimal as the card shows it. Tanggal is the day it was
@@ -116,7 +116,7 @@ export function perjadinFeedbackCsv(rows: readonly PerjadinFeedbackRow[]): strin
 }
 
 /**
- * The filter part of a file name, in `/keuangan`'s style: what the scope covers, slugified, then
+ * The filter part of a file name: what the scope covers, slugified, then
  * `tersaring` when a score filter is on; `semua` with neither. A scope naming a School or trip the
  * picker does not know — an id with no responses — exports nothing, and says `tanpa-masukan`.
  */

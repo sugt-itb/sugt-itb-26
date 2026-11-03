@@ -12,7 +12,7 @@ import { participantFeedbackCsv, participantFeedbackCsvFileName } from "../feedb
  * and sets the file headers. Open to anyone signed in, as `/feedback` is — feedback carries no
  * money (ADR-0004) — and `requirePerson` sends anyone else to sign in, as the page does.
  *
- * A Route Handler rather than a Server Action, because the response is a file, as `/keuangan`'s.
+ * A Route Handler rather than a Server Action, because the response is a file, as the Laporan's.
  */
 export async function GET(request: Request) {
   const person = await requirePerson();

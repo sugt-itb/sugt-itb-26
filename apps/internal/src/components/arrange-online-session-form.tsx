@@ -98,13 +98,11 @@ function ArrangeOnlineSessionForm(
         return;
       }
       setRefusal(
-        result.outcome === "collided"
-          ? "Sekolah ini sudah punya Sesi daring pada tanggal tersebut. Ubah tanggalnya, lalu simpan lagi."
-          : result.outcome === "future-date"
-            ? "Tanggal tidak boleh di masa depan — Sesi daring dicatat setelah terlaksana."
-            : result.outcome === "end-before-start"
-              ? "Jam selesai harus setelah jam mulai."
-              : "Sesi belum tersimpan. Periksa isian, lalu simpan lagi.",
+        result.outcome === "future-date"
+          ? "Tanggal tidak boleh di masa depan — Sesi daring dicatat setelah terlaksana."
+          : result.outcome === "end-before-start"
+            ? "Jam selesai harus setelah jam mulai."
+            : "Sesi belum tersimpan. Periksa isian, lalu simpan lagi.",
       );
     });
   }
