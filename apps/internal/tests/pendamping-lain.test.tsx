@@ -34,21 +34,21 @@ import {
 } from "./support/fixtures";
 
 /**
- * **`/pendamping`'s "Anda" and "Pendamping Lain" tabs, for Administrators** (#440) — the ticket's T4
- * table on its own people:
- * - the two queries open with the Administrator Grant (no other Grant is enough), a Pimpinan refused as
- *   non-Staff first;
- * - anyone but an Administrator gets their own page, the URL's `tab` and `pendamping` never read;
- * - an Administrator sees both tabs, picks another Pendamping and sees that Person's two sections as
- *   they do, with no greeting; a Person on no trip shows the empty state, and an id that names no
- *   Staff Person says so;
- * - a write done there lands under the Administrator's name.
+ * **`/pendamping`'s "Anda" and "Pendamping Lain" tabs, for a Perjadin Editor and an Administrator**
+ * (#440, #539) — the ticket's T4 table on its own people:
+ * - the two queries open with the Perjadin Editor Grant, which an Administrator holds implicitly (no
+ *   other Grant is enough), a Pimpinan refused as non-Staff first;
+ * - anyone else gets their own page, the URL's `tab` and `pendamping` never read;
+ * - a Perjadin Editor or an Administrator sees both tabs, picks another Pendamping and sees that
+ *   Person's two sections as they do, with no greeting; a Person on no trip shows the empty state, and
+ *   an id that names no Staff Person says so;
+ * - a write done there lands under the viewer's name.
  *
  * Against the real database; only the signed-in Person and the router are stubbed.
  */
 
 vi.mock("-/lib/person", () => ({ requirePerson: vi.fn() }));
-// The two Administrator queries, wrapped so a test can assert they never run for anyone else.
+// The two gated queries, wrapped so a test can assert they never run for anyone else.
 vi.mock("@sugt/db/queries", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@sugt/db/queries")>();
   return {
@@ -83,6 +83,8 @@ async function people() {
     andi: await staffWith([], "Andi Wijaya"),
     fajar: await staffWith([], "Fajar Pratama"),
     dewi: await staffWith(["Dashboard Viewer"], "Dewi Lestari"),
+    dina: await staffWith(["Daring Editor"], "Dina Kartika"),
+    eko: await staffWith(["Dashboard Editor"], "Eko Prasetyo"),
     budi: await staffWith(["Perjadin Editor"], "Budi Santoso"),
     sari: await staffWith(["Administrator"], "Sari Utami"),
     hadi: (await addPerson({
@@ -148,7 +150,7 @@ async function refusalOf(call: () => Promise<unknown>) {
 
 /**
  * The page's `searchParams`, as a thenable that records whether it was ever read — so a test can
- * prove a non-Administrator's request never looks at `tab` or `pendamping`.
+ * prove a request from anyone without the Grant never looks at `tab` or `pendamping`.
  */
 function searchParams(params: Record<string, string>) {
   const read = { value: false };
@@ -168,11 +170,11 @@ async function render(viewer: Person, params: Record<string, string> = {}) {
   return { html, read: read.value };
 }
 
-describe("the two queries are an Administrator's", () => {
-  it("refuse a Staff member with no Grant, with Dashboard Viewer and with Perjadin Editor, and a Pimpinan as non-Staff", async () => {
+describe("the two queries are a Perjadin Editor's and an Administrator's", () => {
+  it("refuse a Staff member with no Grant or any other Grant, and a Pimpinan as non-Staff", async () => {
     const who = await people();
 
-    for (const caller of [who.rina, who.dewi, who.budi]) {
+    for (const caller of [who.rina, who.dewi, who.dina, who.eko]) {
       expect(isNotGrantedError(await refusalOf(() => pendampingOptions(caller)))).toBe(true);
       expect(
         isNotGrantedError(await refusalOf(() => pendampingPerjadin(caller, who.andi.id))),
@@ -193,8 +195,27 @@ describe("the two queries are an Administrator's", () => {
       "Andi Wijaya",
       "Budi Santoso",
       "Dewi Lestari",
+      "Dina Kartika",
+      "Eko Prasetyo",
       "Fajar Pratama",
       "Rina Nurhayati",
+    ]);
+    expect(options.find((option) => option.id === who.rina.id)?.email).toBe("rina@itb.ac.id");
+  });
+
+  it("offers a Perjadin Editor every other Staff Person, an Administrator included, with their email", async () => {
+    const who = await people();
+
+    const options = await pendampingOptions(who.budi);
+
+    expect(options.map((option) => option.fullName)).toEqual([
+      "Andi Wijaya",
+      "Dewi Lestari",
+      "Dina Kartika",
+      "Eko Prasetyo",
+      "Fajar Pratama",
+      "Rina Nurhayati",
+      "Sari Utami",
     ]);
     expect(options.find((option) => option.id === who.rina.id)?.email).toBe("rina@itb.ac.id");
   });
@@ -203,13 +224,13 @@ describe("the two queries are an Administrator's", () => {
     const who = await people();
     await perjadinA(who);
 
-    const viewed = await pendampingPerjadin(who.sari, who.rina.id);
-
-    expect(viewed).toEqual({
-      outcome: "ok",
-      fullName: "Rina Nurhayati",
-      perjadin: await myPerjadin(who.rina),
-    });
+    for (const viewer of [who.sari, who.budi]) {
+      await expect(pendampingPerjadin(viewer, who.rina.id)).resolves.toEqual({
+        outcome: "ok",
+        fullName: "Rina Nurhayati",
+        perjadin: await myPerjadin(who.rina),
+      });
+    }
   });
 
   it("answers no-such-pendamping for a Pimpinan, an unknown id and garbage", async () => {
@@ -224,12 +245,12 @@ describe("the two queries are an Administrator's", () => {
 });
 
 describe("the page", () => {
-  it("gives anyone but an Administrator their own page, never reading the URL's tab or person", async () => {
+  it("gives anyone without the Grant their own page, never reading the URL's tab or person", async () => {
     const who = await people();
     await perjadinA(who);
     const url = { tab: "lain", pendamping: who.rina.id };
 
-    for (const viewer of [who.budi, who.dewi, who.fajar]) {
+    for (const viewer of [who.dewi, who.dina, who.eko, who.fajar]) {
       const { html, read } = await render(viewer, url);
       expect(read).toBe(false);
       expect(html).toContain(`Selamat datang kembali, ${viewer.fullName}`);
@@ -247,38 +268,44 @@ describe("the page", () => {
     expect(forRina.html).toContain("Kelompok 10");
   });
 
-  it("shows an Administrator both tabs, Anda being today's page", async () => {
+  it("shows an Administrator and a Perjadin Editor both tabs, Anda being today's page", async () => {
     const who = await people();
 
-    const { html } = await render(who.sari);
+    for (const viewer of [who.sari, who.budi]) {
+      const { html } = await render(viewer);
 
-    expect(html).toContain(">Anda<");
-    expect(html).toContain(">Pendamping Lain<");
-    expect(html).toContain("Selamat datang kembali, Sari Utami");
-    expect(html).toContain("Anda belum tergabung dalam Perjalanan Dinas.");
+      expect(html).toContain(">Anda<");
+      expect(html).toContain(">Pendamping Lain<");
+      expect(html).toContain(`Selamat datang kembali, ${viewer.fullName}`);
+      expect(html).toContain("Anda belum tergabung dalam Perjalanan Dinas.");
+    }
   });
 
   it("shows the picker alone on Pendamping Lain until someone is chosen", async () => {
     const who = await people();
 
-    const { html } = await render(who.sari, { tab: "lain" });
+    for (const viewer of [who.sari, who.budi]) {
+      const { html } = await render(viewer, { tab: "lain" });
 
-    expect(html).toContain("Pilih pendamping…");
-    expect(html).not.toContain("Selamat datang kembali");
-    expect(html).not.toContain("Perjalanan Dinas Anda");
+      expect(html).toContain("Pilih pendamping…");
+      expect(html).not.toContain("Selamat datang kembali");
+      expect(html).not.toContain("Perjalanan Dinas Anda");
+    }
   });
 
   it("shows the chosen Pendamping's sections as they see them, with no greeting", async () => {
     const who = await people();
     await perjadinA(who);
 
-    const { html } = await render(who.sari, { tab: "lain", pendamping: who.rina.id });
+    for (const viewer of [who.sari, who.budi]) {
+      const { html } = await render(viewer, { tab: "lain", pendamping: who.rina.id });
 
-    expect(html).not.toContain("Selamat datang kembali");
-    expect(html).toContain("Perjalanan Dinas Anda");
-    expect(html).toContain("Kelompok 10");
-    expect(html).toContain("PIC: Rina Nurhayati");
-    expect(html).toContain("Perjalanan yang belum selesai, dan yang bisa Anda kerjakan");
+      expect(html).not.toContain("Selamat datang kembali");
+      expect(html).toContain("Perjalanan Dinas Anda");
+      expect(html).toContain("Kelompok 10");
+      expect(html).toContain("PIC: Rina Nurhayati");
+      expect(html).toContain("Perjalanan yang belum selesai, dan yang bisa Anda kerjakan");
+    }
   });
 
   it("shows the empty state of a Pendamping on no trip", async () => {
@@ -301,38 +328,42 @@ describe("the page", () => {
   });
 });
 
-describe("a write on Pendamping Lain is the Administrator's", () => {
-  it("ticks Persiapan, marks a Session delivered and uploads a Dokumen, logged under Sari", async () => {
-    const who = await people();
-    const a = await perjadinA(who);
+describe("a write on Pendamping Lain is the viewer's", () => {
+  it.each(["sari", "budi"] as const)(
+    "ticks Persiapan, marks a Session delivered and uploads a Dokumen, logged under %s, who is not in the Group",
+    async (name) => {
+      const who = await people();
+      const viewer = who[name];
+      const a = await perjadinA(who);
 
-    const [item] = (await perjadinDetail(who.rina, a.id))!.preparation;
-    await expect(
-      togglePreparationItem(who.sari, { perjadinId: a.id, itemId: item!.itemId, checked: true }),
-    ).resolves.toEqual({ outcome: "toggled" });
-    const [tick] = await db.select().from(schema.perjadinPreparationTick);
-    expect(tick?.checkedBy).toBe(who.sari.id);
+      const [item] = (await perjadinDetail(who.rina, a.id))!.preparation;
+      await expect(
+        togglePreparationItem(viewer, { perjadinId: a.id, itemId: item!.itemId, checked: true }),
+      ).resolves.toEqual({ outcome: "toggled" });
+      const [tick] = await db.select().from(schema.perjadinPreparationTick);
+      expect(tick?.checkedBy).toBe(viewer.id);
 
-    // Tandai is status-only: it writes no Log entry and the Session stores no actor, so what holds
-    // for it is that the Administrator's own call lands.
-    await expect(markSessionDelivered(who.sari, a.sessionId)).resolves.toEqual({
-      outcome: "delivered",
-    });
+      // Tandai is status-only: it writes no Log entry and the Session stores no actor, so what holds
+      // for it is that the viewer's own call lands.
+      await expect(markSessionDelivered(viewer, a.sessionId)).resolves.toEqual({
+        outcome: "delivered",
+      });
 
-    await expect(
-      recordPerjadinDocument(who.sari, {
-        perjadinId: a.id,
-        documentId: randomUUID(),
-        driveFileId: randomUUID(),
-        byteSize: 2048,
-        kind: "Daftar Hadir Pendamping",
-        documentDate: daysFromToday(7),
-      }),
-    ).resolves.toEqual({ outcome: "recorded" });
-    const entries = await db
-      .select()
-      .from(schema.activityLog)
-      .where(eq(schema.activityLog.action, "document_uploaded"));
-    expect(entries.map((entry) => entry.actorPersonId)).toEqual([who.sari.id]);
-  });
+      await expect(
+        recordPerjadinDocument(viewer, {
+          perjadinId: a.id,
+          documentId: randomUUID(),
+          driveFileId: randomUUID(),
+          byteSize: 2048,
+          kind: "Daftar Hadir Pendamping",
+          documentDate: daysFromToday(7),
+        }),
+      ).resolves.toEqual({ outcome: "recorded" });
+      const entries = await db
+        .select()
+        .from(schema.activityLog)
+        .where(eq(schema.activityLog.action, "document_uploaded"));
+      expect(entries.map((entry) => entry.actorPersonId)).toEqual([viewer.id]);
+    },
+  );
 });
