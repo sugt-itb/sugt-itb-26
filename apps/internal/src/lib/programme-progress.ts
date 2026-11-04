@@ -13,8 +13,9 @@ import {
  * **The Programme's progress figures — the one derivation two readers share (#503).** The
  * Dashboard (`/`, `app/(app)/dashboard-derive.ts`) shows their percentages; the Unified Dashboard's
  * summary route (`lib/unified-dashboard.ts`) shows the counts and percentages. Both fold the same
- * rows through `deriveProgress`, so the two cannot disagree. Pure: no React, no database, and no
- * money — which is what lets the Unified Dashboard be handed it.
+ * rows through `deriveProgress`, so the two cannot disagree. `/sekolah` and `/sekolah/[slug]` take
+ * the same assessment rule per School (#540). Pure: no React, no database, and no money — which is
+ * what lets the Unified Dashboard be handed it.
  */
 
 /**
@@ -110,7 +111,10 @@ export function completedAssessmentUnits(completions: AssessmentCompletion[]): n
  * Session limit is deliberately unenforced, so a School that over-delivers can read above its true
  * progress, or above 10. `undefined` is a School with no boxes ticked.
  */
-export function schoolKegiatan(deliveredSessions: number, boxes: AssessmentBoxes | undefined) {
+export function schoolKegiatan(
+  deliveredSessions: number,
+  boxes: AssessmentBoxes | undefined,
+): number {
   return deliveredSessions + (boxes === undefined ? 0 : assessmentUnits(boxes));
 }
 

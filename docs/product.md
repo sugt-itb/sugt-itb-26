@@ -217,9 +217,10 @@ plus its completed assessment units, over 10, as the Dashboard does across the P
 - **Detail Sekolah** shows the same number, "n / 10 Kegiatan terlaksana". Since it lists only Sessions,
   one line under it explains the rest with box counts: **"Pretest 3/4 · Posttest 0/4"**.
 - **A unit is all-or-nothing.** Three of four pretest boxes earns nothing, though the line still shows 3/4.
+- **A School on its planned eight Sessions tops out at 9/10 for now.** `/pretest` writes only pretest
+  and nothing enters a posttest yet.
 - **The figure is not capped**, as the Session limit is deliberately unenforced. A School that
   over-delivers can read above its true progress, or above 10.
-- **9/10 is the ceiling for now.** `/pretest` writes only pretest and nothing enters a posttest yet.
 
 ### Pendamping — your own trips
 

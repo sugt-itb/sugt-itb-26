@@ -80,3 +80,6 @@ separate ticket (#249).
 ([#540](https://github.com/sugt-itb/sugt-itb-26/issues/540)): per School, delivered Sessions plus these
 all-or-nothing units, over 10, so their figures add up to the Dashboard's numerator. Neither is capped.
 The public site and `/api/aggregates/delivery` are unchanged and still count Sessions out of eight.
+
+The line above saying only `pretest` is surfaced no longer holds as written: Detail Sekolah shows
+"Posttest n/4", which reads 0 until something enters a posttest. Nothing here can enter one yet.

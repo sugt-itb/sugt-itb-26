@@ -77,12 +77,7 @@ export async function schoolAssessmentCompletions(
     })
     .from(assessmentCompletion)
     .innerJoin(school, eq(school.id, assessmentCompletion.schoolId))
-    .where(eq(school.slug, slug))
-    .orderBy(
-      asc(assessmentCompletion.stream),
-      asc(assessmentCompletion.participantType),
-      asc(assessmentCompletion.kind),
-    );
+    .where(eq(school.slug, slug));
 }
 
 /** The box to toggle, plus the desired state. `done` true ticks it, false un-ticks it. */

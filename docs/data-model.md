@@ -751,8 +751,8 @@ and no `recorded_at`/`recorded_by`**, because a completion needs no audit trail 
 representation. The unique constraint gives one row per box; the three CHECKs mirror the domain
 consts `STREAMS`, `PRETEST_PARTICIPANT_TYPES` and `ASSESSMENT_KINDS` character for character, the
 same discipline as every other set-valued column (see _the glossary is not the schema_). `posttest`
-is a legal `kind` from the start though no UI surfaces it this iteration, so surfacing it is a
-UI-only change rather than a migration.
+is a legal `kind` from the start though nothing writes it this iteration, so screens that read it
+show 0, and entering it is a UI-only change rather than a migration.
 
 `participant_type`'s `Siswa`/`GTK-MS` values coincide with `transaction.participant_type` today but
 sit on a **dedicated** const on purpose — the money axis and the assessment axis evolve

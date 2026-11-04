@@ -367,9 +367,12 @@ describe("the Detail Sekolah payload", () => {
 
   describe("measured by Kegiatan terlaksana, over 10", () => {
     /** The School's page as a reader gets it. Its seed delivers two Sessions. */
-    async function renderDetail(person: Awaited<ReturnType<typeof signInAsStaff>>) {
+    async function renderDetail(
+      person: Awaited<ReturnType<typeof signInAsStaff>>,
+      slug = "sman-1-bandung",
+    ) {
       vi.mocked(requirePerson).mockResolvedValue(person);
-      const params = Promise.resolve({ slug: "sman-1-bandung" });
+      const params = Promise.resolve({ slug });
       return renderToStaticMarkup(await Page({ params } as never));
     }
 
@@ -382,6 +385,28 @@ describe("the Detail Sekolah payload", () => {
       expect(html).toContain("2 / 10 Kegiatan terlaksana");
       expect(html).toContain("Pretest 0/4 · Posttest 0/4");
       expect(html).not.toContain("Sesi terlaksana");
+    });
+
+    it("reads 0 / 10 and empty box counts for a School with nothing", async () => {
+      const person = await signInAsStaff();
+      await seedOneSchool(person.id);
+
+      const html = await renderDetail(person, "sman-2-bandung");
+
+      expect(html).toContain("0 / 10 Kegiatan terlaksana");
+      expect(html).toContain("Pretest 0/4 · Posttest 0/4");
+    });
+
+    it("shows the same figure in its readout, its meter and its meter's label", async () => {
+      const person = await signInAsStaff();
+      const { school } = await seedOneSchool(person.id);
+      await addAssessmentBoxes(school.id, "pretest");
+
+      const html = await renderDetail(person);
+
+      expect(html).toContain("3 / 10 Kegiatan terlaksana");
+      expect(html).toContain(`aria-label="${school.name}: 3 dari 10 Kegiatan terlaksana"`);
+      expect(html).toContain('aria-valuenow="3"');
     });
 
     it("earns no unit for three of four boxes, and still shows the 3/4", async () => {

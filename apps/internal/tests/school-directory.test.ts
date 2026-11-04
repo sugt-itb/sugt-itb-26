@@ -221,6 +221,19 @@ describe("the Direktori Sekolah payload", () => {
       expect(figures.get("SMAN 3 Bogor")).toBe(2);
     });
 
+    it("shows the same figure in a School's row and on its meter", async () => {
+      const { busy } = await seedThreeSchools();
+      await addAssessmentBoxes(busy.id, "pretest");
+
+      const { html } = await renderDirectory();
+
+      // Two delivered Sessions plus a unit: neither the text nor the bar may read the bare 2.
+      expect(html).toContain("3 / 10");
+      expect(html).not.toContain("2 / 10");
+      expect(html).toContain('aria-valuenow="3"');
+      expect(html).not.toContain('aria-valuenow="2"');
+    });
+
     it("earns a unit for each kind, without Sessions and boxes multiplying each other", async () => {
       const { busy, untouched } = await seedThreeSchools();
       await addAssessmentBoxes(busy.id, "pretest");

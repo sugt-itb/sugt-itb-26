@@ -18,7 +18,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 /** A directory row and its Kegiatan terlaksana, which the page folds from two reads (#540). */
-export type SchoolDirectoryRow = DirectorySchool & { kegiatan: number };
+type SchoolDirectoryRow = DirectorySchool & { kegiatan: number };
 
 /**
  * Every School, narrowed by a search box and a Cluster.

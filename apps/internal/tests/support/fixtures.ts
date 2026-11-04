@@ -188,15 +188,6 @@ function oneHourAfter(startsAt: string): string {
 }
 
 /**
- * An **online** Session, which is the cheap one to build: `mode = 'online'` means no
- * Perjadin, so it needs nothing but a School. It carries **no PIC and no Stream (#284)** — a
- * third-party LMS runs online delivery — so it does not even need a Staff Person. The Perjadin CHECK
- * (`session_offline_iff_perjadin`) is an exact mirror — an offline Session has a Perjadin and an
- * online one has none — so an offline fixture would have to build a whole Perjadin first.
- *
- * A cancelled Session needs its reason in the same statement, by CHECK.
- */
-/**
  * Ticks the first `count` of a School's four boxes for one assessment kind. All four is what earns
  * the School that kind's Kegiatan terlaksana unit (ADR-0031).
  */
@@ -216,6 +207,15 @@ export async function addAssessmentBoxes(
     .values(boxes.slice(0, count).map((box) => ({ schoolId, kind, ...box })));
 }
 
+/**
+ * An **online** Session, which is the cheap one to build: `mode = 'online'` means no
+ * Perjadin, so it needs nothing but a School. It carries **no PIC and no Stream (#284)** — a
+ * third-party LMS runs online delivery — so it does not even need a Staff Person. The Perjadin CHECK
+ * (`session_offline_iff_perjadin`) is an exact mirror — an offline Session has a Perjadin and an
+ * online one has none — so an offline fixture would have to build a whole Perjadin first.
+ *
+ * A cancelled Session needs its reason in the same statement, by CHECK.
+ */
 export async function addSession(fixture: SessionFixture) {
   const status: SessionStatus = fixture.status ?? "arranged";
   const startsAt = fixture.startsAt ?? "09:00";

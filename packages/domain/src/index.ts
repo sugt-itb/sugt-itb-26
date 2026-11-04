@@ -51,9 +51,9 @@ export type PretestParticipantType = (typeof PRETEST_PARTICIPANT_TYPES)[number];
 /**
  * The two assessments whose administration this tool tracks — whether a Pretest or Posttest was
  * *administered* to a cohort at a School (yes/no), never scores or outcomes (ADR-0031, reconciling
- * ADR-0009's "delivery, not outcomes"). Only `pretest` is surfaced in the UI this iteration; the
- * column and its CHECK carry `posttest` from the start so surfacing it later is a UI-only change,
- * not a migration. Values a column may hold, mirrored by `assessment_completion_kind_check`.
+ * ADR-0009's "delivery, not outcomes"). Only `pretest` can be entered this iteration; the column
+ * and its CHECK carry `posttest` from the start so entering it later is a UI-only change, not a
+ * migration. Values a column may hold, mirrored by `assessment_completion_kind_check`.
  */
 export const ASSESSMENT_KINDS = ["pretest", "posttest"] as const;
 export type AssessmentKind = (typeof ASSESSMENT_KINDS)[number];
