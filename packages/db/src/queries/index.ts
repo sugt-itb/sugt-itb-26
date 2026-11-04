@@ -133,6 +133,7 @@ export {
 export { programmeDelivery, type MonitoringSession, type ProgrammeDelivery } from "./monitoring";
 export {
   assessmentCompletions,
+  schoolAssessmentCompletions,
   setAssessmentCompletion,
   type AssessmentCompletion,
   type SetAssessmentCompletionInput,

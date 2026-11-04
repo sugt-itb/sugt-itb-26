@@ -51,9 +51,9 @@ export type PretestParticipantType = (typeof PRETEST_PARTICIPANT_TYPES)[number];
 /**
  * The two assessments whose administration this tool tracks — whether a Pretest or Posttest was
  * *administered* to a cohort at a School (yes/no), never scores or outcomes (ADR-0031, reconciling
- * ADR-0009's "delivery, not outcomes"). Only `pretest` is surfaced in the UI this iteration; the
- * column and its CHECK carry `posttest` from the start so surfacing it later is a UI-only change,
- * not a migration. Values a column may hold, mirrored by `assessment_completion_kind_check`.
+ * ADR-0009's "delivery, not outcomes"). Only `pretest` can be entered this iteration; the column
+ * and its CHECK carry `posttest` from the start so entering it later is a UI-only change, not a
+ * migration. Values a column may hold, mirrored by `assessment_completion_kind_check`.
  */
 export const ASSESSMENT_KINDS = ["pretest", "posttest"] as const;
 export type AssessmentKind = (typeof ASSESSMENT_KINDS)[number];
@@ -376,12 +376,12 @@ export const TOTAL_SESSIONS_PER_SCHOOL = SESSIONS_PER_SCHOOL.offline + SESSIONS_
 
 /**
  * How many **Kegiatan terlaksana** units a School is measured against — the denominator of the
- * `/monitoring` progress KPI (`docs/adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md`, #249).
+ * Dashboard's progress KPI and of `/sekolah` and `/sekolah/[slug]` (`docs/adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md`, #249, #540).
  * Its eight Sessions **plus one unit per assessment kind** (pretest + posttest), so **10**. Each
  * assessment unit is all-or-nothing: a School's pretest unit counts only once all four pretest boxes
  * are done, likewise posttest. Derived from `TOTAL_SESSIONS_PER_SCHOOL` and `ASSESSMENT_KINDS.length`
  * so it cannot drift from either. Distinct from `TOTAL_SESSIONS_PER_SCHOOL`, the Session-only total
- * the other progress readouts (school directory/detail, the public figures) still measure against.
+ * the public figures still measure against.
  */
 export const KEGIATAN_UNITS_PER_SCHOOL = TOTAL_SESSIONS_PER_SCHOOL + ASSESSMENT_KINDS.length;
 

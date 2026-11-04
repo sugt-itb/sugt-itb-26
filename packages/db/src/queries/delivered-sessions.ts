@@ -36,10 +36,11 @@ export const onDeliveredSessions = and(
  * The count that goes with it. Counts `session.id` rather than rows, so a School the
  * join found nothing for counts zero instead of one.
  *
- * The denominator is not here and is not in either payload: it is
- * `TOTAL_SESSIONS_PER_SCHOOL` in `@sugt/domain`, the same for every School and fixed
- * from the start, and each screen reads it there. Returning it per row would be a
- * second source of truth for a constant.
+ * The denominator is not here and is not in either payload: each reader takes its own
+ * constant from `@sugt/domain`, the same for every School and fixed from the start —
+ * `TOTAL_SESSIONS_PER_SCHOOL` for the public figures, `KEGIATAN_UNITS_PER_SCHOOL` for the
+ * directory, which adds assessment units to this count (#540). Returning it per row would
+ * be a second source of truth for a constant.
  */
 export const deliveredSessionCount = sql<number>`count(${session.id})`.mapWith(Number);
 

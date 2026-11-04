@@ -21,17 +21,18 @@ import type { Person } from "./caller";
 import { countsTowardsProgress } from "./delivered-sessions";
 
 /**
- * **Detail Sekolah** — one School's Sessions: how many are delivered against the ten
- * it expects, and which of them carry a concern.
+ * **Detail Sekolah** — one School's Sessions: how many are delivered, and which of them
+ * carry a concern. The screen folds the delivered count into Kegiatan terlaksana, over 10
+ * (#540, ADR-0031), with the boxes from `schoolAssessmentCompletions`.
  *
  * Open to anyone signed in, so the signature takes a `Person` and applies no further
  * check: delivery data carries no money, and ADR-0004 opens it to both roles.
  *
- * **Only the Sessions that exist are listed.** A School is due ten and the number is
+ * **Only the Sessions that exist are listed.** A School is due eight and the number is
  * fixed from the start, but a Session comes into existence when it is arranged and
  * never before ([ADR-0006](../../../../docs/adr/0006-sessions-are-created-when-arranged.md)),
- * so there is no such thing as a row for a Session nobody has arranged. The ten is the
- * denominator and nothing else. The design handoff lays all ten out with *"Belum
+ * so there is no such thing as a row for a Session nobody has arranged. The eight are part
+ * of a denominator and nothing else. The design handoff lays them all out with *"Belum
  * dijadwalkan"* against the unplanned ones; that is the schedule ADR-0006 rejects, and
  * it is not built.
  */

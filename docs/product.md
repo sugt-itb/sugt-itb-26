@@ -207,6 +207,21 @@ It shows three things, all worked out afresh on every load:
 3. **One card per Perjadin**, by start date: its name, Schools, "PIC: …" and its own percent in the
    usual tones. Opened, it lists its checklist with every box disabled.
 
+### Sekolah — every School and its progress
+
+`/sekolah` lists every School with its Cluster and Kabupaten/Kota, and `/sekolah/[slug]` lists one
+School's Sessions. Both measure the School by **Kegiatan terlaksana** (#540): its delivered Sessions
+plus its completed assessment units, over 10, as the Dashboard does across the Programme.
+
+- **Direktori Sekolah** shows it as a "Kegiatan terlaksana" column, "n / 10" and a meter, in every row.
+- **Detail Sekolah** shows the same number, "n / 10 Kegiatan terlaksana". Since it lists only Sessions,
+  one line under it explains the rest with box counts: **"Pretest 3/4 · Posttest 0/4"**.
+- **A unit is all-or-nothing.** Three of four pretest boxes earns nothing, though the line still shows 3/4.
+- **A School on its planned eight Sessions tops out at 9/10 for now.** `/pretest` writes only pretest
+  and nothing enters a posttest yet.
+- **The figure is not capped**, as the Session limit is deliberately unenforced. A School that
+  over-delivers can read above its true progress, or above 10.
+
 ### Pendamping — your own trips
 
 `/pendamping` is a Staff member's own trips and nothing else. A Pimpinan is sent to the Dashboard
@@ -1355,8 +1370,9 @@ they must, each box's buttons wrap under its wording, and nothing scrolls sidewa
 
 Absences look like oversights unless they are written down. These are decisions.
 
-- **No stages** between a School's first and last Session. Progress is delivered
-  Sessions out of eight, and nothing else.
+- **No stages** between a School's first and last Session. Progress is Kegiatan terlaksana,
+  delivered Sessions plus pretest and posttest units out of ten, and nothing else. The public
+  site still counts delivered Sessions out of eight.
 - **No Project Teams and no Final Projects.** Several hundred exist across the Programme;
   none are tracked. They reach the public as curated Stories, never as records — a piece
   written about one is not a record of it.

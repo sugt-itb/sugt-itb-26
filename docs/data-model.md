@@ -603,8 +603,12 @@ rest in [what the database does not hold](#what-the-database-does-not-hold).
 
 A Session exists only once arranged
 ([ADR-0006](./adr/0006-sessions-are-created-when-arranged.md)), so there are no planned rows,
-no target dates and nothing is ever overdue. Progress is `count(*) where status = 'delivered'`
-against `TOTAL_SESSIONS_PER_SCHOOL`, a constant that already lives in `@sugt/domain`.
+no target dates and nothing is ever overdue. On the public site, progress is
+`count(*) where status = 'delivered'` against `TOTAL_SESSIONS_PER_SCHOOL`, a constant that already
+lives in `@sugt/domain`. The Dashboard, `/sekolah` and `/sekolah/[slug]` measure Kegiatan terlaksana
+(ADR-0031, #540): that count plus all-or-nothing units from `assessment_completion`, against
+`KEGIATAN_UNITS_PER_SCHOOL`. It is read separately, since joining it to `session` would multiply the
+rows and inflate the count.
 
 **Marking a Session delivered is status only, for both modes** (#140, #152, #153) — and for online it
 is now **legacy** (#318). An online Session is born `delivered` (above), so it never passes through
@@ -747,8 +751,8 @@ and no `recorded_at`/`recorded_by`**, because a completion needs no audit trail 
 representation. The unique constraint gives one row per box; the three CHECKs mirror the domain
 consts `STREAMS`, `PRETEST_PARTICIPANT_TYPES` and `ASSESSMENT_KINDS` character for character, the
 same discipline as every other set-valued column (see _the glossary is not the schema_). `posttest`
-is a legal `kind` from the start though no UI surfaces it this iteration, so surfacing it is a
-UI-only change rather than a migration.
+is a legal `kind` from the start though nothing writes it this iteration, so screens that read it
+show 0, and entering it is a UI-only change rather than a migration.
 
 `participant_type`'s `Siswa`/`GTK-MS` values coincide with `transaction.participant_type` today but
 sit on a **dedicated** const on purpose — the money axis and the assessment axis evolve
