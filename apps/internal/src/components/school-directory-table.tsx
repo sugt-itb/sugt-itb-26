@@ -1,7 +1,7 @@
 "use client";
 
 import type { DirectorySchool } from "@sugt/db/queries";
-import { TOTAL_SESSIONS_PER_SCHOOL } from "@sugt/domain";
+import { KEGIATAN_UNITS_PER_SCHOOL } from "@sugt/domain";
 import { Button } from "@sugt/ui/components/button";
 import { Input } from "@sugt/ui/components/input";
 import { Progress } from "@sugt/ui/components/progress";
@@ -17,6 +17,9 @@ import { cn } from "@sugt/ui/lib/utils";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+/** A directory row and its Kegiatan terlaksana, which the page folds from two reads (#540). */
+type SchoolDirectoryRow = DirectorySchool & { kegiatan: number };
+
 /**
  * Every School, narrowed by a search box and a Cluster.
  *
@@ -30,7 +33,7 @@ import { useMemo, useState } from "react";
  * axis; the Cluster is also the only grouping the Programme is organised by, which
  * makes it worth spending the width on.
  */
-function SchoolDirectoryTable({ schools }: { schools: DirectorySchool[] }) {
+function SchoolDirectoryTable({ schools }: { schools: SchoolDirectoryRow[] }) {
   const [query, setQuery] = useState("");
   const [clusterId, setClusterId] = useState<string | null>(null);
 
@@ -106,7 +109,7 @@ function SchoolDirectoryTable({ schools }: { schools: DirectorySchool[] }) {
               <TableHead>Sekolah</TableHead>
               <TableHead>Cluster</TableHead>
               <TableHead>Kabupaten/Kota</TableHead>
-              <TableHead className="text-right">Sesi terlaksana</TableHead>
+              <TableHead className="text-right">Kegiatan terlaksana</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -129,17 +132,18 @@ function SchoolDirectoryTable({ schools }: { schools: DirectorySchool[] }) {
                     carries the same `<Progress>` the retired `/coverage` page used, because the
                     directory now tells the whole "where are we" story and Coverage showed the same
                     count over the same Schools (#154). A Rating's severity ramp belongs to the
-                    Rating controls (`docs/product.md`), deliberately not to a delivery count.
+                    Rating controls (`docs/product.md`), deliberately not to a delivery count. The
+                    count is uncapped, so a School that over-delivers reads above 10 (#540).
                   */}
                   <div className="flex items-center justify-end gap-3">
                     <span className="tabular-nums">
-                      {school.deliveredSessions} / {TOTAL_SESSIONS_PER_SCHOOL}
+                      {school.kegiatan} / {KEGIATAN_UNITS_PER_SCHOOL}
                     </span>
                     <Progress
                       className="w-21 shrink-0"
-                      value={school.deliveredSessions}
-                      max={TOTAL_SESSIONS_PER_SCHOOL}
-                      aria-label={`${school.name}: ${school.deliveredSessions} dari ${TOTAL_SESSIONS_PER_SCHOOL} Sesi terlaksana`}
+                      value={school.kegiatan}
+                      max={KEGIATAN_UNITS_PER_SCHOOL}
+                      aria-label={`${school.name}: ${school.kegiatan} dari ${KEGIATAN_UNITS_PER_SCHOOL} Kegiatan terlaksana`}
                     />
                   </div>
                 </TableCell>

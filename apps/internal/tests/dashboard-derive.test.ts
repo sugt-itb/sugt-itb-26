@@ -7,9 +7,12 @@ import {
   type MatrixRow,
 } from "-/app/(app)/dashboard-derive";
 import {
+  assessmentBoxes,
+  assessmentBoxesBySchool,
   assessmentProgress,
   completedAssessmentUnits,
   deliveryProgress,
+  schoolKegiatan,
   kegiatanTerlaksana,
 } from "-/lib/programme-progress";
 import type { AssessmentCompletion, MonitoringSession, ProgrammeDelivery } from "@sugt/db/queries";
@@ -346,5 +349,29 @@ describe("completedAssessmentUnits", () => {
       box("s3", "STEM", "Siswa", "pretest"), // partial → contributes 0
     ];
     expect(completedAssessmentUnits(completions)).toBe(3);
+  });
+
+  it("tallies each School's boxes by kind, the counts Detail Sekolah shows", () => {
+    const bySchool = assessmentBoxesBySchool([
+      ...allFour("s1", "pretest"),
+      box("s1", "STEM", "Siswa", "posttest"),
+      ...allFour("s2", "posttest").slice(0, 3),
+    ]);
+
+    expect(bySchool.get("s1")).toEqual({ pretest: 4, posttest: 1 });
+    expect(bySchool.get("s2")).toEqual({ pretest: 0, posttest: 3 });
+    expect(bySchool.has("s3")).toBe(false);
+    expect(assessmentBoxes(allFour("s1", "pretest").slice(0, 2))).toEqual({
+      pretest: 2,
+      posttest: 0,
+    });
+  });
+
+  it("gives one School its delivered Sessions plus its all-or-nothing units, uncapped", () => {
+    expect(schoolKegiatan(0, undefined)).toBe(0);
+    expect(schoolKegiatan(2, { pretest: 3, posttest: 0 })).toBe(2);
+    expect(schoolKegiatan(2, { pretest: 4, posttest: 0 })).toBe(3);
+    expect(schoolKegiatan(8, { pretest: 4, posttest: 4 })).toBe(10);
+    expect(schoolKegiatan(11, { pretest: 4, posttest: 0 })).toBe(12);
   });
 });

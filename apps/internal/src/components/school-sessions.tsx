@@ -13,10 +13,10 @@ import Link from "next/link";
 /**
  * One School's Sessions, oldest first.
  *
- * **Only the Sessions that exist.** A School is due ten, and the ten are a denominator
- * rather than a list — a Session comes into existence when it is arranged and never
- * before (ADR-0006), so there are no rows waiting to be filled in. The design handoff
- * lays all ten out with *"Belum dijadwalkan"* against the unplanned ones; that is the
+ * **Only the Sessions that exist.** A School is due eight, and the eight are part of a
+ * denominator rather than a list — a Session comes into existence when it is arranged and
+ * never before (ADR-0006), so there are no rows waiting to be filled in. The design handoff
+ * lays them all out with *"Belum dijadwalkan"* against the unplanned ones; that is the
  * schedule ADR-0006 rejects, and it is not built here.
  *
  * A cancelled Session stays in the list with the reason it was called off. It counts

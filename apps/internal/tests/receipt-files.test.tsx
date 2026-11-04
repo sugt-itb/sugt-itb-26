@@ -102,7 +102,7 @@ describe("the acquittal's receipt links and gate", () => {
     );
   });
 
-  it("disables Catat and Unggah bukti with the reason while Drive is closed", () => {
+  it("disables Unggah bukti with the reason while Drive is closed, and offers no Catat", () => {
     const reason =
       "Google Drive belum terhubung — minta Administrator menghubungkannya di Pengaturan.";
     const html = renderToStaticMarkup(
@@ -115,13 +115,11 @@ describe("the acquittal's receipt links and gate", () => {
     );
 
     expect(html).toContain(reason);
-    const buttons = [
-      ...html.matchAll(/<button[^>]*>(?:(?!<\/button>).)*?(Catat transaksi|Unggah bukti)/g),
-    ];
+    const buttons = [...html.matchAll(/<button[^>]*>(?:(?!<\/button>).)*?(Unggah bukti)/g)];
     expect(buttons.map(([tag, label]) => [label, /\sdisabled(=""|\s|>)/.test(tag)])).toEqual([
-      ["Catat transaksi", true],
       ["Unggah bukti", true],
     ]);
+    expect(html).not.toContain("Catat transaksi");
   });
 });
 

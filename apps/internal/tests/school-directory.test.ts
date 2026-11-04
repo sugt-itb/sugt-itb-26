@@ -1,9 +1,26 @@
-import { schoolDirectory } from "@sugt/db/queries";
+import Page from "-/app/(app)/sekolah/page";
+import { requirePerson } from "-/lib/person";
+import { deriveProgress } from "-/lib/programme-progress";
+import { assessmentCompletions, programmeDelivery, schoolDirectory } from "@sugt/db/queries";
 import type { Role } from "@sugt/domain";
-import { beforeEach, describe, expect, it } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { addCluster, addProvince, addSchool, addSession, resetDatabase } from "./support/fixtures";
+import {
+  addAssessmentBoxes,
+  addCluster,
+  addProvince,
+  addSchool,
+  addSession,
+  resetDatabase,
+} from "./support/fixtures";
 import { signInAsPerson } from "./support/sign-in";
+
+// Only who the page sees as signed in: `signInAsPerson` still needs the real `resolvePerson`.
+vi.mock("-/lib/person", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("-/lib/person")>()),
+  requirePerson: vi.fn(),
+}));
 
 /**
  * A non-Staff caller, hand-built rather than invited. T3 (#153) retired the Teaching Team Role, so
@@ -153,5 +170,111 @@ describe("the Direktori Sekolah payload", () => {
     await seedThreeSchools();
 
     await expect(schoolDirectory(nonStaff())).resolves.toEqual(await schoolDirectory(staff));
+  });
+
+  it("leaves a School's deliveredSessions alone however many boxes it has ticked", async () => {
+    const person = await signInAsStaff();
+    const { busy } = await seedThreeSchools();
+    await addAssessmentBoxes(busy.id, "pretest");
+    await addAssessmentBoxes(busy.id, "posttest");
+
+    const schools = await schoolDirectory(person);
+
+    expect(schools.find((school) => school.id === busy.id)?.deliveredSessions).toBe(2);
+  });
+
+  /** The screen, as a reader gets it, and each School's figure off its row's meter. */
+  async function renderDirectory() {
+    const person = await signInAsStaff();
+    vi.mocked(requirePerson).mockResolvedValue(person);
+    const html = renderToStaticMarkup(await Page());
+    const figures = new Map(
+      [...html.matchAll(/aria-label="([^"]+): (\d+) dari 10 Kegiatan terlaksana"/g)].map(
+        ([, name, figure]) => [name!, Number(figure)] as const,
+      ),
+    );
+    return { person, html, figures };
+  }
+
+  describe("measured by Kegiatan terlaksana, over 10", () => {
+    it("labels the screen Kegiatan terlaksana, and a School with nothing reads 0 / 10", async () => {
+      const { untouched } = await seedThreeSchools();
+
+      const { html, figures } = await renderDirectory();
+
+      expect(html).toContain(">Kegiatan terlaksana<");
+      expect(html).toContain("jumlah Kegiatan terlaksana.");
+      expect(html).not.toContain("Sesi terlaksana");
+      expect(figures.get("SMAN 2 Bandung")).toBe(0);
+      expect(untouched.name).toBe("SMAN 2 Bandung");
+      expect(html).toContain("0 / 10");
+    });
+
+    it("earns no unit for three of four boxes, and one unit for four of four", async () => {
+      const { busy, other } = await seedThreeSchools();
+      await addAssessmentBoxes(busy.id, "pretest", 3);
+      await addAssessmentBoxes(other.id, "pretest");
+
+      const { figures } = await renderDirectory();
+
+      expect(figures.get("SMAN 1 Bandung")).toBe(2);
+      expect(figures.get("SMAN 3 Bogor")).toBe(2);
+    });
+
+    it("shows the same figure in a School's row and on its meter", async () => {
+      const { busy } = await seedThreeSchools();
+      await addAssessmentBoxes(busy.id, "pretest");
+
+      const { html } = await renderDirectory();
+
+      // Two delivered Sessions plus a unit: neither the text nor the bar may read the bare 2.
+      expect(html).toContain("3 / 10");
+      expect(html).not.toContain("2 / 10");
+      expect(html).toContain('aria-valuenow="3"');
+      expect(html).not.toContain('aria-valuenow="2"');
+    });
+
+    it("earns a unit for each kind, without Sessions and boxes multiplying each other", async () => {
+      const { busy, untouched } = await seedThreeSchools();
+      await addAssessmentBoxes(busy.id, "pretest");
+      await addAssessmentBoxes(busy.id, "posttest");
+      await addAssessmentBoxes(untouched.id, "posttest");
+
+      const { figures } = await renderDirectory();
+
+      // Two delivered Sessions plus two units, and only the one unit where nothing is delivered.
+      expect(figures.get("SMAN 1 Bandung")).toBe(4);
+      expect(figures.get("SMAN 2 Bandung")).toBe(1);
+    });
+
+    it("does not cap a School that delivered more than its eight Sessions", async () => {
+      const { untouched } = await seedThreeSchools();
+      for (let day = 10; day <= 20; day++) {
+        await addSession({ schoolId: untouched.id, heldOn: `2026-10-${day}`, status: "delivered" });
+      }
+
+      const { html, figures } = await renderDirectory();
+
+      expect(figures.get("SMAN 2 Bandung")).toBe(11);
+      expect(html).toContain("11 / 10");
+    });
+
+    it("adds up across the Schools to the numerator of the Dashboard's figure", async () => {
+      const { busy, other } = await seedThreeSchools();
+      await addAssessmentBoxes(busy.id, "pretest");
+      await addAssessmentBoxes(busy.id, "posttest", 3);
+      await addAssessmentBoxes(other.id, "posttest");
+
+      const { person, figures } = await renderDirectory();
+      const dashboard = deriveProgress(
+        await programmeDelivery(person),
+        await assessmentCompletions(person),
+      );
+
+      expect([...figures.values()].reduce((sum, figure) => sum + figure, 0)).toBe(
+        dashboard.kegiatan.count,
+      );
+      expect(dashboard.kegiatan.count).toBe(5);
+    });
   });
 });

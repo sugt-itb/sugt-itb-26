@@ -46,6 +46,9 @@ export async function generateMetadata({ params }: PageProps<"/perjadin/[id]">):
  *
  * The Report has no deadline (ADR-0055, #489): it is neither filed nor due, so the strip shows
  * none.
+ *
+ * **A trip with no line has no strip at all** (#541): nothing records one any more, so "Rp0" would read
+ * as nothing spent, when the app has simply stopped tracking it. The Laporan's URL still answers.
  */
 export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
   const person = await requirePerson();
@@ -91,7 +94,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
         </p>
       </header>
 
-      {acquittal !== null && (
+      {acquittal !== null && acquittal.transactions.length > 0 && (
         <div className="border-b border-border px-4 py-5 sm:px-7">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h2 className="font-heading text-sm font-medium">Pengeluaran</h2>

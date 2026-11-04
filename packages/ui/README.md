@@ -122,7 +122,7 @@ each row was added, then cropped its own title and buttons once it outgrew the s
   opening to closing** whatever is added to it. It is a column: `DialogHeader` pinned at the top,
   `DialogFooter` at the bottom, and the fields inside **`DialogBody`**, the only part that scrolls.
   `DialogBody` belongs to `panel` only — its edge-to-edge margins assume the panel's padding.
-  Used by Catat Transaksi, Dokumen, the Dashboard's Persiapan card editor, the Persiapan checklist,
+  Used by Dokumen, the Dashboard's Persiapan card editor, the Persiapan checklist,
   Catatan Sesi, Tambah/Ubah Sesi, Ubah Group, Ubah Sesi daring and Lihat Grafik.
 
 Inside a panel, short fields may sit two or three to a row from `sm` up, and a row holding several controls

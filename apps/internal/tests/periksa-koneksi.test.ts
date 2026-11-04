@@ -20,7 +20,14 @@ import { eq } from "drizzle-orm";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { connectDrive, digestOf, FORBIDDEN, jpeg, upload } from "./support/drive";
+import {
+  addLineLeftInStaging,
+  connectDrive,
+  digestOf,
+  FORBIDDEN,
+  jpeg,
+  upload,
+} from "./support/drive";
 import {
   addGrant,
   addPerjadin,
@@ -31,7 +38,7 @@ import {
 
 /**
  * **Periksa koneksi, the sweep, the badge and the marker** (#375, ADR-0040) — against the real
- * database and the in-memory `FakeDrive`, faked as in `catat-transaksi-drive.test.ts`.
+ * database and the in-memory `FakeDrive`, faked as in `unggah-bukti-drive.test.ts`.
  */
 
 vi.mock("-/lib/person", () => ({ requirePerson: vi.fn() }));
@@ -94,7 +101,7 @@ async function anUnsyncedLine(perjadinId: string, createdByPersonId: string, des
     description,
     createdByPersonId,
   });
-  const [fileId] = await upload(drive, perjadinId, [jpeg()]);
+  const [fileId] = await upload(drive, perjadinId, [jpeg()], { transactionId: line.id });
   await db.insert(schema.transactionEvidence).values({
     transactionId: line.id,
     driveFileId: fileId!,
@@ -281,6 +288,44 @@ describe("the sweep", () => {
     expect((await lineRow(second.id)).driveSyncedAt).toBeInstanceOf(Date);
     expect((await lineRow(third.id)).driveSyncedAt).toBeNull();
     expect(SWEEP_LIMIT).toBe(25);
+  });
+
+  it("finishes an older line left in _staging: its folder moves out and is shared (#541)", async () => {
+    const { admin, trip } = await scene();
+    const line = await addLineLeftInStaging(drive, folders, admin, trip.id);
+
+    await expect(sweepUnsynced(admin, drive, folders)).resolves.toMatchObject({
+      synced: 1,
+      waiting: 0,
+      failures: [],
+    });
+
+    const [stored] = await db.select().from(schema.perjadin).where(eq(schema.perjadin.id, trip.id));
+    const folder = (await drive.getFile(line.folderId))!;
+    expect(folder.parents).toEqual([stored!.driveFolderId]);
+    expect((await drive.getFile(line.fileId))!.parents).toEqual([line.folderId]);
+    await expect(drive.listPermissions(line.folderId)).resolves.toEqual([
+      expect.objectContaining({ type: "anyone", role: "reader" }),
+    ]);
+    expect((await lineRow(line.transactionId)).driveSyncedAt).toBeInstanceOf(Date);
+  });
+
+  it("leaves an older line in _staging when its Perjadin folder is in the trash", async () => {
+    const { admin, trip } = await scene();
+    const first = await anUnsyncedLine(trip.id, admin.id, "Pertama");
+    await sweepUnsynced(admin, drive, folders);
+    expect((await lineRow(first.id)).driveSyncedAt).toBeInstanceOf(Date);
+    const [stored] = await db.select().from(schema.perjadin).where(eq(schema.perjadin.id, trip.id));
+    drive.trash(stored!.driveFolderId!);
+    const line = await addLineLeftInStaging(drive, folders, admin, trip.id);
+
+    await sweepUnsynced(admin, drive, folders);
+
+    await expect(drive.getFile(line.folderId)).resolves.toMatchObject({
+      parents: [folders.stagingFolderId],
+      trashed: false,
+    });
+    expect((await lineRow(line.transactionId)).driveSyncedAt).toBeNull();
   });
 
   it("moves past a line that fails every time, so the lines behind it are reached", async () => {

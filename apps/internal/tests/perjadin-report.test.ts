@@ -5,7 +5,6 @@ import {
   attachTransactionEvidence,
   isNotStaffError,
   perjadinAcquittal,
-  recordTransaction,
   type NewEvidence,
 } from "@sugt/db/queries";
 import { MAX_RECEIPTS_PER_TRANSACTION, TRANSACTION_CATEGORIES } from "@sugt/domain";
@@ -277,16 +276,12 @@ describe("the category", () => {
     const { staff, trip } = await aTrip();
 
     for (const category of TRANSACTION_CATEGORIES) {
-      const result = await recordTransaction(staff, {
+      await addTransaction({
         perjadinId: trip.id,
-        spentOn: "2026-09-02",
-        description: category,
         amountIdr: 10_000,
         category,
-        participantType: "Siswa",
-        evidence: receipts(1),
+        createdByPersonId: staff.id,
       });
-      expect(result.outcome).toBe("recorded");
     }
 
     const rows = await db
@@ -344,157 +339,33 @@ describe("the category", () => {
 describe("recording a line item", () => {
   beforeEach(resetDatabase);
 
-  it("refuses a non-Staff caller with a distinguishable typed error", async () => {
-    const { trip } = await aTrip();
-
-    const refusal = await recordTransaction(nonStaff(), {
-      perjadinId: trip.id,
-      spentOn: "2026-09-02",
-      description: "Taksi",
-      amountIdr: 50_000,
-      category: "Transport Lokal Dalam Provinsi",
-      participantType: "Siswa",
-      evidence: receipts(1),
-    }).catch((error: unknown) => error);
-
-    expect(isNotStaffError(refusal)).toBe(true);
-  });
-
-  it("records the participant type the form collected, and reads it back on the acquittal", async () => {
-    // `participant_type` is required and orthogonal to `category`; the write persists it and the
-    // acquittal returns it unchanged, which is what the Laporan's per-cohort split reads.
+  it("reads a line's participant type back on the acquittal", async () => {
+    // `participant_type` is required and orthogonal to `category`; the acquittal returns it unchanged,
+    // which is what the Laporan's per-cohort split reads.
     const { staff, trip } = await aTrip();
-
-    const result = await recordTransaction(staff, {
+    await addTransaction({
       perjadinId: trip.id,
-      spentOn: "2026-09-02",
-      description: "Honorarium narasumber",
       amountIdr: 600_000,
       category: "Honorarium Narasumber",
       participantType: "GTK-MS",
-      evidence: receipts(1),
+      createdByPersonId: staff.id,
     });
 
-    expect(result.outcome).toBe("recorded");
     const acquittal = await perjadinAcquittal(staff, trip.id);
     expect(acquittal?.transactions[0]?.participantType).toBe("GTK-MS");
     expect(acquittal?.gtkMsSpentIdr).toBe(600_000);
     expect(acquittal?.siswaSpentIdr).toBe(0);
   });
 
-  it("comes back as a value on a stale Perjadin link and on a non-positive amount", async () => {
+  it("refuses a line of zero, so a trip spending nothing is a trip with no line (#541)", async () => {
+    // What lets the `/pendamping` card read `spentIdr === 0` as "no line" and show no money.
     const { staff, trip } = await aTrip();
 
-    await expect(
-      recordTransaction(staff, {
-        perjadinId: "00000000-0000-0000-0000-000000000000",
-        spentOn: "2026-09-02",
-        description: "Taksi",
-        amountIdr: 50_000,
-        category: "Transport Lokal Dalam Provinsi",
-        participantType: "Siswa",
-        evidence: receipts(1),
-      }),
-    ).resolves.toEqual({ outcome: "no-such-perjadin" });
+    const refusal = await refusedBy(
+      addTransaction({ perjadinId: trip.id, amountIdr: 0, createdByPersonId: staff.id }),
+    );
 
-    await expect(
-      recordTransaction(staff, {
-        perjadinId: trip.id,
-        spentOn: "2026-09-02",
-        description: "Taksi",
-        amountIdr: 0,
-        category: "Transport Lokal Dalam Provinsi",
-        participantType: "Siswa",
-        evidence: receipts(1),
-      }),
-    ).resolves.toEqual({ outcome: "amount-not-positive" });
-  });
-});
-
-describe("recording a line item with its receipts (ADR-0039)", () => {
-  beforeEach(resetDatabase);
-
-  /** One line item's fields, with `count` receipts. */
-  function aLine(perjadinId: string, count: number) {
-    return {
-      perjadinId,
-      spentOn: "2026-09-02",
-      description: "Taksi bandara",
-      amountIdr: 150_000,
-      category: "Transport Bandara/Stasiun" as const,
-      participantType: "Siswa" as const,
-      evidence: receipts(count),
-    };
-  }
-
-  async function rows() {
-    return {
-      lines: await db.select().from(schema.transaction),
-      evidence: await db.select().from(schema.transactionEvidence),
-    };
-  }
-
-  it("refuses a line with no receipt, and writes nothing", async () => {
-    const { staff, trip } = await aTrip();
-
-    await expect(recordTransaction(staff, aLine(trip.id, 0))).resolves.toEqual({
-      outcome: "evidence-missing",
-    });
-    await expect(rows()).resolves.toEqual({ lines: [], evidence: [] });
-  });
-
-  it.each([1, MAX_RECEIPTS_PER_TRANSACTION])(
-    "records a line with %i receipt(s), and the line and its evidence together",
-    async (count) => {
-      const { staff, trip } = await aTrip();
-      const input = aLine(trip.id, count);
-
-      const result = await recordTransaction(staff, input);
-
-      expect(result.outcome).toBe("recorded");
-      const { lines, evidence } = await rows();
-      expect(lines).toHaveLength(1);
-      expect(lines[0]?.id).toBe((result as { transactionId: string }).transactionId);
-      expect(evidence.map((row) => row.driveFileId).sort()).toEqual(
-        input.evidence.map((file) => file.driveFileId).sort(),
-      );
-      expect(evidence.every((row) => row.transactionId === lines[0]?.id)).toBe(true);
-      expect(evidence.every((row) => row.uploadedByPersonId === staff.id)).toBe(true);
-    },
-  );
-
-  it("refuses a line with more than five receipts, and writes nothing", async () => {
-    const { staff, trip } = await aTrip();
-
-    await expect(
-      recordTransaction(staff, aLine(trip.id, MAX_RECEIPTS_PER_TRANSACTION + 1)),
-    ).resolves.toEqual({
-      outcome: "too-many-receipts",
-      limit: MAX_RECEIPTS_PER_TRANSACTION,
-      count: MAX_RECEIPTS_PER_TRANSACTION + 1,
-    });
-    await expect(rows()).resolves.toEqual({ lines: [], evidence: [] });
-  });
-
-  it("writes no line when one of its receipts is refused by the database", async () => {
-    // One transaction for both: a receipt already attached elsewhere trips the unique key, and the
-    // line inserted a moment earlier in the same write must not survive it.
-    const { staff, trip } = await aTrip();
-    const first = aLine(trip.id, 1);
-    await recordTransaction(staff, first);
-    const input = aLine(trip.id, 2);
-    input.evidence[1] = {
-      contentType: "image/jpeg",
-      byteSize: 10,
-      driveFileId: first.evidence[0]!.driveFileId,
-    };
-
-    const refusal = await refusedBy(recordTransaction(staff, input));
-
-    expect(refusal).toBe("transaction_evidence_drive_file_id_unique");
-    const { lines, evidence } = await rows();
-    expect(lines).toHaveLength(1);
-    expect(evidence).toHaveLength(1);
+    expect(refusal).toBe("transaction_amount_check");
   });
 });
 

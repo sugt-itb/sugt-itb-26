@@ -29,21 +29,22 @@ export const metadata: Metadata = { title: "Pendamping" };
  * redirected there. `myPerjadin` is scoped *by* the caller, not gated by role, and the money it
  * carries is open to read (ADR-0026), so it needs no Staff choke point.
  *
- * **An Administrator gets two tabs** (#440): **Anda**, which is this page, and **Pendamping Lain**,
- * where they pick any other Staff Person and see that Person's two sections exactly as that
- * Person does, with no greeting — to show someone how to use their own page. The tab and the Person
- * are in the URL (`?tab=lain&pendamping=<id>`); for anyone else the server never reads them.
+ * **A Perjadin Editor gets two tabs** (#440, #539), and so does an Administrator, who implies the
+ * Grant: **Anda**, which is this page, and **Pendamping Lain**, where they pick any other Staff Person
+ * and see that Person's two sections exactly as that Person does, with no greeting — to show someone
+ * how to use their own page. The tab and the Person are in the URL
+ * (`?tab=lain&pendamping=<id>`); for anyone else the server never reads them.
  */
 export default async function Page({ searchParams }: PageProps<"/pendamping">) {
   const person = await requirePerson();
   if (person.role !== "Staff") redirect("/");
 
-  // **Anyone but an Administrator gets today's page**, and `searchParams` is never read for them:
-  // `?tab=lain&pendamping=<id>` changes nothing, and nothing of anyone else is loaded or sent.
-  const params = hasGrant(person, "Administrator") ? await searchParams : null;
+  // **Anyone without the Perjadin Editor Grant gets today's page**, and `searchParams` is never read
+  // for them: `?tab=lain&pendamping=<id>` changes nothing, and nothing of anyone else is loaded or sent.
+  const params = hasGrant(person, "Perjadin Editor") ? await searchParams : null;
   const tab: PendampingTab = params?.tab === "lain" ? "lain" : "anda";
 
-  // Each trip card's Catat Transaksi is closed, with the reason, while Drive is (ADR-0040). Always
+  // Each trip card's Dokumen is closed, with the reason, while Drive is (ADR-0040). Always
   // the viewer's gate, on Pendamping Lain too: the viewer is who uploads.
   if (params === null || tab === "anda") {
     const [trips, gate] = await Promise.all([myPerjadin(person), uploadGate(person)]);
@@ -80,8 +81,9 @@ export default async function Page({ searchParams }: PageProps<"/pendamping">) {
         )}
         {/*
           Their two sections exactly as they see them — same titles, descriptions and empty state,
-          no greeting — so a screenshot shows their page. Every control works as the Administrator,
-          who writes every Perjadin (ADR-0048), and the Log names the Administrator.
+          no greeting — so a screenshot shows their page. Every control works as the viewer, a
+          Perjadin Editor or an Administrator, who writes every Perjadin (ADR-0048), and every logged
+          write names the viewer.
         */}
         {viewed?.outcome === "ok" && (
           <PendampingTrips
@@ -148,7 +150,7 @@ function PendampingTrips({
       />
       <MyPerjadinSection
         title="Perjalanan Dinas Sebelumnya"
-        description="Perjalanan yang sudah selesai, yang terbaru di atas. Transaksi dan dokumennya masih bisa dikerjakan."
+        description="Perjalanan yang sudah selesai, yang terbaru di atas. Dokumennya masih bisa dikerjakan."
         trips={trips.previous}
         uploadGate={gate}
         canWrite={canWrite}
