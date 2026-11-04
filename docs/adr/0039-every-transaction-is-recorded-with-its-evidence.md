@@ -82,3 +82,9 @@ the gate still enters the whole line that evening and loses nothing.
   insists on before it will submit. This is the second kind: the receipts are part of the line being
   written. Filing gains no new condition — its evidence check is unchanged, and now only ever fires
   on a grandfathered line. _Amended 2026-10-13: there is no filing any more (ADR-0055)._
+
+## Amendment (2026-11-04): no new line is recorded
+
+Nothing records a line any more ([ADR-0060](./0060-trip-spending-is-recorded-outside-the-app.md), [#541](https://github.com/sugt-itb/sugt-itb-26/issues/541)), so "recorded with its evidence" describes the lines
+already there. `attachTransactionEvidence` still holds the ceiling of five, and a line's only receipt
+still cannot be deleted. A line from before this rule may still have none, and Unggah bukti still fixes it.

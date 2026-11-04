@@ -88,3 +88,9 @@ now a kind of Perjadin Document, uploaded as one PDF beside the attendance sheet
 ([ADR-0042](./0042-perjadin-documents-are-stored-in-the-company-google-drive.md)). The tool stores
 the signed paper; it does not fill an SPPD template, so nothing here changes what the acquittal
 export renders. Surat Tugas and SPJ stay unconfirmed, and this ADR's bet still waits on them.
+
+## Amendment (2026-11-04): nobody enters transactions here
+
+The opening line no longer holds: Finance now records and evidences trip spending outside the app, so a
+PIC enters nothing here ([ADR-0060](./0060-trip-spending-is-recorded-outside-the-app.md), [#541](https://github.com/sugt-itb/sugt-itb-26/issues/541)). The lines already recorded stay maintainable, and the Laporan
+and its export still render them.

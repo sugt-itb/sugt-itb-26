@@ -5,8 +5,8 @@ import { readyFolders } from "./fixed-folders";
 import { DRIVE_FOLDERS_UNRESOLVED, DRIVE_NOT_CONNECTED, driveBrokenSince } from "./upload-messages";
 
 /**
- * **Can a file be uploaded to Drive right now?** (ADR-0040, #373) Catat transaksi, every row's
- * Unggah bukti and the Dokumen dialog (ADR-0042) render disabled, with this reason, when it cannot
+ * **Can a file be uploaded to Drive right now?** (ADR-0040, #373) Every row's Unggah bukti and the
+ * Dokumen dialog (ADR-0042) render disabled, with this reason, when it cannot
  * — wherever they render: the acquittal and the trip cards on `/pendamping`.
  *
  * The page's answer is a courtesy. The Server Actions refuse the same states themselves

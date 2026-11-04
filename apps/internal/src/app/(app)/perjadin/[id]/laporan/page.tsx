@@ -33,8 +33,8 @@ export async function generateMetadata({
  *
  * **Readable by ANY signed-in Person now** (ADR-0004 reversed by [ADR-0026](../../../../../../../../docs/adr/0026-money-is-open-to-read-and-staff-only-to-write.md),
  * #180). `perjadinAcquittal` is an open money read, so a Pimpinan reaching this URL sees the whole
- * acquittal — money reads are open. Every **write** control on the page — Catat transaksi, Unggah
- * bukti and each receipt's Hapus (#462) — is the trip's Group's, a Perjadin Editor's or an
+ * acquittal — money reads are open. Every **write** control on the page — Unggah bukti, each
+ * receipt's Hapus (#462) and each line's Hapus (#463) — is the trip's Group's, a Perjadin Editor's or an
  * Administrator's (ADR-0048): absent for anyone else, and refused server-side by each Server
  * Action's query (or, for the receipt actions, before Drive is asked anything — by `staffOnTrip`,
  * and for Hapus by `receiptDeleteTarget`). So a Pimpinan or a Staff member off the trip
@@ -51,6 +51,9 @@ export async function generateMetadata({
  * **It is neither filed nor due** (ADR-0055, #489): no Laporkan, no deadline. The Report is every
  * transaction on the trip, each with its receipts, reconciled against nothing — the Advance is not
  * tracked (ADR-0051, #464) — and Uang Perjalanan Terpakai is derived, never stored.
+ *
+ * **Nothing records a new line** (#541). A trip with none has no Pengeluaran block, since "Rp0" would
+ * read as nothing spent: only the list's "Belum ada transaksi", and this URL keeps answering.
  */
 export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan">) {
   const person = await requirePerson();
@@ -61,7 +64,7 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
 
   const transactions = acquittal.transactions.map(withLinks);
   // Who writes this trip (ADR-0048): its Group, a Perjadin Editor or an Administrator. Everyone else reads
-  // the whole Laporan with Catat transaksi, Unggah bukti and Hapus absent.
+  // the whole Laporan with Unggah bukti and Hapus absent.
   const canWrite = await canWritePerjadin(person, id);
   const gate = canWrite
     ? await uploadGate(person)
@@ -79,43 +82,45 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]/laporan
         <h1 className="mt-1 font-heading text-lg font-medium">Laporan Perjadin</h1>
       </header>
 
-      <div className="border-b border-border px-4 py-5 sm:px-7">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <h2 className="font-heading text-sm font-medium">Pengeluaran</h2>
-          <div className="flex flex-wrap items-center gap-2">
-            {/*
-              A Route Handler rather than a Server Action: the response is a file with its own
-              content type and `Content-Disposition`, which an action cannot set.
-            */}
-            <LinkButton
-              href={`/perjadin/${id}/laporan/ekspor`}
-              variant="outline"
-              size="sm"
-            >
-              Ekspor rincian
-            </LinkButton>
+      {transactions.length > 0 && (
+        <div className="border-b border-border px-4 py-5 sm:px-7">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h2 className="font-heading text-sm font-medium">Pengeluaran</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {/*
+                A Route Handler rather than a Server Action: the response is a file with its own
+                content type and `Content-Disposition`, which an action cannot set.
+              */}
+              <LinkButton
+                href={`/perjadin/${id}/laporan/ekspor`}
+                variant="outline"
+                size="sm"
+              >
+                Ekspor rincian
+              </LinkButton>
+            </div>
           </div>
-        </div>
 
-        <dl className="mt-2.5 flex flex-wrap gap-x-8 gap-y-2 text-sm">
-          <MoneyFigure
-            label="Uang Perjalanan Terpakai"
-            amountIdr={acquittal.spentIdr}
-          />
-          {/*
-            The same Uang Perjalanan Terpakai split by the cohort each transaction served — the two sum to
-            `spentIdr`, since `participant_type` is required and has no third value.
-          */}
-          <MoneyFigure
-            label="Total Siswa"
-            amountIdr={acquittal.siswaSpentIdr}
-          />
-          <MoneyFigure
-            label="Total GTK-MS"
-            amountIdr={acquittal.gtkMsSpentIdr}
-          />
-        </dl>
-      </div>
+          <dl className="mt-2.5 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+            <MoneyFigure
+              label="Uang Perjalanan Terpakai"
+              amountIdr={acquittal.spentIdr}
+            />
+            {/*
+              The same Uang Perjalanan Terpakai split by the cohort each transaction served — the two sum to
+              `spentIdr`, since `participant_type` is required and has no third value.
+            */}
+            <MoneyFigure
+              label="Total Siswa"
+              amountIdr={acquittal.siswaSpentIdr}
+            />
+            <MoneyFigure
+              label="Total GTK-MS"
+              amountIdr={acquittal.gtkMsSpentIdr}
+            />
+          </dl>
+        </div>
+      )}
 
       {acquittal.pimpinan.length > 0 && (
         <section className="border-b border-border px-4 py-5 sm:px-7">

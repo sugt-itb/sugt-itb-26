@@ -1,14 +1,20 @@
 import { openReceiptSessionsAction } from "-/app/(app)/perjadin/[id]/laporan/actions";
 import type { FakeDrive } from "-/lib/drive/fake-drive";
 import { ensureFixedFolders, readyFolders, type ReadyFolders } from "-/lib/drive/fixed-folders";
+import { reconcileTransaction } from "-/lib/drive/reconcile";
 import { encryptRefreshToken } from "-/lib/drive/token-crypto";
 import { db, schema } from "@sugt/db";
+import type { Person } from "@sugt/db/queries";
+import type { TransactionCategory, TransactionParticipantType } from "@sugt/domain";
+import { eq } from "drizzle-orm";
 import { vi } from "vitest";
+
+import { addActivityLogEntry, addTransaction } from "./fixtures";
 
 /**
  * **What a receipt test needs of Google Drive** (ADR-0040): the token endpoint, a connected Drive
- * with its fixed tree, receipt bytes, and the browser's upload. Shared by the Catat transaksi and
- * Unggah bukti tests, which each mock `openDrive` to hand back their own `FakeDrive` — a `vi.mock`
+ * with its fixed tree, receipt bytes, the browser's upload, and a line already recorded. Shared by
+ * the Unggah bukti, Hapus and Periksa koneksi tests, which each mock `openDrive` to hand back their own `FakeDrive` — a `vi.mock`
  * has to sit in the test file, so it is not here.
  */
 
@@ -88,14 +94,14 @@ export async function connectDrive(
 }
 
 /**
- * A receipt control's upload, as the browser does it: open a session per file — for a row's line
- * when `transactionId` is given — then `PUT` each file's bytes (`FakeDrive.land`). Answers the ids.
+ * A row's upload, as the browser does it: open a session per file for the line, then `PUT` each
+ * file's bytes (`FakeDrive.land`). Answers the ids.
  */
 export async function upload(
   drive: FakeDrive,
   perjadinId: string,
   files: Uint8Array[],
-  options: { contentType?: string; transactionId?: string } = {},
+  options: { contentType?: string; transactionId: string },
 ): Promise<string[]> {
   const opened = await openReceiptSessionsAction(
     perjadinId,
@@ -107,6 +113,127 @@ export async function upload(
   );
   if (opened.outcome !== "ready") throw new Error(`Sessions refused: ${opened.outcome}`);
   return opened.sessionUris.map((uri, index) => drive.land(uri, files[index]!).id);
+}
+
+/**
+ * **A line recorded before #541, with its receipts**: nothing in the app records one any more, so it
+ * is inserted directly — the row, its evidence and its `transaction_recorded` Log entry — with real
+ * files in `drive`, and the real reconcile puts them in place. Answers whether that finished, with
+ * the line's id, its folder and its receipt files in upload order.
+ */
+export async function addRecordedLine(
+  drive: FakeDrive,
+  folders: ReadyFolders,
+  person: Person,
+  line: {
+    perjadinId: string;
+    receipts: number;
+    spentOn?: string;
+    description?: string;
+    amountIdr?: number;
+    category?: TransactionCategory;
+    participantType?: TransactionParticipantType;
+  },
+) {
+  const {
+    perjadinId,
+    receipts,
+    spentOn = "2026-10-13",
+    description = "Makan siang",
+    amountIdr = 150_000,
+    category = "Konsumsi",
+    participantType = "Siswa",
+  } = line;
+  const row = await addTransaction({
+    perjadinId,
+    spentOn,
+    description,
+    amountIdr,
+    category,
+    participantType,
+    createdByPersonId: person.id,
+  });
+  const files = Array.from({ length: receipts }, () => jpeg());
+  const fileIds = await upload(drive, perjadinId, files, { transactionId: row.id });
+  await db.insert(schema.transactionEvidence).values(
+    fileIds.map((driveFileId, index) => ({
+      transactionId: row.id,
+      driveFileId,
+      contentType: "image/jpeg",
+      byteSize: files[index]!.length,
+      uploadedByPersonId: person.id,
+    })),
+  );
+  await addActivityLogEntry({
+    perjadinId,
+    actorPersonId: person.id,
+    actorEmail: person.email,
+    action: "transaction_recorded",
+    details: {
+      transactionId: row.id,
+      category,
+      amountIdr,
+      participantType,
+      spentOn,
+      receiptCount: receipts,
+    },
+    searchText: `catat transaksi · ${category.toLowerCase()}`,
+  });
+
+  const reconciled = await reconcileTransaction(person, drive, folders, row.id);
+  const [stored] = await db
+    .select()
+    .from(schema.transaction)
+    .where(eq(schema.transaction.id, row.id));
+  return {
+    transactionId: row.id,
+    synced: reconciled.outcome === "synced",
+    folderId: stored!.driveFolderId!,
+    fileIds,
+  };
+}
+
+/**
+ * **An older line its reconcile never finished** (#541): one receipt, in a folder still in `_staging`
+ * where the record path used to build it, and unsynced. Nothing makes one any more, but one may be
+ * waiting, and the sweep must still finish it.
+ */
+export async function addLineLeftInStaging(
+  drive: FakeDrive,
+  folders: ReadyFolders,
+  person: Person,
+  perjadinId: string,
+) {
+  const row = await addTransaction({
+    perjadinId,
+    spentOn: "2026-10-13",
+    amountIdr: 150_000,
+    category: "Konsumsi",
+    createdByPersonId: person.id,
+  });
+  const staged = await drive.createFolder({
+    name: `2026-10-13 · Konsumsi · T-${row.id.slice(0, 8)}`,
+    parentId: folders.stagingFolderId,
+    appProperties: { sugtPerjadinId: perjadinId, sugtTransactionId: row.id },
+  });
+  const [fileId] = await upload(drive, perjadinId, [jpeg()], { transactionId: row.id });
+  await drive.updateFile(fileId!, {
+    addParent: staged.id,
+    removeParent: folders.stagingFolderId,
+    appProperties: { sugtTransactionId: row.id },
+  });
+  await db
+    .update(schema.transaction)
+    .set({ driveFolderId: staged.id })
+    .where(eq(schema.transaction.id, row.id));
+  await db.insert(schema.transactionEvidence).values({
+    transactionId: row.id,
+    driveFileId: fileId!,
+    contentType: "image/jpeg",
+    byteSize: 4096,
+    uploadedByPersonId: person.id,
+  });
+  return { transactionId: row.id, folderId: staged.id, fileId: fileId! };
 }
 
 /** The digest a refused Server Action threw — `NEXT_HTTP_ERROR_FALLBACK;403` for `forbidden()`. */

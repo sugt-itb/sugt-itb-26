@@ -1,10 +1,5 @@
 import type { DriveRefusal } from "-/lib/drive/upload-messages";
-import type {
-  AcquittalEvidence,
-  AcquittalTransaction,
-  NewTransaction,
-  RecordTransactionResult,
-} from "@sugt/db/queries";
+import type { AcquittalEvidence, AcquittalTransaction } from "@sugt/db/queries";
 
 /**
  * The shapes the Perjadin Report's Server Actions pass to and from the client. They live here
@@ -19,7 +14,7 @@ import type {
 export type UploadedReceipt = { driveFileId: string };
 
 /**
- * One file a receipt control is about to upload to Drive (ADR-0040): its size and type
+ * One file a row's Unggah bukti is about to upload to Drive (ADR-0040): its size and type
  * **after** the browser compressed it. The server opens a session that declares exactly this size,
  * so Drive refuses anything longer, and re-checks both on the file Drive ends up holding.
  */
@@ -38,41 +33,12 @@ export type OpenReceiptSessionsResult =
   | DriveRefusal;
 
 /**
- * What the Catat transaksi dialog sends once every receipt has landed in Drive: the line's fields,
- * and the Drive file id each upload came back with. The action verifies each file in Drive and hands
- * the line and its evidence to `recordTransaction` together (ADR-0039, ADR-0040).
- */
-export type TransactionToRecord = Omit<
-  NewTransaction,
-  "evidence" | "transactionId" | "driveFolderId"
-> & {
-  receipts: UploadedReceipt[];
-};
-
-/**
- * What `recordTransactionAction` did. The query's refusals, plus the ones only the action can see:
- * a receipt that is not what it claims (`receipt-unverified`: not this Perjadin's, not in `_staging`,
- * trashed, over the cap; `unsupported-type`: its first bytes are no PDF or image) and Drive itself
- * being unusable. **Every one of those records nothing.**
- *
- * `recorded` carries `synced`: false when the line and its receipts are written but the reconcile
- * could not finish putting them in place — never an error, since the line stands.
- */
-export type RecordTransactionActionResult =
-  | { outcome: "recorded"; transactionId: string; synced: boolean }
-  | Exclude<RecordTransactionResult, { outcome: "recorded" }>
-  | { outcome: "receipt-unverified"; failed: number }
-  | { outcome: "unsupported-type" }
-  | DriveRefusal;
-
-/**
  * What `finalizeReceiptsAction` recorded — the row's own Unggah bukti (ADR-0040, #374).
  *
  * `failed` counts the files that did not pass the check in Drive — not this Perjadin's, not in
  * `_staging`, trashed, over the cap, or no PDF or image by their first bytes. **Partial success is
  * real here**: the line already stands, so a receipt that checks out is worth keeping, and the
- * failures are reported, not swallowed. (Recording a new line is the opposite: any failure refuses
- * it.) `synced` is false when the receipts are recorded but the reconcile could not yet move them
+ * failures are reported, not swallowed. `synced` is false when the receipts are recorded but the reconcile could not yet move them
  * into the line's folder — never an error.
  *
  * The refusals are the query layer's own, passed through rather than swallowed. The two stale

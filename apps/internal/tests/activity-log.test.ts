@@ -7,9 +7,7 @@ import {
   activityLogRincian,
   attachTransactionEvidence,
   isNotGrantedError,
-  isNotStaffError,
   planPerjadin,
-  recordTransaction,
   type ActivityLogEntry,
   type ActivityLogFilters,
   type NewEvidence,
@@ -151,6 +149,17 @@ describe("each money write logs one entry with the change", () => {
       action: "report_filed",
       details: { transactionCount: 1, totalIdr: 1 },
     } as const;
+    const recorded = {
+      action: "transaction_recorded",
+      details: {
+        transactionId: randomUUID(),
+        category: "Konsumsi",
+        amountIdr: 1,
+        participantType: "Siswa",
+        spentOn: "2026-10-12",
+        receiptCount: 1,
+      },
+    } as const;
     const neverRun = (tx: Parameters<typeof logActivity>[0], actor: Person) => [
       // @ts-expect-error -- advance_set is no longer written
       logActivity(tx, actor, randomUUID(), set),
@@ -158,61 +167,10 @@ describe("each money write logs one entry with the change", () => {
       logActivity(tx, actor, randomUUID(), changed),
       // @ts-expect-error -- report_filed is no longer written (#489)
       logActivity(tx, actor, randomUUID(), filed),
+      // @ts-expect-error -- transaction_recorded is no longer written (#541)
+      logActivity(tx, actor, randomUUID(), recorded),
     ];
     expect(neverRun).toBeTypeOf("function");
-  });
-
-  it("recordTransaction logs transaction_recorded with the line and its receipt count", async () => {
-    const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id });
-
-    const result = await recordTransaction(pic, {
-      perjadinId: trip.id,
-      spentOn: "2026-10-12",
-      description: "Makan siang",
-      amountIdr: 1_250_000,
-      category: "Konsumsi",
-      participantType: "Siswa",
-      evidence: receipts(2),
-    });
-    if (result.outcome !== "recorded") throw new Error(result.outcome);
-
-    const logged = await entries();
-    expect(logged).toHaveLength(1);
-    expect(logged[0]).toMatchObject({
-      actorPersonId: pic.id,
-      perjadinId: trip.id,
-      action: "transaction_recorded",
-      details: {
-        transactionId: result.transactionId,
-        category: "Konsumsi",
-        amountIdr: 1_250_000,
-        participantType: "Siswa",
-        spentOn: "2026-10-12",
-        receiptCount: 2,
-      },
-      searchText: "catat transaksi · konsumsi · rp1.250.000 · siswa · tgl 2026-10-12 · 2 bukti",
-    });
-  });
-
-  it("recordTransaction logs nothing for a sixth receipt or a non-Staff caller", async () => {
-    const pic = await staff();
-    const trip = await addPerjadin({ picPersonId: pic.id });
-    const line = {
-      perjadinId: trip.id,
-      spentOn: "2026-10-12",
-      description: "Makan siang",
-      amountIdr: 1_250_000,
-      category: "Konsumsi" as const,
-      participantType: "Siswa" as const,
-    };
-
-    const refused = await recordTransaction(pic, { ...line, evidence: receipts(6) });
-    expect(refused.outcome).toBe("too-many-receipts");
-    await expect(
-      recordTransaction(nonStaff(), { ...line, evidence: receipts(1) }),
-    ).rejects.toSatisfy(isNotStaffError);
-    await expect(entries()).resolves.toEqual([]);
   });
 
   it("attachTransactionEvidence logs evidence_uploaded with the batch and the line's new total", async () => {
@@ -269,15 +227,12 @@ describe("each money write logs one entry with the change", () => {
   it("keeps the email the actor had at the time, after it changes", async () => {
     const pic = await staff();
     const trip = await addPerjadin({ picPersonId: pic.id });
-    await recordTransaction(pic, {
+    const line = await addTransaction({
       perjadinId: trip.id,
-      spentOn: "2026-10-12",
-      description: "Makan siang",
       amountIdr: 1_250_000,
-      category: "Konsumsi",
-      participantType: "Siswa",
-      evidence: receipts(1),
+      createdByPersonId: pic.id,
     });
+    await attachTransactionEvidence(pic, trip.id, line.id, receipts(1));
 
     await db
       .update(schema.person)

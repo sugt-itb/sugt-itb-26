@@ -2,7 +2,6 @@
 
 import { FeedbackTokenDialog } from "-/components/feedback-token";
 import { FotoVideoDialog } from "-/components/foto-video-dialog";
-import { RecordTransaction } from "-/components/laporan-perjadin/acquittal-transactions";
 import { PerjadinDokumenDialog } from "-/components/perjadin-dokumen-dialog";
 import { PerjadinFeedbackTokenDialog } from "-/components/perjadin-feedback-token";
 import { SessionMarkDeliveredDialog } from "-/components/perjadin-mark-delivered";
@@ -62,8 +61,8 @@ function MyPerjadinSection({
   /**
    * **Whether the viewer writes these trips** (ADR-0048), computed from the viewer and not from whose
    * trips they are. On a person's own `/pendamping` it is always true — every trip listed is one
-   * whose Group they are in. Without it, every write control on the cards is absent: Catat
-   * Transaksi, Dokumen, Tandai, the Persiapan boxes and Foto & Video's upload and Hapus.
+   * whose Group they are in. Without it, every write control on the cards is absent: Dokumen,
+   * Tandai, the Persiapan boxes and Foto & Video's upload and Hapus.
    */
   canWrite: boolean;
 }) {
@@ -200,38 +199,24 @@ function TripCard({
           <div className="flex min-w-0 flex-col gap-4">
             <TripMoney spentIdr={trip.spentIdr} />
 
-            {/* A full-width two-column grid on a phone, each button stretched to its cell. */}
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            {/* A full-width two-column grid on a phone, each button stretched to its cell. An odd
+                last button takes the whole row, so three buttons leave no gap beside it. */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap [&>:last-child:nth-child(odd)]:col-span-2">
               {canWrite && (
-                <>
-                  <RecordTransaction
-                    perjadinId={trip.id}
-                    uploadGate={uploadGate}
-                    trigger={
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="rounded-full"
-                      >
-                        Catat Transaksi
-                      </Button>
-                    }
-                  />
-                  <PerjadinDokumenDialog
-                    perjadinId={trip.id}
-                    name={perjadinName(trip)}
-                    uploadGate={uploadGate}
-                    trigger={
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="rounded-full"
-                      >
-                        Dokumen
-                      </Button>
-                    }
-                  />
-                </>
+                <PerjadinDokumenDialog
+                  perjadinId={trip.id}
+                  name={perjadinName(trip)}
+                  uploadGate={uploadGate}
+                  trigger={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-full"
+                    >
+                      Dokumen
+                    </Button>
+                  }
+                />
               )}
               <PerjadinFeedbackTokenDialog
                 perjadinId={trip.id}
@@ -276,8 +261,12 @@ function TripCard({
  * **The card's Uang Perjalanan Terpakai** (ADR-0051): every transaction on the trip, all categories —
  * the same figure as the trip page, the Laporan and the CSV, pinned equal by a query test. There is
  * no Advance to measure it against, so no remainder and no bar.
+ *
+ * **Absent on a trip with no line** (#541): "Rp0" would read as nothing spent, when the app has simply
+ * stopped tracking it. `transaction_amount_check` keeps every line above zero, so zero means no line.
  */
 function TripMoney({ spentIdr }: { spentIdr: number }) {
+  if (spentIdr === 0) return null;
   return (
     <div>
       <p className="text-xs text-muted-foreground">Uang Perjalanan Terpakai</p>

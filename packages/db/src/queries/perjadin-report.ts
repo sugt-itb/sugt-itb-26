@@ -16,8 +16,8 @@ import { tripPimpinan } from "./trip-pimpinan";
 
 /**
  * **Perjadin Report** — the acquittal of one Perjadin. Reading it is now open to any signed-in
- * Person (ADR-0026 reversed ADR-0004's money-read half, #180); only **writing** it — recording or
- * deleting a transaction, attaching or deleting a receipt — is the trip's Group's,
+ * Person (ADR-0026 reversed ADR-0004's money-read half, #180); only **writing** it — deleting a
+ * transaction, attaching or deleting a receipt — is the trip's Group's,
  * a Perjadin Editor's or an Administrator's (ADR-0048), each write query below opening with its own
  * `requireStaff` and running `requirePerjadinWriter`.
  *
@@ -106,11 +106,11 @@ export type PerjadinAcquittal = {
  * point — a Pimpinan reads all money. There is no `requireStaff` here any more.
  *
  * **The receipt writes do not lean on this read's guard.** Every action in
- * `perjadin/[id]/laporan/actions.ts` that reaches Drive — opening upload sessions, recording a line,
- * attaching receipts — calls `requireStaff` explicitly, ahead of this read, because Google is reached
+ * `perjadin/[id]/laporan/actions.ts` that reaches Drive — opening upload sessions, attaching receipts
+ * — calls `requireStaff` explicitly, ahead of this read, because Google is reached
  * before any write query runs (ADR-0040; the same reason the Supabase-era mint and read-back gave,
- * #180). Every money-write query (`recordTransaction`, `attachTransactionEvidence` and the two
- * deletes) keeps its own `requireStaff`.
+ * #180). Every money-write query (`attachTransactionEvidence` and the two deletes) keeps its own
+ * `requireStaff`.
  *
  * Returns `null` when there is no such Perjadin. That is a genuinely reachable state — a
  * stale link to a deleted Perjadin.
@@ -229,121 +229,6 @@ async function transactionsOf(perjadinId: string): Promise<AcquittalTransaction[
 async function pimpinanOf(perjadinId: string): Promise<string[]> {
   const byTrip = await tripPimpinan([perjadinId]);
   return (byTrip.get(perjadinId) ?? []).map((entry) => entry.name);
-}
-
-/**
- * What the acquittal form collects for one line item — its receipts included. A line is recorded
- * with its evidence or not at all (ADR-0039).
- */
-export type NewTransaction = {
-  perjadinId: string;
-  spentOn: string;
-  description: string;
-  amountIdr: number;
-  category: TransactionCategory;
-  /** Which cohort the spend served — `Siswa` or `GTK-MS`. Required, like `category`. */
-  participantType: TransactionParticipantType;
-  /** The receipts already uploaded, one to `MAX_RECEIPTS_PER_TRANSACTION`. */
-  evidence: NewEvidence[];
-  /**
-   * The id to give the line, when the caller needed it before the insert — Catat transaksi names
-   * the line's Drive folder and files after it (ADR-0040). Generated here when absent.
-   */
-  transactionId?: string;
-  /** The line's Drive folder, already built in `_staging` (ADR-0040). */
-  driveFolderId?: string;
-};
-
-export type RecordTransactionResult =
-  | { outcome: "recorded"; transactionId: string }
-  /** The id names no Perjadin — a stale link, which is reachable. */
-  | { outcome: "no-such-perjadin" }
-  /** A zero or negative line item. `transaction_amount_check` refuses it too. */
-  | { outcome: "amount-not-positive" }
-  /** No receipt came with the line. */
-  | { outcome: "evidence-missing" }
-  /** More receipts than one line may carry. */
-  | { outcome: "too-many-receipts"; limit: number; count: number };
-
-/**
- * Record one line item on the trip, **with its receipts, in one transaction** (ADR-0039).
- *
- * This is the one write path that holds "every transaction has one to five pieces of evidence" —
- * no CHECK does, because the shared database may already hold lines with none or more than five,
- * and those are grandfathered. So the count is refused here, as a value, before anything is
- * written; the dialog's disabled button is only a convenience. The line and its evidence rows
- * commit together, so a receipt the database refuses (an object already attached elsewhere) takes
- * the line down with it rather than leaving it unevidenced.
- *
- * Every refusal here is something a PIC can do honestly, so each comes back as a value and
- * earns a field-level message rather than an error page. `NotStaffError` is the opposite
- * case and still throws.
- */
-export async function recordTransaction(
-  caller: Person,
-  input: NewTransaction,
-): Promise<RecordTransactionResult> {
-  requireStaff(caller);
-
-  if (input.amountIdr <= 0) return { outcome: "amount-not-positive" };
-  if (input.evidence.length === 0) return { outcome: "evidence-missing" };
-  if (input.evidence.length > MAX_RECEIPTS_PER_TRANSACTION) {
-    return {
-      outcome: "too-many-receipts",
-      limit: MAX_RECEIPTS_PER_TRANSACTION,
-      count: input.evidence.length,
-    };
-  }
-
-  return db.transaction(async (tx) => {
-    await requirePerjadinWriter(caller, input.perjadinId, tx);
-
-    const [trip] = await tx
-      .select({ id: perjadin.id })
-      .from(perjadin)
-      .where(eq(perjadin.id, input.perjadinId));
-    if (!trip) return { outcome: "no-such-perjadin" };
-
-    const [line] = await tx
-      .insert(transaction)
-      .values({
-        ...(input.transactionId ? { id: input.transactionId } : {}),
-        driveFolderId: input.driveFolderId ?? null,
-        perjadinId: input.perjadinId,
-        spentOn: input.spentOn,
-        description: input.description,
-        amountIdr: input.amountIdr,
-        category: input.category,
-        participantType: input.participantType,
-        createdByPersonId: caller.id,
-      })
-      .returning({ id: transaction.id });
-
-    await tx.insert(transactionEvidence).values(
-      input.evidence.map((file) => ({
-        ...(file.id ? { id: file.id } : {}),
-        transactionId: line!.id,
-        driveFileId: file.driveFileId,
-        contentType: file.contentType,
-        byteSize: file.byteSize,
-        uploadedByPersonId: caller.id,
-      })),
-    );
-
-    await logActivity(tx, caller, input.perjadinId, {
-      action: "transaction_recorded",
-      details: {
-        transactionId: line!.id,
-        category: input.category,
-        amountIdr: input.amountIdr,
-        participantType: input.participantType,
-        spentOn: input.spentOn,
-        receiptCount: input.evidence.length,
-      },
-    });
-
-    return { outcome: "recorded", transactionId: line!.id };
-  });
 }
 
 /**

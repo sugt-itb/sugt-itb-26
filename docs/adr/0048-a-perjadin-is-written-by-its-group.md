@@ -118,3 +118,9 @@ tab. The **Pendamping Lain** tab shows another Staff Person's trips, to an Admin
 [#539](https://github.com/sugt-itb/sugt-itb-26/issues/539). Its cards take `canWrite` as true because
 only those two reach the tab, and both write every Perjadin, so who writes a trip does not change. See
 the amendment to [ADR-0052](./0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md).
+
+## Amendment (2026-11-04): recording a line is gone
+
+Its transactions no longer include recording a new one ([ADR-0060](./0060-trip-spending-is-recorded-outside-the-app.md), [#541](https://github.com/sugt-itb/sugt-itb-26/issues/541)). Unggah bukti, Hapus bukti and
+Hapus transaksi on the lines already recorded are still the trip's writers', under
+`requirePerjadinWriter`. "Records transactions" under the rejected alternatives is history.

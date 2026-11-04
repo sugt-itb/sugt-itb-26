@@ -118,9 +118,9 @@ export type MyPerjadinTrip = {
   picFullName: string;
   /**
    * **Uang Perjalanan Terpakai** (ADR-0051): the sum of every transaction on the trip, all
-   * categories, zero when none has been entered. The same figure as `perjadinAcquittal.spentIdr` — a
-   * test pins the two equal so the card and the trip's screens never show two answers. It is summed
-   * in SQL here because this list renders no line items.
+   * categories, zero on a trip with no line, which the card then leaves out (#541). The same figure
+   * as `perjadinAcquittal.spentIdr` — a query test pins the two equal so the card and the trip's
+   * screens never show two answers. It is summed in SQL here because this list renders no line items.
    */
   spentIdr: number;
   /** The trip's checklist, each item with its tick state — the pill's `x`/`N` and the dialog's boxes. */

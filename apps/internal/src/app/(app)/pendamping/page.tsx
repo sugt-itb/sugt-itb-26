@@ -44,7 +44,7 @@ export default async function Page({ searchParams }: PageProps<"/pendamping">) {
   const params = hasGrant(person, "Perjadin Editor") ? await searchParams : null;
   const tab: PendampingTab = params?.tab === "lain" ? "lain" : "anda";
 
-  // Each trip card's Catat Transaksi is closed, with the reason, while Drive is (ADR-0040). Always
+  // Each trip card's Dokumen is closed, with the reason, while Drive is (ADR-0040). Always
   // the viewer's gate, on Pendamping Lain too: the viewer is who uploads.
   if (params === null || tab === "anda") {
     const [trips, gate] = await Promise.all([myPerjadin(person), uploadGate(person)]);
@@ -150,7 +150,7 @@ function PendampingTrips({
       />
       <MyPerjadinSection
         title="Perjalanan Dinas Sebelumnya"
-        description="Perjalanan yang sudah selesai, yang terbaru di atas. Transaksi dan dokumennya masih bisa dikerjakan."
+        description="Perjalanan yang sudah selesai, yang terbaru di atas. Dokumennya masih bisa dikerjakan."
         trips={trips.previous}
         uploadGate={gate}
         canWrite={canWrite}
