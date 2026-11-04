@@ -79,11 +79,12 @@ The Perjadin Editor row above gains one thing: the **Pendamping Lain** tab on `/
 ([#539](https://github.com/sugt-itb/sugt-itb-26/issues/539)), which was an Administrator's alone
 ([#440](https://github.com/sugt-itb/sugt-itb-26/issues/440)). A Perjadin Editor does the same support
 work, so they get both tabs, the same picker and every control. This adds no write power:
-`requirePerjadinWriter` already passes them on every trip (ADR-0048), and the Log names them. No other
-Grant gets the tab.
+`requirePerjadinWriter` already passes them on every trip (ADR-0048), and every logged write names
+them. No other Grant gets the tab.
 
 **The picker is a deliberate, narrow exception to
 [#488](https://github.com/sugt-itb/sugt-itb-26/issues/488).** That ticket made the `/orang` roster
 Administrator-only, but `pendampingOptions` sends every other Staff Person's email to the browser so the
-picker can search by it, and a Perjadin Editor now receives those. Only names are displayed. `/orang`
+picker can search by it, and a Perjadin Editor now receives those. Only names are displayed. The list
+has no `active` filter, so deactivated Staff are in it too; who appears was left as it was. `/orang`
 itself stays Administrator-only, and so does Pengaturan Perjadin.

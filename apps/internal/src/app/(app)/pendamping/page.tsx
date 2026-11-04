@@ -82,8 +82,8 @@ export default async function Page({ searchParams }: PageProps<"/pendamping">) {
         {/*
           Their two sections exactly as they see them — same titles, descriptions and empty state,
           no greeting — so a screenshot shows their page. Every control works as the viewer, a
-          Perjadin Editor or an Administrator, who writes every Perjadin (ADR-0048), and the Log names
-          the viewer.
+          Perjadin Editor or an Administrator, who writes every Perjadin (ADR-0048), and every logged
+          write names the viewer.
         */}
         {viewed?.outcome === "ok" && (
           <PendampingTrips

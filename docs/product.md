@@ -218,17 +218,18 @@ signing in.
 
 - **Anda** is the page described below, greeting included.
 - **Pendamping Lain** has a searchable picker, "Pilih pendamping…", over every Staff Person
-  but the viewer, matching name and email, though only names are displayed. Choosing one shows that Person's **Perjalanan Dinas
+  but the viewer, deactivated ones included, matching name and email, though only names are displayed. Choosing one shows that Person's **Perjalanan Dinas
   Anda** and **Perjalanan Dinas Sebelumnya** exactly as they see them — the same titles,
   descriptions and empty state ("Anda belum tergabung dalam Perjalanan Dinas.") — with **no
   greeting**. An id that names no Staff Person reads "Pendamping tidak ditemukan." under the picker.
 - The tab and the Person are in the URL, `/pendamping?tab=lain&pendamping=<id>`, so a refresh or a
   pasted link keeps the view.
-- **Every control there works, as the viewer**, not as the other Person: a Persiapan tick, a
-  Tandai or an upload is the viewer's, and the Log names them. Viewing writes nothing.
+- **Every control there works, as the viewer**, not as the other Person. A Persiapan tick records the
+  viewer, a Tandai is the viewer's call, and an upload or a transaction is logged under the viewer's
+  name. Viewing writes nothing.
 
-For anyone else — a Daring Editor, Dashboard Editor, Dashboard Viewer or grant-less Staff member —
-those URL parameters are ignored on the server: they get their own page, with no tabs, and nothing of the other Person is loaded or sent.
+For anyone else, any other Grant included, those URL parameters are ignored on the server: they get
+their own page, with no tabs, and nothing of the other Person is loaded or sent.
 
 It opens with one small line, **"Selamat datang kembali, {nama}"**. Below it are two sections, each listing the trips the person is in the
 Group of:
