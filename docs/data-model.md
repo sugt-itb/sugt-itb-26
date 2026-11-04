@@ -603,8 +603,12 @@ rest in [what the database does not hold](#what-the-database-does-not-hold).
 
 A Session exists only once arranged
 ([ADR-0006](./adr/0006-sessions-are-created-when-arranged.md)), so there are no planned rows,
-no target dates and nothing is ever overdue. Progress is `count(*) where status = 'delivered'`
-against `TOTAL_SESSIONS_PER_SCHOOL`, a constant that already lives in `@sugt/domain`.
+no target dates and nothing is ever overdue. On the public site, progress is
+`count(*) where status = 'delivered'` against `TOTAL_SESSIONS_PER_SCHOOL`, a constant that already
+lives in `@sugt/domain`. The Dashboard, `/sekolah` and `/sekolah/[slug]` measure Kegiatan terlaksana
+(ADR-0031, #540): that count plus all-or-nothing units from `assessment_completion`, against
+`KEGIATAN_UNITS_PER_SCHOOL`. It is read separately, since joining it to `session` would multiply the
+rows and inflate the count.
 
 **Marking a Session delivered is status only, for both modes** (#140, #152, #153) — and for online it
 is now **legacy** (#318). An online Session is born `delivered` (above), so it never passes through

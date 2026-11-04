@@ -45,7 +45,11 @@ export type DirectorySchool = {
    */
   clusterId: string;
   clusterName: string;
-  /** Delivered Sessions. **Arranged and cancelled count for nothing.** */
+  /**
+   * Delivered Sessions. **Arranged and cancelled count for nothing.** Not the figure the screen
+   * shows: it adds the School's assessment units, from a separate read (#540, ADR-0031), since
+   * joining `assessment_completion` here would multiply the Session rows and inflate this count.
+   */
   deliveredSessions: number;
 };
 

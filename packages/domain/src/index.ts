@@ -376,12 +376,12 @@ export const TOTAL_SESSIONS_PER_SCHOOL = SESSIONS_PER_SCHOOL.offline + SESSIONS_
 
 /**
  * How many **Kegiatan terlaksana** units a School is measured against — the denominator of the
- * `/monitoring` progress KPI (`docs/adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md`, #249).
+ * Dashboard's progress KPI and of `/sekolah` and `/sekolah/[slug]` (`docs/adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md`, #249, #540).
  * Its eight Sessions **plus one unit per assessment kind** (pretest + posttest), so **10**. Each
  * assessment unit is all-or-nothing: a School's pretest unit counts only once all four pretest boxes
  * are done, likewise posttest. Derived from `TOTAL_SESSIONS_PER_SCHOOL` and `ASSESSMENT_KINDS.length`
  * so it cannot drift from either. Distinct from `TOTAL_SESSIONS_PER_SCHOOL`, the Session-only total
- * the other progress readouts (school directory/detail, the public figures) still measure against.
+ * the public figures still measure against.
  */
 export const KEGIATAN_UNITS_PER_SCHOOL = TOTAL_SESSIONS_PER_SCHOOL + ASSESSMENT_KINDS.length;
 

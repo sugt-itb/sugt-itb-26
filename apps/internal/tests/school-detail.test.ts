@@ -1,8 +1,13 @@
-import { schoolDetail } from "@sugt/db/queries";
+import Page from "-/app/(app)/sekolah/[slug]/page";
+import DirectoryPage from "-/app/(app)/sekolah/page";
+import { requirePerson } from "-/lib/person";
+import { schoolAssessmentCompletions, schoolDetail } from "@sugt/db/queries";
 import { CONCERN_AT_OR_BELOW, type Role } from "@sugt/domain";
-import { beforeEach, describe, expect, it } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  addAssessmentBoxes,
   addCluster,
   addOfflineSession,
   addParticipantFeedback,
@@ -14,6 +19,12 @@ import {
   resetDatabase,
 } from "./support/fixtures";
 import { signInAsPerson } from "./support/sign-in";
+
+// Only who the page sees as signed in: `signInAsPerson` still needs the real `resolvePerson`.
+vi.mock("-/lib/person", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("-/lib/person")>()),
+  requirePerson: vi.fn(),
+}));
 
 /**
  * A non-Staff caller, hand-built rather than invited. T3 (#153) retired the Teaching Team Role, so
@@ -32,8 +43,8 @@ function nonStaff() {
 }
 
 /**
- * **Detail Sekolah** — one School's Sessions, how many are delivered against the ten
- * it expects, and which of them carry a concern.
+ * **Detail Sekolah** — one School's Sessions, its Kegiatan terlaksana over 10, and which of the
+ * Sessions carry a concern.
  *
  * The concern assertions are the reason this file is long. A Session's Ratings come
  * from three tables with three different rubrics, and the Aspect names are read out of
@@ -352,5 +363,85 @@ describe("the Detail Sekolah payload", () => {
     await expect(schoolDetail(nonStaff(), "sman-1-bandung")).resolves.toEqual(
       await schoolDetail(staff, "sman-1-bandung"),
     );
+  });
+
+  describe("measured by Kegiatan terlaksana, over 10", () => {
+    /** The School's page as a reader gets it. Its seed delivers two Sessions. */
+    async function renderDetail(person: Awaited<ReturnType<typeof signInAsStaff>>) {
+      vi.mocked(requirePerson).mockResolvedValue(person);
+      const params = Promise.resolve({ slug: "sman-1-bandung" });
+      return renderToStaticMarkup(await Page({ params } as never));
+    }
+
+    it("reads delivered Sessions alone, with empty box counts, when nothing is ticked", async () => {
+      const person = await signInAsStaff();
+      await seedOneSchool(person.id);
+
+      const html = await renderDetail(person);
+
+      expect(html).toContain("2 / 10 Kegiatan terlaksana");
+      expect(html).toContain("Pretest 0/4 · Posttest 0/4");
+      expect(html).not.toContain("Sesi terlaksana");
+    });
+
+    it("earns no unit for three of four boxes, and still shows the 3/4", async () => {
+      const person = await signInAsStaff();
+      const { school } = await seedOneSchool(person.id);
+      await addAssessmentBoxes(school.id, "pretest", 3);
+
+      const html = await renderDetail(person);
+
+      expect(html).toContain("2 / 10 Kegiatan terlaksana");
+      expect(html).toContain("Pretest 3/4 · Posttest 0/4");
+    });
+
+    it("earns a unit for each kind complete, and counts only this School's boxes", async () => {
+      const person = await signInAsStaff();
+      const { school, neighbour } = await seedOneSchool(person.id);
+      await addAssessmentBoxes(school.id, "pretest");
+      await addAssessmentBoxes(school.id, "posttest");
+      await addAssessmentBoxes(neighbour.id, "pretest", 2);
+
+      const html = await renderDetail(person);
+
+      expect(html).toContain("4 / 10 Kegiatan terlaksana");
+      expect(html).toContain("Pretest 4/4 · Posttest 4/4");
+    });
+
+    it("shows the same number as the School's row in the directory", async () => {
+      const person = await signInAsStaff();
+      const { school } = await seedOneSchool(person.id);
+      await addAssessmentBoxes(school.id, "pretest");
+      await addAssessmentBoxes(school.id, "posttest", 1);
+
+      const detail = await renderDetail(person);
+      const directory = renderToStaticMarkup(await DirectoryPage());
+
+      expect(detail).toContain("3 / 10 Kegiatan terlaksana");
+      expect(directory).toContain(`${school.name}: 3 dari 10 Kegiatan terlaksana`);
+    });
+
+    it("leaves deliveredSessions alone however many boxes are ticked", async () => {
+      const person = await signInAsStaff();
+      const { school } = await seedOneSchool(person.id);
+      await addAssessmentBoxes(school.id, "pretest");
+
+      const detail = await schoolDetail(person, "sman-1-bandung");
+
+      expect(detail?.deliveredSessions).toBe(2);
+    });
+
+    it("reads one School's boxes by slug, and nothing for a slug that names no School", async () => {
+      const person = await signInAsStaff();
+      const { school, neighbour } = await seedOneSchool(person.id);
+      await addAssessmentBoxes(school.id, "pretest", 2);
+      await addAssessmentBoxes(neighbour.id, "pretest");
+
+      const rows = await schoolAssessmentCompletions(person, "sman-1-bandung");
+
+      expect(rows).toHaveLength(2);
+      expect(new Set(rows.map((row) => row.schoolId))).toEqual(new Set([school.id]));
+      await expect(schoolAssessmentCompletions(person, "tidak-ada")).resolves.toEqual([]);
+    });
   });
 });

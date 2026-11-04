@@ -3,6 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "../client";
 import { assessmentCompletion } from "../schema/monitoring";
+import { school } from "../schema/reference";
 import type { Person, UnifiedDashboardCaller } from "./caller";
 import { requireGrant } from "./staff-only";
 
@@ -50,6 +51,34 @@ export async function assessmentCompletions(
     .from(assessmentCompletion)
     .orderBy(
       asc(assessmentCompletion.schoolId),
+      asc(assessmentCompletion.stream),
+      asc(assessmentCompletion.participantType),
+      asc(assessmentCompletion.kind),
+    );
+}
+
+/**
+ * **One School's completion rows, by slug** (#540), for Detail Sekolah's Kegiatan terlaksana and its
+ * box counts. By slug because that is what the page is keyed on, and `SchoolDetail` deliberately
+ * carries no `id`. A separate read, never a join into `schoolDetail` or `schoolDirectory`: their
+ * Session rows would multiply against these and inflate `deliveredSessions`. Open like the read
+ * above. A slug naming no School has no rows.
+ */
+export async function schoolAssessmentCompletions(
+  _caller: Person,
+  slug: string,
+): Promise<AssessmentCompletion[]> {
+  return db
+    .select({
+      schoolId: assessmentCompletion.schoolId,
+      stream: assessmentCompletion.stream,
+      participantType: assessmentCompletion.participantType,
+      kind: assessmentCompletion.kind,
+    })
+    .from(assessmentCompletion)
+    .innerJoin(school, eq(school.id, assessmentCompletion.schoolId))
+    .where(eq(school.slug, slug))
+    .orderBy(
       asc(assessmentCompletion.stream),
       asc(assessmentCompletion.participantType),
       asc(assessmentCompletion.kind),

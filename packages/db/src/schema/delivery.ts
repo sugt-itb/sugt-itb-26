@@ -28,8 +28,9 @@ import { perjadin, perjadinTeacher } from "./travel";
  * Delivery: Sessions, and the free-text names of who taught them.
  *
  * A Session exists only once **arranged** — never before — so there are no planned
- * rows, no target dates and nothing is ever overdue. Progress is delivered Sessions
- * against `TOTAL_SESSIONS_PER_SCHOOL`, a constant in `@sugt/domain`.
+ * rows, no target dates and nothing is ever overdue. On the public site progress is
+ * delivered Sessions against `TOTAL_SESSIONS_PER_SCHOOL`, a constant in `@sugt/domain`; the
+ * internal app measures Kegiatan terlaksana, which adds assessment units (ADR-0031).
  */
 export const session = pgTable(
   "session",

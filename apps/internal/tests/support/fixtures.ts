@@ -196,6 +196,26 @@ function oneHourAfter(startsAt: string): string {
  *
  * A cancelled Session needs its reason in the same statement, by CHECK.
  */
+/**
+ * Ticks the first `count` of a School's four boxes for one assessment kind. All four is what earns
+ * the School that kind's Kegiatan terlaksana unit (ADR-0031).
+ */
+export async function addAssessmentBoxes(
+  schoolId: string,
+  kind: "pretest" | "posttest",
+  count: number = 4,
+) {
+  const boxes = [
+    { stream: "STEM", participantType: "Siswa" },
+    { stream: "STEM", participantType: "GTK-MS" },
+    { stream: "Research", participantType: "Siswa" },
+    { stream: "Research", participantType: "GTK-MS" },
+  ] as const;
+  await db
+    .insert(schema.assessmentCompletion)
+    .values(boxes.slice(0, count).map((box) => ({ schoolId, kind, ...box })));
+}
+
 export async function addSession(fixture: SessionFixture) {
   const status: SessionStatus = fixture.status ?? "arranged";
   const startsAt = fixture.startsAt ?? "09:00";
