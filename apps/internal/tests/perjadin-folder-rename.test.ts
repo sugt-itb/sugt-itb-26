@@ -351,7 +351,7 @@ describe("the reconcile", () => {
       amountIdr: 10_000,
       createdByPersonId: pic.id,
     });
-    const [fileId] = await upload(drive, trip.id, [jpeg()]);
+    const [fileId] = await upload(drive, trip.id, [jpeg()], { transactionId: line.id });
     await db.insert(schema.transactionEvidence).values({
       transactionId: line.id,
       driveFileId: fileId!,
@@ -376,7 +376,7 @@ describe("the reconcile", () => {
       amountIdr: 10_000,
       createdByPersonId: pic.id,
     });
-    const [fileId] = await upload(drive, trip.id, [jpeg()]);
+    const [fileId] = await upload(drive, trip.id, [jpeg()], { transactionId: line.id });
     await db.insert(schema.transactionEvidence).values({
       transactionId: line.id,
       driveFileId: fileId!,

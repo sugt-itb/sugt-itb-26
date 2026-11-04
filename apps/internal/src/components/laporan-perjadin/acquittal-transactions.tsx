@@ -2,7 +2,6 @@
 
 import type {
   OpenReceiptSessionsResult,
-  RecordTransactionActionResult,
   UploadedReceipt,
   ViewableTransaction,
 } from "-/app/(app)/perjadin/[id]/laporan/action-types";
@@ -11,7 +10,6 @@ import {
   deleteTransactionAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
-  recordTransactionAction,
 } from "-/app/(app)/perjadin/[id]/laporan/actions";
 import {
   DEFAULT_TRANSACTION_LIST_CONTROLS,
@@ -26,17 +24,9 @@ import {
   receiptDeleteRefusalText,
 } from "-/components/laporan-perjadin/receipt-delete-messages";
 import { TRANSACTION_DELETE_CONFIRM } from "-/components/laporan-perjadin/transaction-delete-messages";
-import { RequiredLegend, RequiredMark } from "-/components/required-mark";
 import { UnsyncedMarker } from "-/components/unsynced-marker";
+import { UploadStatus, useLeaveWarning, type UploadProgress } from "-/components/upload-status";
 import {
-  holdOpenWhile,
-  UploadStatus,
-  useLeaveWarning,
-  type UploadProgress,
-} from "-/components/upload-status";
-import {
-  isAcceptedReceipt,
-  MAX_UPLOAD_MEGABYTES,
   prepareReceipt,
   putToDriveSession,
   RECEIPT_ACCEPT,
@@ -51,21 +41,16 @@ import {
   STALE_PAGE,
 } from "-/lib/drive/upload-messages";
 import {
-  formatIdr,
   formatRupiah,
   MAX_RECEIPTS_PER_TRANSACTION,
   TRANSACTION_CATEGORIES,
   TRANSACTION_PARTICIPANT_TYPES,
-  type TransactionCategory,
-  type TransactionParticipantType,
 } from "@sugt/domain";
-import { Alert, AlertDescription, AlertTitle } from "@sugt/ui/components/alert";
 import { Badge } from "@sugt/ui/components/badge";
 import { Button } from "@sugt/ui/components/button";
 import { Card, CardHeader } from "@sugt/ui/components/card";
 import {
   Dialog,
-  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -73,8 +58,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@sugt/ui/components/dialog";
-import { Input } from "@sugt/ui/components/input";
-import { Label } from "@sugt/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -82,29 +65,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@sugt/ui/components/select";
-import { type ReactElement, useId, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
 /**
- * **The line items, and what a PIC does to them**: enter one with its receipts, add receipts to one
- * already entered, take a mistaken receipt off one (#462), and delete a mistaken one whole (#463).
+ * **The line items already recorded, and what a PIC does to them**: add receipts to one, take a
+ * mistaken receipt off one (#462), and delete a mistaken one whole (#463). **Nothing records a new
+ * line here or anywhere** (#541): Finance records trip spending outside the app. These controls stay
+ * because without them, wrong lines and missing receipts would be permanent in the record the
+ * external audit uses.
  *
- * **A line is entered with its evidence or not at all** (ADR-0039, superseding ADR-0030's optional
- * upload). The entry form stages one to five files; Catat uploads every one of them **first** —
- * straight to the company Google Drive (ADR-0040) — and only once all have landed records the line
- * and its evidence in one write. The "log a fare now,
- * attach the receipt later" path is gone on purpose: a spend is not recorded until its receipt is in
- * hand. The row keeps its own "Unggah bukti" for more receipts on a line that has one — up to five in
- * total — and for a line from before the rule that has none.
+ * A row's "Unggah bukti" adds receipts up to five in total, and serves a line from before ADR-0039
+ * that has none. It already has a `transactionId`, so it attaches as it uploads.
  *
- * `Receipts` (the row path) already has a `transactionId`, so it attaches as it uploads.
+ * The five-receipt ceiling is held by the server (`attachTransactionEvidence`); the disabled buttons
+ * here only keep the row from offering the mistake. A row with no receipt can still appear — a
+ * grandfathered line — and is marked, so its writer can Unggah bukti onto it.
  *
- * The five-receipt ceiling is held by the server (`recordTransaction`, `attachTransactionEvidence`);
- * the disabled buttons here only keep the form from offering the mistake. A row with no receipt can
- * still appear — a grandfathered line — and is marked, so its writer can Unggah bukti onto it.
- *
- * **While Drive cannot take an upload** — not connected, broken, or its folders unresolved — Catat
- * and every row's Unggah bukti and Hapus render disabled, and the reason is said once beside Catat. The
- * Server Actions refuse the same states themselves.
+ * **While Drive cannot take an upload** — not connected, broken, or its folders unresolved — every
+ * row's Unggah bukti and Hapus render disabled, and the reason is said once above the rows. The Server
+ * Actions refuse the same states themselves.
  */
 function AcquittalTransactions({
   perjadinId,
@@ -116,9 +95,9 @@ function AcquittalTransactions({
   transactions: ViewableTransaction[];
   uploadGate: UploadGate;
   /**
-   * Whether the viewer writes this trip — its Group, a Perjadin Editor or an Administrator (ADR-0048). Catat
-   * transaksi and every Unggah bukti are absent for anyone else, who reads the lines and their
-   * receipts; the queries refuse them again.
+   * Whether the viewer writes this trip — its Group, a Perjadin Editor or an Administrator (ADR-0048). Every
+   * Unggah bukti and Hapus is absent for anyone else, who reads the lines and their receipts; the
+   * queries refuse them again.
    */
   canWrite: boolean;
 }) {
@@ -152,16 +131,9 @@ function AcquittalTransactions({
 
   return (
     <div className="border-b border-border px-4 py-5 sm:px-7">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-heading text-sm font-medium">Transaksi</h2>
-        {canWrite && (
-          <RecordTransaction
-            perjadinId={perjadinId}
-            uploadGate={uploadGate}
-          />
-        )}
-      </div>
-      {canWrite && !uploadGate.open && (
+      <h2 className="font-heading text-sm font-medium">Transaksi</h2>
+      {/* It explains the rows' disabled controls, so with no row there is nothing for it to explain. */}
+      {canWrite && !uploadGate.open && transactions.length > 0 && (
         <p className="mt-1.5 text-sm text-muted-foreground">{uploadGate.reason}</p>
       )}
 
@@ -382,7 +354,7 @@ function ControlSelect<T extends string>({
  * Each receipt is a **Bukti n** link that opens it in Google Drive in a new tab (ADR-0040), and a
  * line with a Drive folder adds **Buka folder**, the link anyone can open once the folder is shared.
  *
- * The upload goes to Drive the same way Catat transaksi's does (ADR-0040): each file prepared in the
+ * The upload goes straight to Drive (ADR-0040): each file prepared in the
  * browser, a session opened per file, the bytes `PUT` straight to Drive. Then `finalizeReceiptsAction`
  * checks each file in Drive and records the ones that pass — **partial success is real here**, since
  * the line already stands — and moves them into the line's folder.
@@ -677,426 +649,9 @@ function ConfirmHapus({
   );
 }
 
-/** The entry form. One line item at a time, which is how a PIC has them. */
-function RecordTransaction({
-  perjadinId,
-  uploadGate,
-  trigger,
-}: {
-  perjadinId: string;
-  /** Closed while Drive cannot take an upload: the trigger is disabled, titled with the reason. */
-  uploadGate: UploadGate;
-  // An optional custom trigger so a card elsewhere can open this exact entry form from its own
-  // control. Omitted, the default "Catat transaksi" button renders.
-  trigger?: ReactElement;
-}) {
-  const [open, setOpen] = useState(false);
-  const [spentOn, setSpentOn] = useState("");
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<TransactionCategory | "">("");
-  const [participantType, setParticipantType] = useState<TransactionParticipantType | "">("");
-  // Files chosen but not yet uploaded — one to five, all PUT by `submit` before the line is
-  // recorded. A refusal leaves them staged, so a retry needs no re-pick.
-  const [staged, setStaged] = useState<File[]>([]);
-  // Picks cut off at the ceiling, said out loud rather than dropped silently — as the row does.
-  const [pickNote, setPickNote] = useState<string | null>(null);
-  const [refusal, setRefusal] = useState<string | null>(null);
-  // Recorded, but the reconcile could not finish in Drive. The line stands; the form is reset and
-  // this says so rather than closing as if all were done.
-  const [unsynced, setUnsynced] = useState(false);
-  const [saving, startSaving] = useTransition();
-  // What the save is doing (#420), shown above the buttons only while `saving`. Until it ends the
-  // popup will not close, its fields are disabled and leaving the page asks first.
-  const [progress, setProgress] = useState<UploadProgress | null>(null);
-  const picker = useRef<HTMLInputElement>(null);
-  const fields = useId();
-  useLeaveWarning(saving);
-
-  const complete =
-    spentOn !== "" &&
-    description.trim() !== "" &&
-    // Positive, not just present: the server refuses zero, and catching it here keeps a refusal the
-    // form can predict from uploading receipts first and leaving them orphaned.
-    Number(amount) > 0 &&
-    category !== "" &&
-    participantType !== "" &&
-    staged.length >= 1 &&
-    staged.length <= MAX_RECEIPTS_PER_TRANSACTION;
-
-  function reset() {
-    setSpentOn("");
-    setDescription("");
-    setAmount("");
-    setCategory("");
-    setParticipantType("");
-    setStaged([]);
-    setPickNote(null);
-  }
-
-  /**
-   * Upload every staged receipt to Drive, then record the line with them — all or nothing (ADR-0039,
-   * ADR-0040). Each file is prepared first (images re-encoded, EXIF stripped; the 50 MB cap), then
-   * the server opens a session per file and the bytes go straight to Drive. A failed upload records
-   * nothing and keeps every value and every staged file, so "Catat" again retries the whole of it
-   * against fresh sessions. Files that did land stay in private `_staging`, which ADR-0040 accepts.
-   */
-  function submit() {
-    // Before the transition, so the status shows and the last attempt's alert clears at once (see
-    // `Receipts`'s `upload`).
-    setProgress({ phase: "uploading", done: 0, total: staged.length });
-    setRefusal(null);
-    setUnsynced(false);
-    startSaving(async () => {
-      // A new line is all or nothing: any file that cannot be sent refuses the whole of it.
-      const { prepared, unsupported, tooLarge } = await prepareAll(staged);
-      if (unsupported > 0) return setRefusal(UNSUPPORTED_RECEIPT);
-      if (tooLarge > 0) return setRefusal(UPLOAD_TOO_LARGE);
-
-      const sent = await uploadToDrive(perjadinId, prepared, {
-        onFileDone: () => {
-          setProgress(oneMoreDone);
-        },
-      });
-      if ("refusal" in sent) {
-        setRefusal(sent.refusal);
-        return;
-      }
-      if (sent.failed > 0) {
-        setRefusal(retryNote(sent.failed));
-        return;
-      }
-
-      setProgress({ phase: "saving" });
-      const result = await recordTransactionAction({
-        perjadinId,
-        spentOn,
-        description: description.trim(),
-        // Whole rupiah, which is what the column holds. `amount` holds raw digits (the mask
-        // strips everything else on change), so `Number` is finite or `NaN`, and `NaN` fails the
-        // positivity check.
-        amountIdr: Math.trunc(Number(amount)),
-        category: category as TransactionCategory,
-        participantType: participantType as TransactionParticipantType,
-        receipts: sent.landed,
-      });
-
-      // Nothing was written, so the form keeps everything for another try.
-      if (result.outcome !== "recorded") {
-        setRefusal(refusalFor(result));
-        return;
-      }
-
-      reset();
-      if (result.synced) setOpen(false);
-      else setUnsynced(true);
-    });
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={holdOpenWhile(saving, (next) => {
-        setOpen(next);
-        // Clear a stale alert when the form is reopened, so a prior refusal does not greet the
-        // next entry.
-        if (next) {
-          setRefusal(null);
-          setUnsynced(false);
-        }
-      })}
-    >
-      <DialogTrigger
-        disabled={!uploadGate.open}
-        title={uploadGate.open ? undefined : uploadGate.reason}
-        render={
-          trigger ?? (
-            <Button
-              variant="outline"
-              size="sm"
-            >
-              Catat transaksi
-            </Button>
-          )
-        }
-      />
-      <DialogContent
-        size="panel"
-        closeDisabled={saving}
-      >
-        <DialogHeader>
-          <DialogTitle>Catat transaksi</DialogTitle>
-          <DialogDescription>
-            Satu pengeluaran pada Perjadin ini, beserta buktinya.
-          </DialogDescription>
-          <RequiredLegend />
-        </DialogHeader>
-
-        <DialogBody>
-          {refusal !== null && (
-            <Alert variant="destructive">
-              <AlertTitle>Transaksi belum tercatat.</AlertTitle>
-              <AlertDescription>{refusal}</AlertDescription>
-            </Alert>
-          )}
-          {unsynced && (
-            <Alert>
-              <AlertTitle>Transaksi tercatat.</AlertTitle>
-              <AlertDescription>{UNSYNCED_NOTE}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Short fields sit two to a row from `sm` up, so the panel's width isn't wasted (#417). */}
-          <div className="grid gap-3.5 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label
-                htmlFor={`${fields}-spent-on`}
-                className="gap-1"
-              >
-                Tanggal Transaksi
-                <RequiredMark />
-              </Label>
-              <Input
-                id={`${fields}-spent-on`}
-                aria-required="true"
-                disabled={saving}
-                type="date"
-                value={spentOn}
-                onChange={(event) => {
-                  setSpentOn(event.target.value);
-                }}
-              />
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label
-                htmlFor={`${fields}-description`}
-                className="gap-1"
-              >
-                Keterangan
-                <RequiredMark />
-              </Label>
-              <Input
-                id={`${fields}-description`}
-                aria-required="true"
-                disabled={saving}
-                value={description}
-                onChange={(event) => {
-                  setDescription(event.target.value);
-                }}
-              />
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label
-                htmlFor={`${fields}-amount`}
-                className="gap-1"
-              >
-                Jumlah (Rp)
-                <RequiredMark />
-              </Label>
-              {/*
-                A masked text input, not `type="number"`: it groups the thousands as they type so a
-                large amount's magnitude is legible at the point of entry. `amount` stays a plain digit
-                string in state; every non-digit is stripped back out on change, so submit's
-                `Number(...)` and the `complete` guard are unchanged.
-              */}
-              <Input
-                id={`${fields}-amount`}
-                aria-required="true"
-                disabled={saving}
-                type="text"
-                inputMode="numeric"
-                value={amount === "" ? "" : formatIdr(Number(amount))}
-                onChange={(event) => {
-                  const digits = event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-                  setAmount(digits);
-                }}
-              />
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label
-                htmlFor={`${fields}-category`}
-                className="gap-1"
-              >
-                Kategori
-                <RequiredMark />
-              </Label>
-              {/*
-                The twelve come from `@sugt/domain`, which is the same list `transaction_category_check`
-                pins in the database. There is no "other" beyond `Lainnya`, which is in the list.
-              */}
-              <Select
-                value={category}
-                disabled={saving}
-                onValueChange={(value) => {
-                  setCategory(value as TransactionCategory);
-                }}
-              >
-                <SelectTrigger
-                  id={`${fields}-category`}
-                  aria-required="true"
-                >
-                  <SelectValue placeholder="Pilih kategori" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TRANSACTION_CATEGORIES.map((option) => (
-                    <SelectItem
-                      key={option}
-                      value={option}
-                    >
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label
-                htmlFor={`${fields}-participant-type`}
-                className="gap-1"
-              >
-                Tipe Peserta
-                <RequiredMark />
-              </Label>
-              {/*
-                An axis orthogonal to Kategori — which cohort the spend served. The two values come
-                from `@sugt/domain`, the same list `transaction_participant_type_check` pins in the
-                database. Required, so there is no empty option: a shared cost is attributed to
-                whichever type it predominantly served.
-              */}
-              <Select
-                value={participantType}
-                disabled={saving}
-                onValueChange={(value) => {
-                  setParticipantType(value as TransactionParticipantType);
-                }}
-              >
-                <SelectTrigger
-                  id={`${fields}-participant-type`}
-                  aria-required="true"
-                >
-                  <SelectValue placeholder="Pilih tipe peserta" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TRANSACTION_PARTICIPANT_TYPES.map((option) => (
-                    <SelectItem
-                      key={option}
-                      value={option}
-                    >
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-1.5 sm:col-span-2">
-              <Label className="gap-1">
-                Bukti
-                <RequiredMark />
-              </Label>
-              <p className="-mt-0.5 text-xs text-muted-foreground">
-                1–{MAX_RECEIPTS_PER_TRANSACTION} berkas JPG, PNG, WebP atau PDF, masing-masing
-                paling besar {MAX_UPLOAD_MEGABYTES} MB. Foto diperkecil sebelum diunggah.
-              </p>
-              {/*
-                Required and staged, not uploaded on pick: `submit` PUTs them all before it records the
-                line, and records nothing unless every one landed. Same picker as the row's `Receipts`
-                — image or PDF, many at once, capped at `MAX_RECEIPTS_PER_TRANSACTION`. The control is
-                a button, which `aria-required` does not apply to; Catat staying disabled until a file
-                is staged is what enforces it here.
-              */}
-              <input
-                ref={picker}
-                type="file"
-                accept={RECEIPT_ACCEPT}
-                multiple
-                className="hidden"
-                onChange={(event) => {
-                  const picked = Array.from(event.target.files ?? []);
-                  event.target.value = "";
-                  if (picked.length === 0) return;
-                  // A type outside the four is refused here, before anything is uploaded.
-                  const chosen = picked.filter(isAcceptedReceipt);
-                  const next = [...staged, ...chosen];
-                  setStaged(next.slice(0, MAX_RECEIPTS_PER_TRANSACTION));
-                  const dropped = next.length - MAX_RECEIPTS_PER_TRANSACTION;
-                  const notes = [
-                    chosen.length < picked.length ? UNSUPPORTED_RECEIPT : null,
-                    dropped > 0 ? `${dropped} berkas tidak ditambahkan: ${CAP_NOTE}` : null,
-                  ].filter((note) => note !== null);
-                  setPickNote(notes.length > 0 ? notes.join(" ") : null);
-                }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={saving || staged.length >= MAX_RECEIPTS_PER_TRANSACTION}
-                onClick={() => picker.current?.click()}
-              >
-                Unggah bukti
-              </Button>
-
-              {pickNote !== null && <p className="text-sm text-destructive">{pickNote}</p>}
-
-              {staged.length > 0 && (
-                <ul className="grid gap-1">
-                  {staged.map((file, index) => (
-                    <li
-                      key={`${index}-${file.name}`}
-                      className="flex items-center justify-between gap-2 text-sm"
-                    >
-                      <span className="truncate text-muted-foreground">{file.name}</span>
-                      <button
-                        type="button"
-                        className="text-muted-foreground underline hover:no-underline"
-                        disabled={saving}
-                        onClick={() => {
-                          setStaged((current) => current.filter((_, at) => at !== index));
-                          setPickNote(null);
-                        }}
-                      >
-                        Hapus
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </DialogBody>
-
-        {saving && progress !== null && <UploadStatus progress={progress} />}
-
-        <DialogFooter>
-          <Button
-            variant="ghost"
-            disabled={saving}
-            onClick={() => {
-              setOpen(false);
-            }}
-          >
-            Batal
-          </Button>
-          <Button
-            disabled={saving || !complete}
-            onClick={submit}
-          >
-            Catat
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /**
  * Get each picked file into shape for Drive (`prepareReceipt`): images re-encoded, EXIF stripped, the
- * cap applied. What could not be prepared is counted by reason; each caller decides what that means.
+ * cap applied. What could not be prepared is counted by reason, for the row to report.
  */
 async function prepareAll(
   files: File[],
@@ -1110,19 +665,18 @@ async function prepareAll(
 }
 
 /**
- * Send prepared receipts to Drive — the step both receipt controls share (ADR-0040). The server
- * opens a session per file (for `transactionId`'s line when it is a row's upload, which also checks
- * the line has a slot for each), then each file's bytes go straight to its session. Answers the Drive
- * ids that landed and how many did not, or the sentence for why no session opened.
+ * Send prepared receipts to Drive (ADR-0040). The server opens a session per file for
+ * `transactionId`'s line, which also checks the line has a slot for each, then each file's bytes go
+ * straight to its session. Answers the Drive ids that landed and how many did not, or the sentence for
+ * why no session opened.
  *
- * It records nothing: the entry form hands `landed` to `recordTransactionAction`, the row to
- * `finalizeReceiptsAction`, each with its own answer to a partial failure. `onFileDone` fires as
- * each file's `PUT` settles, landed or not, so the upload status can count them (#420).
+ * It records nothing: the row hands `landed` to `finalizeReceiptsAction`. `onFileDone` fires as each
+ * file's `PUT` settles, landed or not, so the upload status can count them (#420).
  */
 async function uploadToDrive(
   perjadinId: string,
   prepared: PreparedReceipt[],
-  { transactionId, onFileDone }: { transactionId?: string; onFileDone: () => void },
+  { transactionId, onFileDone }: { transactionId: string; onFileDone: () => void },
 ): Promise<{ landed: UploadedReceipt[]; failed: number } | { refusal: string }> {
   const sessions = await openReceiptSessionsAction(
     perjadinId,
@@ -1145,13 +699,8 @@ function oneMoreDone(progress: UploadProgress | null): UploadProgress | null {
   return progress?.phase === "uploading" ? { ...progress, done: progress.done + 1 } : progress;
 }
 
-/** The five-receipt ceiling, as each place that meets it says it: a row upload or a dialog pick cut short, or a refused line. */
+/** The five-receipt ceiling, as each place that meets it says it. */
 const CAP_NOTE = `Maksimal ${MAX_RECEIPTS_PER_TRANSACTION} bukti per transaksi.`;
-
-/** Receipts that did not land — nothing is recorded, and "Catat" again retries all of them. */
-function retryNote(failed: number) {
-  return `${failed} berkas gagal diunggah — coba lagi.`;
-}
 
 /** The line stands, but the reconcile did not finish in Drive; the next one will. */
 const UNSYNCED_NOTE =
@@ -1176,29 +725,4 @@ function sessionRefusalFor(result: Exclude<OpenReceiptSessionsResult, { outcome:
   }
 }
 
-/**
- * What each refusal of a new line says. `no-such-perjadin` is the only one the form cannot have
- * predicted — somebody deleted the trip while this page was open — so it says to reload rather
- * than which field to fix. The two receipt-count refusals are ones the form's own guard already
- * rules out; they are answered anyway, since the server is what holds the rule.
- */
-function refusalFor(result: Exclude<RecordTransactionActionResult, { outcome: "recorded" }>) {
-  switch (result.outcome) {
-    case "amount-not-positive":
-      return "Jumlah harus lebih besar dari nol.";
-    case "no-such-perjadin":
-      return STALE_PAGE;
-    case "evidence-missing":
-      return "Lampirkan setidaknya satu bukti.";
-    case "too-many-receipts":
-      return CAP_NOTE;
-    case "receipt-unverified":
-      return `${result.failed} bukti tidak dapat diperiksa di Google Drive — unggah ulang.`;
-    case "unsupported-type":
-      return UNSUPPORTED_RECEIPT;
-    default:
-      return driveRefusalText(result);
-  }
-}
-
-export { AcquittalTransactions, RecordTransaction };
+export { AcquittalTransactions };

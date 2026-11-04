@@ -28,11 +28,6 @@ const JPEG_QUALITY = 0.82;
 
 export type PreparedReceipt = { blob: Blob; contentType: ReceiptContentType };
 
-/** Is this a file the picker should stage at all? Judged on the browser's word, before any work. */
-export function isAcceptedReceipt(file: File): boolean {
-  return isReceiptContentType(file.type);
-}
-
 /**
  * Ready one picked file for upload. **Every image is re-encoded** to JPEG — long edge at most
  * 2400 px, quality about 0.82, its EXIF orientation applied — which shrinks a phone photo and

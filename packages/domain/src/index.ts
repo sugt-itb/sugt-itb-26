@@ -215,10 +215,9 @@ export function timeZoneSuffix(zone: TimeZone | "" | null | undefined): string {
 /**
  * Group a Rupiah amount the way every screen shows it: `id-ID` locale, dot separators,
  * `formatIdr(1000000) === "1.000.000"`. Returns the grouped digits only, no `Rp` prefix —
- * this is exactly the `n.toLocaleString("id-ID")` the display sites used inline, named once
- * so the masked amount inputs and every read-back amount cannot drift apart. The amount
- * inputs render this directly (the value carries digits only); displays wrap it in
- * {@link formatRupiah}, which is the single place the `Rp` prefix lives.
+ * this is exactly the `n.toLocaleString("id-ID")` the display sites used inline, named once so
+ * no amount can drift from another. Displays wrap it in {@link formatRupiah}, which is the single
+ * place the `Rp` prefix lives.
  */
 export function formatIdr(n: number): string {
   return n.toLocaleString("id-ID");
@@ -624,9 +623,9 @@ export const MAX_EXTRA_STAFF_PER_GROUP = 10;
 
 /**
  * **Receipts per transaction: at least one, at most this many, in total** ([ADR-0039](../../../docs/adr/0039-every-transaction-is-recorded-with-its-evidence.md)).
- * A product rule, not a guard on an array: it counts the receipts recorded with the line plus every
- * later upload from its row. Held by the application, in the two writes that add evidence
- * (`recordTransaction`, `attachTransactionEvidence`) — no CHECK, because the shared database may
+ * A product rule, not a guard on an array: it counts the receipts already on the line plus every
+ * later upload from its row. Held by the application, in the one write left that adds evidence
+ * (`attachTransactionEvidence`) — no CHECK, because the shared database may
  * already hold lines with none or with more, and those are grandfathered.
  * The floor of one needs no constant of its own.
  */
@@ -692,7 +691,8 @@ export type SessionFootageContentType = keyof typeof SESSION_FOOTAGE_CONTENT_TYP
  * `advance_set` and `advance_changed` are **history only** (ADR-0051, #464): the Advance is no
  * longer tracked, so nothing writes them, but the entries already in the Log stay readable and
  * searchable. `report_filed` is history only the same way (ADR-0055, #489): the Laporan is no
- * longer filed.
+ * longer filed. So is `transaction_recorded` (ADR-0060, #541): nothing records a new line, but past entries
+ * keep their label and the `/log` filter still finds them.
  */
 export const ACTIVITY_LOG_ACTIONS = [
   "advance_set",

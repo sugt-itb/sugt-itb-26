@@ -28,3 +28,8 @@ Finance reconciles and reports outside the app, so programme-wide money views du
 - **The Keuangan Grant is gone, and so is the record of who held it.** `/keuangan` was all it unlocked.
   Someone who held only this Grant becomes grant-less Staff and lands on `/pendamping`. `/keuangan` and
   `/keuangan/ekspor` show the normal 404, with no redirect, and git history is the way back.
+
+## Amendment (2026-11-04): transactions are no longer recorded
+
+"Transactions are still recorded" no longer holds: Finance now records them outside the app too ([ADR-0060](./0060-trip-spending-is-recorded-outside-the-app.md),
+[#541](https://github.com/sugt-itb/sugt-itb-26/issues/541)). Each Perjadin's Report and CSV export stay, for the lines already recorded.

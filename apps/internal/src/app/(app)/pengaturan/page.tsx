@@ -102,8 +102,9 @@ function DriveCard({
           <CardDescription>Belum terhubung</CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Bukti transaksi disimpan di Google Drive perusahaan ({accountEmail}). Hubungkan akun itu
-          agar Catat transaksi dan Unggah bukti dapat mengunggah.
+          Bukti transaksi, Dokumen, serta Foto &amp; Video disimpan di Google Drive perusahaan (
+          {accountEmail}). Hubungkan akun itu agar Unggah bukti, Dokumen, serta Foto &amp; Video
+          dapat mengunggah.
         </CardContent>
         <CardFooter>{connectButton("Hubungkan Google Drive")}</CardFooter>
       </Card>

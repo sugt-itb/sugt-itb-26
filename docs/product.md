@@ -111,10 +111,10 @@ record's owner throughout. Publishing to the public site is Staff-only; every Gr
 contains a Staff member by construction, so no trip's material is unreachable.
 
 **Popups that take data are a big fixed panel** (#417), because Staff work the tool mostly from
-phones during a Perjadin. Catat transaksi, Dokumen, Catatan Sesi, Tambah/Ubah Sesi, Ubah Group,
+phones during a Perjadin. Dokumen, Catatan Sesi, Tambah/Ubah Sesi, Ubah Group,
 Ubah Sesi daring and both Persiapan popups open as a panel about 900px wide and nearly the screen's
 height on a laptop, and as the whole screen on a phone. It keeps that size however much is added —
-twenty checklist items, five staged receipts — with the title pinned at the top, the buttons at the
+twenty checklist items — with the title pinned at the top, the buttons at the
 bottom, and only the fields between them scrolling. Confirmations and single-value edits stay small
 popups.
 
@@ -124,8 +124,7 @@ inside their border on a phone (#419). Tables still scroll sideways inside their
 `/log`'s filters stack below 640px, and on the Laporan each transaction's receipts wrap under
 it.
 
-**An upload to Google Drive says that it is running** (#420). Catat transaksi, a line's Unggah
-bukti and Dokumen's Unggah show a spinner with "Mengunggah ke Google Drive…" — "Mengunggah 2 dari 3
+**An upload to Google Drive says that it is running** (#420). A line's Unggah bukti and Dokumen's Unggah show a spinner with "Mengunggah ke Google Drive…" — "Mengunggah 2 dari 3
 berkas ke Google Drive…" when several files go at once — and "Jangan tutup halaman ini sampai
 selesai." under it. Once the files are in Drive it reads "Menyimpan…" while the app records them.
 There is no progress bar. In a popup it sits directly above the buttons; for Unggah bukti it sits
@@ -253,7 +252,7 @@ Group of:
   first.
 - **Perjalanan Dinas Sebelumnya**: the trips that are over, the most recently ended first, with
   every action still on them. It reads "Perjalanan yang sudah selesai, yang terbaru di atas.
-  Transaksi dan dokumennya masih bisa dikerjakan."
+  Dokumennya masih bisa dikerjakan."
 
 **Every collapsed card looks the same** (#419), in both sections, whether the trip is past, current
 or future and whether or not the person is its PIC:
@@ -273,9 +272,10 @@ SMA Pradita Dirgantara, SMA Trensains Muhammadiyah Sragen
   right side. On a phone, PIC and Persiapan wrap onto their own line under the Schools.
 
 A card opens to show **Uang Perjalanan Terpakai** — every transaction on the trip, all categories,
-the same figure as the trip's screen and its Laporan — then **Catat Transaksi**, **Dokumen**, **Evaluasi Perjadin**
-and **Edit**, then the timeline of Sessions and who is on the trip. On a phone those four buttons
-are a full-width two-column grid, and the money row and each Session's buttons wrap rather than
+the same figure as the trip's screen and its Laporan, and left out on a trip with none (#541) — then
+**Dokumen**, **Evaluasi Perjadin** and **Edit**, then the timeline of Sessions and who is on the trip.
+On a phone those three buttons are a full-width two-column grid with the last one across the whole
+row, and the money row and each Session's buttons wrap rather than
 spill sideways. Each section shows three cards with **Tampilkan lebih banyak** for the rest, and is
 left out when it has none. With neither, the page says "Anda belum tergabung dalam Perjalanan
 Dinas."
@@ -340,7 +340,7 @@ described "Upload dokumentasi kegiatan luring untuk sesi ini"
 - **While Drive is down** the popup still opens and lists the files; uploading and Hapus are closed,
   with the reason said as text.
 
-**Dokumen**, beside Catat Transaksi on every card in both sections, opens **"Dokumen —
+**Dokumen**, on every card in both sections, opens **"Dokumen —
 {name}"**: the trip's attendance sheets and each School's SPPD
 ([ADR-0042](./adr/0042-perjadin-documents-are-stored-in-the-company-google-drive.md)).
 
@@ -373,7 +373,7 @@ described "Upload dokumentasi kegiatan luring untuk sesi ini"
   Drive." — then moves the file to the Drive trash and removes the sheet. There is no editing: a
   wrong upload is fixed by Hapus and a new upload.
 - The trip's Group, a Perjadin Editor or an Administrator uploads and deletes (ADR-0048). The button, and Hapus, are disabled with the reason while
-  Drive is not connected or broken, as Catat Transaksi is.
+  Drive is not connected or broken, as Unggah bukti is.
 
 ### Concerns list
 
@@ -495,9 +495,10 @@ read-only.
 
 **The form asks for no money.** The tool does not track how much Uang Perjalanan a trip received
 ([ADR-0051](./adr/0051-the-advance-is-not-tracked.md), #464): the figure is usually unknown unless
-someone asks the trip's members. The trip's screen carries a **Pengeluaran** strip — a link to the
-Laporan and one figure, **Uang Perjalanan Terpakai**: the sum of every transaction on the trip, all
-categories. It shows no due date: the Laporan is neither filed nor due (ADR-0055, #489). The
+someone asks the trip's members. A trip with at least one transaction carries a **Pengeluaran** strip
+— a link to the Laporan and one figure, **Uang Perjalanan Terpakai**: the sum of every transaction on
+the trip, all categories. A trip with none has no strip, no figure and no link (#541), because "Rp0"
+would read as nothing spent. It shows no due date: the Laporan is neither filed nor due (ADR-0055, #489). The
 Laporan, its export and the `/pendamping` card show that same number. Nothing shows an amount
 received, a remainder or a progress bar.
 
@@ -644,7 +645,7 @@ Administrator** ([ADR-0048](./adr/0048-a-perjadin-is-written-by-its-group.md), #
 in reads every trip. On `/perjadin/[id]`, `/perjadin/[id]/laporan` and `/sesi/[id]`, anyone else sees
 everything with every write control absent — Ubah tanggal, Ubah Group, the
 Narasumber edits, Tambah/Ubah/Batalkan Sesi (a Session's Pimpinan with it), Ubah Pimpinan, Tandai,
-the Persiapan boxes, Catat transaksi, Unggah bukti, Foto & Video's upload and Hapus — and a forced
+the Persiapan boxes, Unggah bukti, each line's Hapus, Foto & Video's upload and Hapus — and a forced
 request answers 403.
 Only **Evaluasi Perjadin**'s link stays open to everyone signed in. A Staff member added to a Group
 writes that trip from then on; one who leaves it stops at once. `/pendamping` lists only a person's own
@@ -652,19 +653,22 @@ trips, so every control on its cards stays theirs.
 
 ### The acquittal — the most important screen
 
-The PIC accounts for the whole Group. They enter each transaction on the trip together with its
-evidence, and export a filled template of the acquittal paperwork. Nothing is reconciled against an
+**Nothing records a new transaction** (ADR-0060, #541): Finance now records and evidences trip spending
+outside the app, and PICs are told so outside it too. What stays is every line already recorded, kept
+correct and exported, because the external audit uses that record. Nothing is reconciled against an
 amount received, which the tool does not track (ADR-0051): the Laporan is every transaction, each with
 its receipts, totalled as **Uang Perjalanan Terpakai** and split into **Total Siswa** and **Total
 GTK-MS**.
 
-**A transaction is entered with its receipts: one to five, image or PDF** (ADR-0039). The
-"Catat transaksi" dialog uploads them all before it records the line. If any fails to upload,
-nothing is recorded, and the form keeps what was typed and picked so the PIC can try again. More
-receipts can be added later from the line's own "Unggah bukti", up to five in total. A line
-entered before this rule may have none; it is marked on the screen and fixed the same way.
+**A trip with no transactions has no Pengeluaran block** on its Laporan: no figures and no Ekspor
+rincian, only "Belum ada transaksi pada Perjadin ini." The URL keeps working on any trip, and deleting a
+trip's last line moves it to this display.
 
-**Receipts open in Google Drive** (ADR-0040). The dialog, and each line's own "Unggah bukti", upload
+**A transaction carries one to five receipts, image or PDF** (ADR-0039). More can be added from the
+line's own "Unggah bukti", up to five in total. A line entered before this rule may have none; it is
+marked on the screen and fixed the same way.
+
+**Receipts open in Google Drive** (ADR-0040). Each line's own "Unggah bukti" uploads
 to the company Google Drive, and the app never shows a receipt itself — every receipt, including
 those recorded before the move, is a link to Drive. "Unggah bukti" adds to a
 line already recorded, up to five receipts in total. A file that is not a real receipt is reported
@@ -687,10 +691,10 @@ as failed, and the rest are kept.
   Drive."_, then moves the line's folder and receipts to the Drive trash and takes the line off the
   Laporan. The totals, the Siswa and GTK-MS subtotals and the export no longer count it. Any line can be deleted, with or without receipts. Like Hapus bukti, it is the trip writer's
   alone, and is disabled with the reason while Drive is not connected or broken. Each one is a
-  **Transaksi dihapus** entry on `/log`, under the Catat transaksi filter; the line's earlier entries
+  **Transaksi dihapus** entry on `/log`, under the "Catat transaksi" filter; the line's earlier entries
   stay, without their Buka folder link.
 
-What both controls take:
+What Unggah bukti takes:
 
 - JPG, PNG, WebP or PDF; anything else is refused before it uploads. An iPhone photo arrives as a
   JPG.
@@ -698,10 +702,10 @@ What both controls take:
 - Every photo is shrunk before it uploads — longest side 2400 px — which also strips its location
   and camera data, since the link is public.
 
-**While Drive is not connected, or its connection has broken**, "Catat transaksi" and every
-"Unggah bukti" are disabled, and the screen says why and that an Administrator fixes it on
-Pengaturan. If Drive stops answering after a line is recorded, the line still stands; the dialog
-says its receipts are not yet in place in Drive, and that is finished later.
+**While Drive is not connected, or its connection has broken**, every "Unggah bukti" is disabled, and
+the screen says why and that an Administrator fixes it on Pengaturan. If Drive stops answering after a
+receipt is recorded, the receipt still stands; the screen says it is not yet in place in Drive, and that
+is finished later.
 
 **Each transaction carries a category**, from a closed list of eleven plus _Lainnya_ —
 _Tiket Pesawat/Kereta PP_, _Uang Harian_, _Honorarium Narasumber_, _Akomodasi_,
@@ -721,11 +725,6 @@ replaced rather than corrected when a filled example arrives. Until then a PIC s
 the real form, which is the one thing this screen exists to stop; see the amendment to
 [ADR-0007](./adr/0007-the-tool-generates-the-acquittal.md) for why that means the bet is
 not yet placed.
-
-Transactions can be entered **as they happen or after returning** — whichever suits,
-with the receipt in hand either way. Both are first-class paths. There is no offline
-support; capture needs connectivity, and where it fails the PIC enters it later, losing
-convenience but never data. Offline is worth adding eventually, not worth blocking on.
 
 **The Laporan is neither filed nor due**
 ([ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md), #489). There is no
@@ -1187,7 +1186,8 @@ can sign in to reach this screen. See
 
 **Only an Administrator sees Pengaturan**, in the sidebar and at `/pengaturan`. Anyone else,
 Pimpinan included, gets the 403. It holds one card for now: the company Google Drive that
-transaction evidence is moving to
+holds transaction evidence, Dokumen and Foto & Video, and serves Unggah bukti and both of the others'
+uploads
 ([ADR-0040](./adr/0040-transaction-evidence-is-stored-in-the-company-google-drive.md)).
 
 The card is in one of four states:
@@ -1302,7 +1302,8 @@ A table, newest first, 50 rows a page:
   before the Log existed read "(dari data lama)" after it. The two Uang Perjalanan actions are
   history only: nothing writes them since the Advance stopped being tracked (ADR-0051), and past
   entries still read as they did. Laporan dikirim is history only the same way: nothing writes it
-  since the Laporan stopped being filed (ADR-0055).
+  since the Laporan stopped being filed (ADR-0055). So is Catat transaksi, since nothing records a new
+  line (ADR-0060); its filter still finds past entries and Transaksi dihapus.
 - **Rincian** says what changed. A transaction's row links to its folder in Drive, when it has one.
 
 **Above the table**, a search box, an Aksi filter and a Rentang tanggal:

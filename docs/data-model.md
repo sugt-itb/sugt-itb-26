@@ -1795,9 +1795,10 @@ all categories, and the same query answer on every screen that shows it. There i
 subtract it from, and so no remainder (ADR-0051, which supersedes ADR-0029's draw-down categories).
 
 Evidence is **one to five per transaction** (ADR-0039). The application holds that range, not
-the database: `recordTransaction` writes a line and its evidence together and refuses zero or
-more than five, and `attachTransactionEvidence` refuses a batch that would take a line past five,
-counting under a lock on the parent row. There is no CHECK, because the shared database may
+the database: `attachTransactionEvidence` refuses a batch that would take a line past five,
+counting under a lock on the parent row, and `deleteTransactionEvidence` keeps a line's last receipt.
+**Nothing inserts a `transaction` row any more** (ADR-0060, #541): Finance records trip spending outside
+the app, and the table and its rows stay for the lines already recorded. There is no CHECK, because the shared database may
 already hold lines with none or more, and those are grandfathered.
 
 **A receipt may be deleted, but never a line's only one** (#462,
@@ -1820,7 +1821,7 @@ reconcile claimed, between its first read and the lock. The totals and the expor
 drop the line without a write of their own.
 
 **Every receipt is a file in the company's Google Drive** (ADR-0040). `drive_file_id` is the
-file's Drive id, written by Catat transaksi or by a line's own "Unggah bukti", and `not null`. A
+file's Drive id, written by a line's own "Unggah bukti", and `not null`. A
 CHECK pins `content_type` to the four types the server sniffs from the first bytes. `unique` means
 a file cannot be attached twice. It is an id, never a path, so a folder renamed or moved by hand in
 Drive breaks nothing.
@@ -1833,8 +1834,9 @@ drop the only pointer to a receipt the script had not moved.
 **`drive_folder_id` on `transaction` and on `perjadin` name the line's and the trip's Drive
 folders**, and `transaction.drive_synced_at` records when the reconcile last finished the line.
 It finishes a line by putting its folder inside the Perjadin's, naming and moving its files there,
-and sharing the folder "anyone with the link". Catat transaksi builds the line's folder privately
-in `_staging` before it commits, so the folder id is written with the line. The Perjadin's folder
+and sharing the folder "anyone with the link". A line recorded before ADR-0060 had its folder built
+privately in `_staging` before it committed, so an unsynced older line may still have one there; the
+reconcile moves it out, which is why that handling stays. The Perjadin's folder
 is claimed by **compare-and-set** (`… where drive_folder_id is null`) the first time a line on it
 is reconciled. No row lock is ever held across a call to Google; a caller that lost the race
 trashes its own folder and uses the winner's.
@@ -1871,12 +1873,10 @@ cleared when the line syncs. Periksa koneksi's sweep is bounded per press. It ta
 never failed first, oldest first, then the longest-failed, so lines that fail every time cannot fill
 every press while the lines behind them wait for good.
 
-**The two receipt writes run in opposite orders, on purpose.** Catat transaksi builds the line's
-folder in private `_staging`, moves the files into it, and only then commits. A line's own "Unggah
-bukti" (`attachTransactionEvidence`) **commits first**. It locks the line, counts, writes the
+**The receipt write commits first, on purpose.** A line's own "Unggah
+bukti" (`attachTransactionEvidence`) locks the line, counts, writes the
 evidence rows and sets `drive_synced_at` back to null, all in one transaction. Only then does the
-reconcile move the new files out of `_staging` into the line's folder. The difference is the
-folder: a new line's folder is private until it is shared last, but an existing line's folder is
+reconcile move the new files out of `_staging` into the line's folder. An existing line's folder is
 usually **already public**. A file moved in before the count was settled could become a sixth
 receipt anyone can open that no row records. So the count and the rows come first, under the lock,
 and the files follow.
@@ -1915,15 +1915,15 @@ migration 0049 — one migration for both.
 or failed write logs nothing. The money writes log as below, each through `logActivity` in
 `queries/activity-log.ts`; the Dokumen and Foto & Video writes are described with their tables:
 
-| Write                       | `action`               | `details`                                                                          |
-| --------------------------- | ---------------------- | ---------------------------------------------------------------------------------- |
-| nothing, since ADR-0051     | `advance_set`          | `{ amountIdr }`; history only — past rows stay readable (#464)                     |
-| nothing, since ADR-0051     | `advance_changed`      | `{ fromIdr, toIdr }`; history only, like `advance_set`                             |
-| `recordTransaction`         | `transaction_recorded` | `{ transactionId, category, amountIdr, participantType, spentOn, receiptCount }`   |
-| `attachTransactionEvidence` | `evidence_uploaded`    | `{ transactionId, category, amountIdr, spentOn, added, total }`                    |
-| `deleteTransactionEvidence` | `evidence_deleted`     | `{ transactionId, evidenceId, category, amountIdr, spentOn, left }`, a copy (#462) |
-| `deleteTransaction`         | `transaction_deleted`  | as `transaction_recorded`, plus `description`; a copy (#463)                       |
-| nothing, since ADR-0055     | `report_filed`         | `{ transactionCount, totalIdr }`; history only — Laporkan is gone (#489)           |
+| Write                       | `action`               | `details`                                                                                             |
+| --------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| nothing, since ADR-0051     | `advance_set`          | `{ amountIdr }`; history only — past rows stay readable (#464)                                        |
+| nothing, since ADR-0051     | `advance_changed`      | `{ fromIdr, toIdr }`; history only, like `advance_set`                                                |
+| nothing, since ADR-0060     | `transaction_recorded` | `{ transactionId, category, amountIdr, participantType, spentOn, receiptCount }`; history only (#541) |
+| `attachTransactionEvidence` | `evidence_uploaded`    | `{ transactionId, category, amountIdr, spentOn, added, total }`                                       |
+| `deleteTransactionEvidence` | `evidence_deleted`     | `{ transactionId, evidenceId, category, amountIdr, spentOn, left }`, a copy (#462)                    |
+| `deleteTransaction`         | `transaction_deleted`  | as `transaction_recorded`, plus `description`; a copy (#463)                                          |
+| nothing, since ADR-0055     | `report_filed`         | `{ transactionCount, totalIdr }`; history only — Laporkan is gone (#489)                              |
 
 **`actor_email` is a copy**, taken when the act happens, so the row stays true if the Person's email
 later changes. **`search_text`** is the Aksi and Rincian text `/log` shows, lower-cased once at
@@ -1936,7 +1936,7 @@ derives, with `backfilled = true`:
 
 - one `transaction_recorded` per existing line, at its `created_at`, by its creator. Its
   `receiptCount` is the receipts uploaded with it — those whose `uploaded_at` equals the line's
-  `created_at`, since `recordTransaction` inserts both in one database transaction and so with one
+  `created_at`, since the write that recorded them inserted both in one database transaction and so with one
   `now()`;
 - one `evidence_uploaded` per later batch: the remaining receipts grouped by line, uploader and
   `uploaded_at`, for the same reason.
@@ -2109,8 +2109,8 @@ A Story's photographs are public by intent, which is the whole difference from a
 
 **Receipts and Perjadin Documents are not in Supabase Storage.** Receipts live in the company's
 Google Drive
-([ADR-0040](./adr/0040-transaction-evidence-is-stored-in-the-company-google-drive.md)): Catat
-transaksi and a line's own "Unggah bukti" both upload there, and the database holds each file's
+([ADR-0040](./adr/0040-transaction-evidence-is-stored-in-the-company-google-drive.md)): a line's own
+"Unggah bukti" uploads there, and the database holds each file's
 Drive id ([Money](#money)). Perjadin Documents are beside them, under `Dokumen/`
 ([ADR-0042](./adr/0042-perjadin-documents-are-stored-in-the-company-google-drive.md),
 [Perjadin Documents](#perjadin-documents)):
@@ -2407,7 +2407,7 @@ places:
    [ADR-0044](./adr/0044-a-perjadin-is-named-by-its-kelompok-and-dates.md), #376, #407). The rename
    runs after the commit and is best effort: a failed rename never fails or rolls back the
    correction. The next reconcile that touches that Perjadin sets the name back to what the database
-   says, because folder names are app-owned. That is a Catat transaksi or Unggah bukti on it, a sweep
+   says, because folder names are app-owned. That is an Unggah bukti on it, a sweep
    reaching one of its unsynced lines, or a press of Periksa koneksi. Until then the folder keeps the
    old date.
 
@@ -2451,8 +2451,9 @@ cancellation while a Session is `arranged` and never after, and offers no way ba
 `delivered` at all.
 
 **"Every transaction has at least one piece of evidence."** Also a cross-row count. Held at
-entry since [ADR-0039](./adr/0039-every-transaction-is-recorded-with-its-evidence.md), in the one
-write path: `recordTransaction` records a line with one to five receipts or refuses it. A line
+entry from [ADR-0039](./adr/0039-every-transaction-is-recorded-with-its-evidence.md) until nothing
+recorded a new line ([ADR-0060](./adr/0060-trip-spending-is-recorded-outside-the-app.md)), and
+`deleteTransactionEvidence` still keeps a line's last receipt. A line
 entered before that rule may still have none; nothing catches it now that filing is gone
 ([ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md)), and the Laporan marks it
 for its writer to Unggah bukti.

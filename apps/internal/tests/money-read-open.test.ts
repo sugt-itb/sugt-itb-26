@@ -3,7 +3,6 @@ import {
   deleteTransaction,
   isNotStaffError,
   perjadinAcquittal,
-  recordTransaction,
 } from "@sugt/db/queries";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -63,22 +62,6 @@ describe("a Pimpinan reads money", () => {
 
 describe("a Pimpinan cannot write money", () => {
   beforeEach(resetDatabase);
-
-  it("is refused by recordTransaction", async () => {
-    const { pimpinan, trip } = await aTripWithAPimpinan();
-
-    const refusal = await recordTransaction(pimpinan, {
-      perjadinId: trip.id,
-      spentOn: "2026-09-02",
-      description: "Taksi",
-      amountIdr: 50_000,
-      category: "Transport Lokal Dalam Provinsi",
-      participantType: "Siswa",
-      evidence: [{ driveFileId: "a", contentType: "image/jpeg", byteSize: 10 }],
-    }).catch((error: unknown) => error);
-
-    expect(isNotStaffError(refusal)).toBe(true);
-  });
 
   it("is refused by attachTransactionEvidence", async () => {
     const { staff, pimpinan, trip } = await aTripWithAPimpinan();

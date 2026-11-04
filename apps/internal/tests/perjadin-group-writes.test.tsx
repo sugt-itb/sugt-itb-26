@@ -24,7 +24,6 @@ import {
   deleteTransactionAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
-  recordTransactionAction,
 } from "-/app/(app)/perjadin/[id]/laporan/actions";
 import LaporanPage from "-/app/(app)/perjadin/[id]/laporan/page";
 import PerjadinDetailPage from "-/app/(app)/perjadin/[id]/page";
@@ -66,7 +65,6 @@ import {
   receiptsOnLine,
   recordPerjadinDocument,
   recordSessionFootage,
-  recordTransaction,
   removePerjadinTeacher,
   renamePerjadinTeacher,
   setPerjadinStaff,
@@ -389,20 +387,6 @@ const WRITES: [
     "toggled",
   ],
   [
-    "Catat transaksi",
-    (c, a) =>
-      recordTransaction(c, {
-        perjadinId: a.id,
-        spentOn: "2026-10-12",
-        description: "Taksi",
-        amountIdr: 75_000,
-        category: "Transport Lokal Dalam Provinsi",
-        participantType: "Siswa",
-        evidence: receipt(),
-      }),
-    "recorded",
-  ],
-  [
     "Unggah bukti",
     (c, a) => attachTransactionEvidence(c, a.id, a.transactionId, receipt()),
     "attached",
@@ -566,7 +550,6 @@ describe("the actions answer a non-member with a 403", () => {
             suggestions: null,
           }),
       ],
-      ["Catat transaksi", () => recordTransactionAction({ perjadinId: a.id } as never)],
       ["Unggah bukti", () => finalizeReceiptsAction(a.id, a.transactionId, [])],
       ["Dokumen record", () => recordDocumentAction({ perjadinId: a.id } as never)],
       ["Foto & Video record", () => recordFootageAction({ sessionId: a.arrangedId } as never)],
@@ -585,7 +568,11 @@ describe("the actions answer a non-member with a 403", () => {
 
     await expect(
       digestOf(
-        openReceiptSessionsAction(a.id, [{ contentType: "image/jpeg", size: 1_000 }] as never),
+        openReceiptSessionsAction(
+          a.id,
+          [{ contentType: "image/jpeg", size: 1_000 }],
+          a.transactionId,
+        ),
       ),
     ).resolves.toBe(FORBIDDEN);
     await expect(
@@ -637,7 +624,7 @@ describe("the write controls follow who writes the trip", () => {
     }
   });
 
-  it("hides Catat transaksi and Unggah bukti on the Laporan from a non-member", async () => {
+  it("hides Unggah bukti on the Laporan from a non-member, and offers Catat transaksi to no one", async () => {
     const who = await people();
     const a = await perjadinA(who, await place());
     const render = async (viewer: Person) => {
@@ -648,16 +635,14 @@ describe("the write controls follow who writes the trip", () => {
     };
 
     const forFajar = await render(who.fajar);
-    for (const control of ["Catat transaksi", "Unggah bukti"]) {
-      expect(forFajar).not.toContain(control);
-    }
+    expect(forFajar).not.toContain("Unggah bukti");
     // The receipts stay readable.
     expect(forFajar).toContain("Bukti 1");
 
     const forRina = await render(who.rina);
-    for (const control of ["Catat transaksi", "Unggah bukti"]) {
-      expect(forRina).toContain(control);
-    }
+    expect(forRina).toContain("Unggah bukti");
+
+    for (const html of [forFajar, forRina]) expect(html).not.toContain("Catat transaksi");
   });
 
   it("shows nobody a deadline, Laporkan or Dilaporkan, on the Laporan or the trip (#489)", async () => {
