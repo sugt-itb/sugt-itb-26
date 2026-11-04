@@ -78,7 +78,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
  * that has none. It already has a `transactionId`, so it attaches as it uploads.
  *
  * The five-receipt ceiling is held by the server (`attachTransactionEvidence`); the disabled buttons
- * here only keep the form from offering the mistake. A row with no receipt can still appear — a
+ * here only keep the row from offering the mistake. A row with no receipt can still appear — a
  * grandfathered line — and is marked, so its writer can Unggah bukti onto it.
  *
  * **While Drive cannot take an upload** — not connected, broken, or its folders unresolved — every
@@ -651,7 +651,7 @@ function ConfirmHapus({
 
 /**
  * Get each picked file into shape for Drive (`prepareReceipt`): images re-encoded, EXIF stripped, the
- * cap applied. What could not be prepared is counted by reason; each caller decides what that means.
+ * cap applied. What could not be prepared is counted by reason, for the row to report.
  */
 async function prepareAll(
   files: File[],

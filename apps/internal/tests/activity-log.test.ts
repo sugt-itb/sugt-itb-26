@@ -140,7 +140,7 @@ describe("each money write logs one entry with the change", () => {
     await expect(entries()).resolves.toEqual([]);
   });
 
-  it("cannot be handed advance_set, advance_changed or report_filed — they are history only (ADR-0051, ADR-0055)", () => {
+  it("cannot be handed advance_set, advance_changed, report_filed or transaction_recorded — they are history only (ADR-0051, ADR-0055, ADR-0060)", () => {
     // Never called: the assertion is the typecheck gate, which fails on an unused `@ts-expect-error`
     // the day `logActivity` accepts the action again.
     const set = { action: "advance_set", details: { amountIdr: 1 } } as const;

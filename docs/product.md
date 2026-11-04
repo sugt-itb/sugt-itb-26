@@ -694,7 +694,7 @@ as failed, and the rest are kept.
   **Transaksi dihapus** entry on `/log`, under the "Catat transaksi" filter; the line's earlier entries
   stay, without their Buka folder link.
 
-What both controls take:
+What Unggah bukti takes:
 
 - JPG, PNG, WebP or PDF; anything else is refused before it uploads. An iPhone photo arrives as a
   JPG.
@@ -725,11 +725,6 @@ replaced rather than corrected when a filled example arrives. Until then a PIC s
 the real form, which is the one thing this screen exists to stop; see the amendment to
 [ADR-0007](./adr/0007-the-tool-generates-the-acquittal.md) for why that means the bet is
 not yet placed.
-
-Transactions can be entered **as they happen or after returning** — whichever suits,
-with the receipt in hand either way. Both are first-class paths. There is no offline
-support; capture needs connectivity, and where it fails the PIC enters it later, losing
-convenience but never data. Offline is worth adding eventually, not worth blocking on.
 
 **The Laporan is neither filed nor due**
 ([ADR-0055](./adr/0055-the-perjadin-report-is-neither-filed-nor-due.md), #489). There is no

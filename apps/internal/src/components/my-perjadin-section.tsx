@@ -34,7 +34,7 @@ import { useId, useState } from "react";
  * **One section of `/pendamping`'s own trips** (#199) — Perjalanan Dinas Anda or Perjalanan Dinas
  * Sebelumnya (#396), each the client island over its half of `myPerjadin`'s payload (#197). It
  * wires that read straight into the reusable dialogs #198
- * carved out: the Preparation checklist, the two feedback-QR dialogs and the transaction entry form
+ * carved out: the Preparation checklist and the two feedback-QR dialogs
  * all open from a card's own labelled control rather than a page of their own, and each Session on a
  * trip's timeline carries its own Tandai confirmation (#349). Each trip is a card in one single-open
  * accordion (#348), all collapsed to start, with the Anggota roster shown inline.

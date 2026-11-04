@@ -147,17 +147,19 @@ describe("no Drive call before the guard", () => {
     expect(drive.calls).toBe(0);
   });
 
-  it.each(["none", "broken"] as const)(
-    "answers drive-disconnected with zero Drive calls when the connection is %s",
-    async (connection) => {
+  it.each([
+    ["none", /^Google Drive belum terhubung/],
+    ["broken", /^Koneksi Google Drive terputus sejak \d{4}-\d{2}-\d{2} \d{2}:\d{2} WIB/],
+  ] as const)(
+    "answers drive-disconnected, with the gate's reason, and zero Drive calls when the connection is %s",
+    async (connection, reason) => {
       const { trip, line } = await scene({ connection });
+      const refusal = { outcome: "drive-disconnected", reason: expect.stringMatching(reason) };
 
-      await expect(openReceiptSessionsAction(trip.id, oneFile, line.id)).resolves.toMatchObject({
-        outcome: "drive-disconnected",
-      });
-      await expect(
-        finalizeReceiptsAction(trip.id, line.id, asReceipts(["x"])),
-      ).resolves.toMatchObject({ outcome: "drive-disconnected" });
+      await expect(openReceiptSessionsAction(trip.id, oneFile, line.id)).resolves.toEqual(refusal);
+      await expect(finalizeReceiptsAction(trip.id, line.id, asReceipts(["x"]))).resolves.toEqual(
+        refusal,
+      );
       expect(drive.calls).toBe(0);
       await expect(evidenceOf(line.id)).resolves.toHaveLength(0);
     },

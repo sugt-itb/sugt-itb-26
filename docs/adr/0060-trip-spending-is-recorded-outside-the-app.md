@@ -11,7 +11,9 @@ Finance now records and evidences trip spending outside the app, so PICs no long
 places to enter one spend would only disagree. This reverses
 [ADR-0059](./0059-programme-wide-money-is-not-in-the-app.md)'s "Transactions are still recorded" and
 gives up [ADR-0007](./0007-the-tool-generates-the-acquittal.md)'s idea that a PIC enters transactions
-once in the tool and exports the acquittal.
+once in the tool and exports the acquittal. It also amends
+[ADR-0039](./0039-every-transaction-is-recorded-with-its-evidence.md) and
+[ADR-0048](./0048-a-perjadin-is-written-by-its-group.md).
 
 ## The decision
 

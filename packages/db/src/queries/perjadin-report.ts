@@ -78,8 +78,8 @@ export type PerjadinAcquittal = {
   endsOn: string;
   /**
    * **Uang Perjalanan Terpakai** (ADR-0051): the sum of **every** transaction on the trip, all
-   * categories. Zero when none has been entered. `/perjadin/[id]`, the Laporan, its CSV and the
-   * `/pendamping` card all show this one number.
+   * categories. Zero on a trip with no line, where nothing shows it (ADR-0060). `/perjadin/[id]`, the
+   * Laporan, its CSV and the `/pendamping` card all show this one number.
    */
   spentIdr: number;
   /** Of `spentIdr`, the spend attributed to the Siswa cohort — every category, like `spentIdr`. */
@@ -237,8 +237,6 @@ async function pimpinanOf(perjadinId: string): Promise<string[]> {
  * taken from the browser, which never had to tell the truth about either.
  */
 export type NewEvidence = {
-  /** The row's id, when the caller needed it first — a Drive file is named after it. */
-  id?: string;
   driveFileId: string;
   contentType: string;
   byteSize: number;
@@ -307,7 +305,6 @@ export async function attachTransactionEvidence(
 
     await tx.insert(transactionEvidence).values(
       evidence.map((file) => ({
-        ...(file.id ? { id: file.id } : {}),
         transactionId,
         driveFileId: file.driveFileId,
         contentType: file.contentType,

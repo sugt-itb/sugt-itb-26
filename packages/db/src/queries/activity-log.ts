@@ -71,7 +71,7 @@ export type FootageLogDetails = {
  * its line (#462), `transaction_deleted` of the whole line (#463). The two `advance_*` shapes are
  * history only: nothing writes them since the Advance stopped being tracked (ADR-0051, #464). Nor
  * does anything write `report_filed`, since the Laporan stopped being filed (ADR-0055, #489), or
- * `transaction_recorded`, since nothing records a new line (#541).
+ * `transaction_recorded`, since nothing records a new line (ADR-0060, #541).
  */
 export type ActivityLogDetails = {
   advance_set: { amountIdr: number };
@@ -127,7 +127,7 @@ export type ActivityLogEntry = {
 
 /**
  * The actions the app still writes. `advance_set` and `advance_changed` (ADR-0051, #464),
- * `report_filed` (ADR-0055, #489) and `transaction_recorded` (#541) are history only: the Log reads
+ * `report_filed` (ADR-0055, #489) and `transaction_recorded` (ADR-0060, #541) are history only: the Log reads
  * and renders them, and `logActivity` cannot be handed one.
  */
 export type WritableActivityLogEntry = Exclude<

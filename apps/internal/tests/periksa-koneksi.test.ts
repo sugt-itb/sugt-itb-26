@@ -310,6 +310,24 @@ describe("the sweep", () => {
     expect((await lineRow(line.transactionId)).driveSyncedAt).toBeInstanceOf(Date);
   });
 
+  it("leaves an older line in _staging when its Perjadin folder is in the trash", async () => {
+    const { admin, trip } = await scene();
+    const first = await anUnsyncedLine(trip.id, admin.id, "Pertama");
+    await sweepUnsynced(admin, drive, folders);
+    expect((await lineRow(first.id)).driveSyncedAt).toBeInstanceOf(Date);
+    const [stored] = await db.select().from(schema.perjadin).where(eq(schema.perjadin.id, trip.id));
+    drive.trash(stored!.driveFolderId!);
+    const line = await addLineLeftInStaging(drive, folders, admin, trip.id);
+
+    await sweepUnsynced(admin, drive, folders);
+
+    await expect(drive.getFile(line.folderId)).resolves.toMatchObject({
+      parents: [folders.stagingFolderId],
+      trashed: false,
+    });
+    expect((await lineRow(line.transactionId)).driveSyncedAt).toBeNull();
+  });
+
   it("moves past a line that fails every time, so the lines behind it are reached", async () => {
     const { admin, trip } = await scene();
     const stuck = await anUnsyncedLine(trip.id, admin.id, "Macet");

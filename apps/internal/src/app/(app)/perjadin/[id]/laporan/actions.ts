@@ -239,9 +239,8 @@ export async function finalizeReceiptsAction(
   // screen and `too-many-receipts` a line that would pass five — a second tab got there first under
   // the lock; both are reachable, and swallowing either would tell the PIC that receipts attached
   // when none did.
-  const evidence = checked.verified.map((receipt) => ({ ...receipt, id: randomUUID() }));
   const result = await staffSurface(() =>
-    attachTransactionEvidence(person, perjadinId, transactionId, evidence),
+    attachTransactionEvidence(person, perjadinId, transactionId, checked.verified),
   );
   if (result.outcome === "no-such-transaction") return result;
   if (result.outcome === "too-many-receipts") {

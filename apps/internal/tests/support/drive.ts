@@ -1,6 +1,9 @@
+import { randomUUID } from "node:crypto";
+
 import { openReceiptSessionsAction } from "-/app/(app)/perjadin/[id]/laporan/actions";
 import type { FakeDrive } from "-/lib/drive/fake-drive";
 import { ensureFixedFolders, readyFolders, type ReadyFolders } from "-/lib/drive/fixed-folders";
+import { evidenceFileName, transactionFolderName } from "-/lib/drive/receipt-files";
 import { reconcileTransaction } from "-/lib/drive/reconcile";
 import { encryptRefreshToken } from "-/lib/drive/token-crypto";
 import { db, schema } from "@sugt/db";
@@ -212,12 +215,14 @@ export async function addLineLeftInStaging(
     createdByPersonId: person.id,
   });
   const staged = await drive.createFolder({
-    name: `2026-10-13 · Konsumsi · T-${row.id.slice(0, 8)}`,
+    name: transactionFolderName(row.spentOn, "Konsumsi", row.id),
     parentId: folders.stagingFolderId,
     appProperties: { sugtPerjadinId: perjadinId, sugtTransactionId: row.id },
   });
   const [fileId] = await upload(drive, perjadinId, [jpeg()], { transactionId: row.id });
+  const evidenceId = randomUUID();
   await drive.updateFile(fileId!, {
+    name: evidenceFileName(row.spentOn, "Konsumsi", row.id, evidenceId, "image/jpeg"),
     addParent: staged.id,
     removeParent: folders.stagingFolderId,
     appProperties: { sugtTransactionId: row.id },
@@ -227,6 +232,7 @@ export async function addLineLeftInStaging(
     .set({ driveFolderId: staged.id })
     .where(eq(schema.transaction.id, row.id));
   await db.insert(schema.transactionEvidence).values({
+    id: evidenceId,
     transactionId: row.id,
     driveFileId: fileId!,
     contentType: "image/jpeg",
