@@ -164,7 +164,7 @@ The **Grant** that administers Grants and People — an Administrator assigns an
 _Avoid_: admin, superuser, owner (it is a Grant a Staff Person holds, not a Role or an account tier)
 
 **Perjadin Editor**:
-The **Grant** that lets a **Staff** Person **plan a Perjadin** ([ADR-0047](./docs/adr/0047-planning-a-perjadin-and-online-sessions-need-the-editor-grant.md)) and **write every Perjadin**, not only those whose **Group** they are in ([ADR-0048](./docs/adr/0048-a-perjadin-is-written-by-its-group.md)). It does not reach Pengaturan Perjadin, which stays an **Administrator**'s, nor the Dashboard. One of the three Grants the Editor Grant split into ([ADR-0052](./docs/adr/0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md)).
+The **Grant** that lets a **Staff** Person **plan a Perjadin** ([ADR-0047](./docs/adr/0047-planning-a-perjadin-and-online-sessions-need-the-editor-grant.md)) and **write every Perjadin**, not only those whose **Group** they are in ([ADR-0048](./docs/adr/0048-a-perjadin-is-written-by-its-group.md)), and opens the **Pendamping Lain** tab on `/pendamping`, to see another Staff Person's page and show them how to use it ([#539](https://github.com/sugt-itb/sugt-itb-26/issues/539)). It does not reach Pengaturan Perjadin, which stays an **Administrator**'s, nor the Dashboard. One of the three Grants the Editor Grant split into ([ADR-0052](./docs/adr/0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md)).
 _Avoid_: Editor (the Grant split in three; say which)
 
 **Daring Editor**:

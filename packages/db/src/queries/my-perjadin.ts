@@ -166,22 +166,22 @@ export type PendampingPerjadinResult =
   | { outcome: "no-such-pendamping" };
 
 /**
- * **One Staff Person's `/pendamping`, for an Administrator** (#440): the trips that Person sees as
- * theirs, exactly as `myPerjadin` gives them to that Person, for the "Pendamping Lain" tab — the
- * screenshot an Administrator needs to show someone how to use their own page.
+ * **One Staff Person's `/pendamping`, for a Perjadin Editor or an Administrator** (#440, #539): the
+ * trips that Person sees as theirs, exactly as `myPerjadin` gives them to that Person, for the
+ * "Pendamping Lain" tab — the screenshot needed to show someone how to use their own page.
  *
- * **Administrator only, held here rather than only in the page.** `requireStaff` first, so a
- * Pimpinan is refused as non-Staff; then `requireGrant(caller, "Administrator")` — no other Grant
- * is enough — before any row is read. A `personId` that names no Staff Person (a Pimpinan, an unknown id,
- * a malformed one) is `no-such-pendamping`, a value the page says in a sentence. Viewing writes
- * nothing to the Activity Log.
+ * **The Perjadin Editor Grant, held here rather than only in the page.** `requireStaff` first, so a
+ * Pimpinan is refused as non-Staff; then `requireGrant(caller, "Perjadin Editor")` — which an
+ * Administrator implies, and no other Grant is enough — before any row is read. A `personId` that
+ * names no Staff Person (a Pimpinan, an unknown id, a malformed one) is `no-such-pendamping`, a value
+ * the page says in a sentence. Viewing writes nothing to the Activity Log.
  */
 export async function pendampingPerjadin(
   caller: Person,
   personId: string,
 ): Promise<PendampingPerjadinResult> {
   requireStaff(caller);
-  requireGrant(caller, "Administrator");
+  requireGrant(caller, "Perjadin Editor");
 
   const [found] = await db
     .select({ id: person.id, fullName: person.fullName })
@@ -198,11 +198,12 @@ export type PendampingOption = { id: string; fullName: string; email: string };
 
 /**
  * **Whom "Pendamping Lain" offers** (#440): every Staff Person but the caller, by name, with
- * the email the picker also searches. Administrator only, like `pendampingPerjadin`.
+ * the email the picker also searches. The Perjadin Editor Grant, like `pendampingPerjadin`: a
+ * deliberate, narrow exception to `/orang` being Administrator-only (#488, ADR-0052).
  */
 export async function pendampingOptions(caller: Person): Promise<PendampingOption[]> {
   requireStaff(caller);
-  requireGrant(caller, "Administrator");
+  requireGrant(caller, "Perjadin Editor");
 
   return db
     .select({ id: person.id, fullName: person.fullName, email: person.email })
@@ -213,7 +214,7 @@ export async function pendampingOptions(caller: Person): Promise<PendampingOptio
 
 /**
  * The body of `myPerjadin`, keyed on a **person id** rather than a caller, so `pendampingPerjadin`
- * gives an Administrator another Person's trips through exactly the read that Person gets.
+ * gives a Perjadin Editor another Person's trips through exactly the read that Person gets.
  */
 async function perjadinOf(personId: string): Promise<MyPerjadin> {
   // Not yet over: `ends_on` on or after today, reckoned in the office's zone via the shared

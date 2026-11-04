@@ -343,7 +343,7 @@ export const GRANT_LABELS: Record<Grant, string> = {
  */
 export const GRANT_DESCRIPTIONS: Record<Grant, string> = {
   Administrator: "semua akses",
-  "Perjadin Editor": "merencanakan dan menulis setiap Perjadin",
+  "Perjadin Editor": "merencanakan dan menulis setiap Perjadin, serta membuka Pendamping Lain",
   "Daring Editor": "Sesi daring dan Pretest",
   "Dashboard Editor": "termasuk Dashboard Viewer",
   "Dashboard Viewer": "membaca Dashboard",
