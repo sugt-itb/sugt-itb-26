@@ -188,6 +188,26 @@ function oneHourAfter(startsAt: string): string {
 }
 
 /**
+ * Ticks the first `count` of a School's four boxes for one assessment kind. All four is what earns
+ * the School that kind's Kegiatan terlaksana unit (ADR-0031).
+ */
+export async function addAssessmentBoxes(
+  schoolId: string,
+  kind: "pretest" | "posttest",
+  count: number = 4,
+) {
+  const boxes = [
+    { stream: "STEM", participantType: "Siswa" },
+    { stream: "STEM", participantType: "GTK-MS" },
+    { stream: "Research", participantType: "Siswa" },
+    { stream: "Research", participantType: "GTK-MS" },
+  ] as const;
+  await db
+    .insert(schema.assessmentCompletion)
+    .values(boxes.slice(0, count).map((box) => ({ schoolId, kind, ...box })));
+}
+
+/**
  * An **online** Session, which is the cheap one to build: `mode = 'online'` means no
  * Perjadin, so it needs nothing but a School. It carries **no PIC and no Stream (#284)** — a
  * third-party LMS runs online delivery — so it does not even need a Staff Person. The Perjadin CHECK

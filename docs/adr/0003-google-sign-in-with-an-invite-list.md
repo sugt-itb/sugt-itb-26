@@ -103,4 +103,6 @@ member's ([#470](https://github.com/sugt-itb/sugt-itb-26/issues/470)). `addPerso
 Administrator alone. Everyone signed in still reads the roster. An Administrator cannot deactivate
 themselves, so no Administrator removes their own access. _Amended 2026-10-13: reading the roster is
 an Administrator's too ([#488](https://github.com/sugt-itb/sugt-itb-26/issues/488)) — `/orang`
-answers anyone else with a 403, and its sidebar link is hidden from them._
+answers anyone else with a 403, and its sidebar link is hidden from them. Amended 2026-11-04: a
+Perjadin Editor also receives every Staff Person's name and email, through the Pendamping Lain picker
+([#539](https://github.com/sugt-itb/sugt-itb-26/issues/539), ADR-0052); `/orang` itself is unchanged._

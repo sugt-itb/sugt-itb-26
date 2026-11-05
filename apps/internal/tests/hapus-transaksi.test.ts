@@ -2,7 +2,6 @@ import LogPage from "-/app/(app)/log/page";
 import {
   deleteTransactionAction,
   finalizeReceiptsAction,
-  recordTransactionAction,
 } from "-/app/(app)/perjadin/[id]/laporan/actions";
 import { csvOf } from "-/app/(app)/perjadin/[id]/laporan/ekspor/csv";
 import LaporanPage from "-/app/(app)/perjadin/[id]/laporan/page";
@@ -31,6 +30,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  addLineLeftInStaging,
+  addRecordedLine,
   connectDrive,
   digestOf,
   FORBIDDEN,
@@ -80,8 +81,8 @@ let drive: FakeDrive;
 let folders: ReadyFolders;
 
 /**
- * A Staff PIC, an Administrator, a Pimpinan, a trip with Drive connected, and one line recorded
- * through Catat transaksi with `receipts` real files in Drive, synced — plus a second line, kept, so
+ * A Staff PIC, an Administrator, a Pimpinan, a trip with Drive connected, and one recorded line with
+ * `receipts` real files in Drive, synced — plus a second line, kept, so
  * the totals have something left to count.
  */
 async function scene({ receipts = 2 }: { receipts?: number } = {}) {
@@ -115,39 +116,13 @@ async function scene({ receipts = 2 }: { receipts?: number } = {}) {
     .set({ driveSyncedAt: new Date() })
     .where(eq(schema.transaction.id, hotel.id));
 
-  const recorded = await record(trip.id, receipts);
+  const recorded = await addRecordedLine(drive, folders, staff as Person, {
+    perjadinId: trip.id,
+    receipts,
+  });
   if (!recorded.synced) throw new Error("not synced");
   drive.calls = 0;
   return { staff, admin, pimpinan, trip, ...recorded };
-}
-
-/** Catat transaksi with `receipts` fresh files: the line's id, its folder and its receipt files. */
-async function record(perjadinId: string, receipts: number) {
-  const ids = await upload(
-    drive,
-    perjadinId,
-    Array.from({ length: receipts }, () => jpeg()),
-  );
-  const recorded = await recordTransactionAction({
-    perjadinId,
-    spentOn: "2026-10-13",
-    description: "Makan siang",
-    amountIdr: 150_000,
-    category: "Konsumsi",
-    participantType: "Siswa",
-    receipts: ids.map((driveFileId) => ({ driveFileId })),
-  });
-  if (recorded.outcome !== "recorded") throw new Error(`not recorded: ${recorded.outcome}`);
-  const [line] = await db
-    .select()
-    .from(schema.transaction)
-    .where(eq(schema.transaction.id, recorded.transactionId));
-  return {
-    transactionId: recorded.transactionId,
-    synced: recorded.synced,
-    folderId: line!.driveFolderId!,
-    fileIds: ids,
-  };
 }
 
 const lineOf = async (transactionId: string) =>
@@ -242,18 +217,7 @@ describe("Hapus transaksi", () => {
 
   it("trashes an unsynced line from _staging — its folder, and a receipt outside it", async () => {
     const { staff, trip } = await scene();
-    // The reconcile cannot make the Perjadin folder, so the line's folder stays in `_staging`.
-    const createFolder = drive.createFolder.bind(drive);
-    vi.spyOn(drive, "createFolder")
-      .mockImplementationOnce(createFolder)
-      .mockRejectedValueOnce(new DriveRequestError("files.create", 503));
-    await db
-      .update(schema.perjadin)
-      .set({ driveFolderId: null })
-      .where(eq(schema.perjadin.id, trip.id));
-    const unsynced = await record(trip.id, 1);
-    vi.mocked(drive.createFolder).mockRestore();
-    expect(unsynced.synced).toBe(false);
+    const unsynced = await addLineLeftInStaging(drive, folders, staff as Person, trip.id);
     expect(drive.files.get(unsynced.folderId)?.parents).toEqual([folders.stagingFolderId]);
     // A receipt added by Unggah bukti that its reconcile could not move: in `_staging` itself.
     const [late] = await upload(drive, trip.id, [jpeg()], {
@@ -484,6 +448,7 @@ describe("Hapus transaksi", () => {
             drive,
             trip.id,
             Array.from({ length: 5 }, () => jpeg()),
+            { transactionId: line.id },
           )
         : [];
     for (let i = 0; i < count; i += 1) {
@@ -544,7 +509,7 @@ describe("against the reconcile", () => {
       amountIdr: 50_000,
       createdByPersonId: staff.id,
     });
-    const [file] = await upload(drive, trip.id, [jpeg()]);
+    const [file] = await upload(drive, trip.id, [jpeg()], { transactionId: line.id });
     await addTransactionEvidence({
       transactionId: line.id,
       uploadedByPersonId: staff.id,
@@ -654,7 +619,7 @@ describe("on the Laporan", () => {
     const html = await render(staff as Person, trip.id);
     const hapus = html.match(/<button[^>]*aria-label="Hapus transaksi 2026-10-13[^"]*"[^>]*>/)?.[0];
     expect(hapus).toContain("disabled");
-    // On the button itself, as well as once beside Catat transaksi.
+    // On the button itself, as well as once above the rows.
     expect(hapus).toMatch(reason);
     expect(html).toMatch(reason);
   });

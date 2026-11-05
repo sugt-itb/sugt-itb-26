@@ -67,8 +67,8 @@ import { type ReactElement, useId, useRef, useState, useTransition } from "react
  * School that already has one on this trip is offered marked "sudah ada" and not selectable.
  *
  * The trip's documents and Schools are fetched when the dialog opens (`perjadinDokumenAction`), and
- * again after each upload or Hapus, rather than riding on every card's payload. The upload is Catat
- * transaksi's: a session, the browser's `PUT` straight to Drive, then the record. **Any failure
+ * again after each upload or Hapus, rather than riding on every card's payload. The upload is a
+ * session, the browser's `PUT` straight to Drive, then the record. **Any failure
  * keeps every value and the picked file**, so Unggah again retries against a fresh session.
  */
 function PerjadinDokumenDialog({

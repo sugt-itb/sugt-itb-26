@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 
 import { SingleSelectCombobox } from "./single-select-combobox";
 
-/** Which `/pendamping` tab an Administrator is on: their own page, or another Pendamping's. */
+/** Which `/pendamping` tab the viewer is on: their own page, or another Pendamping's. */
 export type PendampingTab = "anda" | "lain";
 
 /**
@@ -23,7 +23,8 @@ function pendampingHref(tab: PendampingTab, personId: string | null = null): Rou
 }
 
 /**
- * **`/pendamping`'s two tabs, for an Administrator only** (#440): **Anda** and **Pendamping Lain**.
+ * **`/pendamping`'s two tabs, for a Perjadin Editor or an Administrator** (#440, #539): **Anda** and
+ * **Pendamping Lain**.
  * The tab lives in the URL (`?tab=lain`), unlike the Dashboard's local-state tabs, because the server
  * needs it to load the other Person's trips; so switching navigates, and the server renders the
  * chosen tab's content as `children`. A refresh or a pasted link keeps the view.

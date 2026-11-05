@@ -2,7 +2,6 @@ import {
   deleteReceiptAction,
   finalizeReceiptsAction,
   openReceiptSessionsAction,
-  recordTransactionAction,
 } from "-/app/(app)/perjadin/[id]/laporan/actions";
 import LaporanPage from "-/app/(app)/perjadin/[id]/laporan/page";
 import {
@@ -26,6 +25,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  addRecordedLine,
   connectDrive,
   digestOf,
   FORBIDDEN,
@@ -70,8 +70,8 @@ let drive: FakeDrive;
 let folders: ReadyFolders;
 
 /**
- * A Staff PIC, an Administrator, a Pimpinan, a trip with Drive connected, and one line recorded
- * through Catat transaksi with `receipts` real files in Drive, synced. Answers the receipts' rows in
+ * A Staff PIC, an Administrator, a Pimpinan, a trip with Drive connected, and one recorded line with
+ * `receipts` real files in Drive, synced. Answers the receipts' rows in
  * upload order, each with its file.
  */
 async function scene({ receipts = 2 }: { receipts?: number } = {}) {
@@ -91,21 +91,11 @@ async function scene({ receipts = 2 }: { receipts?: number } = {}) {
   folders = await connectDrive(drive, staff.id);
   vi.mocked(requirePerson).mockResolvedValue(staff);
 
-  const ids = await upload(
-    drive,
-    trip.id,
-    Array.from({ length: receipts }, () => jpeg()),
-  );
-  const recorded = await recordTransactionAction({
+  const recorded = await addRecordedLine(drive, folders, staff as Person, {
     perjadinId: trip.id,
-    spentOn: "2026-10-13",
-    description: "Makan siang",
-    amountIdr: 150_000,
-    category: "Konsumsi",
-    participantType: "Siswa",
-    receipts: ids.map((driveFileId) => ({ driveFileId })),
+    receipts,
   });
-  if (recorded.outcome !== "recorded" || !recorded.synced) throw new Error("not recorded");
+  if (!recorded.synced) throw new Error("not synced");
   drive.calls = 0;
   return {
     staff,

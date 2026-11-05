@@ -17,7 +17,7 @@ import { openDrive } from "./google";
  * roll it back. A trip with no Drive folder yet, or a connection that is not `connected`, makes no
  * call to Google at all. The fixed tree need not be resolved — renaming one folder by its id needs
  * none of it. A rename that fails is logged and left: the next reconcile that touches this Perjadin —
- * a Catat transaksi or Unggah bukti on it, or a sweep that reaches one of its unsynced lines — or the
+ * an Unggah bukti on it, or a sweep that reaches one of its unsynced lines — or the
  * next press of Periksa koneksi re-asserts the name, because names are app-owned. Until one does, the
  * folder keeps the old name.
  */

@@ -51,9 +51,9 @@ export type PretestParticipantType = (typeof PRETEST_PARTICIPANT_TYPES)[number];
 /**
  * The two assessments whose administration this tool tracks — whether a Pretest or Posttest was
  * *administered* to a cohort at a School (yes/no), never scores or outcomes (ADR-0031, reconciling
- * ADR-0009's "delivery, not outcomes"). Only `pretest` is surfaced in the UI this iteration; the
- * column and its CHECK carry `posttest` from the start so surfacing it later is a UI-only change,
- * not a migration. Values a column may hold, mirrored by `assessment_completion_kind_check`.
+ * ADR-0009's "delivery, not outcomes"). Only `pretest` can be entered this iteration; the column
+ * and its CHECK carry `posttest` from the start so entering it later is a UI-only change, not a
+ * migration. Values a column may hold, mirrored by `assessment_completion_kind_check`.
  */
 export const ASSESSMENT_KINDS = ["pretest", "posttest"] as const;
 export type AssessmentKind = (typeof ASSESSMENT_KINDS)[number];
@@ -215,10 +215,9 @@ export function timeZoneSuffix(zone: TimeZone | "" | null | undefined): string {
 /**
  * Group a Rupiah amount the way every screen shows it: `id-ID` locale, dot separators,
  * `formatIdr(1000000) === "1.000.000"`. Returns the grouped digits only, no `Rp` prefix —
- * this is exactly the `n.toLocaleString("id-ID")` the display sites used inline, named once
- * so the masked amount inputs and every read-back amount cannot drift apart. The amount
- * inputs render this directly (the value carries digits only); displays wrap it in
- * {@link formatRupiah}, which is the single place the `Rp` prefix lives.
+ * this is exactly the `n.toLocaleString("id-ID")` the display sites used inline, named once so
+ * no amount can drift from another. Displays wrap it in {@link formatRupiah}, which is the single
+ * place the `Rp` prefix lives.
  */
 export function formatIdr(n: number): string {
   return n.toLocaleString("id-ID");
@@ -343,7 +342,7 @@ export const GRANT_LABELS: Record<Grant, string> = {
  */
 export const GRANT_DESCRIPTIONS: Record<Grant, string> = {
   Administrator: "semua akses",
-  "Perjadin Editor": "merencanakan dan menulis setiap Perjadin",
+  "Perjadin Editor": "merencanakan dan menulis setiap Perjadin, serta membuka Pendamping Lain",
   "Daring Editor": "Sesi daring dan Pretest",
   "Dashboard Editor": "termasuk Dashboard Viewer",
   "Dashboard Viewer": "membaca Dashboard",
@@ -376,12 +375,12 @@ export const TOTAL_SESSIONS_PER_SCHOOL = SESSIONS_PER_SCHOOL.offline + SESSIONS_
 
 /**
  * How many **Kegiatan terlaksana** units a School is measured against — the denominator of the
- * `/monitoring` progress KPI (`docs/adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md`, #249).
+ * Dashboard's progress KPI and of `/sekolah` and `/sekolah/[slug]` (`docs/adr/0031-pretest-posttest-completion-is-tracked-as-delivery-not-outcomes.md`, #249, #540).
  * Its eight Sessions **plus one unit per assessment kind** (pretest + posttest), so **10**. Each
  * assessment unit is all-or-nothing: a School's pretest unit counts only once all four pretest boxes
  * are done, likewise posttest. Derived from `TOTAL_SESSIONS_PER_SCHOOL` and `ASSESSMENT_KINDS.length`
  * so it cannot drift from either. Distinct from `TOTAL_SESSIONS_PER_SCHOOL`, the Session-only total
- * the other progress readouts (school directory/detail, the public figures) still measure against.
+ * the public figures still measure against.
  */
 export const KEGIATAN_UNITS_PER_SCHOOL = TOTAL_SESSIONS_PER_SCHOOL + ASSESSMENT_KINDS.length;
 
@@ -624,9 +623,9 @@ export const MAX_EXTRA_STAFF_PER_GROUP = 10;
 
 /**
  * **Receipts per transaction: at least one, at most this many, in total** ([ADR-0039](../../../docs/adr/0039-every-transaction-is-recorded-with-its-evidence.md)).
- * A product rule, not a guard on an array: it counts the receipts recorded with the line plus every
- * later upload from its row. Held by the application, in the two writes that add evidence
- * (`recordTransaction`, `attachTransactionEvidence`) — no CHECK, because the shared database may
+ * A product rule, not a guard on an array: it counts the receipts already on the line plus every
+ * later upload from its row. Held by the application, in the one write left that adds evidence
+ * (`attachTransactionEvidence`) — no CHECK, because the shared database may
  * already hold lines with none or with more, and those are grandfathered.
  * The floor of one needs no constant of its own.
  */
@@ -692,7 +691,8 @@ export type SessionFootageContentType = keyof typeof SESSION_FOOTAGE_CONTENT_TYP
  * `advance_set` and `advance_changed` are **history only** (ADR-0051, #464): the Advance is no
  * longer tracked, so nothing writes them, but the entries already in the Log stay readable and
  * searchable. `report_filed` is history only the same way (ADR-0055, #489): the Laporan is no
- * longer filed.
+ * longer filed. So is `transaction_recorded` (ADR-0060, #541): nothing records a new line, but past entries
+ * keep their label and the `/log` filter still finds them.
  */
 export const ACTIVITY_LOG_ACTIONS = [
   "advance_set",

@@ -133,6 +133,7 @@ export {
 export { programmeDelivery, type MonitoringSession, type ProgrammeDelivery } from "./monitoring";
 export {
   assessmentCompletions,
+  schoolAssessmentCompletions,
   setAssessmentCompletion,
   type AssessmentCompletion,
   type SetAssessmentCompletionInput,
@@ -355,7 +356,6 @@ export {
   perjadinAcquittal,
   receiptDeleteTarget,
   receiptsOnLine,
-  recordTransaction,
   transactionDeleteTarget,
   type AcquittalEvidence,
   type AcquittalTransaction,
@@ -364,9 +364,7 @@ export {
   type DeleteTransactionResult,
   type ReceiptDeleteTarget,
   type NewEvidence,
-  type NewTransaction,
   type PerjadinAcquittal,
-  type RecordTransactionResult,
   type TransactionDriveItems,
 } from "./perjadin-report";
 export {

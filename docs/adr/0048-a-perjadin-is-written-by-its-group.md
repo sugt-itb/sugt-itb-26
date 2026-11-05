@@ -108,3 +108,19 @@ Writing every Perjadin, not only one's own Group's, is now the **Perjadin Editor
 #469); "an Editor" above means a Perjadin Editor. Pengaturan Perjadin stays Administrator-only, and
 the other Grants — Daring Editor, Dashboard Editor, Dashboard Viewer and Keuangan — write only a trip
 whose Group the Person is in.
+
+## Amendment (2026-11-04): another Person's page
+
+Two sentences above no longer hold whole: that `/pendamping` lists only trips whose Group the viewer is
+in, and that a trip an Editor is not on is not on their `/pendamping`. Both still describe the **Anda**
+tab. The **Pendamping Lain** tab shows another Staff Person's trips, to an Administrator since
+[#440](https://github.com/sugt-itb/sugt-itb-26/issues/440) and to a Perjadin Editor since
+[#539](https://github.com/sugt-itb/sugt-itb-26/issues/539). Its cards take `canWrite` as true because
+only those two reach the tab, and both write every Perjadin, so who writes a trip does not change. See
+the amendment to [ADR-0052](./0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md).
+
+## Amendment (2026-11-04): recording a line is gone
+
+Its transactions no longer include recording a new one ([ADR-0060](./0060-trip-spending-is-recorded-outside-the-app.md), [#541](https://github.com/sugt-itb/sugt-itb-26/issues/541)). Unggah bukti, Hapus bukti and
+Hapus transaksi on the lines already recorded are still the trip's writers', under
+`requirePerjadinWriter`. "Records transactions" under the rejected alternatives is history.
