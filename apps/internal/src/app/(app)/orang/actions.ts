@@ -1,10 +1,12 @@
 "use server";
 
+import { reshareFootageFolders } from "-/lib/drive/reshare-footage";
 import { requirePerson } from "-/lib/person";
 import { staffSurface } from "-/lib/staff-surface";
 import {
   addPerson,
   assignGrant,
+  footagePerjadinsOfMember,
   revokeGrant,
   revokePerson,
   type AddPersonResult,
@@ -37,11 +39,19 @@ export async function addPersonAction(input: NewPerson): Promise<AddPersonResult
   return result;
 }
 
+/**
+ * Revoke a Person, then — once that has committed — take their edit access off the Foto & Video
+ * folders of the trips whose Group they were in (#553), best effort. A Perjadin Editor's or an
+ * Administrator's reach over every trip is left to Periksa koneksi's sharing pass.
+ */
 export async function revokePersonAction(personId: string): Promise<RevokePersonResult> {
   const person = await requirePerson();
 
   const result = await staffSurface(() => revokePerson(person, personId));
-  if (result.outcome === "revoked") revalidatePath("/orang");
+  if (result.outcome === "revoked") {
+    await reshareFootageFolders(person, await footagePerjadinsOfMember(person, personId));
+    revalidatePath("/orang");
+  }
   return result;
 }
 

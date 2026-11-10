@@ -1,8 +1,8 @@
-import { and, asc, eq, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { person, personGrant } from "../schema/people";
-import { groupMember } from "../schema/travel";
+import { groupMember, perjadin } from "../schema/travel";
 import type { Person } from "./caller";
 
 /**
@@ -42,4 +42,29 @@ export async function perjadinWriterEmails(_caller: Person, perjadinId: string):
     .where(and(eq(person.active, true), eq(person.role, "Staff"), or(inGroup, holdsWriterGrant)))
     .orderBy(asc(sql`lower(${person.email})`));
   return rows.map((row) => row.email);
+}
+
+/**
+ * **The trips whose footage-folder sharing names this Person through their Group** (#553): every
+ * Perjadin they are a Group member of **that has a Foto & Video folder** — a trip with none has
+ * nothing to share yet, and its first click shares it. Revoking the Person re-applies these at once.
+ * Membership rows outlive a revocation, so this reads the same before it and after. Open to any
+ * signed-in Person, for the same reason `perjadinWriterEmails` is.
+ */
+export async function footagePerjadinsOfMember(
+  _caller: Person,
+  personId: string,
+): Promise<string[]> {
+  const rows = await db
+    .select({ id: perjadin.id })
+    .from(groupMember)
+    .innerJoin(perjadin, eq(perjadin.id, groupMember.perjadinId))
+    .where(
+      and(
+        sql`${groupMember.personId}::text = ${personId}`,
+        isNotNull(perjadin.driveFootageFolderId),
+      ),
+    )
+    .orderBy(asc(perjadin.id));
+  return rows.map((row) => row.id);
 }

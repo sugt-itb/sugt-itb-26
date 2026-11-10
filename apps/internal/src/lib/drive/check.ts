@@ -21,6 +21,7 @@ import { reconcileTransaction, type UnsyncedReason } from "./reconcile";
 import { type DocumentUnsyncedReason, reconcileDocument } from "./reconcile-document";
 import { type FootageUnsyncedReason, reconcileFootage } from "./reconcile-footage";
 import { reassertSessionFootageNames } from "./rename-session-footage";
+import { applyFootageFolderSharing } from "./session-footage-folder";
 
 /**
  * **Periksa koneksi** (ADR-0040, #375): whether the company Drive connection works, whether its tree
@@ -47,6 +48,13 @@ export const SWEEP_BUDGET_MS = 40_000;
  * folders, and Session footage folders with their files (ADR-0046). Checked between folders.
  */
 export const RENAME_LIMIT = 25;
+
+/**
+ * After how many Perjadin Foto & Video folders whose sharing it changed one press stops (#553). A
+ * folder already right costs a read and a list and does not count, as a right name does not in the
+ * rename pass — so the next press, which starts from the first trip again, gets further.
+ */
+export const SHARING_LIMIT = 25;
 
 export type SweepFailure = {
   transactionId: string;
@@ -268,6 +276,73 @@ export async function reassertPerjadinFolderNames(
   };
 }
 
+/** A Perjadin Foto & Video folder whose sharing the pass could not re-apply (#553). */
+export type SharingFailure = {
+  perjadinId: string;
+  /** The folder's name, as `perjadinFolderName` gives it — what the Administrator is told. */
+  name: string;
+  reason: "folder-trashed" | "folder-missing" | "drive-failed";
+};
+
+export type SharingReport = {
+  /** Folders whose sharing this press changed to match the trip's writers. */
+  updated: number;
+  /** Folders this press did not reach — past the bound or the budget. */
+  remaining: number;
+  failures: SharingFailure[];
+};
+
+/**
+ * **Re-apply every Perjadin Foto & Video folder's sharing** (#553, ADR-0061): anyone with the link
+ * views, and exactly the trip's active writers edit (`applyFootageFolderSharing`). It is the backstop
+ * for every change to who writes a trip — a Grant assigned or revoked above all, which reaches every
+ * trip and is never applied inline — and for an inline re-share that failed.
+ *
+ * Bounded like the rename pass: it stops after `limit` folders it changed or once `budgetMs` has
+ * passed, and reports what it did not reach; the next press re-reads the ones already right and
+ * carries on. A folder trashed or
+ * deleted by hand is reported and skipped, never recreated, and never shared in the trash.
+ */
+export async function reapplyFootageSharing(
+  person: Person,
+  drive: DriveClient,
+  { limit = SHARING_LIMIT, budgetMs = SWEEP_BUDGET_MS }: { limit?: number; budgetMs?: number } = {},
+): Promise<SharingReport> {
+  const folders = (await perjadinDriveFolders(person)).flatMap((trip) =>
+    trip.driveFootageFolderId
+      ? [
+          {
+            perjadinId: trip.naming.id,
+            folderId: trip.driveFootageFolderId,
+            name: perjadinFolderName(trip.naming),
+          },
+        ]
+      : [],
+  );
+
+  const failures: SharingFailure[] = [];
+  const startedAt = Date.now();
+  let updated = 0;
+  let checked = 0;
+  for (const { perjadinId, folderId, name } of folders) {
+    if (updated >= limit || Date.now() - startedAt > budgetMs) break;
+    checked += 1;
+    try {
+      const folder = await drive.getFile(folderId);
+      if (!folder || folder.trashed) {
+        failures.push({ perjadinId, name, reason: folder ? "folder-trashed" : "folder-missing" });
+      } else if (await applyFootageFolderSharing(person, drive, perjadinId, folderId)) {
+        updated += 1;
+      }
+    } catch (error) {
+      if (!isDriveFailure(error)) throw error;
+      failures.push({ perjadinId, name, reason: "drive-failed" });
+    }
+  }
+
+  return { updated, remaining: folders.length - checked, failures };
+}
+
 /** One of the four fixed folders, as Periksa koneksi found it. */
 export type FolderCheck = {
   folder: "root" | "staging" | "bukti-transaksi" | "pelaksanaan-offline";
@@ -305,6 +380,8 @@ export type DriveCheckReport =
         | { ran: false; waiting: number; documentsWaiting: number; footageWaiting: number };
       /** The Perjadin folder names re-asserted (#407) — skipped, like the sweep, while the tree is not usable. */
       names: ({ ran: true } & FolderNameReport) | { ran: false };
+      /** Every Perjadin Foto & Video folder's sharing re-applied (#553) — skipped the same way. */
+      sharing: ({ ran: true } & SharingReport) | { ran: false };
     };
 
 /**
@@ -325,6 +402,8 @@ export type DriveCheckReport =
  * 6. **The folder names** (`reassertPerjadinFolderNames`, #407), only when the tree is usable, within
  *    what the sweep left of `SWEEP_BUDGET_MS`. This is how folders made before ADR-0044 take the new
  *    name: the Administrator presses again until none is left.
+ * 7. **The Foto & Video sharing** (`reapplyFootageSharing`, #553), only when the tree is usable,
+ *    within what is left of the same budget: the trips' footage folders shared to who writes them now.
  *
  * The caller has already checked the Administrator Grant.
  */
@@ -401,7 +480,15 @@ export async function checkDriveConnection(person: Person): Promise<DriveCheckRe
           })),
         }
       : { ran: false as const };
-    return { token: "ok", folders, exposed, dokumen, footage, sweep, names };
+    const sharing = ready
+      ? {
+          ran: true as const,
+          ...(await reapplyFootageSharing(person, drive, {
+            budgetMs: SWEEP_BUDGET_MS - (Date.now() - sweptFrom),
+          })),
+        }
+      : { ran: false as const };
+    return { token: "ok", folders, exposed, dokumen, footage, sweep, names, sharing };
   } catch (error) {
     if (isDriveFailure(error)) return { token: "unreachable" };
     throw error;

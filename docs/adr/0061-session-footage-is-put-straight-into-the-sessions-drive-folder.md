@@ -91,9 +91,12 @@ record of its own visit, not evidence anyone audits.
   **Hasil verifikasi kepemilikan: belum.** _Replace this line with the result, and its date, once
   it is in._
 
-- **Leaving a Group takes effect late.** Editors are re-applied only when someone clicks the button on
-  that trip, so a Person who has left a Group, lost a Grant or been revoked keeps edit access until the
-  next click. The follow-up ticket applies the sharing the moment a Group, Grant or Person changes.
+- **A Grant change takes effect late.** _Updated 2026-11-10 by #553:_ a trip's Group or PIC changing,
+  or a Person being deactivated, re-shares the affected folders straight after the change commits, best
+  effort. A Perjadin Editor or Administrator Grant reaches every trip, so it is not applied inline:
+  Periksa koneksi's sharing pass applies it, or the next click on each Session's Foto & Video. Until one
+  of them runs, a Person who lost such a Grant keeps edit access, and an inline re-share that failed
+  waits the same way.
 
 ## What it supersedes and amends
 
@@ -102,8 +105,9 @@ record of its own visit, not evidence anyone audits.
   size checks (50 MB photos, 1000 MB videos, 30 files at a time); sharing one file at a time for new
   files; Hapus; and the Log entries. Its tree, its names, the sweep and the renames stand.
 - **Amends [ADR-0048](./0048-a-perjadin-is-written-by-its-group.md)** on how its write rule is enforced
-  for footage. Drive's edit access now enforces it, not a guard in the app, and it is re-applied when
-  someone clicks, so leaving a Group takes effect late until the follow-up lands. Who may write is
+  for footage. Drive's edit access now enforces it, not a guard in the app. Since #553 it is
+  re-applied the moment a Group changes or a Person is deactivated, so leaving a Group again takes
+  effect at once; only a Grant change waits for Periksa koneksi or a click. Who may write is
   unchanged.
 - **Amends [ADR-0040](./0040-transaction-evidence-is-stored-in-the-company-google-drive.md)** as above:
   the credential read and the folder bookkeeping are open to anyone signed in, for the app's own use.

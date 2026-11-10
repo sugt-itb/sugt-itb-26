@@ -1704,7 +1704,8 @@ Offline`, named as its other two; `session.drive_footage_folder_id` is the Sessi
 `{held_on} · {HH.MM} · {School} · S-{session8}`. **They are made on the first click** of the Foto &
 Video button, by anyone signed in, and both are claimed by compare-and-set (`where … is null`). The
 trip's folder carries the sharing: anyone with the link can view, and the trip's writers can edit, set
-from Drive's side and re-applied on each click. The database holds none of that. A Session's folder,
+from Drive's side and re-applied on each click, after a Group change or a deactivation, and by
+Periksa koneksi (#553). The database holds none of that. A Session's folder,
 and the files the old upload placed in it, are renamed when its date or time moves.
 
 ## Money
