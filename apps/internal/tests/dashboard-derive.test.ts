@@ -54,6 +54,26 @@ function sess(
   };
 }
 
+/** Terse completion-row builder: one ticked box of one kind, for one School. */
+function box(
+  schoolId: string,
+  stream: "STEM" | "Research",
+  participantType: "Siswa" | "GTK-MS",
+  kind: "pretest" | "posttest",
+): AssessmentCompletion {
+  return { schoolId, stream, participantType, kind };
+}
+
+/** All four `STREAMS × PRETEST_PARTICIPANT_TYPES` boxes of one kind, for one School. */
+function allFour(schoolId: string, kind: "pretest" | "posttest"): AssessmentCompletion[] {
+  return [
+    box(schoolId, "STEM", "Siswa", kind),
+    box(schoolId, "STEM", "GTK-MS", kind),
+    box(schoolId, "Research", "Siswa", kind),
+    box(schoolId, "Research", "GTK-MS", kind),
+  ];
+}
+
 describe("deliveryMatrix", () => {
   it("ranks by date, skips a cancelled earlier Session, and never lets X exceed Y", () => {
     const sessions: MonitoringSession[] = [
@@ -130,21 +150,6 @@ describe("deliveryProgress", () => {
 });
 
 describe("assessmentProgress", () => {
-  const box = (
-    schoolId: string,
-    stream: "STEM" | "Research",
-    participantType: "Siswa" | "GTK-MS",
-    kind: "pretest" | "posttest",
-  ): AssessmentCompletion => ({ schoolId, stream, participantType, kind });
-
-  /** All four `STREAMS × PRETEST_PARTICIPANT_TYPES` boxes of one kind, for one School. */
-  const allFour = (schoolId: string, kind: "pretest" | "posttest") => [
-    box(schoolId, "STEM", "Siswa", kind),
-    box(schoolId, "STEM", "GTK-MS", kind),
-    box(schoolId, "Research", "Siswa", kind),
-    box(schoolId, "Research", "GTK-MS", kind),
-  ];
-
   it("counts a School only once all four of its boxes of the kind are ticked", () => {
     // Every School has three of its four pretest boxes: none is complete → 0 of 3 Schools.
     const threeOfFour = ["s1", "s2", "s3"].flatMap((id) => allFour(id, "pretest").slice(0, 3));
@@ -202,13 +207,6 @@ describe("pivotByCluster", () => {
 });
 
 describe("assessmentTable", () => {
-  const box = (
-    schoolId: string,
-    stream: "STEM" | "Research",
-    participantType: "Siswa" | "GTK-MS",
-    kind: "pretest" | "posttest",
-  ): AssessmentCompletion => ({ schoolId, stream, participantType, kind });
-
   it("counts, per Cluster, schools with each box ticked over the Cluster's school count", () => {
     // Cluster A holds s1, s2; Cluster B holds s3.
     const completions = [
@@ -338,15 +336,7 @@ describe("deriveDashboard", () => {
 
   it("reads the Pretest card by School: one complete School of 3, the partial one adding nothing", () => {
     // s1 has all four pretest boxes, s2 three of four: 1 of 3 Schools → 33%, not 7 of 12 boxes.
-    const completions: AssessmentCompletion[] = [
-      { schoolId: "s1", stream: "STEM", participantType: "Siswa", kind: "pretest" },
-      { schoolId: "s1", stream: "STEM", participantType: "GTK-MS", kind: "pretest" },
-      { schoolId: "s1", stream: "Research", participantType: "Siswa", kind: "pretest" },
-      { schoolId: "s1", stream: "Research", participantType: "GTK-MS", kind: "pretest" },
-      { schoolId: "s2", stream: "STEM", participantType: "Siswa", kind: "pretest" },
-      { schoolId: "s2", stream: "STEM", participantType: "GTK-MS", kind: "pretest" },
-      { schoolId: "s2", stream: "Research", participantType: "Siswa", kind: "pretest" },
-    ];
+    const completions = [...allFour("s1", "pretest"), ...allFour("s2", "pretest").slice(0, 3)];
     const data: ProgrammeDelivery = { clusters: CLUSTERS, schools: SCHOOLS, sessions: [] };
     const { summary } = deriveDashboard(data, "2026-09-01", completions);
     expect(summary.pretest).toEqual({ percent: 33, detail: "1/3 sekolah" });
@@ -374,21 +364,6 @@ describe("deriveDashboard", () => {
 });
 
 describe("completedAssessmentUnits", () => {
-  const box = (
-    schoolId: string,
-    stream: "STEM" | "Research",
-    participantType: "Siswa" | "GTK-MS",
-    kind: "pretest" | "posttest",
-  ): AssessmentCompletion => ({ schoolId, stream, participantType, kind });
-
-  /** All four boxes of one kind for one School. */
-  const allFour = (schoolId: string, kind: "pretest" | "posttest"): AssessmentCompletion[] => [
-    box(schoolId, "STEM", "Siswa", kind),
-    box(schoolId, "STEM", "GTK-MS", kind),
-    box(schoolId, "Research", "Siswa", kind),
-    box(schoolId, "Research", "GTK-MS", kind),
-  ];
-
   it("counts a School's kind only when all four boxes are present — three of four is zero", () => {
     expect(completedAssessmentUnits(allFour("s1", "pretest"))).toBe(1);
     // Drop one box → the unit no longer counts.

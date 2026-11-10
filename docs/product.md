@@ -181,8 +181,8 @@ it (#551):
 | Progress Posttest | Schools with all four Posttest boxes ticked over all Schools, "0/47 sekolah" for now |
 
 - **Pretest and Posttest count Schools, not boxes.** A School counts only once all four of its boxes
-  (2 streams × 2 participant types) are ticked; three of four adds nothing. That is the rule Kegiatan
-  terlaksana and `/sekolah` already use, so the cards cannot read "75%" above "0/47 sekolah".
+  (2 streams × 2 participant types) are ticked; three of four adds nothing. It is the same rule
+  Kegiatan terlaksana and `/sekolah` use.
 - **Daring and Luring are measured against the full plan**, not the Sessions arranged so far, and a
   School that over-delivers is not capped.
 - The per-Cluster Pretest Terlaksana and Postest Terlaksana tables below still count each box apart:

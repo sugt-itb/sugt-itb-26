@@ -11,8 +11,8 @@ import {
 
 /**
  * **The Programme's progress figures — the one derivation two readers share (#503).** The
- * Dashboard (`/`, `app/(app)/dashboard-derive.ts`) shows their percentages; the Unified Dashboard's
- * summary route (`lib/unified-dashboard.ts`) shows the counts and percentages. Both fold the same
+ * Dashboard (`/`, `app/(app)/dashboard-derive.ts`) and the Unified Dashboard's summary route
+ * (`lib/unified-dashboard.ts`) both show the counts and percentages (#551). Both fold the same
  * rows through `deriveProgress`, so the two cannot disagree. `/sekolah` and `/sekolah/[slug]` take
  * the same assessment rule per School (#540). Pure: no React, no database, and no money — which is
  * what lets the Unified Dashboard be handed it.
@@ -21,7 +21,7 @@ import {
 /**
  * A count over its denominator, with the whole-number percent the screen shows — **computed from
  * those two numbers and nothing else**: `percent` is `count / total` rounded to a whole percent, or
- * 0 when `total` is 0. The Unified Dashboard (#503) shows all three; `/` shows the percent.
+ * 0 when `total` is 0. The Unified Dashboard (#503) and `/`'s summary cards (#551) show all three.
  */
 export type Fraction = { count: number; total: number; percent: number };
 
@@ -39,7 +39,10 @@ export type ProgrammeProgress = {
   online: Fraction;
   /** Schools with all four Pretest boxes ticked, over the School count (#551). */
   pretest: Fraction;
-  /** Schools with all four Posttest boxes ticked, over the School count — an honest 0 until posttest rows exist. */
+  /**
+   * Schools with all four Posttest boxes ticked, over the School count — an honest 0 until posttest
+   * rows exist.
+   */
   posttest: Fraction;
 };
 
@@ -83,8 +86,8 @@ export function assessmentBoxesBySchool(
 }
 
 /**
- * The **all-or-nothing** assessment units one School has earned, the one place the rule lives
- * (ADR-0031/#249). It earns one unit for a kind only when **all four** of that kind's boxes
+ * The **all-or-nothing** assessment units one School has earned (ADR-0031/#249). The rule itself
+ * lives in `hasAssessmentUnit`, below, which `assessmentProgress` shares (#551). It earns one unit for a kind only when **all four** of that kind's boxes
  * (STREAMS × PRETEST_PARTICIPANT_TYPES) are present; three of four contributes nothing. Written
  * generically over `ASSESSMENT_KINDS`, so **posttest is already counted** — it simply stays 0 until
  * posttest rows exist, which is what caps the KPI near 90% this iteration. The unique constraint on
@@ -162,8 +165,8 @@ export function assessmentProgress(
 
 /**
  * Every progress figure, from the delivery rows and the completion rows (#503). `deriveDashboard`
- * takes its percentages from here, and the Unified Dashboard's summary route takes its counts and
- * percentages from here, so the two cannot disagree. Every denominator is the always-47 School count
+ * and the Unified Dashboard's summary route both take their counts and percentages from here, so
+ * the two cannot disagree. Every denominator is the always-47 School count
  * times a programme constant, or the School count itself for pretest and posttest; posttest is
  * honestly 0 until posttest rows exist.
  */
