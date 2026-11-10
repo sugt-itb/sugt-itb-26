@@ -1,4 +1,4 @@
-import { deriveProgress } from "-/lib/programme-progress";
+import { deriveProgress, type Fraction } from "-/lib/programme-progress";
 import type { AssessmentCompletion, MonitoringSession, ProgrammeDelivery } from "@sugt/db/queries";
 import {
   type AssessmentKind,
@@ -64,12 +64,32 @@ export type ColumnGroup = { label: string; subColumns: string[] };
 export type PivotTable = { columns: string[]; groups?: ColumnGroup[]; rows: PivotRow[] };
 
 /**
- * The four Pelaksanaan summary percentages (#313), each a whole-number percent rendered `{n}%`.
- * Luring/Daring are delivered Sessions over the per-mode capacity; pretest/posttest are ticked boxes
- * over `schools × 4` (`STREAMS × PRETEST_PARTICIPANT_TYPES`). Posttest reads an honest 0 until
- * posttest rows exist. All four are guarded at a 0-School denominator.
+ * One Pelaksanaan summary card's figures (#313, #551): the whole-number percent rendered `{n}%`, and
+ * the detail line under it — the count and denominator that percent came from, built whole here
+ * (`"12/47 sekolah"`, `"140/282 sesi"`) so the view computes nothing.
  */
-export type ProgressSummary = { pretest: number; daring: number; luring: number; posttest: number };
+export type SummaryFigure = { percent: number; detail: string };
+
+/**
+ * The four Pelaksanaan summary cards (#313, #551). Luring/Daring are delivered Sessions over the
+ * per-mode capacity (Schools × 2, Schools × 6), read in `sesi`; pretest/posttest are Schools with
+ * all four of that kind's boxes ticked over the School count, read in `sekolah`. Posttest reads an
+ * honest 0 until posttest rows exist. All four are guarded at a 0-School denominator.
+ */
+export type ProgressSummary = {
+  pretest: SummaryFigure;
+  daring: SummaryFigure;
+  luring: SummaryFigure;
+  posttest: SummaryFigure;
+};
+
+/** A `Fraction` as a summary card shows it: its percent, and `"{count}/{total} {unit}"` beneath. */
+function summaryFigure(
+  { count, total, percent }: Fraction,
+  unit: "sekolah" | "sesi",
+): SummaryFigure {
+  return { percent, detail: `${count}/${total} ${unit}` };
+}
 
 /** A Luring Sesi's calendar window — the shape `LURING_SESI_WINDOWS` holds, accepted read-only. */
 type SesiWindow = { sesi: number; startsOn: string; endsOn: string };
@@ -235,7 +255,7 @@ export function overdueWarnings(
 
 /**
  * Assemble the whole view from the raw data, today's date and the assessment completion rows (#313).
- * Kegiatan terlaksana and the four summary percentages are `deriveProgress`'s — the figures the
+ * Kegiatan terlaksana and the four summary cards' figures are `deriveProgress`'s — the figures the
  * Unified Dashboard reads too (#503). The two delivery tables are the
  * ranked matrices pivoted to Klaster rows; the two assessment tables count ticked boxes per Cluster.
  * The overdue warnings still fold the Sesi-indexed Luring matrix, before it is pivoted for the view.
@@ -263,10 +283,10 @@ export function deriveDashboard(
   return {
     activitiesPercent: progress.kegiatan.percent,
     summary: {
-      pretest: progress.pretest.percent,
-      daring: progress.online.percent,
-      luring: progress.offline.percent,
-      posttest: progress.posttest.percent,
+      pretest: summaryFigure(progress.pretest, "sekolah"),
+      daring: summaryFigure(progress.online, "sesi"),
+      luring: summaryFigure(progress.offline, "sesi"),
+      posttest: summaryFigure(progress.posttest, "sekolah"),
     },
     luring: pivotByCluster(data.clusters, luringRows),
     daring: pivotByCluster(data.clusters, daringRows),

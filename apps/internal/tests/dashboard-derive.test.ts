@@ -137,24 +137,45 @@ describe("assessmentProgress", () => {
     kind: "pretest" | "posttest",
   ): AssessmentCompletion => ({ schoolId, stream, participantType, kind });
 
-  it("counts ticked boxes of the kind over schoolCount × 4, box-level not all-or-nothing", () => {
-    const completions = [
-      box("s1", "STEM", "Siswa", "pretest"),
-      box("s1", "STEM", "GTK-MS", "pretest"), // s1 partial (2 of 4) still contributes both boxes
-      box("s2", "Research", "Siswa", "pretest"),
-    ];
-    // 3 pretest boxes of 3 schools × 4 = 12 → 25%.
-    expect(assessmentProgress(completions, "pretest", 3)).toEqual({
-      count: 3,
-      total: 12,
-      percent: 25,
-    });
-    // No posttest rows → an honest 0%.
-    expect(assessmentProgress(completions, "posttest", 3)).toEqual({
+  /** All four `STREAMS × PRETEST_PARTICIPANT_TYPES` boxes of one kind, for one School. */
+  const allFour = (schoolId: string, kind: "pretest" | "posttest") => [
+    box(schoolId, "STEM", "Siswa", kind),
+    box(schoolId, "STEM", "GTK-MS", kind),
+    box(schoolId, "Research", "Siswa", kind),
+    box(schoolId, "Research", "GTK-MS", kind),
+  ];
+
+  it("counts a School only once all four of its boxes of the kind are ticked", () => {
+    // Every School has three of its four pretest boxes: none is complete → 0 of 3 Schools.
+    const threeOfFour = ["s1", "s2", "s3"].flatMap((id) => allFour(id, "pretest").slice(0, 3));
+    expect(assessmentProgress(threeOfFour, "pretest", 3)).toEqual({
       count: 0,
-      total: 12,
+      total: 3,
       percent: 0,
     });
+    // One School with all four → 1 of 3 Schools → 33%; the others' partial boxes add nothing.
+    const oneComplete = [...allFour("s1", "pretest"), box("s2", "STEM", "Siswa", "pretest")];
+    expect(assessmentProgress(oneComplete, "pretest", 3)).toEqual({
+      count: 1,
+      total: 3,
+      percent: 33,
+    });
+    // No posttest rows → an honest 0 of 3 Schools.
+    expect(assessmentProgress(oneComplete, "posttest", 3)).toEqual({
+      count: 0,
+      total: 3,
+      percent: 0,
+    });
+  });
+
+  it("counts each kind apart: a complete posttest does not complete a School's pretest", () => {
+    const completions = [...allFour("s1", "posttest"), ...allFour("s2", "pretest").slice(1)];
+    expect(assessmentProgress(completions, "posttest", 2)).toEqual({
+      count: 1,
+      total: 2,
+      percent: 50,
+    });
+    expect(assessmentProgress(completions, "pretest", 2).count).toBe(0);
   });
 
   it("guards a zero school count at 0%", () => {
@@ -284,9 +305,14 @@ describe("deriveDashboard", () => {
     expect(derived.daring.rows).toHaveLength(CLUSTERS.length);
     // 2 delivered units (no assessment units) of 3 Schools × 10 = 30 possible → 6.67 rounds to 7%.
     expect(derived.activitiesPercent).toBe(7);
-    // Summary percentages: no completions → 0% pretest and posttest; 1 delivered online of 18 → 6%,
-    // 1 delivered offline of 6 → 17%.
-    expect(derived.summary).toEqual({ pretest: 0, daring: 6, luring: 17, posttest: 0 });
+    // Summary cards: no completions → 0% and 0 of 3 Schools for pretest and posttest; 1 delivered
+    // online of 3 × 6 = 18 → 6%, 1 delivered offline of 3 × 2 = 6 → 17%.
+    expect(derived.summary).toEqual({
+      pretest: { percent: 0, detail: "0/3 sekolah" },
+      daring: { percent: 6, detail: "1/18 sesi" },
+      luring: { percent: 17, detail: "1/6 sesi" },
+      posttest: { percent: 0, detail: "0/3 sekolah" },
+    });
     // No completions → both assessment tables read all 0/Y, one row per Cluster.
     expect(derived.postestTable.rows).toEqual([
       { label: "Klaster A", cells: ["0/2", "0/2", "0/2", "0/2"] },
@@ -308,6 +334,42 @@ describe("deriveDashboard", () => {
       sessions: [],
     };
     expect(deriveDashboard(data, "2026-09-01", s1FullPretest).activitiesPercent).toBe(3);
+  });
+
+  it("reads the Pretest card by School: one complete School of 3, the partial one adding nothing", () => {
+    // s1 has all four pretest boxes, s2 three of four: 1 of 3 Schools → 33%, not 7 of 12 boxes.
+    const completions: AssessmentCompletion[] = [
+      { schoolId: "s1", stream: "STEM", participantType: "Siswa", kind: "pretest" },
+      { schoolId: "s1", stream: "STEM", participantType: "GTK-MS", kind: "pretest" },
+      { schoolId: "s1", stream: "Research", participantType: "Siswa", kind: "pretest" },
+      { schoolId: "s1", stream: "Research", participantType: "GTK-MS", kind: "pretest" },
+      { schoolId: "s2", stream: "STEM", participantType: "Siswa", kind: "pretest" },
+      { schoolId: "s2", stream: "STEM", participantType: "GTK-MS", kind: "pretest" },
+      { schoolId: "s2", stream: "Research", participantType: "Siswa", kind: "pretest" },
+    ];
+    const data: ProgrammeDelivery = { clusters: CLUSTERS, schools: SCHOOLS, sessions: [] };
+    const { summary } = deriveDashboard(data, "2026-09-01", completions);
+    expect(summary.pretest).toEqual({ percent: 33, detail: "1/3 sekolah" });
+    // No posttest rows → 0% and 0 of 3 Schools.
+    expect(summary.posttest).toEqual({ percent: 0, detail: "0/3 sekolah" });
+  });
+
+  it("counts every delivered Session in the Daring/Luring detail, uncapped, over the full capacity", () => {
+    // s1 has three delivered offline Sessions — one more than its two — and one arranged; the
+    // detail counts all three delivered over 3 × 2 = 6, matching the percent.
+    const data: ProgrammeDelivery = {
+      clusters: CLUSTERS,
+      schools: SCHOOLS,
+      sessions: [
+        sess({ schoolId: "s1", heldOn: "2026-10-01" }),
+        sess({ schoolId: "s1", heldOn: "2026-10-02" }),
+        sess({ schoolId: "s1", heldOn: "2026-10-03" }),
+        sess({ schoolId: "s2", status: "arranged" }),
+      ],
+    };
+    const { summary } = deriveDashboard(data, "2026-09-01", []);
+    expect(summary.luring).toEqual({ percent: 50, detail: "3/6 sesi" });
+    expect(summary.daring).toEqual({ percent: 0, detail: "0/18 sesi" });
   });
 });
 

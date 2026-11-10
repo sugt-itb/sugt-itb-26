@@ -37,9 +37,9 @@ export type ProgrammeProgress = {
   offline: Fraction;
   /** Delivered online Sessions over Schools × `SESSIONS_PER_SCHOOL.online` — the Daring figure. */
   online: Fraction;
-  /** Ticked Pretest boxes over Schools × 4. */
+  /** Schools with all four Pretest boxes ticked, over the School count (#551). */
   pretest: Fraction;
-  /** Ticked Posttest boxes over Schools × 4 — an honest 0 until posttest rows exist. */
+  /** Schools with all four Posttest boxes ticked, over the School count — an honest 0 until posttest rows exist. */
   posttest: Fraction;
 };
 
@@ -92,7 +92,12 @@ export function assessmentBoxesBySchool(
  * four distinct boxes", so a plain tally is the rollup.
  */
 function assessmentUnits(boxes: AssessmentBoxes): number {
-  return ASSESSMENT_KINDS.filter((kind) => boxes[kind] >= BOXES_PER_ASSESSMENT_UNIT).length;
+  return ASSESSMENT_KINDS.filter((kind) => hasAssessmentUnit(boxes, kind)).length;
+}
+
+/** Whether one School has earned `kind`'s unit — all four of its boxes ticked, the rule above. */
+function hasAssessmentUnit(boxes: AssessmentBoxes, kind: AssessmentKind): boolean {
+  return boxes[kind] >= BOXES_PER_ASSESSMENT_UNIT;
 }
 
 /** The assessment units complete across all Schools, summed over both kinds. */
@@ -136,26 +141,31 @@ export function deliveryProgress(
 }
 
 /**
- * A summary figure for one assessment kind (#313): every ticked box of that kind over
- * `schoolCount × BOXES_PER_ASSESSMENT_UNIT` (the four `STREAMS × PRETEST_PARTICIPANT_TYPES` boxes a
- * School can tick). Box-level, matching the per-box meters this replaces — a School three-quarters
- * done still contributes its three boxes. Posttest stays 0% until posttest rows exist, by
- * construction. Guards a 0-School denominator at 0%.
+ * A summary figure for one assessment kind (#313, #551): the Schools that have earned that kind's
+ * unit — **all four** `STREAMS × PRETEST_PARTICIPANT_TYPES` boxes ticked, the all-or-nothing rule
+ * Kegiatan terlaksana and `/sekolah` use (ADR-0031) — over `schoolCount`. A School with three of
+ * four boxes counts nothing, so the percent and the card's "{n}/{school count} sekolah" line always
+ * agree. Posttest stays 0% until posttest rows exist, by construction. Guards a 0-School
+ * denominator at 0%.
  */
 export function assessmentProgress(
   completions: AssessmentCompletion[],
   kind: AssessmentKind,
   schoolCount: number,
 ): Fraction {
-  const ticked = completions.filter((c) => c.kind === kind).length;
-  return fraction(ticked, schoolCount * BOXES_PER_ASSESSMENT_UNIT);
+  let complete = 0;
+  for (const boxes of assessmentBoxesBySchool(completions).values()) {
+    if (hasAssessmentUnit(boxes, kind)) complete++;
+  }
+  return fraction(complete, schoolCount);
 }
 
 /**
  * Every progress figure, from the delivery rows and the completion rows (#503). `deriveDashboard`
  * takes its percentages from here, and the Unified Dashboard's summary route takes its counts and
  * percentages from here, so the two cannot disagree. Every denominator is the always-47 School count
- * times a programme constant; posttest is honestly 0 until posttest rows exist.
+ * times a programme constant, or the School count itself for pretest and posttest; posttest is
+ * honestly 0 until posttest rows exist.
  */
 export function deriveProgress(
   data: Pick<ProgrammeDelivery, "schools" | "sessions">,
