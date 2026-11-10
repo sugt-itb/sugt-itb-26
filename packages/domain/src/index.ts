@@ -644,21 +644,12 @@ export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 /**
  * **Session Footage** — the photos and videos documenting one offline Session, shown as "Foto &
- * Video" (#424, ADR-0046). Two kinds, each with its own cap, in the same MiB arithmetic as
- * `MAX_UPLOAD_BYTES`. A photo is held to the receipts' 50 MB; a video may be twenty times that.
- * Footage is uploaded untouched, so these caps are on the file as it was taken.
+ * Video" (#424, ADR-0046). Two kinds. Since #552 (ADR-0061) the app no longer uploads footage, so it
+ * checks no type or size: Staff put files straight into the Session's Drive folder. The kinds and
+ * types below describe the rows uploads made before then, which the app still reads.
  */
 export const SESSION_FOOTAGE_KINDS = ["foto", "video"] as const;
 export type SessionFootageKind = (typeof SESSION_FOOTAGE_KINDS)[number];
-
-export const MAX_FOOTAGE_PHOTO_BYTES = 50 * 1024 * 1024;
-export const MAX_FOOTAGE_VIDEO_BYTES = 1000 * 1024 * 1024;
-
-/** The cap on one file of each kind. */
-export const MAX_FOOTAGE_BYTES: Record<SessionFootageKind, number> = {
-  foto: MAX_FOOTAGE_PHOTO_BYTES,
-  video: MAX_FOOTAGE_VIDEO_BYTES,
-};
 
 /**
  * The types Session Footage is stored as — the six the server recognises from a file's first bytes

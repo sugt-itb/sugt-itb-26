@@ -1,29 +1,27 @@
 import {
-  claimPerjadinFootageFolder,
-  claimSessionFootageFolder,
   footageReconcileTarget,
   markFootageSynced,
   markFootageSyncFailed,
   type Person,
 } from "@sugt/db/queries";
 
-import { perjadinFolderName } from "../perjadin-name";
-import { ensureFootageFolders } from "./dokumen-folders";
 import type { ReadyFolders } from "./fixed-folders";
-import { footageFileName, sessionFootageFolderName } from "./footage-files";
+import { footageFileName } from "./footage-files";
 import { type DriveClient, isDriveFailure, isLinkShared } from "./google";
-import { reassertPerjadinFolderName } from "./reconcile";
+import {
+  ensureSessionFootageFolder,
+  type FootageFolderUnavailable,
+} from "./session-footage-folder";
 
 /**
  * **Put one file of Session Footage in place in Drive** (#424, ADR-0046) — the footage's counterpart
- * to `reconcileDocument`, one folder deeper. Idempotent, so the upload, Periksa koneksi's sweep and a
- * reconnect all run the same code, and holding no row lock across a call to Google:
+ * to `reconcileDocument`, one folder deeper. Since #552 (ADR-0061) nothing uploads footage through
+ * the app any more, so only Periksa koneksi's sweep runs this, to finish files an upload left
+ * unsynced. Idempotent, and holding no row lock across a call to Google:
  *
- * 1. **The fixed footage folders** (`ensureFootageFolders`), made if a connection predates them.
- * 2. **The Perjadin's folder** under `Foto & Video/Pelaksanaan Offline`, named as its receipts and
- *    Dokumen folders, claimed by compare-and-set; its name is re-asserted, as theirs is.
- * 3. **The Session's folder** in it, `{held_on} · {HH.MM} · {School} · S-{session8}`, claimed the same
- *    way. A trashed or missing folder is not remade: the footage waits, unsynced, as a document does.
+ * 1–3. **The folders** (`ensureSessionFootageFolder`, shared with the Foto & Video button): the
+ *    fixed footage folders, the Perjadin's and the Session's. A trashed or missing folder is not
+ *    remade: the footage waits, unsynced, as a document does.
  * 4. **The file**, moved out of `_staging`, named and tagged with `sugtFootageId`.
  * 5. **Shared** anyone/reader — the file only; every folder stays private.
  * 6. **`drive_synced_at`** set.
@@ -32,12 +30,9 @@ import { reassertPerjadinFolderName } from "./reconcile";
  */
 
 export type FootageUnsyncedReason =
-  | "folder-trashed"
-  | "folder-missing"
+  | FootageFolderUnavailable
   | "file-trashed"
   | "file-missing"
-  /** `Foto & Video/` kept changing under this run; the next one finishes it. */
-  | "footage-folders-busy"
   | "drive-failed";
 
 export type FootageReconcileResult =
@@ -67,40 +62,10 @@ async function reconcileOnce(
   const perjadinId = target.perjadin.id;
 
   try {
-    // 1. The fixed footage folders.
-    const fixed = await ensureFootageFolders(person, drive, folders.rootFolderId);
-    if (!fixed) return { outcome: "unsynced", reason: "footage-folders-busy" };
-
-    // 2. The Perjadin's footage folder.
-    let tripFolderId = target.perjadinFolderId;
-    if (!tripFolderId) {
-      const made = await drive.createFolder({
-        name: perjadinFolderName(target.perjadin),
-        parentId: fixed.pelaksanaanOfflineFolderId,
-        appProperties: { sugtPerjadinId: perjadinId },
-      });
-      tripFolderId = await claimPerjadinFootageFolder(person, perjadinId, made.id);
-      if (tripFolderId !== made.id) await drive.trashFile(made.id);
-    }
-    const tripFolder = await drive.getFile(tripFolderId);
-    if (!tripFolder) return { outcome: "unsynced", reason: "folder-missing" };
-    if (tripFolder.trashed) return { outcome: "unsynced", reason: "folder-trashed" };
-    await reassertPerjadinFolderName(person, drive, perjadinId, tripFolder);
-
-    // 3. The Session's folder.
-    let sessionFolderId = target.sessionFolderId;
-    if (!sessionFolderId) {
-      const made = await drive.createFolder({
-        name: sessionFootageFolderName(target.session),
-        parentId: tripFolderId,
-        appProperties: { sugtPerjadinId: perjadinId, sugtSessionId: target.session.sessionId },
-      });
-      sessionFolderId = await claimSessionFootageFolder(person, target.session.sessionId, made.id);
-      if (sessionFolderId !== made.id) await drive.trashFile(made.id);
-    }
-    const sessionFolder = await drive.getFile(sessionFolderId);
-    if (!sessionFolder) return { outcome: "unsynced", reason: "folder-missing" };
-    if (sessionFolder.trashed) return { outcome: "unsynced", reason: "folder-trashed" };
+    // 1–3. The fixed folders, the Perjadin's and the Session's — shared with the Foto & Video button.
+    const ensured = await ensureSessionFootageFolder(person, drive, folders, target);
+    if (ensured.outcome !== "ok") return { outcome: "unsynced", reason: ensured.reason };
+    const { sessionFolderId } = ensured;
 
     // 4. The file, out of `_staging`.
     const file = await drive.getFile(target.driveFileId);

@@ -174,9 +174,19 @@ export type DrivePermission = {
   id: string;
   type: string;
   role: string;
+  /** Whose permission it is, for a `user` or `group`; `null` for `anyone` and `domain`. */
+  emailAddress: string | null;
   /** True when the permission reaches this item from a folder above it. */
   inherited: boolean;
 };
+
+/**
+ * The permissions the app ever creates: "anyone with the link can view" — a receipt, a document, a
+ * footage folder — and, since #552, edit access by sign-in email on a Perjadin's footage folder.
+ */
+export type NewDrivePermission =
+  | { type: "anyone"; role: "reader" }
+  | { type: "user"; role: "writer"; emailAddress: string };
 
 /**
  * **The narrow set of Drive operations ADR-0040 needs**, and nothing else. Each throws a
@@ -214,7 +224,10 @@ export interface DriveClient {
   untrashFile(id: string): Promise<void>;
   /** Bytes `start` to `end` inclusive, for sniffing a file's type from its first bytes. */
   readRange(id: string, start: number, end: number): Promise<Uint8Array>;
-  createPermission(id: string, permission: { type: "anyone"; role: "reader" }): Promise<void>;
+  /** A `user` permission is created without Drive's notification email. */
+  createPermission(id: string, permission: NewDrivePermission): Promise<void>;
+  /** Remove one permission from an item — a stale editor of a footage folder (#552). */
+  deletePermission(id: string, permissionId: string): Promise<void>;
   listPermissions(id: string): Promise<DrivePermission[]>;
   /**
    * A resumable upload session the browser `PUT`s to. `origin` is the uploading page's, and is
@@ -405,9 +418,12 @@ export function openDrive(accessToken: string): DriveClient {
     },
 
     async createPermission(id, permission) {
+      const params = new URLSearchParams({ fields: "id" });
+      // Being given edit access to a footage folder is not news worth an email (#552).
+      if (permission.type === "user") params.set("sendNotificationEmail", "false");
       await call(
         "permissions.create",
-        `${DRIVE_API}/files/${encodeURIComponent(id)}/permissions?fields=id`,
+        `${DRIVE_API}/files/${encodeURIComponent(id)}/permissions?${params}`,
         {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -416,16 +432,25 @@ export function openDrive(accessToken: string): DriveClient {
       );
     },
 
+    async deletePermission(id, permissionId) {
+      await call(
+        "permissions.delete",
+        `${DRIVE_API}/files/${encodeURIComponent(id)}/permissions/${encodeURIComponent(permissionId)}`,
+        { method: "DELETE" },
+      );
+    },
+
     async listPermissions(id) {
       const response = await call(
         "permissions.list",
-        `${DRIVE_API}/files/${encodeURIComponent(id)}/permissions?fields=permissions(id,type,role,permissionDetails)`,
+        `${DRIVE_API}/files/${encodeURIComponent(id)}/permissions?fields=permissions(id,type,role,emailAddress,permissionDetails)`,
       );
       const body = await readJson<{
         permissions?: {
           id: string;
           type: string;
           role: string;
+          emailAddress?: string;
           permissionDetails?: { inherited?: boolean }[];
         }[];
       }>("permissions.list", response);
@@ -433,6 +458,7 @@ export function openDrive(accessToken: string): DriveClient {
         id: permission.id,
         type: permission.type,
         role: permission.role,
+        emailAddress: permission.emailAddress ?? null,
         inherited: (permission.permissionDetails ?? []).some((detail) => detail.inherited),
       }));
     },

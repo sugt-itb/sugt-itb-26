@@ -59,14 +59,13 @@ function selectPerjadinDriveFolders() {
 
 /**
  * What renaming a Perjadin's Drive folder reads (#376) — after a date correction, and again in the
- * reconcile, fresh, just before it re-asserts the name. `null` when there is no such trip.
+ * reconcile, fresh, just before it re-asserts the name. `null` when there is no such trip. Open to
+ * any signed-in Person: the Foto & Video button re-asserts the name on anyone's click (#552).
  */
 export async function perjadinDriveFolder(
-  caller: Person,
+  _caller: Person,
   perjadinId: string,
 ): Promise<PerjadinDriveFolder | null> {
-  requireStaff(caller);
-
   const [trip] = await selectPerjadinDriveFolders().where(eq(perjadin.id, perjadinId));
   return trip ?? null;
 }

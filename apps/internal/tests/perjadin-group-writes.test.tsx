@@ -34,11 +34,6 @@ import {
   markSessionDeliveredAction,
   moveSessionDateAction,
 } from "-/app/(app)/sesi/[id]/actions";
-import {
-  deleteFootageAction,
-  openFootageUploadAction,
-  recordFootageAction,
-} from "-/app/(app)/sesi/[id]/foto-video/actions";
 import SesiPage from "-/app/(app)/sesi/[id]/page";
 import { driveAccessToken } from "-/lib/drive/access-token";
 import { requirePerson } from "-/lib/person";
@@ -51,11 +46,9 @@ import {
   changePerjadinPic,
   checkDocumentFields,
   deletePerjadinDocument,
-  deleteSessionFootage,
   deleteTransaction,
   editPerjadinSession,
   fileSessionRecord,
-  footageSession,
   isNotOnPerjadinError,
   isNotStaffError,
   issuePerjadinFeedbackToken,
@@ -64,7 +57,6 @@ import {
   perjadinDetail,
   receiptsOnLine,
   recordPerjadinDocument,
-  recordSessionFootage,
   removePerjadinTeacher,
   renamePerjadinTeacher,
   setPerjadinStaff,
@@ -254,8 +246,6 @@ async function perjadinA(who: People, where: Place) {
   });
   const documentId = randomUUID();
   await recordPerjadinDocument(who.rina, sheet(trip.id, documentId));
-  const footageId = randomUUID();
-  await recordSessionFootage(who.rina, footage(arranged.id, footageId));
   return {
     id: trip.id,
     arrangedId: arranged.id,
@@ -264,7 +254,6 @@ async function perjadinA(who: People, where: Place) {
     transactionId: line.id,
     evidenceId: receipt.id,
     documentId,
-    footageId,
   };
 }
 
@@ -278,17 +267,6 @@ function sheet(perjadinId: string, documentId = randomUUID()) {
     byteSize: 2048,
     kind: "Daftar Hadir Pendamping" as const,
     documentDate: "2026-10-12",
-  };
-}
-
-function footage(sessionId: string, footageId = randomUUID()) {
-  return {
-    footageId,
-    sessionId,
-    contentType: "image/jpeg" as const,
-    originalFilename: "kelas.jpg",
-    driveFileId: randomUUID(),
-    byteSize: 4096,
   };
 }
 
@@ -406,9 +384,6 @@ const WRITES: [
   ],
   ["Dokumen record", (c, a) => recordPerjadinDocument(c, sheet(a.id)), "recorded"],
   ["Dokumen Hapus", (c, a) => deletePerjadinDocument(c, a.documentId), "deleted"],
-  ["Foto & Video open", (c, a) => footageSession(c, a.arrangedId), "ok"],
-  ["Foto & Video record", (c, a) => recordSessionFootage(c, footage(a.arrangedId)), "recorded"],
-  ["Foto & Video Hapus", (c, a) => deleteSessionFootage(c, a.footageId), "deleted"],
 ];
 
 describe("every write on Perjadin A, by each of the ticket's people", () => {
@@ -552,7 +527,6 @@ describe("the actions answer a non-member with a 403", () => {
       ],
       ["Unggah bukti", () => finalizeReceiptsAction(a.id, a.transactionId, [])],
       ["Dokumen record", () => recordDocumentAction({ perjadinId: a.id } as never)],
-      ["Foto & Video record", () => recordFootageAction({ sessionId: a.arrangedId } as never)],
     ];
 
     for (const [name, call] of calls) {
@@ -584,13 +558,7 @@ describe("the actions answer a non-member with a 403", () => {
         ),
       ),
     ).resolves.toBe(FORBIDDEN);
-    await expect(
-      digestOf(
-        openFootageUploadAction(a.arrangedId, { contentType: "image/jpeg", size: 1_000 } as never),
-      ),
-    ).resolves.toBe(FORBIDDEN);
     await expect(digestOf(deleteDocumentAction(a.documentId))).resolves.toBe(FORBIDDEN);
-    await expect(digestOf(deleteFootageAction(a.footageId))).resolves.toBe(FORBIDDEN);
     await expect(digestOf(deleteReceiptAction(a.evidenceId))).resolves.toBe(FORBIDDEN);
     await expect(digestOf(deleteTransactionAction(a.transactionId))).resolves.toBe(FORBIDDEN);
 
@@ -667,20 +635,23 @@ describe("the write controls follow who writes the trip", () => {
     }
   });
 
-  it("hides /sesi/[id]'s Tandai and Foto & Video upload from a non-member", async () => {
+  it("hides /sesi/[id]'s Tandai from a non-member, who still gets the Foto & Video link", async () => {
     const who = await people();
     const a = await perjadinA(who, await place());
     const render = async (viewer: Person) => {
       signedInAs(viewer);
       return renderToStaticMarkup(
-        await SesiPage({ params: Promise.resolve({ id: a.arrangedId }) } as never),
+        await SesiPage({
+          params: Promise.resolve({ id: a.arrangedId }),
+          searchParams: Promise.resolve({}),
+        } as never),
       );
     };
 
     const forDewi = await render(who.dewi);
     expect(forDewi).not.toContain("Tandai terlaksana");
-    expect(forDewi).not.toContain("Unggah Foto");
-    expect(forDewi).toContain("kelas.jpg");
+    // Opening the folder is a read (#552); what Dewi may do inside it is Drive's sharing.
+    expect(forDewi).toContain(`/sesi/${a.arrangedId}/foto-video/buka`);
 
     for (const writer of [who.andi, who.budi]) {
       expect(await render(writer)).toContain("Tandai terlaksana");

@@ -59,6 +59,12 @@ same Staff who may write money today. A Pimpinan writes nothing, as before.
 
 > Amended 2026-10-08: the trip's Group, an Editor or an Administrator, not every Staff member —
 > [ADR-0048](./0048-a-perjadin-is-written-by-its-group.md), and the amendment at the bottom.
+>
+> Amended 2026-11-10: the app's own use of the connection — the credential read, the token-refresh
+> bookkeeping and the footage folder ids — is open to anyone signed in, a Pimpinan included, so the Foto
+> & Video button can make and share a Session's folder on their click
+> ([ADR-0061](./0061-session-footage-is-put-straight-into-the-sessions-drive-folder.md)). A Pimpinan still
+> writes nothing a person entered.
 
 ## The tree
 

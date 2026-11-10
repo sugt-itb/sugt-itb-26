@@ -1,7 +1,7 @@
 "use client";
 
 import { FeedbackTokenDialog } from "-/components/feedback-token";
-import { FotoVideoDialog } from "-/components/foto-video-dialog";
+import { FotoVideoLink } from "-/components/foto-video-link";
 import { PerjadinDokumenDialog } from "-/components/perjadin-dokumen-dialog";
 import { PerjadinFeedbackTokenDialog } from "-/components/perjadin-feedback-token";
 import { SessionMarkDeliveredDialog } from "-/components/perjadin-mark-delivered";
@@ -245,7 +245,6 @@ function TripCard({
 
             <TripTimeline
               nodes={tripTimeline(trip)}
-              uploadGate={uploadGate}
               canWrite={canWrite}
             />
           </div>
@@ -428,12 +427,10 @@ function NarasumberToggle({
  */
 function TripTimeline({
   nodes,
-  uploadGate,
   canWrite,
 }: {
   nodes: TimelineNode[];
-  uploadGate: UploadGate;
-  /** Tandai and Foto & Video's upload and Hapus are the trip's writers' (ADR-0048). */
+  /** Tandai is the trip's writers' (ADR-0048). */
   canWrite: boolean;
 }) {
   if (nodes.length === 0) return null;
@@ -460,7 +457,6 @@ function TripTimeline({
             <span className="sr-only">{node.done ? "Selesai: " : "Belum: "}</span>
             <SessionNode
               node={node}
-              uploadGate={uploadGate}
               canWrite={canWrite}
             />
           </div>
@@ -493,18 +489,10 @@ function TimelineMarker({ done }: { done: boolean }) {
  * `{heldOn} · {start time} · {School}`, then the Session's own controls: **Tandai** only while it is
  * `arranged` (a delivered Session has no transition left, so the pill goes once it lands),
  * **Feedback** — the Participant-Feedback QR — which stays after delivery, and **Foto & Video**
- * (#425), the Session's photos and videos, in both sections since footage is often uploaded after
- * the trip. It opens even while Drive is down, so the files can be viewed; uploading is closed then.
+ * (#425, #552), a link to the Session's folder in the company Google Drive, in both sections since
+ * footage is often added after the trip. Who may add to it is the folder's sharing, not this button.
  */
-function SessionNode({
-  node,
-  uploadGate,
-  canWrite,
-}: {
-  node: TimelineNode;
-  uploadGate: UploadGate;
-  canWrite: boolean;
-}) {
+function SessionNode({ node, canWrite }: { node: TimelineNode; canWrite: boolean }) {
   const { school, session } = node;
   const text = `${session.heldOn} · ${formatSessionStartTimeWithWib(session.startsAt, school.timeZone)} · ${school.name}`;
 
@@ -542,24 +530,11 @@ function SessionNode({
             </Button>
           }
         />
-        <FotoVideoDialog
+        {/* The Session's Drive folder, in a new tab (#552). The timeline holds no cancelled Session. */}
+        <FotoVideoLink
           sessionId={session.sessionId}
-          heldOn={session.heldOn}
-          schoolName={school.name}
-          uploadGate={uploadGate}
-          // The timeline holds no cancelled Session; who writes the trip uploads and deletes.
-          canUpload={canWrite}
-          canDelete={canWrite}
-          trigger={
-            <Button
-              variant="secondary"
-              size="sm"
-              className="rounded-full"
-              aria-label={`Foto & Video ${text}`}
-            >
-              Foto & Video
-            </Button>
-          }
+          from="/pendamping"
+          label={`Foto & Video ${text}`}
         />
       </span>
     </>
