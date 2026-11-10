@@ -1,4 +1,9 @@
-import { driveCredentials, perjadinDriveFolder, type Person } from "@sugt/db/queries";
+import {
+  driveCredentials,
+  footagePerjadinsOfMember,
+  perjadinDriveFolder,
+  type Person,
+} from "@sugt/db/queries";
 
 import { refreshDriveToken } from "./access-token";
 import { openDrive } from "./google";
@@ -31,17 +36,42 @@ export async function reshareFootageFolders(
     const credentials = await driveCredentials(person);
     if (credentials?.status !== "connected") return;
     const token = await refreshDriveToken(person, credentials);
-    if (token.outcome !== "ok") return;
+    if (token.outcome !== "ok") {
+      console.error(`Re-sharing footage folders skipped: Drive answered ${token.outcome}.`);
+      return;
+    }
     const drive = openDrive(token.accessToken);
 
     for (const { perjadinId, folderId } of folders) {
-      await applyFootageFolderSharing(person, drive, perjadinId, folderId).catch(
-        (error: unknown) => {
-          console.error(`Re-sharing Perjadin ${perjadinId}'s footage folder failed.`, error);
-        },
-      );
+      try {
+        // A folder in the Drive trash, or gone, is shared nothing — the sweep's rule too.
+        const folder = await drive.getFile(folderId);
+        if (!folder || folder.trashed) continue;
+        await applyFootageFolderSharing(person, drive, perjadinId, folderId);
+      } catch (error) {
+        console.error(`Re-sharing Perjadin ${perjadinId}'s footage folder failed.`, error);
+      }
     }
   } catch (error) {
     console.error(`Re-sharing the footage folders of ${perjadinIds.join(", ")} failed.`, error);
   }
+}
+
+/**
+ * **Re-share the footage folders of every trip whose Group this Person is in** — after they are
+ * revoked (#553). The read of those trips is inside the same best effort: once the revocation has
+ * committed, nothing here may fail it, a database hiccup included.
+ */
+export async function reshareMemberFootageFolders(person: Person, personId: string): Promise<void> {
+  let perjadinIds: string[];
+  try {
+    perjadinIds = await footagePerjadinsOfMember(person, personId);
+  } catch (error) {
+    console.error(
+      `Reading the trips of Person ${personId} to re-share their folders failed.`,
+      error,
+    );
+    return;
+  }
+  await reshareFootageFolders(person, perjadinIds);
 }

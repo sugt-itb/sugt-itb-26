@@ -22,8 +22,8 @@ import type { Person } from "./caller";
  *
  * **Open to any signed-in Person**: sharing the folder is the app's housekeeping on the company
  * account, run on whoever's click (a Pimpinan's included), and an email list of Staff is not a write.
- * Kept in its own module so the follow-up ticket — re-sharing the moment a Group, Grant or Person
- * changes — calls the same read.
+ * Kept in its own module because two callers share it: the Foto & Video button's sharing (#552) and
+ * the re-share after a Group change or a revocation, and Periksa koneksi's sharing pass (#553).
  */
 export async function perjadinWriterEmails(_caller: Person, perjadinId: string): Promise<string[]> {
   const inGroup = sql<boolean>`exists (

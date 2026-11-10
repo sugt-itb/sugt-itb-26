@@ -347,8 +347,7 @@ photos and videos there through Drive's web page or app; the app uploads, lists 
 - **Who may add to it is Drive's sharing**: the trip's Group, every Perjadin Editor and every
   Administrator can edit, and anyone with the link can view. It follows the people (#553): changing a
   trip's Group or its PIC, or deactivating a Person, re-shares the trip's folder at once. A Grant
-  change reaches every trip, so it is applied by Periksa koneksi instead, or by the next click on each
-  Session's Foto & Video. Each click re-applies the list too, which also removes an editor someone
+  change is applied by Periksa koneksi, or by the next click on each Session's Foto & Video. Each click re-applies the list too, which also removes an editor someone
   added by hand in Drive.
 - **When the folder cannot be opened**, the new tab comes back to this page with a red notice: "Google
   Drive belum tersedia — coba lagi nanti." while Drive is down and the folder does not exist yet, or a
@@ -1180,8 +1179,7 @@ says only an Administrator reads the roster, adds people and deactivates them.
   alone. A Pimpinan or deactivated row shows "—".
 - **Adding or removing Perjadin Editor or Administrator** also says, once, under the chips: "Akses
   edit folder Foto & Video diperbarui lewat Periksa koneksi, atau saat Foto & Video tiap sesi dibuka
-  berikutnya." Those two Grants decide who edits every trip's Foto & Video folder, and Drive is
-  updated later rather than at once (#553).
+  berikutnya." It shows only once the change has gone through (#553).
 - **An Administrator cannot revoke their own Administrator Grant**: that chip is locked on their
   row, and the write refuses it. With the rule above, no Administrator can remove their own
   access.
@@ -1260,8 +1258,7 @@ was recorded while the connection was down, as Periksa koneksi does below.
   with the link views, and exactly the trip's Group, every Perjadin Editor and every Administrator
   edit. "{n} folder Foto & Video: akses diperbarui, {m} tersisa". It stops after 25 folders it
   changed, or when the press's time is up; a folder already right is only read. A folder in the Drive
-  trash or gone is listed with the reason and left alone. This is how a Grant change reaches Drive —
-  press again until nothing is left.
+  trash or gone is listed with the reason and left alone. Press again until nothing is left.
 
 A trip's folders are also renamed by themselves, right after the change is saved, when either of
 its dates changes or its Schools do: a Session added at a new School, moved to another School, or a

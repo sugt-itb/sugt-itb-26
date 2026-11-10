@@ -265,15 +265,25 @@ function GrantPicker({
   function change(next: Grant[]) {
     const added = next.filter((grant) => !held.includes(grant));
     const removed = held.filter((grant) => !next.includes(grant));
-    if (touchesFootageAccess([...added, ...removed])) setFootageNote(true);
     startSaving(async () => {
       // Inside the transition so the chips and the pending state are one update, then the actions —
       // their `revalidatePath` re-reads the real grants and `useOptimistic` falls back to them.
       setHeld(next);
-      await Promise.all([
-        ...added.map((grant) => assignGrantAction(personId, grant)),
-        ...removed.map((grant) => revokeGrantAction(personId, grant)),
+      const results = await Promise.all([
+        ...added.map(async (grant) => ({
+          grant,
+          result: await assignGrantAction(personId, grant),
+        })),
+        ...removed.map(async (grant) => ({
+          grant,
+          result: await revokeGrantAction(personId, grant),
+        })),
       ]);
+      // Only a change that went through reaches the Foto & Video folders.
+      const made = results.flatMap(({ grant, result }) =>
+        result.outcome === "assigned" || result.outcome === "revoked" ? [grant] : [],
+      );
+      if (touchesFootageAccess(made)) setFootageNote(true);
     });
   }
 

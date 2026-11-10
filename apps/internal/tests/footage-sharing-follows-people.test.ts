@@ -153,13 +153,17 @@ describe("a Group change, straight away", () => {
     expect(await editors(folder)).toContain("citra@itb.ac.id");
   });
 
-  it("makes no Drive call for a trip with no footage folder yet", async () => {
+  it("asks Google nothing — not even for a token — for a trip with no footage folder yet", async () => {
     const { citra, a } = await scene();
     drive.calls = 0;
+    // The token endpoint, watched: a refresh is a call to Google too.
+    const fetch = vi.fn(globalThis.fetch);
+    vi.stubGlobal("fetch", fetch);
 
     await setPerjadinStaffAction(a.id, [citra.id]);
 
     expect(drive.calls).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("keeps the Group change when Drive fails, logs it, and Periksa koneksi puts it right", async () => {
@@ -201,6 +205,36 @@ describe("a revocation, straight away", () => {
 
     expect(await editors(folderA)).toEqual(["rina@itb.ac.id"]);
     expect(await editors(folderB)).toEqual(["rina@itb.ac.id"]);
+  });
+
+  it("stays revoked when Drive fails, and logs it", async () => {
+    const { admin, budi, a } = await scene();
+    const folder = await clickFotoVideo(admin, a.sessionId, a.id);
+    vi.spyOn(drive, "listPermissions").mockRejectedValue(
+      new DriveRequestError("permissions.list", 503),
+    );
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(revokePersonAction(budi.id)).resolves.toEqual({ outcome: "revoked" });
+
+    const [row] = await db
+      .select({ active: schema.person.active })
+      .from(schema.person)
+      .where(eq(schema.person.id, budi.id));
+    expect(row?.active).toBe(false);
+    expect(error).toHaveBeenCalled();
+    vi.mocked(drive.listPermissions).mockRestore();
+    expect(await editors(folder)).toContain("budi@itb.ac.id");
+  });
+
+  it("shares nothing on a folder in the Drive trash", async () => {
+    const { admin, budi, a } = await scene();
+    const folder = await clickFotoVideo(admin, a.sessionId, a.id);
+    drive.trash(folder);
+
+    await revokePersonAction(budi.id);
+
+    expect(await editors(folder)).toContain("budi@itb.ac.id");
   });
 });
 
@@ -245,6 +279,19 @@ describe("Periksa koneksi's sharing pass", () => {
 
     const second = await reapplyFootageSharing(admin, drive, { limit: 2 });
     expect(second).toMatchObject({ updated: 1, remaining: 0, failures: [] });
+  });
+
+  it("starts nothing once the press's time is up, leaving every folder for the next press", async () => {
+    const { admin, citra, where, a } = await scene();
+    const b = await trip(where, admin.id, "2026-10-21");
+    for (const t of [a, b]) await clickFotoVideo(admin, t.sessionId, t.id);
+    await addGrant(citra.id, "Perjadin Editor");
+
+    await expect(reapplyFootageSharing(admin, drive, { budgetMs: -1 })).resolves.toEqual({
+      updated: 0,
+      remaining: 2,
+      failures: [],
+    });
   });
 
   it("reports a trashed folder and shares nothing in the trash", async () => {

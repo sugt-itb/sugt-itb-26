@@ -1,12 +1,11 @@
 "use server";
 
-import { reshareFootageFolders } from "-/lib/drive/reshare-footage";
+import { reshareMemberFootageFolders } from "-/lib/drive/reshare-footage";
 import { requirePerson } from "-/lib/person";
 import { staffSurface } from "-/lib/staff-surface";
 import {
   addPerson,
   assignGrant,
-  footagePerjadinsOfMember,
   revokeGrant,
   revokePerson,
   type AddPersonResult,
@@ -49,7 +48,7 @@ export async function revokePersonAction(personId: string): Promise<RevokePerson
 
   const result = await staffSurface(() => revokePerson(person, personId));
   if (result.outcome === "revoked") {
-    await reshareFootageFolders(person, await footagePerjadinsOfMember(person, personId));
+    await reshareMemberFootageFolders(person, personId);
     revalidatePath("/orang");
   }
   return result;
