@@ -62,9 +62,10 @@ export type DriveAccess =
   | { outcome: "drive-folders-unresolved" };
 
 /**
- * **An access token for a Staff member's upload** (ADR-0040): `refreshDriveToken`, but only once the
- * fixed tree is usable. A tree that is not answers before Google is asked anything, so no upload is
- * ever pointed at a trashed `_staging`.
+ * **An access token for the app's use of the company Drive** (ADR-0040) — a Staff member's upload, or
+ * the Foto & Video button on anyone's click (#552): `refreshDriveToken`, but only once the fixed tree
+ * is usable. A tree that is not answers before Google is asked anything, so no upload is ever pointed
+ * at a trashed `_staging`.
  */
 export async function driveAccessToken(person: Person): Promise<DriveAccess> {
   const credentials = await driveCredentials(person);
