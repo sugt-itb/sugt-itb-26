@@ -167,6 +167,27 @@ School: _which Schools are next_, and the trip is planned around the Sub-Cluster
 **Persiapan Program** (the free-standing Preparation Cards, named Persiapan until #423) and
 **Persiapan Luring**.
 
+#### Pelaksanaan — the summary cards
+
+Under the Kegiatan Terlaksana card sit four progress cards, two across on a phone and four on a wider
+screen. Each shows a whole percent and, under it, a muted line with the count and denominator behind
+it (#551):
+
+| Card              | Percent and line                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| Progress Pretest  | Schools with **all four** Pretest boxes ticked over all Schools: "12/47 sekolah"     |
+| Progress Daring   | delivered online Sessions over Schools × 6: "140/282 sesi"                           |
+| Progress Luring   | delivered offline Sessions over Schools × 2: "47/94 sesi"                            |
+| Progress Posttest | Schools with all four Posttest boxes ticked over all Schools, "0/47 sekolah" for now |
+
+- **Pretest and Posttest count Schools, not boxes.** A School counts only once all four of its boxes
+  (2 streams × 2 participant types) are ticked; three of four adds nothing. It is the same rule
+  Kegiatan terlaksana and `/sekolah` use.
+- **Daring and Luring are measured against the full plan**, not the Sessions arranged so far, and a
+  School that over-delivers is not capped.
+- The per-Cluster Pretest Terlaksana and Postest Terlaksana tables below still count each box apart:
+  a cell is the Schools in that Cluster with that one box ticked.
+
 #### Persiapan Program — two orders
 
 **Urutkan** offers two orders, each combining date and progress (#466):

@@ -62,7 +62,7 @@ const token = await new SignJWT({})
   "progress": {
     "detailUrl": "https://internal.sugtitb.com/",
     "kegiatanTerlaksana": { "percent": 42, "completed": 198, "total": 470 },
-    "pretest": 61,
+    "pretest": 94,
     "daring": 38,
     "luring": 50,
     "posttest": 0,
@@ -78,8 +78,8 @@ const token = await new SignJWT({})
       "total": 282,
       "detailUrl": "https://internal.sugtitb.com/sesi-daring",
     },
-    "pretest": { "completed": 115, "total": 188, "detailUrl": "https://internal.sugtitb.com/" },
-    "posttest": { "completed": 0, "total": 188, "detailUrl": "https://internal.sugtitb.com/" },
+    "pretest": { "completed": 44, "total": 47, "detailUrl": "https://internal.sugtitb.com/" },
+    "posttest": { "completed": 0, "total": 47, "detailUrl": "https://internal.sugtitb.com/" },
   },
   "participantFeedback": {
     "detailUrl": "https://internal.sugtitb.com/feedback",
@@ -106,22 +106,25 @@ the same calculation. Percentages are whole numbers, rounded half up. Each count
 grain as its percentage, so `count / total`, rounded, reproduces the percentage beside it. With no
 Schools at all, every count, total and percentage is `0`.
 
-| Field                           | Meaning                                                                                                                                                                             |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`                       | The payload's version. See [Versions](#versions).                                                                                                                                   |
-| `generatedAt`                   | When this response was computed, as an ISO 8601 UTC timestamp.                                                                                                                      |
-| `progress.detailUrl`            | The internal Dashboard, where every figure below is shown.                                                                                                                          |
-| `progress.kegiatanTerlaksana`   | **Activities done.** Each School has 10 units: 8 Sessions, a Pretest unit and a Posttest unit. `completed` is delivered Sessions plus completed units, and `total` is Schools × 10. |
-| `progress.pretest` / `posttest` | The percentage of Pretest (or Posttest) boxes ticked. Each School has 4 boxes: 2 streams × 2 participant types. Posttest is an honest `0` until posttests are recorded.             |
-| `progress.daring` / `luring`    | The percentage of the online (Daring) or offline (Luring) Sessions planned that have been delivered.                                                                                |
-| `sessions.offline`              | `delivered` offline Sessions over `total`, which is the full plan: Schools × 2. It is not the number arranged so far. Reproduces `progress.luring`.                                 |
-| `sessions.online`               | `delivered` online Sessions over `total`, which is Schools × 6. Reproduces `progress.daring`.                                                                                       |
-| `sessions.pretest` / `posttest` | Ticked boxes, `completed`, over Schools × 4. Named `completed` rather than `delivered` because a Pretest is not a Session. Reproduces `progress.pretest` / `progress.posttest`.     |
-| `detailUrl` (every one)         | Where **Lihat Detail** goes, built from the internal app's own address, so staging links to staging.                                                                                |
+| Field                           | Meaning                                                                                                                                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`                       | The payload's version. See [Versions](#versions).                                                                                                                                                       |
+| `generatedAt`                   | When this response was computed, as an ISO 8601 UTC timestamp.                                                                                                                                          |
+| `progress.detailUrl`            | The internal Dashboard, where every figure below is shown.                                                                                                                                              |
+| `progress.kegiatanTerlaksana`   | **Activities done.** Each School has 10 units: 8 Sessions, a Pretest unit and a Posttest unit. `completed` is delivered Sessions plus completed units, and `total` is Schools × 10.                     |
+| `progress.pretest` / `posttest` | The percentage of Schools whose Pretest (or Posttest) is complete: all 4 boxes ticked, 2 streams × 2 participant types. Posttest is an honest `0` until posttests are recorded.                         |
+| `progress.daring` / `luring`    | The percentage of the online (Daring) or offline (Luring) Sessions planned that have been delivered.                                                                                                    |
+| `sessions.offline`              | `delivered` offline Sessions over `total`, which is the full plan: Schools × 2. It is not the number arranged so far. Reproduces `progress.luring`.                                                     |
+| `sessions.online`               | `delivered` online Sessions over `total`, which is Schools × 6. Reproduces `progress.daring`.                                                                                                           |
+| `sessions.pretest` / `posttest` | Schools with all 4 boxes ticked, `completed`, over the School count. Named `completed` rather than `delivered` because a Pretest is not a Session. Reproduces `progress.pretest` / `progress.posttest`. |
+| `detailUrl` (every one)         | Where **Lihat Detail** goes, built from the internal app's own address, so staging links to staging.                                                                                                    |
 
-A Pretest unit in `kegiatanTerlaksana` counts only when **all four** of a School's Pretest boxes are
-ticked. The `pretest` percentage counts **boxes**. A School with three of four boxes ticked adds 3 to
-`sessions.pretest.completed` and nothing to `kegiatanTerlaksana.completed`.
+Pretest and Posttest count **Schools, not boxes**: a School counts only when **all four** of its
+boxes for that kind are ticked. A School with three of four adds nothing to
+`sessions.pretest.completed`, nothing to `progress.pretest` and nothing to
+`kegiatanTerlaksana.completed`. So `sessions.pretest.completed` is also the number of Pretest units in
+`kegiatanTerlaksana`. Until #551 these two figures counted boxes over Schools × 4 (188); the fields,
+their types and `version` did not change, only the values.
 
 ### The feedback sections
 

@@ -84,7 +84,10 @@ export async function authorizeUnifiedDashboard(
 
 /** A delivery figure as it travels: delivered Sessions over capacity, and where to see them. */
 type DeliveredFigure = { delivered: number; total: number; detailUrl: string };
-/** An assessment figure as it travels: ticked boxes over Schools × 4. Not a Session, so not "delivered". */
+/**
+ * An assessment figure as it travels: Schools with all four boxes ticked over the School count
+ * (#551). Not a Session, so not "delivered".
+ */
 type CompletedFigure = { completed: number; total: number; detailUrl: string };
 
 /**
