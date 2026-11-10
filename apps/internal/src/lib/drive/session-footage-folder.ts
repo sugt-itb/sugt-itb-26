@@ -204,9 +204,11 @@ export async function openSessionFootageFolder(
     ? { outcome: "open", folderId: target.sessionFolderId }
     : null;
   if (target.status === "cancelled") return existing ?? { outcome: "no-such-folder" };
+  // When Drive cannot be used now: the folder it already has, else "coba lagi nanti".
+  const unavailable = existing ?? { outcome: "drive-unavailable" };
 
   const access = await driveAccessToken(person);
-  if (access.outcome !== "ok") return existing ?? { outcome: "drive-unavailable" };
+  if (access.outcome !== "ok") return unavailable;
   const drive = openDrive(access.accessToken);
   const perjadin = target.perjadin;
 
@@ -218,12 +220,10 @@ export async function openSessionFootageFolder(
     });
   } catch (error) {
     if (!isDriveFailure(error)) throw error;
-    return existing ?? { outcome: "drive-unavailable" };
+    return unavailable;
   }
   if (ensured.outcome !== "ok") {
-    return ensured.reason === "footage-folders-busy"
-      ? (existing ?? { outcome: "drive-unavailable" })
-      : { outcome: "folder-gone" };
+    return ensured.reason === "footage-folders-busy" ? unavailable : { outcome: "folder-gone" };
   }
 
   await applyFootageFolderSharing(person, drive, perjadin.id, ensured.perjadinFolderId).catch(

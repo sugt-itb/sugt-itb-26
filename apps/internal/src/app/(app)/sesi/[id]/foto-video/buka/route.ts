@@ -1,6 +1,6 @@
 import { openSessionFootageFolder } from "-/lib/drive/session-footage-folder";
 import { requireEnv } from "-/lib/env";
-import { FOTO_VIDEO_NOTICE_PARAM, fotoVideoBackPath } from "-/lib/foto-video";
+import { fotoVideoBackUrl } from "-/lib/foto-video";
 import { requirePerson } from "-/lib/person";
 
 /**
@@ -29,10 +29,9 @@ export async function GET(
     );
   }
 
-  const back = new URL(
-    fotoVideoBackPath(new URL(request.url).searchParams.get("dari"), id),
-    requireEnv("BETTER_AUTH_URL"),
+  const from = new URL(request.url).searchParams.get("dari");
+  return Response.redirect(
+    fotoVideoBackUrl(from, id, requireEnv("BETTER_AUTH_URL"), opened.outcome),
+    303,
   );
-  back.searchParams.set(FOTO_VIDEO_NOTICE_PARAM, opened.outcome);
-  return Response.redirect(back.href, 303);
 }

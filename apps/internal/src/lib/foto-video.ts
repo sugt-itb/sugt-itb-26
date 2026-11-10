@@ -9,6 +9,17 @@ export function fotoVideoHref(sessionId: string, from: string): string {
   return `/sesi/${encodeURIComponent(sessionId)}/foto-video/buka?dari=${encodeURIComponent(from)}`;
 }
 
+/**
+ * The page a button is on, as `dari`: its path and query, less any notice an earlier click left, so
+ * a second failure does not stack them.
+ */
+export function fotoVideoFrom(pathname: string, search: { toString(): string } | null): string {
+  const query = new URLSearchParams(search?.toString() ?? "");
+  query.delete(FOTO_VIDEO_NOTICE_PARAM);
+  const rest = query.toString();
+  return rest ? `${pathname}?${rest}` : pathname;
+}
+
 /** The search parameter the route sets on the page it sends the tab back to. */
 export const FOTO_VIDEO_NOTICE_PARAM = "foto-video";
 
@@ -22,12 +33,24 @@ export const FOTO_VIDEO_NOTICES: Record<FotoVideoNoticeCode, string> = {
 };
 
 /**
- * Where the route sends the tab back to: `dari` when it is a path on this app, else the Session's
- * own page. Only a single leading `/` passes, so `//evil.example` and `https://…` cannot turn the
- * redirect into one off the app.
+ * **Where the route sends the tab back to**, as an absolute URL on `base` (this app's own address),
+ * carrying `code` as the notice: `from` when it resolves to a page **on this app**, else the Session's
+ * own page. The check is on the resolved URL's origin, not on how `from` is spelt, because the URL
+ * parser forgives a great deal — `/\evil.example`, or a tab inside `//`, both become another host —
+ * and only the origin it lands on says whether the redirect stays here.
  */
-export function fotoVideoBackPath(from: string | null, sessionId: string): string {
-  if (from && from.startsWith("/") && !from.startsWith("//") && !from.startsWith("/\\"))
-    return from;
-  return `/sesi/${encodeURIComponent(sessionId)}`;
+export function fotoVideoBackUrl(
+  from: string | null,
+  sessionId: string,
+  base: string,
+  code: FotoVideoNoticeCode,
+): string {
+  const own = new URL(base).origin;
+  let back = new URL(`/sesi/${encodeURIComponent(sessionId)}`, base);
+  if (from?.startsWith("/")) {
+    const resolved = new URL(from, base);
+    if (resolved.origin === own) back = resolved;
+  }
+  back.searchParams.set(FOTO_VIDEO_NOTICE_PARAM, code);
+  return back.href;
 }

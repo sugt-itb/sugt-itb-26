@@ -31,9 +31,12 @@ record of its own visit, not evidence anyone audits.
   because Safari blocks a new tab opened that way.
 - **Anyone signed in may click it, a Pimpinan included.** Opening the folder is reading. Making a
   missing folder on the way, and setting its sharing, is the **company account's housekeeping**, not a
-  write by whoever clicked. So the reads and claims it needs (the stored credential, the token-refresh
-  bookkeeping, the footage folder ids, the Perjadin's folder name) carry no Staff guard of their own any
-  more. They change only ids the app owns, never a record a person entered, and the credential stays on
+  write by whoever clicked. So the reads and claims it needs carry no Staff guard of their own any more: the
+  stored credential and the token-refresh bookkeeping (`driveCredentials`, `touchDriveConnection`,
+  `markDriveConnectionBroken`), the footage folder ids and their claims (`footageFolderIds`,
+  `claimFootageFolder`, `claimPerjadinFootageFolder`, `claimSessionFootageFolder`), the Perjadin's
+  folder name (`perjadinDriveFolder`), and two new reads, the Session's folder target
+  (`sessionFootageFolderTarget`) and the trip's writers' emails (`perjadinWriterEmails`). They change only ids the app owns, never a record a person entered, and the credential stays on
   the server, where only `@sugt/internal` can decrypt it. This amends
   [ADR-0040](./0040-transaction-evidence-is-stored-in-the-company-google-drive.md)'s "Who" for these
   reads alone: a Pimpinan still writes nothing a person entered. Every upload still runs its own write guard
@@ -104,3 +107,6 @@ record of its own visit, not evidence anyone audits.
   unchanged.
 - **Amends [ADR-0040](./0040-transaction-evidence-is-stored-in-the-company-google-drive.md)** as above:
   the credential read and the folder bookkeeping are open to anyone signed in, for the app's own use.
+- **Narrows how [ADR-0025](./0025-pimpinan-is-a-second-signed-in-read-only-person-role.md)'s "writes
+  nothing" is read.** A Pimpinan still writes no record a person entered, and holds no Grant and no
+  place in a Group. A Pimpinan's click may now set off the app's own Drive housekeeping, as above.

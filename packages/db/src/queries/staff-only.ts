@@ -270,7 +270,8 @@ export function isNotOnPerjadinError(error: unknown): error is NotOnPerjadinErro
  * writes every Perjadin, then anyone else only a trip whose Group — a `group_member` row, the PIC included —
  * they are in. A Pimpinan recorded on a trip is not in its Group (ADR-0020). The one statement of
  * the rule: `requirePerjadinWriter`, `canWritePerjadin` and the `/perjadin` directory's per-row
- * answer all read it. Not exported from the package.
+ * answer all read it. Not exported from the package. **`perjadinWriterEmails`** (`./perjadin-writers.ts`)
+ * states the same rule the other way round, as the list of who may write; change the two together.
  */
 export function perjadinWriterSql(person: Person): SQL<boolean> {
   if (person.role !== "Staff") return sql<boolean>`false`;

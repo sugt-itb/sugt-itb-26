@@ -9,6 +9,7 @@ import { PerjadinPreparationDialog } from "-/components/perjadin-preparation";
 import { progressTone } from "-/components/progress-tone";
 import { tripTimeline, type TimelineNode } from "-/components/trip-timeline";
 import type { UploadGate } from "-/lib/drive/upload-gate";
+import { fotoVideoFrom } from "-/lib/foto-video";
 import { perjadinName, perjadinSchoolsLine } from "-/lib/perjadin-name";
 import type { MyPerjadinTrip } from "@sugt/db/queries";
 import { formatRupiah, formatSessionStartTimeWithWib } from "@sugt/domain";
@@ -28,6 +29,7 @@ import {
 import { LinkButton } from "@sugt/ui/components/link-button";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useId, useState } from "react";
 
 /**
@@ -494,6 +496,8 @@ function TimelineMarker({ done }: { done: boolean }) {
  */
 function SessionNode({ node, canWrite }: { node: TimelineNode; canWrite: boolean }) {
   const { school, session } = node;
+  // Back to this very view if the folder cannot open — Pendamping Lain's choice included.
+  const from = fotoVideoFrom(usePathname() ?? "/pendamping", useSearchParams());
   const text = `${session.heldOn} · ${formatSessionStartTimeWithWib(session.startsAt, school.timeZone)} · ${school.name}`;
 
   return (
@@ -533,7 +537,7 @@ function SessionNode({ node, canWrite }: { node: TimelineNode; canWrite: boolean
         {/* The Session's Drive folder, in a new tab (#552). The timeline holds no cancelled Session. */}
         <FotoVideoLink
           sessionId={session.sessionId}
-          from="/pendamping"
+          from={from}
           label={`Foto & Video ${text}`}
         />
       </span>

@@ -1,5 +1,5 @@
 import Page from "-/app/(app)/sesi/[id]/page";
-import { fotoVideoBackPath, fotoVideoHref } from "-/lib/foto-video";
+import { fotoVideoBackUrl, fotoVideoFrom, fotoVideoHref } from "-/lib/foto-video";
 import { requirePerson } from "-/lib/person";
 import { db, schema } from "@sugt/db";
 import type { Person } from "@sugt/db/queries";
@@ -136,10 +136,40 @@ describe("Foto & Video on /sesi/[id]", () => {
 });
 
 describe("where the route sends a tab back", () => {
-  it("keeps a path on this app, and falls back to the Session's page for anything else", () => {
-    expect(fotoVideoBackPath("/pendamping", "s1")).toBe("/pendamping");
-    for (const offsite of ["//evil.example", "/\\evil.example", "https://evil.example", null, ""]) {
-      expect(fotoVideoBackPath(offsite, "s1")).toBe("/sesi/s1");
+  const base = "https://internal.sugt.test";
+  const back = (from: string | null) => fotoVideoBackUrl(from, "s1", base, "folder-gone");
+
+  it("keeps a page on this app, its own query included, and adds the notice", () => {
+    expect(back("/pendamping")).toBe(`${base}/pendamping?foto-video=folder-gone`);
+    expect(back("/pendamping?tab=lain&pendamping=p1")).toBe(
+      `${base}/pendamping?tab=lain&pendamping=p1&foto-video=folder-gone`,
+    );
+  });
+
+  it("falls back to the Session's page for anything that would leave the app", () => {
+    for (const offsite of [
+      "//evil.example",
+      "/\\evil.example",
+      "/\t/evil.example/x",
+      "/\n/evil.example",
+      "https://evil.example",
+      "javascript:alert(1)",
+      null,
+      "",
+    ]) {
+      expect(back(offsite), JSON.stringify(offsite)).toBe(`${base}/sesi/s1?foto-video=folder-gone`);
     }
+  });
+});
+
+describe("the page a timeline button names as dari", () => {
+  it("is the path and its query, without an earlier notice", () => {
+    expect(fotoVideoFrom("/pendamping", null)).toBe("/pendamping");
+    expect(
+      fotoVideoFrom(
+        "/pendamping",
+        new URLSearchParams("tab=lain&pendamping=p1&foto-video=drive-unavailable"),
+      ),
+    ).toBe("/pendamping?tab=lain&pendamping=p1");
   });
 });

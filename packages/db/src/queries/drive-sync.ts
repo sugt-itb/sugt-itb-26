@@ -25,8 +25,10 @@ import { requireStaff } from "./staff-only";
  * company Drive tree. The reconcile itself talks to Google and lives in `@sugt/internal`; this module
  * is only its database half.
  *
- * Every function is Staff-only: the reconcile runs after a Staff member records or adds a receipt,
- * or when an Administrator — Staff too — sweeps what is unsynced. A Pimpinan writes nothing.
+ * Every function is Staff-only — the reconcile runs after a Staff member records or adds a receipt,
+ * or when an Administrator, Staff too, sweeps what is unsynced — **except `perjadinDriveFolder`**, a
+ * read of what a trip's folders are named from, which the Foto & Video button calls on anyone's click
+ * (#552, ADR-0061). A Pimpinan still writes no record a person entered.
  *
  * **No row lock is held across a call to Google.** The Perjadin's and the transaction's folder ids
  * are claimed by compare-and-set instead: the update writes only where the column is still null, and

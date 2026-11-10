@@ -313,11 +313,12 @@ describe("the Foto & Video button", () => {
   it("goes back to the Session's page when `dari` points off the app", async () => {
     const { session } = await scene({ connection: "broken" });
 
-    const back = await click(session.id, "//evil.example/x");
-
-    expect(back.headers.get("location")).toBe(
-      `http://localhost:3001/sesi/${session.id}?foto-video=drive-unavailable`,
-    );
+    for (const offsite of ["//evil.example/x", "/\t/evil.example/x"]) {
+      const back = await click(session.id, offsite);
+      expect(back.headers.get("location")).toBe(
+        `http://localhost:3001/sesi/${session.id}?foto-video=drive-unavailable`,
+      );
+    }
   });
 });
 
