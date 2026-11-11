@@ -1,5 +1,3 @@
-import type { Grant } from "@sugt/domain";
-
 /**
  * **The Foto & Video button's link and its way back** (#552, ADR-0061), shared by the button
  * (`components/foto-video-link.tsx`), the route it opens (`/sesi/[id]/foto-video/buka`) and the
@@ -55,20 +53,4 @@ export function fotoVideoBackUrl(
   }
   back.searchParams.set(FOTO_VIDEO_NOTICE_PARAM, code);
   return back.href;
-}
-
-/**
- * The Grants that change who may edit **every** trip's Foto & Video folder (ADR-0048): Perjadin
- * Editor, and Administrator, which implies it. A change to either is not applied to Drive inline —
- * it would reach every trip — so the Grant screen says when it will be (#553).
- */
-const FOOTAGE_ACCESS_GRANTS: readonly Grant[] = ["Perjadin Editor", "Administrator"];
-
-/** The sentence the Grant screen says once a change touches `FOOTAGE_ACCESS_GRANTS`. */
-export const FOOTAGE_ACCESS_NOTE =
-  "Akses edit folder Foto & Video diperbarui lewat Periksa koneksi, atau saat Foto & Video tiap sesi dibuka berikutnya.";
-
-/** Whether assigning or revoking these Grants changes who edits the Foto & Video folders. */
-export function touchesFootageAccess(changed: readonly Grant[]): boolean {
-  return changed.some((grant) => FOOTAGE_ACCESS_GRANTS.includes(grant));
 }

@@ -4,7 +4,6 @@ import type {
   ExposableFolder,
   FolderCheck,
   FolderNameFailure,
-  SharingFailure,
   FootageSweepFailure,
   SweepFailure,
 } from "./check";
@@ -71,12 +70,6 @@ const NAME_FAILURE_REASONS: Record<FolderNameFailure["reason"], string> = {
   "drive-failed": "Google Drive gagal menjawab",
 };
 
-const SHARING_FAILURE_REASONS: Record<SharingFailure["reason"], string> = {
-  "folder-trashed": "folder ada di Sampah Google Drive, akses tidak diperbarui",
-  "folder-missing": "folder tidak ditemukan, akses tidak diperbarui",
-  "drive-failed": "Google Drive gagal menjawab, akses tidak diperbarui",
-};
-
 const PERJADIN_FOLDER_LABELS: Record<FolderNameFailure["folder"], string> = {
   "bukti-transaksi": "Bukti Transaksi",
   dokumen: "Dokumen",
@@ -136,7 +129,7 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
         failures: [],
       };
     case "ok": {
-      const { sweep, names, sharing } = report;
+      const { sweep, names } = report;
       const lines = [
         "Token Google Drive berfungsi.",
         ...report.folders.map(
@@ -155,11 +148,6 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
             ]),
         ...(names.ran
           ? [`${names.renamed} nama folder dan berkas diganti, ${names.remaining} folder tersisa.`]
-          : []),
-        ...(sharing.ran
-          ? [
-              `${sharing.updated} folder Foto & Video: akses diperbarui, ${sharing.remaining} tersisa.`,
-            ]
           : []),
       ];
       return {
@@ -182,10 +170,6 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
               ...(names.ran ? names.failures : []).map(
                 (failure) =>
                   `${failure.name} (${PERJADIN_FOLDER_LABELS[failure.folder]}): ${NAME_FAILURE_REASONS[failure.reason]}.`,
-              ),
-              ...(sharing.ran ? sharing.failures : []).map(
-                (failure) =>
-                  `${failure.name} (Foto & Video): ${SHARING_FAILURE_REASONS[failure.reason]}.`,
               ),
             ]
           : [],

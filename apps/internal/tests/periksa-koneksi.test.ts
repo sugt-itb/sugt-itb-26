@@ -164,7 +164,6 @@ describe("the check, in order", () => {
         footage: { synced: 0, waiting: 0, failures: [] },
       },
       names: { ran: true, renamed: 0, remaining: 0, failures: [] },
-      sharing: { ran: true, updated: 0, remaining: 0, failures: [] },
     });
     expect(describeDriveCheck(report).warnings).toEqual([]);
     const [row] = await db.select().from(schema.driveConnection);

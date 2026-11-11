@@ -1,8 +1,8 @@
-import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, or, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { person, personGrant } from "../schema/people";
-import { groupMember, perjadin } from "../schema/travel";
+import { groupMember } from "../schema/travel";
 import type { Person } from "./caller";
 
 /**
@@ -22,8 +22,8 @@ import type { Person } from "./caller";
  *
  * **Open to any signed-in Person**: sharing the folder is the app's housekeeping on the company
  * account, run on whoever's click (a Pimpinan's included), and an email list of Staff is not a write.
- * Kept in its own module because two callers share it: the Foto & Video button's sharing (#552) and
- * the re-share after a Group change or a revocation, and Periksa koneksi's sharing pass (#553).
+ * Kept in its own module so the follow-up ticket — re-sharing the moment a Group, Grant or Person
+ * changes — calls the same read.
  */
 export async function perjadinWriterEmails(_caller: Person, perjadinId: string): Promise<string[]> {
   const inGroup = sql<boolean>`exists (
@@ -42,29 +42,4 @@ export async function perjadinWriterEmails(_caller: Person, perjadinId: string):
     .where(and(eq(person.active, true), eq(person.role, "Staff"), or(inGroup, holdsWriterGrant)))
     .orderBy(asc(sql`lower(${person.email})`));
   return rows.map((row) => row.email);
-}
-
-/**
- * **The trips whose footage-folder sharing names this Person through their Group** (#553): every
- * Perjadin they are a Group member of **that has a Foto & Video folder** — a trip with none has
- * nothing to share yet, and its first click shares it. Revoking the Person re-applies these at once.
- * Membership rows outlive a revocation, so this reads the same before it and after. Open to any
- * signed-in Person, for the same reason `perjadinWriterEmails` is.
- */
-export async function footagePerjadinsOfMember(
-  _caller: Person,
-  personId: string,
-): Promise<string[]> {
-  const rows = await db
-    .select({ id: perjadin.id })
-    .from(groupMember)
-    .innerJoin(perjadin, eq(perjadin.id, groupMember.perjadinId))
-    .where(
-      and(
-        sql`${groupMember.personId}::text = ${personId}`,
-        isNotNull(perjadin.driveFootageFolderId),
-      ),
-    )
-    .orderBy(asc(perjadin.id));
-  return rows.map((row) => row.id);
 }

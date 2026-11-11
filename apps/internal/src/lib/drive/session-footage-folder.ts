@@ -119,19 +119,16 @@ export async function ensureSessionFootageFolder(
  * - Nothing else is touched: the owner, the link share, a commenter, anything inherited.
  * - **An email Drive refuses** (not a Google account, say) is skipped and logged; it fails nothing.
  *
- * Answers whether it changed anything: a folder already right costs one list and no write. Any other
- * Drive failure throws.
+ * Any other Drive failure throws.
  */
 export async function shareFootageFolder(
   drive: DriveClient,
   folderId: string,
   writerEmails: readonly string[],
-): Promise<boolean> {
-  let changed = false;
+): Promise<void> {
   const own = (await drive.listPermissions(folderId)).filter((permission) => !permission.inherited);
   if (!isLinkShared(own)) {
     await drive.createPermission(folderId, { type: "anyone", role: "reader" });
-    changed = true;
   }
 
   const wanted = new Set(writerEmails.map((email) => email.toLowerCase()));
@@ -142,42 +139,33 @@ export async function shareFootageFolder(
   for (const writer of writers) {
     const email = writer.emailAddress?.toLowerCase();
     if (email && wanted.has(email)) present.add(email);
-    else {
-      await drive.deletePermission(folderId, writer.id);
-      changed = true;
-    }
+    else await drive.deletePermission(folderId, writer.id);
   }
 
   for (const email of wanted) {
     if (present.has(email)) continue;
     try {
       await drive.createPermission(folderId, { type: "user", role: "writer", emailAddress: email });
-      changed = true;
     } catch (error) {
       if (!isDriveFailure(error)) throw error;
       console.error(`Drive refused to share footage folder ${folderId} with ${email}.`, error);
     }
   }
-  return changed;
 }
 
 /**
  * **Apply a Perjadin's footage-folder sharing** from who may write the trip now (ADR-0048,
  * `perjadinWriterEmails`): its Group's active members, every active Perjadin Editor and every active
  * Administrator. The one function the follow-up — re-sharing the moment a Group, Grant or Person
- * changes — calls too (#553). Answers whether the folder's sharing changed.
+ * changes — calls too.
  */
 export async function applyFootageFolderSharing(
   person: Person,
   drive: DriveClient,
   perjadinId: string,
   perjadinFolderId: string,
-): Promise<boolean> {
-  return shareFootageFolder(
-    drive,
-    perjadinFolderId,
-    await perjadinWriterEmails(person, perjadinId),
-  );
+): Promise<void> {
+  await shareFootageFolder(drive, perjadinFolderId, await perjadinWriterEmails(person, perjadinId));
 }
 
 export type OpenFootageFolderResult =
