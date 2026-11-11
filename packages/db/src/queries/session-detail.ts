@@ -75,11 +75,6 @@ export type SessionDetail = {
   /** Set on a cancelled Session and null on every other, by CHECK. */
   cancelledReason: string | null;
   /**
-   * Whether the Session has its Foto & Video folder in the company Drive yet (#552). A cancelled
-   * Session shows the button only when it has one, since the button never makes a folder for it.
-   */
-  hasFootageFolder: boolean;
-  /**
    * The Session's PIC — **only an offline Session has one now (#284)**: it is the PIC of the
    * Perjadin the Session sits on. An **online** Session no longer tracks a PIC (a third-party LMS
    * runs online delivery), so both are `null` for it. This is the offline detail surface, and an
@@ -152,7 +147,6 @@ export async function sessionDetail(_caller: Person, id: string): Promise<Sessio
       timeZone: province.timeZone,
       status: session.status,
       cancelledReason: session.cancelledReason,
-      hasFootageFolder: sql<boolean>`${session.driveFootageFolderId} is not null`,
 
       picPersonId: pic.id,
       picFullName: pic.fullName,
@@ -205,7 +199,6 @@ export async function sessionDetail(_caller: Person, id: string): Promise<Sessio
     timeZone: row.timeZone,
     status: row.status,
     cancelledReason: row.cancelledReason,
-    hasFootageFolder: row.hasFootageFolder,
     picPersonId: row.picPersonId,
     picFullName: row.picFullName,
     perjadin:

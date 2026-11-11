@@ -1,5 +1,4 @@
 import Page from "-/app/(app)/sesi/[id]/page";
-import { fotoVideoBackUrl, fotoVideoFrom, fotoVideoHref } from "-/lib/foto-video";
 import { requirePerson } from "-/lib/person";
 import { db, schema } from "@sugt/db";
 import type { Person } from "@sugt/db/queries";
@@ -19,25 +18,20 @@ import {
 } from "./support/fixtures";
 
 /**
- * **The Foto & Video section on `/sesi/[id]`** (#425, #552): one link, in a new tab, to the route that
- * opens the Session's folder in the company Google Drive — for everyone signed in, a Pimpinan
- * included. A cancelled Session shows it only when its folder already exists. Rendered to static
- * markup with the router stubbed, against the real database.
+ * **The Foto & Video section on `/sesi/[id]`** (#425): the list for everyone signed in, a Pimpinan
+ * included; Hapus and the upload popup for Staff only; no upload on a cancelled Session. Rendered to
+ * static markup with the router stubbed, against the real database. With no Drive connection, the
+ * Staff upload trigger still shows — the popup opens to view, and says why uploading is closed.
  */
 
 vi.mock("-/lib/person", () => ({ requirePerson: vi.fn() }));
-/** The browser's query string, as `useSearchParams` reads it. */
-let search = new URLSearchParams();
 vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/navigation")>()),
   useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
-  useSearchParams: () => search,
 }));
 
-const render = async (id: string, query: Record<string, string> = {}) => {
-  search = new URLSearchParams(query);
-  return renderToStaticMarkup(await Page({ params: Promise.resolve({ id }) } as never));
-};
+const render = async (id: string) =>
+  renderToStaticMarkup(await Page({ params: Promise.resolve({ id }) } as never));
 
 async function scene() {
   const staff = await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" });
@@ -67,14 +61,17 @@ async function scene() {
     heldOn: "2026-10-14",
     perjadinId: trip.id,
   });
+  await db.insert(schema.sessionFootage).values({
+    sessionId: session.id,
+    kind: "video",
+    contentType: "video/mp4",
+    originalFilename: "PENUTUPAN.MP4",
+    byteSize: 300 * 1024 * 1024,
+    driveFileId: "drive-file-video",
+    uploadedByPersonId: staff.id,
+  });
   return { staff: staff as Person, pimpinan: pimpinan as Person, session };
 }
-
-const cancel = (sessionId: string) =>
-  db
-    .update(schema.session)
-    .set({ status: "cancelled", cancelledReason: "Hujan" })
-    .where(eq(schema.session.id, sessionId));
 
 beforeEach(async () => {
   await resetDatabase();
@@ -82,94 +79,41 @@ beforeEach(async () => {
 });
 
 describe("Foto & Video on /sesi/[id]", () => {
-  it("gives a Pimpinan the link to the Session's folder, in a new tab, and no upload", async () => {
+  it("shows a Pimpinan the list with Buka, and neither Hapus nor an upload", async () => {
     const { pimpinan, session } = await scene();
     vi.mocked(requirePerson).mockResolvedValue(pimpinan);
 
     const html = await render(session.id);
 
     expect(html).toContain("Foto &amp; Video");
-    expect(html).toContain(
-      `href="${fotoVideoHref(session.id, `/sesi/${session.id}`).replaceAll("&", "&amp;")}"`,
-    );
-    expect(html).toContain('target="_blank"');
-    expect(html).toContain('rel="noopener noreferrer"');
-    expect(html).not.toContain("Unggah");
+    expect(html).toContain("PENUTUPAN.MP4");
+    expect(html).toContain("300 MB");
+    expect(html).toContain("https://drive.google.com/file/d/drive-file-video/view");
     expect(html).not.toContain(">Hapus<");
+    expect(html).not.toContain("Unggah Foto &amp; Video");
   });
 
-  it("offers no link on a cancelled Session with no folder", async () => {
+  it("gives Staff Hapus and the upload popup", async () => {
     const { staff, session } = await scene();
-    await cancel(session.id);
     vi.mocked(requirePerson).mockResolvedValue(staff);
 
     const html = await render(session.id);
 
-    expect(html).not.toContain("/foto-video/buka");
-    expect(html).toContain("tidak punya folder Foto &amp; Video");
+    expect(html).toContain(">Hapus<");
+    expect(html).toContain("Unggah Foto &amp; Video");
   });
 
-  it("keeps the link on a cancelled Session whose folder already exists", async () => {
+  it("keeps the list on a cancelled Session, and offers no upload", async () => {
     const { staff, session } = await scene();
     await db
       .update(schema.session)
-      .set({ driveFootageFolderId: "folder-1" })
+      .set({ status: "cancelled", cancelledReason: "Hujan" })
       .where(eq(schema.session.id, session.id));
-    await cancel(session.id);
     vi.mocked(requirePerson).mockResolvedValue(staff);
 
-    expect(await render(session.id)).toContain("/foto-video/buka");
-  });
+    const html = await render(session.id);
 
-  it("says why the folder did not open, in the app's own words only", async () => {
-    const { staff, session } = await scene();
-    vi.mocked(requirePerson).mockResolvedValue(staff);
-
-    expect(await render(session.id, { "foto-video": "drive-unavailable" })).toContain(
-      "Google Drive belum tersedia — coba lagi nanti.",
-    );
-    expect(await render(session.id, { "foto-video": "folder-gone" })).toContain(
-      "Minta Administrator memulihkannya dari tempat sampah Google Drive.",
-    );
-    expect(await render(session.id, { "foto-video": "<b>apa saja</b>" })).not.toContain("apa saja");
-  });
-});
-
-describe("where the route sends a tab back", () => {
-  const base = "https://internal.sugt.test";
-  const back = (from: string | null) => fotoVideoBackUrl(from, "s1", base, "folder-gone");
-
-  it("keeps a page on this app, its own query included, and adds the notice", () => {
-    expect(back("/pendamping")).toBe(`${base}/pendamping?foto-video=folder-gone`);
-    expect(back("/pendamping?tab=lain&pendamping=p1")).toBe(
-      `${base}/pendamping?tab=lain&pendamping=p1&foto-video=folder-gone`,
-    );
-  });
-
-  it("falls back to the Session's page for anything that would leave the app", () => {
-    for (const offsite of [
-      "//evil.example",
-      "/\\evil.example",
-      "/\t/evil.example/x",
-      "/\n/evil.example",
-      "https://evil.example",
-      "javascript:alert(1)",
-      null,
-      "",
-    ]) {
-      expect(back(offsite), JSON.stringify(offsite)).toBe(`${base}/sesi/s1?foto-video=folder-gone`);
-    }
-  });
-});
-
-describe("the page a timeline button names as dari", () => {
-  it("is the path and its query, without an earlier notice", () => {
-    expect(fotoVideoFrom("/pendamping", null)).toBe("/pendamping");
-    expect(
-      fotoVideoFrom(
-        "/pendamping",
-        new URLSearchParams("tab=lain&pendamping=p1&foto-video=drive-unavailable"),
-      ),
-    ).toBe("/pendamping?tab=lain&pendamping=p1");
+    expect(html).toContain("PENUTUPAN.MP4");
+    expect(html).not.toContain("Unggah Foto &amp; Video");
   });
 });

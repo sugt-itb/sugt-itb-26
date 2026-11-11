@@ -1,11 +1,5 @@
 # Session Footage is stored in the company Google Drive
 
-> **Superseded in part by [ADR-0061](./0061-session-footage-is-put-straight-into-the-sessions-drive-folder.md)
-> (2026-11-10, #552):** the app no longer uploads footage. The upload path below — resumable pieces,
-> check → verify → commit → reconcile for new files, the type and size checks, one-file sharing for new
-> files, Hapus and the Log entries — is gone. The **Foto & Video** button opens the Session's Drive
-> folder, which Staff add to directly. The tree, the names, the sweep and the renames stand.
-
 An offline Session now carries **Session Footage**, which the UI calls _Foto & Video_: the photos and
 videos documenting it. Each file goes to the same company Google Drive that holds the receipts and
 the attendance sheets ([ADR-0040](./0040-transaction-evidence-is-stored-in-the-company-google-drive.md),

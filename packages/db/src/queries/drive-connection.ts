@@ -8,7 +8,7 @@ import {
 } from "../schema/drive";
 import { person } from "../schema/people";
 import type { Person } from "./caller";
-import { requireGrant } from "./staff-only";
+import { requireGrant, requireStaff } from "./staff-only";
 
 /**
  * **The company Google Drive connection** (ADR-0040, #372) — the one `drive_connection` row.
@@ -16,11 +16,9 @@ import { requireGrant } from "./staff-only";
  * Two audiences, two guards, and the split is ADR-0040's "Who":
  * - **Only an Administrator connects, reconnects or inspects it.** The card's read and the two
  *   connect writes open with `requireGrant(caller, "Administrator")`.
- * - **Anyone signed in may have the app use it.** The credential read and the two bookkeeping writes
- *   a token refresh makes (`last_used_at`, broken) carry no guard of their own: a Staff upload reaches
- *   them after its own write guard, and since #552 (ADR-0061) the Foto & Video button refreshes the
- *   token on a Pimpinan's click too, to make and share a Session's folder as the company account's
- *   housekeeping. The ciphertext never leaves the server, and only `@sugt/internal` can decrypt it.
+ * - **Any Staff member uploads through it**, so the credential read and the two bookkeeping writes
+ *   a token refresh makes (`last_used_at`, broken) open with `requireStaff` alone. A Pimpinan writes
+ *   nothing, so reaches none of them.
  *
  * This module stores and reads ciphertext only. Encrypting, decrypting and talking to Google are
  * `@sugt/internal`'s, which holds `DRIVE_TOKEN_KEY`; nothing here could decrypt a token if it tried.
@@ -124,11 +122,10 @@ export type DriveCredentials = DriveFolderIds & {
   refreshToken: EncryptedRefreshToken;
 };
 
-/**
- * The stored credential, for the app's own use of the company Drive: a Staff upload, or the Foto &
- * Video button on anyone's click (#552). `null` when Drive was never connected.
- */
-export async function driveCredentials(_caller: Person): Promise<DriveCredentials | null> {
+/** The stored credential, for any Staff upload. `null` when Drive was never connected. */
+export async function driveCredentials(caller: Person): Promise<DriveCredentials | null> {
+  requireStaff(caller);
+
   const [row] = await db.select().from(driveConnection);
   if (!row) return null;
   return {
@@ -188,7 +185,9 @@ export async function recordDriveFolders(
  * The stored token stopped working — Google answered `invalid_grant`, or it will not decrypt under
  * the current key. Only a `connected` row moves, so the first failure's time is the one kept.
  */
-export async function markDriveConnectionBroken(_caller: Person): Promise<void> {
+export async function markDriveConnectionBroken(caller: Person): Promise<void> {
+  requireStaff(caller);
+
   await db
     .update(driveConnection)
     .set({ status: "broken", brokenAt: sql`now()` })
@@ -196,7 +195,9 @@ export async function markDriveConnectionBroken(_caller: Person): Promise<void> 
 }
 
 /** A refresh succeeded. Bumps `last_used_at` on a still-connected row. */
-export async function touchDriveConnection(_caller: Person): Promise<void> {
+export async function touchDriveConnection(caller: Person): Promise<void> {
+  requireStaff(caller);
+
   await db
     .update(driveConnection)
     .set({ lastUsedAt: sql`now()` })

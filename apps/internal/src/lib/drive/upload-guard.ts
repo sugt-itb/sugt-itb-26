@@ -56,11 +56,14 @@ export async function driveRefusal(
  * any upload before it is recorded — the server never saw the bytes. It must sit in `_staging`,
  * untrashed, carry this Perjadin's `sugtPerjadinId`, and be no larger than the cap by Drive's own
  * count. What its first bytes must be is the caller's to sniff: a receipt's four types, or a PDF.
+ * `maxBytes` is the cap: the receipts' and documents' by default; Session Footage passes the largest
+ * of its kinds, and checks the sniffed kind's own cap after.
  */
 export function isStagedUploadFor(
   file: DriveFile | null,
   stagingFolderId: string,
   perjadinId: string,
+  maxBytes: number = MAX_UPLOAD_BYTES,
 ): file is DriveFile & { size: number } {
   return Boolean(
     file &&
@@ -69,6 +72,6 @@ export function isStagedUploadFor(
     file.appProperties.sugtPerjadinId === perjadinId &&
     file.size !== null &&
     file.size > 0 &&
-    file.size <= MAX_UPLOAD_BYTES,
+    file.size <= maxBytes,
   );
 }
