@@ -42,11 +42,7 @@ ADR-0047's.
 - Catat transaksi, Unggah bukti (and its early receipt count), Laporkan — _amended 2026-10-13:
   Laporkan is gone, the Report being neither filed nor due
   ([ADR-0055](./0055-the-perjadin-report-is-neither-filed-nor-due.md))_
-- Dokumen and Foto & Video: the upload openers, the record, and Hapus — _amended 2026-11-10: Foto &
-  Video has no upload, record or Hapus any more. Who may add footage is enforced by Drive's edit access
-  on the trip's folder, re-applied from this rule the moment a Group changes or a Person is
-  deactivated, and for a Grant change by Periksa koneksi or the next click
-  ([ADR-0061](./0061-session-footage-is-put-straight-into-the-sessions-drive-folder.md), #553)_
+- Dokumen and Foto & Video: the upload openers, the record, and Hapus
 
 The guard runs on the write's own transaction where it has one, so the membership it reads is the state
 the write commits against: a member who removes themselves from the Group is refused on their next write.

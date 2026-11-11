@@ -21,14 +21,8 @@ import { requireStaff } from "./staff-only";
  *         └── {held_on} · {School} · {Foto|Video} · M-{footage8}.{ext}
  * ```
  *
- * **No row lock is held across a call to Google**: each folder id is claimed by compare-and-set, and a
- * caller that lost reads back the winner's id and trashes its own.
- *
- * **Who may call what.** The sweep's bookkeeping on footage rows stays Staff-only. Finding and
- * claiming the **folders** is open to any signed-in Person, a Pimpinan included (#552, ADR-0061):
- * the Foto & Video button makes a Session's folder on whoever's click, as the company account's own
- * housekeeping. It writes folder ids the app owns, never a Person's record, so the "a Pimpinan writes
- * nothing" rule (ADR-0025) is about something else.
+ * Every function is Staff-only. **No row lock is held across a call to Google**: each folder id is
+ * claimed by compare-and-set, and a caller that lost reads back the winner's id and trashes its own.
  */
 
 export type FootageFolderIds = {
@@ -37,7 +31,9 @@ export type FootageFolderIds = {
 };
 
 /** The two fixed footage folders, as the connection stores them; `null` with no connection. */
-export async function footageFolderIds(_caller: Person): Promise<FootageFolderIds | null> {
+export async function footageFolderIds(caller: Person): Promise<FootageFolderIds | null> {
+  requireStaff(caller);
+
   const [row] = await db
     .select({
       footageFolderId: driveConnection.footageFolderId,
@@ -53,7 +49,7 @@ export async function footageFolderIds(_caller: Person): Promise<FootageFolderId
  * under the `Foto & Video/` it was made in. `false` when another caller changed it first.
  */
 export async function claimFootageFolder(
-  _caller: Person,
+  caller: Person,
   claim:
     | { folder: "footageFolderId"; expected: string | null; next: string }
     | {
@@ -63,6 +59,8 @@ export async function claimFootageFolder(
         parentId: string;
       },
 ): Promise<boolean> {
+  requireStaff(caller);
+
   const claimed =
     claim.folder === "footageFolderId"
       ? await db
@@ -141,74 +139,14 @@ export async function footageReconcileTarget(
   return row ?? null;
 }
 
-/** An offline or online Session, with what the Foto & Video button needs to open its folder. */
-export type SessionFootageFolderTarget = {
-  sessionId: string;
-  mode: "offline" | "online";
-  status: "arranged" | "delivered" | "cancelled";
-  session: SessionFolderNaming;
-  /** The trip and what its folder is named from; `null` for an online Session, which has none. */
-  perjadin: PerjadinFolderNaming | null;
-  /** The Perjadin's folder under `Foto & Video/Pelaksanaan Offline`, once claimed. */
-  perjadinFolderId: string | null;
-  /** The Session's folder in it, once claimed. */
-  sessionFolderId: string | null;
-};
-
-/**
- * **One Session, for the Foto & Video button** (#552): its mode and status, what its folders are
- * named from, and the folder ids claimed so far. `null` when there is no such Session — a text
- * compare, so a malformed id is simply none. Open to any signed-in Person: opening the folder is a
- * read, and making it is housekeeping.
- */
-export async function sessionFootageFolderTarget(
-  _caller: Person,
-  sessionId: string,
-): Promise<SessionFootageFolderTarget | null> {
-  const [row] = await db
-    .select({
-      sessionId: session.id,
-      mode: session.mode,
-      status: session.status,
-      session: sessionFolderNaming,
-      perjadin: perjadinFolderNaming,
-      perjadinFolderId: perjadin.driveFootageFolderId,
-      sessionFolderId: session.driveFootageFolderId,
-    })
-    .from(session)
-    .innerJoin(school, eq(school.id, session.schoolId))
-    .leftJoin(perjadin, eq(perjadin.id, session.perjadinId))
-    .leftJoin(subCluster, eq(subCluster.id, perjadin.subClusterId))
-    .where(sql`${session.id}::text = ${sessionId}`);
-  if (!row) return null;
-  // Left-joined, so every part is null for an online Session, which has no trip.
-  const trip = row.perjadin;
-  return {
-    sessionId: row.sessionId,
-    mode: row.mode,
-    status: row.status,
-    session: row.session,
-    perjadin:
-      trip?.id && trip.subClusterName && trip.startsOn && trip.endsOn
-        ? {
-            id: trip.id,
-            subClusterName: trip.subClusterName,
-            startsOn: trip.startsOn,
-            endsOn: trip.endsOn,
-            schoolNames: trip.schoolNames,
-          }
-        : null,
-    perjadinFolderId: row.perjadinFolderId,
-    sessionFolderId: row.sessionFolderId,
-  };
-}
-
-/** Claim the Perjadin's footage folder; answers whichever id won. Any signed-in Person (#552). */
+/** Claim the Perjadin's footage folder; answers whichever id won. */
 export async function claimPerjadinFootageFolder(
-  _caller: Person,
+  caller: Person,
   perjadinId: string,
   folderId: string,
 ): Promise<string> {
+  requireStaff(caller);
+
   const [claimed] = await db
     .update(perjadin)
     .set({ driveFootageFolderId: folderId })
@@ -223,12 +161,14 @@ export async function claimPerjadinFootageFolder(
   return winner!.id!;
 }
 
-/** Claim the Session's footage folder; answers whichever id won. Any signed-in Person (#552). */
+/** Claim the Session's footage folder; answers whichever id won. */
 export async function claimSessionFootageFolder(
-  _caller: Person,
+  caller: Person,
   sessionId: string,
   folderId: string,
 ): Promise<string> {
+  requireStaff(caller);
+
   const [claimed] = await db
     .update(session)
     .set({ driveFootageFolderId: folderId })

@@ -1,9 +1,5 @@
 # Pimpinan is a second signed-in, read-only Person role
 
-> **Amended 2026-11-10 ([ADR-0061](./0061-session-footage-is-put-straight-into-the-sessions-drive-folder.md),
-> #552):** "writes nothing" means no record a person entered. A Pimpinan's click on Foto & Video may
-> still have the app make and share that Session's Drive folder, as the company account's housekeeping.
-
 The Programme's leadership now sign in. `Pimpinan` is a **second Person role** beside `Staff` — a
 signed-in principal who **reads every non-money delivery surface, writes nothing, and lands on
 `/monitoring`**. This reverses the T3 decision that _every Person is Staff_, and adds the first

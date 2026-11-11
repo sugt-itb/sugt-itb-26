@@ -2,7 +2,6 @@
 
 import { renamePerjadinFolder } from "-/lib/drive/rename-perjadin-folder";
 import { renameSessionFootage } from "-/lib/drive/rename-session-footage";
-import { reshareFootageFolders } from "-/lib/drive/reshare-footage";
 import { requireEnv } from "-/lib/env";
 import { requirePerson } from "-/lib/person";
 import { staffSurface } from "-/lib/staff-surface";
@@ -48,10 +47,7 @@ import QRCode from "qrcode";
  * honestly comes back as a value the client renders.
  */
 
-/**
- * **Set the Group's extra Staff** — the PIC plus this set, and nobody else. Once committed, the trip's
- * Foto & Video folder is re-shared to the new Group (#553), best effort.
- */
+/** **Set the Group's extra Staff** — the PIC plus this set, and nobody else. */
 export async function setPerjadinStaffAction(
   perjadinId: string,
   staffPersonIds: string[],
@@ -59,17 +55,11 @@ export async function setPerjadinStaffAction(
   const person = await requirePerson();
 
   const result = await staffSurface(() => setPerjadinStaff(person, perjadinId, staffPersonIds));
-  if (result.outcome === "set") {
-    await reshareFootageFolders(person, [perjadinId]);
-    revalidatePath(`/perjadin/${perjadinId}`);
-  }
+  if (result.outcome === "set") revalidatePath(`/perjadin/${perjadinId}`);
   return result;
 }
 
-/**
- * **Reassign the PIC**, keeping the Group valid in one transaction. A new PIC joins the Group, so the
- * trip's Foto & Video folder is re-shared once it commits (#553), best effort.
- */
+/** **Reassign the PIC**, keeping the Group valid in one transaction. */
 export async function changePerjadinPicAction(
   perjadinId: string,
   newPicPersonId: string,
@@ -77,10 +67,7 @@ export async function changePerjadinPicAction(
   const person = await requirePerson();
 
   const result = await staffSurface(() => changePerjadinPic(person, perjadinId, newPicPersonId));
-  if (result.outcome === "changed") {
-    await reshareFootageFolders(person, [perjadinId]);
-    revalidatePath(`/perjadin/${perjadinId}`);
-  }
+  if (result.outcome === "changed") revalidatePath(`/perjadin/${perjadinId}`);
   return result;
 }
 

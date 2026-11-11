@@ -1,4 +1,3 @@
-import { FotoVideoNotice } from "-/components/foto-video-notice";
 import { MyPerjadinSection } from "-/components/my-perjadin-section";
 import { PendampingPicker, type PendampingTab, PendampingTabs } from "-/components/pendamping-tabs";
 import { uploadGate, type UploadGate } from "-/lib/drive/upload-gate";
@@ -99,13 +98,7 @@ export default async function Page({ searchParams }: PageProps<"/pendamping">) {
 }
 
 function PageFrame({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex min-h-full flex-col gap-6 px-4 py-5 sm:p-7">
-      {/* Foto & Video sent the tab back (#552); read in the browser, never by this render. */}
-      <FotoVideoNotice />
-      {children}
-    </div>
-  );
+  return <div className="flex min-h-full flex-col gap-6 px-4 py-5 sm:p-7">{children}</div>;
 }
 
 /** Today's page: the greeting, then the viewer's own trips. */

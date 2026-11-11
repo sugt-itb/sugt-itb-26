@@ -1682,31 +1682,29 @@ alter table perjadin add column drive_footage_folder_id text;
 alter table session  add column drive_footage_folder_id text;
 ```
 
-**One offline Session's photos and videos, one file each, as the old upload recorded them** (#424,
+**One offline Session's photos and videos, one file each** (#424,
 [ADR-0046](./adr/0046-session-footage-is-stored-in-the-company-google-drive.md)), shown as "Foto &
-Video". **Nothing writes to this table any more** (#552,
-[ADR-0061](./adr/0061-session-footage-is-put-straight-into-the-sessions-drive-folder.md)): Staff now put
-footage straight into the Session's folder in the company Drive, which the app cannot see, so there is
-no row, no type or size check and no Activity Log entry for it. The table, its rows and its CHECKs are
-kept, with no migration, because three things still read them: Periksa koneksi's sweep, which finishes a
-row an upload left unsynced; the renames, which name the files the old upload made; and the old
-`footage_uploaded` / `footage_deleted` entries on `/log`.
+Video". **The database holds** each file's kind against its type and its kind's cap
+(`MAX_FOOTAGE_PHOTO_BYTES`, `MAX_FOOTAGE_VIDEO_BYTES` as literals), so no write can store a 2 GB
+"photo", and that the uploader is Staff, by the composite key a PIC's is held by. `content_type` is
+the type the server **sniffed**; a HEIF file is stored as `image/heic`.
 
-**The database holds** each row's kind against its type and its kind's cap (50 MiB for a photo,
-1000 MiB for a video, as literals), and that the uploader is Staff, by the composite key a PIC's is held
-by. `content_type` is the type the upload **sniffed**; a HEIF file is stored as `image/heic`. The key to
+**The application holds the rest**: in `recordSessionFootage`, the Session is offline and not
+cancelled when the footage is added — checked again under a row lock inside the commit — and, in
+the upload's verify step before it, the file was opened for this Session and its declared kind
+matches the sniffed one. Footage of a Session cancelled later stays. The key to
 `session` has **no cascade**: offline Sessions are only ever cancelled, so a delete that would orphan
-Drive files is refused rather than followed. `drive_synced_at` is null until the reconcile names, files
-and shares a row's file.
+Drive files is refused rather than followed.
+
+**The row and its Activity Log entry are written in one transaction** (`footage_uploaded`), with
+`drive_synced_at` null until the reconcile names, files and shares the file. `id` is generated before
+the insert, because the file's name carries it (`M-{footage8}`). **Hapus** is the Dokumen order: the
+file to the Drive trash first, then the row and a `footage_deleted` entry in one transaction.
 
 **Folders.** `perjadin.drive_footage_folder_id` is the trip's folder under `Foto & Video/Pelaksanaan
 Offline`, named as its other two; `session.drive_footage_folder_id` is the Session's folder inside it,
-`{held_on} · {HH.MM} · {School} · S-{session8}`. **They are made on the first click** of the Foto &
-Video button, by anyone signed in, and both are claimed by compare-and-set (`where … is null`). The
-trip's folder carries the sharing: anyone with the link can view, and the trip's writers can edit, set
-from Drive's side and re-applied on each click, after a Group change or a deactivation, and by
-Periksa koneksi (#553). The database holds none of that. A Session's folder,
-and the files the old upload placed in it, are renamed when its date or time moves.
+`{held_on} · {HH.MM} · {School} · S-{session8}`. Both are claimed by compare-and-set
+(`where … is null`). A Session's folder and files are renamed when its date or time moves.
 
 ## Money
 
@@ -2234,10 +2232,8 @@ compare-and-set, so no Administrator has to reconnect for them. **`footage_folde
 reconcile.
 
 **Who reaches it.** The card's read and the connect writes need the Administrator Grant. The
-credential read, and the two writes a token refresh makes (`last_used_at`, broken), carry no guard of
-their own: an upload reaches them after its own write guard, and the Foto & Video button reaches them on
-anyone's click, a Pimpinan's included, to make and share a Session's folder as the company account's
-housekeeping (ADR-0061). The ciphertext never leaves the server.
+credential read, and the two writes a token refresh makes (`last_used_at`, broken), need Staff,
+because any Staff member uploads through the connection.
 
 ---
 
