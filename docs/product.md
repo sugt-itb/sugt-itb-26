@@ -1203,14 +1203,19 @@ The card is in one of four states:
 
 - **Belum terhubung** — a short explanation and **Hubungkan Google Drive**.
 - **Terhubung** — the account, a link that opens the root folder in Drive, who connected it and
-  when, when it was last used, and **Hubungkan ulang**.
+  when, when it was last used, and **Hubungkan ulang**. A connection made before the daily Foto &
+  Video copy (#562) carries only the narrower Drive permission: everything else works, but the card
+  says "Akses Drive perlu diperluas untuk menyalin Foto & Video — hubungkan ulang." until an
+  Administrator reconnects.
 - **Terputus sejak {tanggal}** — Google stopped accepting the stored token. Receipts cannot be
   uploaded until an Administrator presses **Hubungkan ulang**.
 - **Folder bermasalah** — the token works, but the main folder or `_staging` is in the Drive trash
   or gone, or Drive failed while the folders were being set up. It says which, and offers
   **Hubungkan ulang**.
 
-**Connecting** goes to Google's consent screen for the company account and back. If the wrong
+**Connecting** goes to Google's consent screen for the company account and back. It asks for access
+to the whole company Drive (#562), so Google first warns that the app is not verified; the
+Administrator clicks through it. If the wrong
 account was picked, the Drive permission was unticked, or Google sent no long-lived token, the card
 says so in its own words and stores nothing. A first connect creates the app's folders in the
 company Drive: the main folder, **SUGT ITB 2026 Internal App Object Storage**, and beside it, never
@@ -1246,7 +1251,12 @@ was recorded while the connection was down, as Periksa koneksi does below.
   folder already right means its files are too, so they are not read at all. A
   folder in the Drive trash or gone is listed with the reason and left alone. Folders made before
   the name changed, or whose Sub-Cluster was renamed since, take the new name here — press again
-  until nothing is left.
+  until nothing is left;
+- the **daily Foto & Video copy** (below), run now within what is left of the press's time: "{n}
+  berkas Foto & Video disalin ke arsip, {m} gagal, {k} sesi belum diperiksa", with each failure's
+  Session, file name, uploader and reason, such as "Penyimpanan Google Drive pengunggah penuh". Without
+  the wider Drive permission it says "Akses Drive perlu diperluas untuk menyalin Foto & Video —
+  hubungkan ulang." and copies nothing.
 
 A trip's folders are also renamed by themselves, right after the change is saved, when either of
 its dates changes or its Schools do: a Session added at a new School, moved to another School, or a
@@ -1287,7 +1297,12 @@ each Session's **Foto & Video** on `/pendamping` and `/sesi/[id]`; those files a
 storage of, whoever uploaded them. Each trip's upload folder is editable by its Group, every Perjadin
 Editor and every Administrator, by sign-in email, and never shared by link. Once a day the company
 account copies new uploads into the **archive** (#562), whose Session folders anyone with the link
-can view; the trip's archive folder and everything above it stay private. Anyone signed in opens the
+can view. The copy runs once a night, around 01.00 WIB, and whenever an Administrator presses
+Periksa koneksi. It keeps each file's own name and subfolder, copies every file whatever its type or
+size, skips shortcuts and anything in the trash, and copies a file only once: renaming or editing
+the original later changes nothing in the archive. It never changes, moves or deletes a Staff
+member's file. A file Google refuses — the uploader's storage full, say — is listed on Periksa
+koneksi and tried again next time; the trip's archive folder and everything above it stay private. Anyone signed in opens the
 archive from **Lihat arsip**. The app sees none of the files, so it checks no type or size, and a photo
 keeps its location data. A file deleted from the upload folder before that day's copy is lost. Files
 uploaded through the app before #561 stay in the archive, each shared on its own.

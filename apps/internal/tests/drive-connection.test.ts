@@ -17,7 +17,7 @@ import {
   ROOT_FOLDER_NAME,
   STAGING_FOLDER_NAME,
 } from "-/lib/drive/fixed-folders";
-import { DRIVE_FILE_SCOPE, DriveRequestError, openDrive } from "-/lib/drive/google";
+import { DRIVE_FILE_SCOPE, DRIVE_SCOPE, DriveRequestError, openDrive } from "-/lib/drive/google";
 import { decryptRefreshToken } from "-/lib/drive/token-crypto";
 import { requirePerson, resolvePerson } from "-/lib/person";
 import { db, schema } from "@sugt/db";
@@ -90,7 +90,7 @@ function goodExchange(overrides: Record<string, unknown> = {}): TokenReply {
     body: {
       access_token: "access-from-exchange",
       refresh_token: "refresh-token-plaintext",
-      scope: `openid https://www.googleapis.com/auth/userinfo.email ${DRIVE_FILE_SCOPE}`,
+      scope: `openid https://www.googleapis.com/auth/userinfo.email ${DRIVE_SCOPE}`,
       id_token: idToken(ACCOUNT),
       ...overrides,
     },
@@ -179,7 +179,7 @@ describe("only an Administrator reaches the connection", () => {
       client_id: "test-drive-client-id",
       redirect_uri: "http://localhost:3001/api/drive/callback",
       response_type: "code",
-      scope: `openid email ${DRIVE_FILE_SCOPE}`,
+      scope: `openid email ${DRIVE_SCOPE}`,
       access_type: "offline",
       prompt: "consent",
       login_hint: ACCOUNT,
@@ -196,6 +196,8 @@ describe("the callback's checks, in order", () => {
     ["exchange-failed", {}, { status: 400, body: { error: "invalid_grant" } }],
     ["wrong-account", {}, goodExchange({ id_token: idToken("someone@gmail.com") })],
     ["scope-missing", {}, goodExchange({ scope: "openid email" })],
+    // A connect granting only `drive.file`, as every connect did before #562, is not enough now.
+    ["scope-missing", {}, goodExchange({ scope: `openid email ${DRIVE_FILE_SCOPE}` })],
     ["no-refresh-token", {}, goodExchange({ refresh_token: undefined })],
   ] as const)("stops at %s and stores nothing", async (outcome, params, exchange) => {
     const { admin } = await people();
@@ -534,7 +536,7 @@ describe("driveAccessToken", () => {
     const staff = await connected();
     await markDriveConnectionBroken(staff);
 
-    await touchDriveConnection(staff);
+    await touchDriveConnection(staff, `openid email ${DRIVE_SCOPE}`);
 
     await expect(rows()).resolves.toMatchObject([{ status: "broken", lastUsedAt: null }]);
   });
@@ -631,6 +633,23 @@ describe("the Pengaturan card", () => {
     expect(text).toContain("Admin,");
     expect(text).toContain("Hubungkan ulang");
     expect(html).toContain(`https://drive.google.com/drive/folders/${row!.rootFolderId}`);
+  });
+
+  it("says the connection needs widening while its token lacks the full drive scope (#562)", async () => {
+    const { admin, staff } = await people();
+    stubTokenEndpoint({ exchange: goodExchange() });
+    await callback(admin, {});
+    const widen = "Akses Drive perlu diperluas untuk menyalin Foto &amp; Video — hubungkan ulang.";
+    expect(await pageText(admin)).not.toContain(widen);
+
+    // A connection from before #562: its refresh reports `drive.file` only, and the card says so.
+    stubTokenEndpoint({
+      refresh: { body: { access_token: "a", scope: `openid email ${DRIVE_FILE_SCOPE}` } },
+    });
+    await expect(driveAccessToken(staff)).resolves.toMatchObject({ outcome: "ok" });
+    const text = await pageText(admin);
+    expect(text).toContain("Terhubung");
+    expect(text).toContain(widen);
   });
 
   it("reads Terputus sejak … once the token is refused", async () => {

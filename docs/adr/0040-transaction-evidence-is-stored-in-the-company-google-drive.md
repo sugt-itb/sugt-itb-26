@@ -37,7 +37,12 @@ This decision only makes it possible.
   that, both need Workspace.
 - **An OAuth refresh token with the `drive.file` scope only.** The app can see the files and folders
   it created, and nothing else in the account. `drive.file` is non-sensitive, so the consent screen
-  needs no Google verification.
+  needs no Google verification. _Amended 2026-11-16: widened to the full `drive` scope by
+  [ADR-0063](./0063-session-footage-is-uploaded-to-a-drive-folder-and-copied-into-the-company-archive.md)
+  (#562). The daily Foto & Video copy must read files Staff put in the upload folders, which
+  `drive.file` cannot see. The app can now read the whole company Drive, and still only touches its
+  own trees; the consent screen shows Google's "unverified app" warning, clicked through once per
+  connect, on the same client._
 - **The token is stored encrypted in the database**, AES-256-GCM under the key `DRIVE_TOKEN_KEY`,
   not in an environment variable. Reconnecting writes a new row value and needs no redeploy. Losing
   the key only means connecting again; it never loses a receipt.

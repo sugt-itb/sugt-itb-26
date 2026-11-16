@@ -407,6 +407,13 @@
       "when": 1794827387357,
       "tag": "0057_footage_upload_folders",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1794829898245,
+      "tag": "0058_footage_copy",
+      "breakpoints": true
     }
   ]
 }

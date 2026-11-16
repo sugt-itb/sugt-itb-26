@@ -1,5 +1,7 @@
+import { FOOTAGE_COPY_SCOPE_MISSING } from "-/lib/drive/check-report";
 import { driveConnectMessage, parseDriveConnectOutcome } from "-/lib/drive/connect";
 import { readyFolders } from "-/lib/drive/fixed-folders";
+import { grantsFullDrive } from "-/lib/drive/google";
 import { driveFolderUrl } from "-/lib/drive/receipt-files";
 import { requireEnv } from "-/lib/env";
 import { formatWib } from "-/lib/format-wib";
@@ -78,6 +80,8 @@ export default async function Page({ searchParams }: PageProps<"/pengaturan">) {
  *   last connect did not finish the tree, so the card does not claim Terhubung until a reconnect
  *   settles it (`readyFolders`, the same predicate uploads read).
  * - **Terhubung** — the account, its root folder, who connected it and when, and when it was last used.
+ *   A connection whose token lacks the full `drive` scope (#562) says it needs widening: everything
+ *   else works, but the daily Foto & Video copy cannot run until an Administrator reconnects.
  *
  * There is no disconnect button, by design: nothing would be gained by a state with no token.
  */
@@ -173,6 +177,11 @@ function DriveCard({
           <dt className="text-muted-foreground">Terakhir dipakai</dt>
           <dd>{connection.lastUsedAt ? formatWib(connection.lastUsedAt) : "—"}</dd>
         </dl>
+        {!grantsFullDrive(connection.scope) && (
+          <Alert className="mt-4">
+            <AlertDescription>{FOOTAGE_COPY_SCOPE_MISSING}</AlertDescription>
+          </Alert>
+        )}
       </CardContent>
       <CardFooter>
         <PeriksaKoneksi>{connectButton("Hubungkan ulang")}</PeriksaKoneksi>

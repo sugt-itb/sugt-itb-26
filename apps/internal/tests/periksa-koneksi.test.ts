@@ -10,7 +10,7 @@ import { describeDriveCheck, exposureWarning } from "-/lib/drive/check-report";
 import { completeDriveConnection } from "-/lib/drive/connect";
 import { FakeDrive, MY_DRIVE } from "-/lib/drive/fake-drive";
 import type { ReadyFolders } from "-/lib/drive/fixed-folders";
-import { DRIVE_FILE_SCOPE, openDrive } from "-/lib/drive/google";
+import { DRIVE_SCOPE, openDrive } from "-/lib/drive/google";
 import { uploadGate } from "-/lib/drive/upload-gate";
 import { RECEIPTS_UNSYNCED_TOOLTIP } from "-/lib/drive/upload-messages";
 import { requirePerson } from "-/lib/person";
@@ -65,7 +65,9 @@ function stubTokenEndpoint(
     if (url !== TOKEN_ENDPOINT) throw new Error(`Unexpected outbound request: ${url}`);
     const grant = new URLSearchParams(String(init?.body)).get("grant_type");
     if (grant === "authorization_code") return Response.json(replies.exchange);
-    const refresh = replies.refresh ?? { body: { access_token: "access" } };
+    const refresh = replies.refresh ?? {
+      body: { access_token: "access", scope: `openid email ${DRIVE_SCOPE}` },
+    };
     return Response.json(refresh.body, { status: refresh.status ?? 200 });
   });
 }
@@ -156,6 +158,7 @@ describe("the check, in order", () => {
       dokumen: "ok",
       footage: "ok",
       footageUpload: "ok",
+      footageCopy: { ran: true, copied: 0, failed: 0, remaining: 0, failures: [] },
       sweep: {
         ran: true,
         synced: 0,
@@ -421,7 +424,7 @@ describe("the sweep", () => {
       exchange: {
         access_token: "access",
         refresh_token: "again",
-        scope: `openid email ${DRIVE_FILE_SCOPE}`,
+        scope: `openid email ${DRIVE_SCOPE}`,
         id_token: `${segment({ alg: "RS256" })}.${segment({ email: "bukti@perusahaan.test" })}.c2ln`,
       },
     });

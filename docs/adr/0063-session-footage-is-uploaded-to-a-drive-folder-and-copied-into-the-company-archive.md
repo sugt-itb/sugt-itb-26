@@ -76,8 +76,49 @@ renamed in the upload tree, never a Staff file.**
     set it off.
 - **Under Foto & Video, a fixed note**: "Unggah langsung di Google Drive. Berkas disalin ke arsip
   perusahaan sekali sehari; setelah itu berkas asli boleh Anda hapus."
-- **The Drive scope stays `drive.file` here.** Copying Staff-owned files needs full `drive` (see the
-  trade-offs); #562 widens it.
+- **The Drive scope is widened to full `drive`** by #562, which copies (see _The daily copy_ below).
+
+## The daily copy
+
+_Added 2026-11-16 by [#562](https://github.com/sugt-itb/sugt-itb-26/issues/562)._
+
+- **What it does.** As the company account, for every Session with an upload folder (cancelled ones
+  included), it copies each file in the upload folder, subfolders included, that is not yet in the
+  Session's archive into the archive, under the original's name. Every file is copied, whatever its
+  type or size. Trashed items and shortcuts are skipped. A subfolder becomes an archive subfolder of
+  the same name. **Originals are never touched**, and nothing in either tree is ever deleted, trashed
+  or moved.
+- **What is already copied is read from Drive, not stored.** Each copy carries
+  `appProperties.sugtSourceFileId`, the original's id, and each archive subfolder carries
+  `sugtSourceFolderId`. So a renamed original is not copied again. **An edited original (same id, new
+  version) is not re-copied either**: the archive keeps the version that was there at the first copy.
+- **Bounded and resumable.** One pass stops after 40 seconds, inside the 60-second `maxDuration` its
+  routes declare (Vercel Hobby). Sessions are taken oldest-checked first, never-checked before all
+  (`session.drive_footage_upload_checked_at`). A Session goes to the back of the queue once its whole
+  folder has been gone through, failures included, so a file Google keeps refusing never starves the
+  Sessions behind it; the refused file is tried again when its Session next comes round. A rate limit, or Google refusing the token, stops the pass; any other failure stops only that
+  file and is reported with a reason a person can act on, such as "Penyimpanan Google Drive pengunggah
+  penuh".
+- **One pass at a time, by a lease.** `drive_connection.footage_copy_lease_until` is claimed by
+  compare-and-set (`… where lease is null or lease < now()`) and cleared at the end. It is a lease
+  rather than an advisory lock because the runtime pool is Supavisor's transaction mode, where a
+  session-level lock is not safe. A pass that crashes frees it when the lease runs out (five minutes).
+- **When it runs.** Once a day, by Vercel Cron (`apps/internal/vercel.json`, 01.00 WIB), at
+  `GET /api/cron/foto-video` with `Authorization: Bearer ${CRON_SECRET}`. The Hobby plan allows **at
+  most one cron run a day**, at a time Vercel picks within the scheduled hour, so a file can wait up to
+  a day and a bit. An Administrator's **Periksa koneksi** runs the same pass on demand. The cron has no
+  Person: it is its own caller (`CronCaller`), which reaches only the Drive bookkeeping.
+- **No Activity Log entries.** Failures are logged on the server and listed by Periksa koneksi.
+- **How the scope and the copy were verified** (#560, 2026-11-16): the connector's Google Cloud project
+  was put **In production** with `https://www.googleapis.com/auth/drive` added under Data access, not
+  submitted for verification, on the same OAuth client. A hand-built consent requesting `drive` was
+  shown and approved on both the dev Gmail and the company account, past Google's "unverified app"
+  warning. And the company account's copy of a file a Staff member uploaded was **owned by the company
+  account**, and survived the Staff member deleting the original and emptying their trash.
+- **A connection made before this** carries `drive.file` only. It keeps working for everything else;
+  the card and Periksa koneksi say "Akses Drive perlu diperluas untuk menyalin Foto & Video —
+  hubungkan ulang", and the copy is skipped until an Administrator reconnects. The scopes are read from
+  each token refresh and kept on the connection (`drive_connection.scope`).
 
 ## What stays
 
@@ -104,8 +145,10 @@ renamed in the upload tree, never a Staff file.**
   link opened one photo; a Session archive link now opens every photo and video in it. The photos are of
   minors and keep their GPS data, since nothing strips it.
 - **The scope.** Under `drive.file` the app reaches only files it made itself, so it cannot copy a Staff
-  upload. Copying needs full `drive`, which amends ADR-0040's `drive.file`-only point. #562 widens it and
-  records how that was verified
+  upload. Copying needs full `drive`, which amends ADR-0040's `drive.file`-only point. **The app can now
+  read the whole company Drive**, though it still only touches its own trees. Full `drive` is a
+  restricted scope, so the consent screen warns the app is unverified until Google verifies it; an
+  Administrator clicks through that once per connect. How it was verified is under _The daily copy_
   ([#560](https://github.com/sugt-itb/sugt-itb-26/issues/560)).
 - **Why not the alternatives:**
   - **Ownership transfer**: only the Staff member can start it, file by file.
