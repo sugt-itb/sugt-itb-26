@@ -1686,6 +1686,7 @@ alter table perjadin add column drive_footage_folder_id text;
 alter table session  add column drive_footage_folder_id text;
 alter table perjadin add column drive_footage_upload_folder_id text;  -- #561
 alter table session  add column drive_footage_upload_folder_id text;  -- #561
+alter table session  add column drive_footage_upload_checked_at timestamptz;  -- #562
 ```
 
 **One offline Session's photos and videos, one file each, as the old upload recorded them** (#424,
@@ -1718,6 +1719,12 @@ folder can be viewed by anyone with its link, and the trip's upload folder can b
 writers. Every one of these folders, and the files the old upload placed in the archive, are renamed
 when the trip's name or the Session's date, time or School changes; a Staff file in the upload tree
 never is.
+
+**The daily copy** (#562, ADR-0063) keeps **no row per file**: each copy in the archive carries its
+original's id in Drive (`appProperties.sugtSourceFileId`), and that is how the next pass knows what
+is done. `session.drive_footage_upload_checked_at` is when the copy last went through a Session's
+whole upload folder with nothing failing — null until then — and the pass takes Sessions in that
+order, never-checked first, so one cut short by its time budget does not starve the same Sessions.
 
 ## Money
 
@@ -2203,6 +2210,8 @@ create table drive_connection (
   footage_pelaksanaan_offline_folder_id text,
   footage_upload_folder_id       text,
   footage_upload_pelaksanaan_offline_folder_id text,
+  scope                          text,
+  footage_copy_lease_until       timestamptz,
   folder_problem                 text check (folder_problem in
                                    ('root-trashed', 'root-missing',
                                     'staging-trashed', 'staging-missing',
@@ -2249,11 +2258,20 @@ reconcile. **`footage_upload_folder_id` and `footage_upload_pelaksanaan_offline_
 `Foto & Video — Unggahan/` and its `Pelaksanaan Offline/` (#561, ADR-0063), the upload tree beside
 it, ensured where the archive's are and by the Foto & Video button.
 
+**`scope`** is the space-separated scopes the stored token carries, as Google reported them on the
+connect and on each refresh (#562). Without the full `drive` scope the daily Foto & Video copy does
+not run and the card asks for a reconnect; null, for a connection no refresh has reported on since,
+reads the same way. **`footage_copy_lease_until`** is the copy's lease: set by compare-and-set only
+when null or past, cleared when the pass ends, so the daily cron and a Periksa koneksi press never
+copy at once. A lease rather than an advisory lock, because the runtime pool is Supavisor's
+transaction mode; a crashed pass frees it by letting it expire.
+
 **Who reaches it.** The card's read and the connect writes need the Administrator Grant. The
 credential read, and the two writes a token refresh makes (`last_used_at`, broken), carry no guard of
 their own: an upload reaches them after its own write guard, and Lihat arsip reaches them on anyone's
 click, a Pimpinan's included, to make and share a Session's archive folder as the company account's
-housekeeping (ADR-0063). The ciphertext never leaves the server.
+housekeeping (ADR-0063). The daily copy reaches them with no Person at all, as Vercel Cron holding
+`CRON_SECRET` (a `CronCaller`, #562), and the copy's own lease and checked times with them. The ciphertext never leaves the server.
 
 ---
 
@@ -2521,6 +2539,7 @@ type rather than one type with optional fields:
 | `UnifiedDashboardCaller` | the company's Unified Dashboard, with a verified JWT    | the Programme summary; no money | nothing                                |
 | `ParticipantToken`       | a live Session feedback token                           | nothing                         | `participant_feedback` only            |
 | `PerjadinToken`          | a live Perjadin feedback token                          | nothing                         | `perjadin_evaluation` only             |
+| `CronCaller`             | Vercel Cron, holding `CRON_SECRET` (#562)               | the company Drive's bookkeeping | the same; nothing a person entered     |
 
 Every query takes one, and the money queries accept only `Person`. A single type carrying
 optional fields would turn "is this a Staff caller" into a runtime shape check — which is
@@ -2534,6 +2553,11 @@ for both would open to the public site whatever is opened to leadership. It read
 `programmeDelivery` and `assessmentCompletions`, the same rows `/` reads, and
 `participantFeedbackFigures` and `perjadinFeedbackFigures`, the read behind `/feedback`'s average
 cards (#504). Nothing it reads returns money, a comment, a name or a row.
+
+**The cron is its own arm too** (#562, ADR-0063). The daily Foto & Video copy runs with nobody
+signed in, so it is a `CronCaller`. It reaches only the queries the company Drive's own housekeeping
+uses — the stored credential and token refresh, the footage folder ids and their claims, and the
+copy's lease and checked times — each of which takes `DriveCaller` (`Person | CronCaller`).
 
 **A person on two overlapping Perjadins.** Genuinely preventable with `btree_gist` and an
 exclusion constraint, and genuinely useful — but it would mean denormalising the date range

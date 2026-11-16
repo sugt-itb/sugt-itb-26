@@ -2,8 +2,8 @@ import {
   driveCredentials,
   markDriveConnectionBroken,
   touchDriveConnection,
+  type DriveCaller,
   type DriveCredentials,
-  type Person,
 } from "@sugt/db/queries";
 
 import { readyFolders, type ReadyFolders } from "./fixed-folders";
@@ -12,7 +12,13 @@ import { decryptRefreshToken } from "./token-crypto";
 
 /** A refreshed token, or why there is none. Says nothing about the folders. */
 export type DriveToken =
-  | { outcome: "ok"; accessToken: string; credentials: DriveCredentials }
+  | {
+      outcome: "ok";
+      accessToken: string;
+      credentials: DriveCredentials;
+      /** The scopes the token carries (#562): without the full `drive` one, nothing is copied. */
+      scope: string;
+    }
   /** No connection, or a broken one — just now, if this refresh is what broke it. */
   | { outcome: "drive-disconnected" }
   /** Google could not be reached. The token may be fine; nothing is marked. */
@@ -29,7 +35,7 @@ export type DriveToken =
  * whether the token itself works. Uploads go through `driveAccessToken`, which does.
  */
 export async function refreshDriveToken(
-  person: Person,
+  person: DriveCaller,
   /** The connection row, as the caller read it — every caller reads it first, to decide first. */
   credentials: DriveCredentials | null,
 ): Promise<DriveToken> {
@@ -48,12 +54,17 @@ export async function refreshDriveToken(
     return { outcome: "drive-disconnected" };
   }
 
-  await touchDriveConnection(person);
-  return { outcome: "ok", accessToken: refreshed.accessToken, credentials };
+  await touchDriveConnection(person, refreshed.scope);
+  return {
+    outcome: "ok",
+    accessToken: refreshed.accessToken,
+    credentials,
+    scope: refreshed.scope,
+  };
 }
 
 export type DriveAccess =
-  | { outcome: "ok"; accessToken: string; folders: ReadyFolders }
+  | { outcome: "ok"; accessToken: string; folders: ReadyFolders; scope: string }
   | Exclude<DriveToken, { outcome: "ok" }>
   /**
    * The token is stored but the fixed tree is not usable — the root or `_staging` is trashed or
@@ -67,7 +78,7 @@ export type DriveAccess =
  * is usable. A tree that is not answers before Google is asked anything, so no upload is ever pointed
  * at a trashed `_staging`.
  */
-export async function driveAccessToken(person: Person): Promise<DriveAccess> {
+export async function driveAccessToken(person: DriveCaller): Promise<DriveAccess> {
   const credentials = await driveCredentials(person);
   // Checked here as well as in `refreshDriveToken`, because the folder check below must come before
   // any call to Google and must not mistake a broken connection for unresolved folders.
@@ -78,5 +89,5 @@ export async function driveAccessToken(person: Person): Promise<DriveAccess> {
 
   const token = await refreshDriveToken(person, credentials);
   if (token.outcome !== "ok") return token;
-  return { outcome: "ok", accessToken: token.accessToken, folders };
+  return { outcome: "ok", accessToken: token.accessToken, folders, scope: token.scope };
 }

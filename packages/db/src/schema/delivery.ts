@@ -90,6 +90,12 @@ export const session = pgTable(
     // The Session's folder in its Perjadin's upload folder (#561, ADR-0063): what Foto & Video opens.
     // Named as the archive folder above, claimed the same way. Only an offline Session has one.
     driveFootageUploadFolderId: text("drive_footage_upload_folder_id"),
+    // When the daily copy (#562) last went through every file in that upload folder. The pass takes
+    // Sessions oldest-checked first, never-checked before all, so one cut short by its time budget
+    // never starves the same Sessions.
+    driveFootageUploadCheckedAt: timestamp("drive_footage_upload_checked_at", {
+      withTimezone: true,
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

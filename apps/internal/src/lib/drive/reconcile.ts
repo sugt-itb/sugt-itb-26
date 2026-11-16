@@ -5,6 +5,7 @@ import {
   markTransactionSynced,
   perjadinDriveFolder,
   reconcileTarget,
+  type DriveCaller,
   type Person,
 } from "@sugt/db/queries";
 
@@ -58,7 +59,7 @@ import { evidenceFileName, isReceiptContentType, transactionFolderName } from ".
  * cosmetic, and it must not hold up the receipts this reconcile is putting in place.
  */
 export async function reassertPerjadinFolderName(
-  person: Person,
+  person: DriveCaller,
   drive: DriveClient,
   perjadinId: string,
   folder: DriveFile,

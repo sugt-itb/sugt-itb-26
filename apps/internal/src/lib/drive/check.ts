@@ -14,10 +14,11 @@ import {
 
 import { perjadinFolderName } from "../perjadin-name";
 import { refreshDriveToken } from "./access-token";
+import { copyFootageToArchive, type FootageCopyReport } from "./copy-footage";
 import { ensureDokumenFolders, ensureFootageFolders } from "./dokumen-folders";
 import { readyFolders, type ReadyFolders } from "./fixed-folders";
 import { sessionFootageFolderName } from "./footage-files";
-import { type DriveClient, isDriveFailure, openDrive } from "./google";
+import { type DriveClient, grantsFullDrive, isDriveFailure, openDrive } from "./google";
 import { reconcileTransaction, type UnsyncedReason } from "./reconcile";
 import { type DocumentUnsyncedReason, reconcileDocument } from "./reconcile-document";
 import { type FootageUnsyncedReason, reconcileFootage } from "./reconcile-footage";
@@ -345,6 +346,13 @@ export type DriveCheckReport =
         | { ran: false; waiting: number; documentsWaiting: number; footageWaiting: number };
       /** The Perjadin folder names re-asserted (#407) — skipped, like the sweep, while the tree is not usable. */
       names: ({ ran: true } & FolderNameReport) | { ran: false };
+      /**
+       * The daily Foto & Video copy (#562), run here on demand — or why it did not run: the tree not
+       * usable (`skipped`), the full `drive` scope missing, or another pass under way.
+       */
+      footageCopy: FootageCopyReport | { ran: false; reason: "skipped" };
+      /** Whether the token carries the full `drive` scope (#562); without it, reconnect. */
+      fullDriveScope: boolean;
     };
 
 /**
@@ -366,6 +374,9 @@ export type DriveCheckReport =
  * 6. **The folder names** (`reassertPerjadinFolderNames`, #407), only when the tree is usable, within
  *    what the sweep left of `SWEEP_BUDGET_MS`. This is how folders made before ADR-0044 take the new
  *    name: the Administrator presses again until none is left.
+ * 7. **The Foto & Video copy** (`copyFootageToArchive`, #562), the daily pass run on demand, within
+ *    what is left of the same budget — skipped while the tree is not usable or the token lacks the
+ *    full `drive` scope.
  *
  * The caller has already checked the Administrator Grant.
  */
@@ -452,7 +463,24 @@ export async function checkDriveConnection(person: Person): Promise<DriveCheckRe
           })),
         }
       : { ran: false as const };
-    return { token: "ok", folders, exposed, dokumen, footage, footageUpload, sweep, names };
+    const footageCopy = ready
+      ? await copyFootageToArchive(person, drive, ready, {
+          scope: token.scope,
+          budgetMs: Math.max(0, SWEEP_BUDGET_MS - (Date.now() - sweptFrom)),
+        })
+      : { ran: false as const, reason: "skipped" as const };
+    return {
+      token: "ok",
+      folders,
+      exposed,
+      dokumen,
+      footage,
+      footageUpload,
+      sweep,
+      names,
+      footageCopy,
+      fullDriveScope: grantsFullDrive(token.scope),
+    };
   } catch (error) {
     if (isDriveFailure(error)) return { token: "unreachable" };
     throw error;

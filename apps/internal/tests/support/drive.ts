@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { openReceiptSessionsAction } from "-/app/(app)/perjadin/[id]/laporan/actions";
 import type { FakeDrive } from "-/lib/drive/fake-drive";
 import { ensureFixedFolders, readyFolders, type ReadyFolders } from "-/lib/drive/fixed-folders";
+import { DRIVE_SCOPE } from "-/lib/drive/google";
 import { evidenceFileName, transactionFolderName } from "-/lib/drive/receipt-files";
 import { reconcileTransaction } from "-/lib/drive/reconcile";
 import { reconcileDocument } from "-/lib/drive/reconcile-document";
@@ -35,12 +36,17 @@ import { addActivityLogEntry, addTransaction } from "./fixtures";
 
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
-/** Google's token endpoint, answering every refresh with an access token. Anything else throws. */
-export function stubTokenEndpoint() {
+/**
+ * Google's token endpoint, answering every refresh with an access token carrying `scope` — the full
+ * `drive` scope unless a test says otherwise (#562). Anything else throws.
+ */
+export function stubTokenEndpoint({
+  scope = `openid email ${DRIVE_SCOPE}`,
+}: { scope?: string } = {}) {
   vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
     const url = input instanceof Request ? input.url : String(input);
     if (url !== TOKEN_ENDPOINT) throw new Error(`Unexpected outbound request: ${url}`);
-    return Response.json({ access_token: "access" });
+    return Response.json({ access_token: "access", scope });
   });
 }
 

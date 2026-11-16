@@ -5,6 +5,7 @@ import {
   perjadinWriterEmails,
   sessionFootageFolderTarget,
   type FootageTree,
+  type DriveCaller,
   type Person,
   type SessionFolderNaming,
   type SessionFootageFolderTarget,
@@ -64,7 +65,7 @@ export type EnsuredFootageFolder =
  * A Drive failure throws, for the caller to answer.
  */
 export async function ensureSessionFootageFolder(
-  person: Person,
+  person: DriveCaller,
   drive: DriveClient,
   folders: ReadyFolders,
   target: {

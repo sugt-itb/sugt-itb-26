@@ -4,6 +4,7 @@ import {
   dokumenFolderIds,
   footageFolderIds,
   type FootageTree,
+  type DriveCaller,
   type Person,
 } from "@sugt/db/queries";
 
@@ -145,7 +146,7 @@ export async function ensureDokumenFolders(
  * `Foto & Video — Unggahan/` and its `Pelaksanaan Offline/` (#561, ADR-0063).
  */
 export async function ensureFootageFolders(
-  person: Person,
+  person: DriveCaller,
   drive: DriveClient,
   rootFolderId: string,
   tree: FootageTree = "archive",

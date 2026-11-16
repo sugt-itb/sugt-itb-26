@@ -44,6 +44,8 @@
  */
 export type {
   Caller,
+  CronCaller,
+  DriveCaller,
   ParticipantToken,
   PerjadinToken,
   Person,
@@ -256,6 +258,13 @@ export {
   type RewordPreparationItemResult,
 } from "./preparation-items";
 export { perjadinWriterEmails } from "./perjadin-writers";
+export {
+  claimFootageCopyLease,
+  footageCopySessions,
+  markFootageUploadChecked,
+  releaseFootageCopyLease,
+  type FootageCopySession,
+} from "./footage-copy";
 export {
   claimFootageFolder,
   claimPerjadinFootageFolder,

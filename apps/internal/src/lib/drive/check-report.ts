@@ -7,6 +7,11 @@ import type {
   FootageSweepFailure,
   SweepFailure,
 } from "./check";
+import type {
+  FootageCopyFailure,
+  FootageCopyFailureReason,
+  FootageCopyReport,
+} from "./copy-footage";
 
 /**
  * **What Periksa koneksi says** (#375) — the report as sentences, kept apart from both the check
@@ -97,6 +102,39 @@ const FOOTAGE_UPLOAD_LINES: Record<"ok" | "created" | "busy", string> = {
   busy: "Folder Foto & Video — Unggahan: sedang disiapkan proses lain — periksa lagi.",
 };
 
+/** Why a Foto & Video file, or a Session's folder, was not copied to the archive (#562). */
+const COPY_FAILURE_REASONS: Record<FootageCopyFailureReason, string> = {
+  "storage-full": "Penyimpanan Google Drive pengunggah penuh",
+  "copy-refused": "Google Drive menolak menyalin berkas ini",
+  "rate-limited": "Google Drive membatasi permintaan — penyalinan berhenti, dilanjutkan nanti",
+  "token-refused": "Google menolak token — penyalinan berhenti",
+  "folder-trashed": "folder ada di tempat sampah Google Drive",
+  "folder-missing": "folder sudah tidak ada di Google Drive",
+  "drive-failed": "Google Drive gagal menjawab",
+};
+
+/** What Periksa koneksi says about the Foto & Video copy (#562). */
+export const FOOTAGE_COPY_SCOPE_MISSING =
+  "Akses Drive perlu diperluas untuk menyalin Foto & Video — hubungkan ulang.";
+
+function footageCopyLines(copy: FootageCopyReport | { ran: false; reason: "skipped" }): string[] {
+  if (copy.ran) {
+    return [
+      `${copy.copied} berkas Foto & Video disalin ke arsip, ${copy.failed} gagal, ${copy.remaining} sesi belum diperiksa.`,
+    ];
+  }
+  if (copy.reason === "scope-missing") return [FOOTAGE_COPY_SCOPE_MISSING];
+  if (copy.reason === "busy") return ["Penyalinan Foto & Video sedang berjalan di proses lain."];
+  return [];
+}
+
+function footageCopyFailure(failure: FootageCopyFailure): string {
+  const what = failure.fileName
+    ? `${failure.sessionName} · ${failure.fileName}${failure.uploader ? ` (${failure.uploader})` : ""}`
+    : failure.sessionName;
+  return `${what}: ${COPY_FAILURE_REASONS[failure.reason]}.`;
+}
+
 /** The prominent warning when a link-shared folder reaches the root or `_staging`. */
 export function exposureWarning(folder: ExposableFolder): string {
   return `${FOLDER_NAMES[folder]} dapat dibuka siapa saja yang punya link — pindahkan keluar dari folder yang dibagikan.`;
@@ -158,7 +196,11 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
         ...(names.ran
           ? [`${names.renamed} nama folder dan berkas diganti, ${names.remaining} folder tersisa.`]
           : []),
+        ...footageCopyLines(report.footageCopy),
       ];
+      const copyFailures = report.footageCopy.ran
+        ? report.footageCopy.failures.map(footageCopyFailure)
+        : [];
       return {
         lines,
         warnings: report.exposed.map(exposureWarning),
@@ -180,8 +222,9 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
                 (failure) =>
                   `${failure.name} (${PERJADIN_FOLDER_LABELS[failure.folder]}): ${NAME_FAILURE_REASONS[failure.reason]}.`,
               ),
+              ...copyFailures,
             ]
-          : [],
+          : copyFailures,
       };
     }
   }

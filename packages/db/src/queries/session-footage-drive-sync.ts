@@ -6,7 +6,7 @@ import { session, sessionFootage } from "../schema/delivery";
 import { driveConnection } from "../schema/drive";
 import { school, subCluster } from "../schema/reference";
 import { perjadin } from "../schema/travel";
-import type { Person } from "./caller";
+import type { DriveCaller, Person } from "./caller";
 import { perjadinFolderNaming, type PerjadinFolderNaming } from "./perjadin-naming";
 import { requireStaff } from "./staff-only";
 
@@ -66,7 +66,7 @@ const FIXED_FOOTAGE_COLUMNS = {
  * The archive's (`Foto & Video/`) unless `tree` says the upload tree's (`Foto & Video — Unggahan/`).
  */
 export async function footageFolderIds(
-  _caller: Person,
+  _caller: DriveCaller,
   tree: FootageTree = "archive",
 ): Promise<FootageFolderIds | null> {
   const columns = FIXED_FOOTAGE_COLUMNS[tree];
@@ -86,7 +86,7 @@ export async function footageFolderIds(
  * unless `claim.tree` says the upload tree's.
  */
 export async function claimFootageFolder(
-  _caller: Person,
+  _caller: DriveCaller,
   claim: { tree?: FootageTree } & (
     | { folder: "footageFolderId"; expected: string | null; next: string }
     | {
@@ -201,7 +201,7 @@ export type SessionFootageFolderTarget = {
  * opening a folder is a read, and making one is housekeeping.
  */
 export async function sessionFootageFolderTarget(
-  _caller: Person,
+  _caller: DriveCaller,
   sessionId: string,
 ): Promise<SessionFootageFolderTarget | null> {
   const [row] = await db
@@ -251,7 +251,7 @@ export async function sessionFootageFolderTarget(
  * Any signed-in Person (#561, ADR-0063).
  */
 export async function claimPerjadinFootageFolder(
-  _caller: Person,
+  _caller: DriveCaller,
   perjadinId: string,
   folderId: string,
   tree: FootageTree = "archive",
@@ -278,7 +278,7 @@ export async function claimPerjadinFootageFolder(
  * Any signed-in Person (#561, ADR-0063).
  */
 export async function claimSessionFootageFolder(
-  _caller: Person,
+  _caller: DriveCaller,
   sessionId: string,
   folderId: string,
   tree: FootageTree = "archive",

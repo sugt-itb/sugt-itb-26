@@ -16,7 +16,7 @@ import {
 import { db } from "../client";
 import { subCluster } from "../schema/reference";
 import { perjadin, transaction, transactionEvidence } from "../schema/travel";
-import type { Person } from "./caller";
+import type { DriveCaller, Person } from "./caller";
 import { perjadinFolderNaming, type PerjadinFolderNaming } from "./perjadin-naming";
 import { requireStaff } from "./staff-only";
 
@@ -68,7 +68,7 @@ function selectPerjadinDriveFolders() {
  * any signed-in Person: Lihat arsip re-asserts the name on anyone's click (#561).
  */
 export async function perjadinDriveFolder(
-  _caller: Person,
+  _caller: DriveCaller,
   perjadinId: string,
 ): Promise<PerjadinDriveFolder | null> {
   const [trip] = await selectPerjadinDriveFolders().where(eq(perjadin.id, perjadinId));

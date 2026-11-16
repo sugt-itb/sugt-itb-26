@@ -22,8 +22,21 @@ const AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3";
 
+/** What connections made before #562 granted: only files the app itself made or opened. */
 export const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+/**
+ * **The full Drive scope** (#562, ADR-0063), what a connect now asks for: the daily Foto & Video copy
+ * must read files Staff put in the upload folders, which `drive.file` cannot see. The app still only
+ * touches its own trees.
+ */
+export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 export const FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
+export const SHORTCUT_MIME_TYPE = "application/vnd.google-apps.shortcut";
+
+/** Whether a space-separated scope list, as Google returns it, grants the full Drive scope. */
+export function grantsFullDrive(scope: string | null): boolean {
+  return (scope ?? "").split(" ").includes(DRIVE_SCOPE);
+}
 
 /** Where Google sends the Administrator back. Registered on the connector client (#369). */
 export const DRIVE_CALLBACK_PATH = "/api/drive/callback";
@@ -47,7 +60,7 @@ export function driveAuthorizationUrl(state: string): string {
     client_id: requireEnv("GOOGLE_DRIVE_CLIENT_ID"),
     redirect_uri: redirectUri(),
     response_type: "code",
-    scope: `openid email ${DRIVE_FILE_SCOPE}`,
+    scope: `openid email ${DRIVE_SCOPE}`,
     access_type: "offline",
     prompt: "consent",
     login_hint: requireEnv("GOOGLE_DRIVE_ACCOUNT_EMAIL"),
@@ -125,7 +138,8 @@ function idTokenEmail(idToken: string): string | null {
 }
 
 export type TokenRefresh =
-  | { ok: true; accessToken: string }
+  /** `scope` is what the token actually carries, space-separated — `drive.file` on an old connection. */
+  | { ok: true; accessToken: string; scope: string }
   /** Google refused the refresh token itself: revoked, expired, or the grant was removed. */
   | { ok: false; reason: "invalid-grant" }
   /** Anything else — the network, a 5xx. Says nothing about the token. */
@@ -151,9 +165,12 @@ export async function refreshDriveAccessToken(refreshToken: string): Promise<Tok
 
   const body = (await response.json().catch(() => null)) as {
     access_token?: string;
+    scope?: string;
     error?: string;
   } | null;
-  if (response.ok && body?.access_token) return { ok: true, accessToken: body.access_token };
+  if (response.ok && body?.access_token) {
+    return { ok: true, accessToken: body.access_token, scope: body.scope ?? "" };
+  }
   if (body?.error === "invalid_grant") return { ok: false, reason: "invalid-grant" };
   return { ok: false, reason: "unreachable" };
 }
@@ -168,6 +185,17 @@ export type DriveFile = {
   /** Bytes. Absent for folders. */
   size: number | null;
   appProperties: Record<string, string>;
+};
+
+/** One item in a folder, as `listChildren` reads it for the daily Foto & Video copy (#562). */
+export type DriveChild = {
+  id: string;
+  name: string;
+  mimeType: string;
+  trashed: boolean;
+  appProperties: Record<string, string>;
+  /** Who owns it — the Staff member who uploaded it, for an upload. `null` when Drive does not say. */
+  ownerEmail: string | null;
 };
 
 export type DrivePermission = {
@@ -231,6 +259,19 @@ export interface DriveClient {
   deletePermission(id: string, permissionId: string): Promise<void>;
   listPermissions(id: string): Promise<DrivePermission[]>;
   /**
+   * **Every item directly in a folder** (#562), trashed ones and shortcuts included — the caller
+   * skips them — across every page. Needs the full `drive` scope to see files the app did not make.
+   */
+  listChildren(folderId: string): Promise<DriveChild[]>;
+  /**
+   * **Copy a file into `parentId`, as the company account** (#562): the copy is the company's,
+   * whoever owns the original, and the original is not touched.
+   */
+  copyFile(
+    id: string,
+    input: { name: string; parentId: string; appProperties: Record<string, string> },
+  ): Promise<{ id: string }>;
+  /**
    * A resumable upload session the browser `PUT`s to. `origin` is the uploading page's, and is
    * required: without it the bytes land but the browser cannot read the response (#370).
    */
@@ -251,6 +292,11 @@ export class DriveRequestError extends Error {
     readonly operation: string,
     /** The HTTP status, or 0 when the request never got an answer — the network, a timeout. */
     readonly status: number,
+    /**
+     * Google's own reason, when its error body gave one — `storageQuotaExceeded`,
+     * `userRateLimitExceeded`, `cannotCopyFile` — for a caller that must tell them apart (#562).
+     */
+    readonly reason: string | null = null,
   ) {
     super(
       status === 0
@@ -290,6 +336,14 @@ export function isLinkShared(permissions: DrivePermission[]): boolean {
   );
 }
 
+/** Google's reason for a failed call, from its error body: `error.errors[0].reason`, if any. */
+async function errorReason(response: Response): Promise<string | null> {
+  const body = (await response.json().catch(() => null)) as {
+    error?: { errors?: { reason?: string }[]; status?: string };
+  } | null;
+  return body?.error?.errors?.[0]?.reason ?? body?.error?.status ?? null;
+}
+
 /** `fetch`, with a request that got no answer turned into a `DriveRequestError` of status 0. */
 async function send(operation: string, url: string, init?: RequestInit): Promise<Response> {
   try {
@@ -310,7 +364,9 @@ export function openDrive(accessToken: string): DriveClient {
       ...init,
       headers: { ...authorization, ...(init.headers as Record<string, string> | undefined) },
     });
-    if (!response.ok) throw new DriveRequestError(operation, response.status);
+    if (!response.ok) {
+      throw new DriveRequestError(operation, response.status, await errorReason(response));
+    }
     return response;
   }
 
@@ -462,6 +518,57 @@ export function openDrive(accessToken: string): DriveClient {
         emailAddress: permission.emailAddress ?? null,
         inherited: (permission.permissionDetails ?? []).some((detail) => detail.inherited),
       }));
+    },
+
+    async listChildren(folderId) {
+      const children: DriveChild[] = [];
+      let pageToken: string | undefined;
+      do {
+        const params = new URLSearchParams({
+          q: `'${folderId.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}' in parents`,
+          fields:
+            "nextPageToken,files(id,name,mimeType,trashed,appProperties,owners(emailAddress))",
+          pageSize: "1000",
+          ...(pageToken ? { pageToken } : {}),
+        });
+        const response = await call("files.list", `${DRIVE_API}/files?${params}`);
+        const body = await readJson<{
+          nextPageToken?: string;
+          files?: {
+            id: string;
+            name: string;
+            mimeType: string;
+            trashed?: boolean;
+            appProperties?: Record<string, string>;
+            owners?: { emailAddress?: string }[];
+          }[];
+        }>("files.list", response);
+        for (const file of body.files ?? []) {
+          children.push({
+            id: file.id,
+            name: file.name,
+            mimeType: file.mimeType,
+            trashed: file.trashed ?? false,
+            appProperties: file.appProperties ?? {},
+            ownerEmail: file.owners?.[0]?.emailAddress ?? null,
+          });
+        }
+        pageToken = body.nextPageToken;
+      } while (pageToken);
+      return children;
+    },
+
+    async copyFile(id, { name, parentId, appProperties }) {
+      const response = await call(
+        "files.copy",
+        `${DRIVE_API}/files/${encodeURIComponent(id)}/copy?fields=id`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name, parents: [parentId], appProperties }),
+        },
+      );
+      return readJson<{ id: string }>("files.copy", response);
     },
 
     async openResumableSession({ name, parentId, mimeType, size, origin, appProperties }) {
