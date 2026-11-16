@@ -133,7 +133,7 @@ async function scene(
 }
 
 /**
- * A file of footage as the upload left it before #552: a JPEG in `_staging`, tagged with the trip and
+ * A file of footage as the upload left it before #561: a JPEG in `_staging`, tagged with the trip and
  * the Session, and its `session_footage` row. `placed` runs the reconcile, as the upload did.
  */
 async function recorded(
@@ -329,6 +329,30 @@ describe("Foto & Video: the Session's upload folder", () => {
     expect(openedFolder(await click(cancelled.id, "archive"))).toBe("archive-before");
   });
 
+  it("still re-applies the sharing on a cancelled Session's existing folders", async () => {
+    const { session, trip, staff } = await scene();
+    openedFolder(await click(session.id));
+    await db
+      .update(schema.session)
+      .set({ status: "cancelled", cancelledReason: "Hujan" })
+      .where(eq(schema.session.id, session.id));
+    const { archive, upload } = await sessionFoldersOf(session.id);
+    const tripUpload = (await perjadinFoldersOf(trip.id)).upload!;
+    for (const id of [archive!, tripUpload]) {
+      for (const permission of await drive.listPermissions(id)) {
+        if (!permission.inherited) await drive.deletePermission(id, permission.id);
+      }
+    }
+    const before = allFolders().length;
+
+    expect(openedFolder(await click(session.id, "archive"))).toBe(archive);
+    expect(openedFolder(await click(session.id, "upload"))).toBe(upload);
+
+    expect(await sharesOn(archive!)).toEqual(["anyone reader"]);
+    expect(await sharesOn(tripUpload)).toEqual([`user writer ${staff.email}`]);
+    expect(allFolders()).toHaveLength(before);
+  });
+
   it("opens an existing folder while Drive is not usable, and sends a new one back", async () => {
     const { session } = await scene({ connection: "broken" });
 
@@ -508,7 +532,7 @@ describe("the upload folder's sharing", () => {
   });
 });
 
-describe("footage recorded before #552", () => {
+describe("footage recorded before #561", () => {
   it("keeps old footage unsynced while its folder is trashed; a later run finishes it, once", async () => {
     const { session, staff } = await scene();
     // The Session's folder will be made in a trip folder trashed by hand.
@@ -689,7 +713,7 @@ describe("Periksa koneksi", () => {
   it("sweeps unsynced footage and re-asserts the Session folder's and files' names", async () => {
     const { session } = await scene();
     const { driveFileId, footageId } = await recorded(session);
-    // Names gone stale by hand, and a second file an upload left in `_staging` before #552.
+    // Names gone stale by hand, and a second file an upload left in `_staging` before #561.
     const sessionFolderId = drive.files.get(driveFileId)!.parents[0]!;
     await drive.updateFile(sessionFolderId, { name: "lama" });
     await drive.updateFile(driveFileId, { name: "lama.jpg" });

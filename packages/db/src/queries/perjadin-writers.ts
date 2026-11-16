@@ -6,7 +6,7 @@ import { groupMember } from "../schema/travel";
 import type { Person } from "./caller";
 
 /**
- * **Who may write a Perjadin, as a list of sign-in emails** (#552) — the people `perjadinWriterSql`
+ * **Who may write a Perjadin, as a list of sign-in emails** (#561) — the people `perjadinWriterSql`
  * in `./staff-only.ts` lets write the trip (ADR-0048), read the other way round, so a change to one is
  * a change to both (the Grants here are `hasGrant`'s for Perjadin Editor: itself and Administrator): not "may this
  * Person write", but "everyone who may". It is what the trip's Foto & Video upload folder in the

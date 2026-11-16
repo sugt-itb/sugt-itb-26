@@ -19,11 +19,13 @@ import {
  * the app any more, so only Periksa koneksi's sweep runs this, to finish files an upload left
  * unsynced. Idempotent, and holding no row lock across a call to Google:
  *
- * 1–3. **The folders** (`ensureSessionFootageFolder`, shared with the Foto & Video button): the
- *    fixed footage folders, the Perjadin's and the Session's. A trashed or missing folder is not
- *    remade: the footage waits, unsynced, as a document does.
+ * 1–3. **The archive folders** (`ensureSessionFootageFolder`, shared with the Foto & Video and Lihat
+ *    arsip buttons): the fixed footage folders, the Perjadin's and the Session's — a Session folder
+ *    made here is link-shared, as every archive Session folder is (#561). A trashed or missing folder
+ *    is not remade: the footage waits, unsynced, as a document does.
  * 4. **The file**, moved out of `_staging`, named and tagged with `sugtFootageId`.
- * 5. **Shared** anyone/reader — the file only; every folder stays private.
+ * 5. **Shared** anyone/reader, the file itself, as every old upload was; the Perjadin's folder and
+ *    everything above it stay private.
  * 6. **`drive_synced_at`** set.
  *
  * A failure leaves the footage recorded and "belum tersinkron", and remembers the attempt.

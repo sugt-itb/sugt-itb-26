@@ -63,7 +63,7 @@ export default async function Page({ params }: PageProps<"/sesi/[id]">) {
 
   return (
     <div className="flex min-h-full flex-col">
-      {/* Foto & Video or Lihat arsip sent the tab back: the folder could not be opened (#552). */}
+      {/* Foto & Video or Lihat arsip sent the tab back: the folder could not be opened (#561). */}
       <FotoVideoNotice className="mx-4 mt-4 w-auto sm:mx-7" />
       <header className="border-b border-border px-4 py-5 sm:px-7">
         <Link

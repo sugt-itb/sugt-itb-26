@@ -201,8 +201,8 @@ export async function applyFootageUploadSharing(
   );
 }
 
-/** Which button: Foto & Video opens the upload folder, Lihat arsip the archive. */
-export type FootageFolderKind = "upload" | "archive";
+/** Which button: Foto & Video opens the upload tree's folder, Lihat arsip the archive's. */
+export type FootageFolderKind = FootageTree;
 
 export type OpenFootageFolderResult =
   | { outcome: "open"; folderId: string }
@@ -220,7 +220,7 @@ export type OpenFootageFolderResult =
  * **What the Foto & Video and Lihat arsip buttons do** (#561), in the ticket's order:
  *
  * 1. Load the Session. An online one has no folder, and a **cancelled** one never gets one made: it
- *    opens the folder it already has, or nothing. **The upload folder is the trip's writers' only**
+ *    opens the folder it already has — re-sharing it as in step 4 when Drive is usable — or nothing. **The upload folder is the trip's writers' only**
  *    (ADR-0048): anyone else is answered as if there were no folder.
  * 2. **Drive not usable**: an existing folder still opens — the link works without the app — and a
  *    missing one cannot be made.
@@ -252,13 +252,22 @@ export async function openSessionFootageFolder(
   const existing: OpenFootageFolderResult | null = existingId
     ? { outcome: "open", folderId: existingId }
     : null;
-  if (target.status === "cancelled") return existing ?? { outcome: "no-such-folder" };
+  if (target.status === "cancelled" && !existing) return { outcome: "no-such-folder" };
   // When Drive cannot be used now: the folder it already has, else "coba lagi nanti".
   const unavailable = existing ?? { outcome: "drive-unavailable" };
 
   const access = await driveAccessToken(person);
   if (access.outcome !== "ok") return unavailable;
   const drive = openDrive(access.accessToken);
+
+  // A cancelled Session never gets a folder made, but the one it has is still shared as any other.
+  if (target.status === "cancelled") {
+    await shareExisting(person, drive, kind, perjadin.id, {
+      archiveSessionFolderId: target.sessionFolderId,
+      uploadPerjadinFolderId: target.uploadPerjadinFolderId,
+    });
+    return existing!;
+  }
 
   let archive: EnsuredFootageFolder;
   let upload: EnsuredFootageFolder | null = null;
@@ -295,15 +304,36 @@ export async function openSessionFootageFolder(
   }
   if (archive.outcome !== "ok" || opened?.outcome !== "ok") return unavailable;
 
-  await shareArchiveFolder(drive, archive.sessionFolderId).catch((error: unknown) => {
-    console.error(`Link-sharing Session ${sessionId}'s archive folder failed.`, error);
+  await shareExisting(person, drive, kind, perjadin.id, {
+    archiveSessionFolderId: archive.sessionFolderId,
+    uploadPerjadinFolderId: opened.perjadinFolderId,
   });
-  if (kind === "upload") {
-    await applyFootageUploadSharing(person, drive, perjadin.id, opened.perjadinFolderId).catch(
+  return { outcome: "open", folderId: opened.sessionFolderId };
+}
+
+/**
+ * Step 4, best effort: re-assert the archive Session folder's link share and, for Foto & Video, the
+ * Perjadin upload folder's writers. A folder not made yet is skipped; any failure is logged, and the
+ * folder still opens.
+ */
+async function shareExisting(
+  person: Person,
+  drive: DriveClient,
+  kind: FootageFolderKind,
+  perjadinId: string,
+  folders: { archiveSessionFolderId: string | null; uploadPerjadinFolderId: string | null },
+): Promise<void> {
+  const { archiveSessionFolderId, uploadPerjadinFolderId } = folders;
+  if (archiveSessionFolderId) {
+    await shareArchiveFolder(drive, archiveSessionFolderId).catch((error: unknown) => {
+      console.error(`Link-sharing archive folder ${archiveSessionFolderId} failed.`, error);
+    });
+  }
+  if (kind === "upload" && uploadPerjadinFolderId) {
+    await applyFootageUploadSharing(person, drive, perjadinId, uploadPerjadinFolderId).catch(
       (error: unknown) => {
-        console.error(`Sharing Perjadin ${perjadin.id}'s upload folder failed.`, error);
+        console.error(`Sharing Perjadin ${perjadinId}'s upload folder failed.`, error);
       },
     );
   }
-  return { outcome: "open", folderId: opened.sessionFolderId };
 }

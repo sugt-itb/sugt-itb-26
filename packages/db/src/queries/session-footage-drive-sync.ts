@@ -32,7 +32,7 @@ import { requireStaff } from "./staff-only";
  *
  * **Who may call what.** The sweep's bookkeeping on footage rows stays Staff-only. Finding and
  * claiming the **folders** is open to any signed-in Person, a Pimpinan included (#561, ADR-0063):
- * the Foto & Video button makes a Session's folder on whoever's click, as the company account's own
+ * Lihat arsip makes a Session's archive folder on whoever's click, as the company account's own
  * housekeeping. It writes folder ids the app owns, never a Person's record, so the "a Pimpinan writes
  * nothing" rule (ADR-0025) is about something else.
  */
@@ -248,7 +248,7 @@ export async function sessionFootageFolderTarget(
 
 /**
  * Claim the Perjadin's footage folder in `tree` (the archive unless said); answers whichever id won.
- * Any signed-in Person (#552).
+ * Any signed-in Person (#561, ADR-0063).
  */
 export async function claimPerjadinFootageFolder(
   _caller: Person,
@@ -275,7 +275,7 @@ export async function claimPerjadinFootageFolder(
 
 /**
  * Claim the Session's footage folder in `tree` (the archive unless said); answers whichever id won.
- * Any signed-in Person (#552).
+ * Any signed-in Person (#561, ADR-0063).
  */
 export async function claimSessionFootageFolder(
   _caller: Person,

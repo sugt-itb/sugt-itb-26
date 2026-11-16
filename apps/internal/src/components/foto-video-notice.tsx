@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@sugt/ui/components/alert";
 import { useSearchParams } from "next/navigation";
 
 /**
- * **The notice a page shows when the Foto & Video route sent the tab back** (#552): the folder could
+ * **The notice a page shows when a Foto & Video route sent the tab back** (#561): the folder could
  * not be opened, and the URL's `foto-video` says why. Read **in the browser**, so the page's server
  * render never reads the URL for it — `/pendamping` reads no search parameter at all for a viewer
  * without the Perjadin Editor Grant, and this keeps it so. Any other value renders nothing, so the
