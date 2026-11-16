@@ -195,7 +195,7 @@ cannot pass. A Pimpinan can read `/`, `/perjadin`, `/sesi-daring` and `/feedback
    `UNIFIED_DASHBOARD_JWT_AUDIENCE` in production, and in staging with a **different** secret.
 3. Agree `iss` and `aud` with the Unified Dashboard's developer. Share the secret through a password
    manager or a one-time-secret link, never by chat, email or an issue.
-4. Have an Administrator add leadership's Google accounts as **Pimpinan** in `/orang`.
+4. Have an Administrator add leadership's sign-in addresses (Google or ITB) as **Pimpinan** in `/orang`.
 5. Smoke-test with the Postman CLI:
    - a freshly signed token returns 200;
    - a token signed with the wrong secret, an expired token and a token with the wrong `aud` each

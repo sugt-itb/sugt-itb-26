@@ -31,7 +31,7 @@ export type SignInResult = {
 };
 
 /**
- * Drive a whole Google sign-in through the same handler `route.ts` mounts.
+ * Drive a whole Google sign-in through the same handler `route.ts` mounts (`signInWith`, below).
  *
  * Two requests, because that is what a browser makes: `POST /sign-in/social` to get
  * the authorization URL and the state cookie, then `GET /callback/google` carrying
@@ -64,7 +64,11 @@ export async function signInWithMicrosoft(
   };
 }
 
-/** Both requests of one sign-in, against whichever provider's stub is in place. */
+/**
+ * Both requests of one sign-in, against whichever provider's stub is in place: `POST
+ * /sign-in/social` for the authorization URL and the state cookie, then `GET /callback/{provider}`
+ * with the code the provider would have sent back.
+ */
 async function signInWith(
   provider: "google" | "microsoft",
   callbackURL: string,

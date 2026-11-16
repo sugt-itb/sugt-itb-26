@@ -242,6 +242,13 @@ describe("the sign-in screen (/masuk)", () => {
       expect(html.match(/<button/g)).toHaveLength(2);
       expect(html.match(/<svg aria-hidden="true"/g)).toHaveLength(2);
       expect(html).toContain("Gunakan akun ITB atau akun Google yang terdaftar.");
+      // Each keeps its brand fill and label in dark mode too: no theme `dark:` or `hover:text-*`
+      // class is left on either button to override them.
+      for (const button of html.match(/<button[^>]*>/g)!) {
+        expect(button).not.toMatch(/dark:bg-|dark:hover:|hover:text-foreground/);
+      }
+      expect(html).toContain("bg-[#2F2F2F]");
+      expect(html).toContain("bg-[#FFFFFF]");
     });
   });
 

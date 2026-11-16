@@ -147,13 +147,19 @@ describe("refused", () => {
   it.each([
     ["a lookalike domain", { email: "x@evilitb.ac.id" }],
     ["a domain that only ends in itb.ac.id's letters", { email: "x@notitb.ac.id" }],
-    [
-      "no email and a non-ITB UPN",
-      { preferredUsername: "guest_gmail.com#EXT#@itb.onmicrosoft.com" },
-    ],
+    ["no email and a non-ITB UPN", { preferredUsername: "ratna@gmail.com" }],
+    ["an empty label under itb.ac.id", { email: "x@.itb.ac.id" }],
+    ["a doubled dot under itb.ac.id", { email: "x@dept..itb.ac.id" }],
     ["no email and no UPN", {}],
   ])("%s", async (_case, address) => {
-    for (const email of ["x@evilitb.ac.id", "x@notitb.ac.id"]) {
+    // Every address here is on the invite list, so only the ITB guard can be what refuses it.
+    for (const email of [
+      "x@evilitb.ac.id",
+      "x@notitb.ac.id",
+      "ratna@gmail.com",
+      "x@.itb.ac.id",
+      "x@dept..itb.ac.id",
+    ]) {
       await addPerson({ fullName: email, email, role: "Staff" });
     }
 

@@ -88,6 +88,13 @@ export function SignInButtons({ destination }: { destination: string | null }) {
   );
 }
 
+/**
+ * One provider's button: `@sugt/ui`'s `Button` on its **default** variant, whose plain `bg-*`,
+ * `text-*`, `hover:bg-*` and transparent border the brand classes replace one for one. Not
+ * `outline`: its `dark:bg-transparent` and `hover:text-foreground` survive the merge (they carry
+ * other modifiers), so in dark mode the fill would vanish and Google's dark label would sit on a
+ * dark page.
+ */
 function ProviderButton({
   label,
   logo,
@@ -106,7 +113,6 @@ function ProviderButton({
   return (
     <Button
       size="lg"
-      variant="outline"
       disabled={disabled}
       onClick={onClick}
       className={cn("w-full gap-3", className)}

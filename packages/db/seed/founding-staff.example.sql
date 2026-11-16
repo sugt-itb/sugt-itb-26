@@ -26,7 +26,8 @@
 --
 -- ## Two rules the rows below have to obey
 --
--- 1. **Each row's email is simply the Google account that person signs in with.** Any
+-- 1. **Each row's email is simply the account that person signs in with** — Google, or an ITB
+--    account (ADR-0062) when the address is ITB's. Any
 --    address — the sign-in gate is the active `person` row alone. The old
 --    `@ditsama.itb.ac.id` requirement on Staff was dropped in ADR-0003's amendment
 --    ("the gate is single-tier", #115), so a founding-Staff row may hold any Google

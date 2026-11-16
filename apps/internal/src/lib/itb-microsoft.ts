@@ -11,25 +11,27 @@ import { requireEnv } from "./env";
  */
 
 /** ITB's own domain. An address here or at any subdomain of it is ITB's to vouch for. */
-export const ITB_DOMAIN = "itb.ac.id";
+const ITB_DOMAIN = "itb.ac.id";
 
 /**
  * **Is this an ITB address?** `itb.ac.id` itself or any subdomain of it — `ditsama.itb.ac.id`
  * included — matched on the **domain**, never as a suffix of the whole string, so
  * `x@evilitb.ac.id` is refused. Expects a lowercased address.
  */
-export function isItbAddress(email: string): boolean {
+function isItbAddress(email: string): boolean {
   const at = email.lastIndexOf("@");
   if (at <= 0 || email.indexOf("@") !== at) return false;
   const domain = email.slice(at + 1);
+  // Every label non-empty, so `a@.itb.ac.id` and `a@x..itb.ac.id` are no ITB addresses either.
+  if (domain.split(".").some((label) => label === "")) return false;
   return domain === ITB_DOMAIN || domain.endsWith(`.${ITB_DOMAIN}`);
 }
 
-/** What `getUserInfo` answers Better Auth: the identity it links by, or `null` to refuse. */
-export type ItbUserInfo = {
+/** What `getUserInfo` answers Better Auth for an accepted ITB address: the identity it links by. */
+type ItbUserInfo = {
   user: { id: string; name: string; email: string; emailVerified: true };
   data: Record<string, unknown>;
-} | null;
+};
 
 /**
  * **The signed-in identity, read from the ID token alone** — no Microsoft Graph request of any
@@ -49,7 +51,7 @@ export type ItbUserInfo = {
  * to the built-in reading it would be `false`, and an account would then never link to a Person who
  * signed in with Google first — nor Google to one who signed in here first.
  */
-export function itbUserInfo(idToken: string | undefined): ItbUserInfo {
+function itbUserInfo(idToken: string | undefined): ItbUserInfo | null {
   if (!idToken) return null;
   const claims = decodeJwt(idToken);
   const claimed = typeof claims.email === "string" && claims.email ? claims.email : null;
@@ -67,7 +69,7 @@ export function itbUserInfo(idToken: string | undefined): ItbUserInfo {
  * `${BETTER_AUTH_URL}/api/auth/callback/microsoft` would only fail at someone's first sign-in, as
  * Microsoft's redirect-mismatch page. Failing here makes it a deploy-time error instead.
  */
-export function microsoftRedirectURI(): string {
+function microsoftRedirectURI(): string {
   const configured = requireEnv("MICROSOFT_OAUTH_REDIRECT_URL");
   const expected = `${requireEnv("BETTER_AUTH_URL")}/api/auth/callback/microsoft`;
   if (configured !== expected) {

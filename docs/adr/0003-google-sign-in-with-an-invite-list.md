@@ -1,5 +1,10 @@
 # Google sign-in with an invite list, not ITB SSO
 
+> **Partially superseded by [ADR-0062](./0062-itb-microsoft-sign-in-beside-google.md).** "Not ITB
+> SSO" and "Identity is a Google account, not an ITB one" no longer hold: an ITB account (ITB's
+> Microsoft tenant) is a second way to sign in, beside Google. The invite list as the only gate
+> stands.
+
 The internal tool authenticates Staff and Teaching Team via Google sign-in, restricted to an explicit invite list. It does not use ITB's institutional identity provider.
 
 ## Why
