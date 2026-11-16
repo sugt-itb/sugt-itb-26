@@ -82,15 +82,25 @@ building around permissions.
 ## The internal tool
 
 `@sugt/internal`. Two roles, and no third: **Staff** (DITSAMA employees, leadership
-included) and **Teaching Team** (the professors who deliver Sessions). Sign-in is Google,
-restricted to an invite list — Staff with a DITSAMA account, Teaching Team with whatever Google
-account they have, and a `person` row required either way. See
-[ADR-0003](./adr/0003-google-sign-in-with-an-invite-list.md).
+included) and **Pimpinan**, who sign in read-only
+([ADR-0025](./adr/0025-pimpinan-is-a-second-signed-in-read-only-person-role.md)). Sign-in is an **ITB
+account** (ITB's Microsoft tenant) **or Google**, restricted to an invite list either way: a
+Person whose roster email is an ITB address may use either button, anyone else Google, and a
+`person` row is required whichever is used. See
+[ADR-0003](./adr/0003-google-sign-in-with-an-invite-list.md) and
+[ADR-0062](./adr/0062-itb-microsoft-sign-in-beside-google.md).
+
+**Masuk** (`/masuk`) shows two stacked buttons, the same size and full width, neither primary:
+**Masuk dengan akun ITB** first, in Microsoft's dark sign-in style with its four-square logo, then
+**Masuk dengan Google**, in Google's light style with its "G". While either sign-in is under way
+both are disabled and the one pressed reads "Menghubungkan…". Under them: "Gunakan akun ITB atau
+akun Google yang terdaftar." Every refusal — not on the list, revoked, or an address that is not
+ITB's on the ITB button — shows the same one sentence.
 
 **A deep link survives sign-in.** A signed-out Person who opens any page behind sign-in — most
 often a **Lihat Detail** link on the company's Unified Dashboard, such as `/`, `/sesi-daring` or
 `/feedback` — is sent to **Masuk** (`/masuk`) carrying that page's path and query string, and lands
-on it after Google sign-in. A Person already signed in who opens `/masuk` with a destination goes
+on it after signing in. A Person already signed in who opens `/masuk` with a destination goes
 straight to it. Only a path on this app is honoured; anything else is dropped. Without a
 destination a Person lands where they always have: Staff on `/pendamping`, a Pimpinan on `/`.
 Sign-in only decides where to go. A page the Person may not read still turns them away with its own

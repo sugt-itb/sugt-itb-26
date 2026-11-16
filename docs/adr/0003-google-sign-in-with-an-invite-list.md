@@ -106,3 +106,11 @@ an Administrator's too ([#488](https://github.com/sugt-itb/sugt-itb-26/issues/48
 answers anyone else with a 403, and its sidebar link is hidden from them. Amended 2026-11-04: a
 Perjadin Editor also receives every Staff Person's name and email, through the Pendamping Lain picker
 ([#539](https://github.com/sugt-itb/sugt-itb-26/issues/539), ADR-0052); `/orang` itself is unchanged._
+
+## Amendment (2026-11-16): ITB sign-in beside Google
+
+"Not ITB SSO" no longer holds. An ITB account (ITB's Microsoft tenant) is now a second way to sign
+in, beside Google ([ADR-0062](./0062-itb-microsoft-sign-in-beside-google.md),
+[#565](https://github.com/sugt-itb/sugt-itb-26/issues/565)): the Teaching Team this ADR chose Google
+for no longer signs in, and ITB IT has registered the app. **The invite list is unchanged and is
+still the only gate** — the active `person` row, by email, whichever button is used.
