@@ -6,6 +6,7 @@ import {
   revokeGrantAction,
   revokePersonAction,
 } from "-/app/(app)/orang/actions";
+import { FOOTAGE_ACCESS_NOTE, footageAccessChanged } from "-/lib/foto-video";
 import type { RosterEntry } from "@sugt/db/queries";
 import {
   type Grant,
@@ -258,6 +259,8 @@ function GrantPicker({
 }) {
   const [held, setHeld] = useOptimistic(grants, (_state, next: Grant[]) => next);
   const [, startSaving] = useTransition();
+  // Said once a change reaches every trip's Foto & Video upload folder, which Drive learns later (#563).
+  const [footageNote, setFootageNote] = useState(false);
 
   function change(next: Grant[]) {
     const added = next.filter((grant) => !held.includes(grant));
@@ -266,10 +269,17 @@ function GrantPicker({
       // Inside the transition so the chips and the pending state are one update, then the actions —
       // their `revalidatePath` re-reads the real grants and `useOptimistic` falls back to them.
       setHeld(next);
-      await Promise.all([
-        ...added.map((grant) => assignGrantAction(personId, grant)),
-        ...removed.map((grant) => revokeGrantAction(personId, grant)),
+      const results = await Promise.all([
+        ...added.map(async (grant) => ({
+          grant,
+          result: await assignGrantAction(personId, grant),
+        })),
+        ...removed.map(async (grant) => ({
+          grant,
+          result: await revokeGrantAction(personId, grant),
+        })),
       ]);
+      if (footageAccessChanged(results)) setFootageNote(true);
     });
   }
 
@@ -286,6 +296,7 @@ function GrantPicker({
           change(next as Grant[]);
         }}
       />
+      {footageNote && <p className="mt-1 text-xs text-muted-foreground">{FOOTAGE_ACCESS_NOTE}</p>}
     </div>
   );
 }

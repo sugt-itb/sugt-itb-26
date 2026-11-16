@@ -137,10 +137,13 @@ _Added 2026-11-16 by [#562](https://github.com/sugt-itb/sugt-itb-26/issues/562).
   only they can delete it. Hence two folders and a company-owned copy. Staff storage is used until they
   delete their originals; a new free Google account has 5 GB, 15 GB once its phone number is verified.
 - **The loss window.** A file deleted before the next daily copy is lost. Accepted.
-- **Leaving a Group takes effect late.** Edit access on the upload folder is re-applied when a writer
-  clicks Foto & Video, so a Person who has left the Group, lost a Grant or been revoked keeps it until
-  then. [#563](https://github.com/sugt-itb/sugt-itb-26/issues/563) applies it the moment a Group, Grant
-  or Person changes.
+- **A Grant change takes effect late; a Group change or a revocation does not** (#563). Right after a
+  trip's Group is set or its PIC changed, its upload folder's writers are re-applied, and right after
+  a Person is revoked, so are the upload folders of every trip whose Group they were in — best effort,
+  after the commit, like the folder renames. A Grant (Perjadin Editor, Administrator) reaches every
+  trip, so it is not applied inline: Periksa koneksi's sharing pass re-applies every upload folder,
+  bounded per press, and a Foto & Video click re-applies its own trip. Until one of those runs, a
+  Person who lost such a Grant keeps edit access, and one who gained it waits for it.
 - **Archive folders can be browsed by anyone with their link.** ADR-0046 shared one file at a time, so a
   link opened one photo; a Session archive link now opens every photo and video in it. The photos are of
   minors and keep their GPS data, since nothing strips it.

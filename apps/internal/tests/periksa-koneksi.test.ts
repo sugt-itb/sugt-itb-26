@@ -159,6 +159,7 @@ describe("the check, in order", () => {
       footage: "ok",
       footageUpload: "ok",
       footageCopy: { ran: true, copied: 0, failed: 0, remaining: 0, failures: [] },
+      sharing: { ran: true, updated: 0, remaining: 0, failures: [] },
       sweep: {
         ran: true,
         synced: 0,

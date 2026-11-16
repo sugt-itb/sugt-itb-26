@@ -175,7 +175,7 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
         failures: [],
       };
     case "ok": {
-      const { sweep, names } = report;
+      const { sweep, names, sharing } = report;
       const lines = [
         "Token Google Drive berfungsi.",
         ...report.folders.map(
@@ -196,8 +196,17 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
         ...(names.ran
           ? [`${names.renamed} nama folder dan berkas diganti, ${names.remaining} folder tersisa.`]
           : []),
+        ...(sharing.ran
+          ? [
+              `${sharing.updated} folder unggah Foto & Video: akses diperbarui, ${sharing.remaining} tersisa.`,
+            ]
+          : []),
         ...footageCopyLines(report.footageCopy),
       ];
+      const sharingFailures = (sharing.ran ? sharing.failures : []).map(
+        (failure) =>
+          `${failure.name} (${PERJADIN_FOLDER_LABELS["foto-video-unggah"]}): ${NAME_FAILURE_REASONS[failure.reason]}, akses tidak diperbarui.`,
+      );
       const copyFailures = report.footageCopy.ran
         ? report.footageCopy.failures.map(footageCopyFailure)
         : [];
@@ -222,9 +231,10 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
                 (failure) =>
                   `${failure.name} (${PERJADIN_FOLDER_LABELS[failure.folder]}): ${NAME_FAILURE_REASONS[failure.reason]}.`,
               ),
+              ...sharingFailures,
               ...copyFailures,
             ]
-          : copyFailures,
+          : [...sharingFailures, ...copyFailures],
       };
     }
   }
