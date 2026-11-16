@@ -32,8 +32,9 @@ import { ensureSessionFootageFolder } from "./session-footage-folder";
  *   becomes an archive subfolder of the same name, found again by `sugtSourceFolderId`.
  * - **Originals are never touched**, and nothing in either tree is ever deleted, trashed or moved.
  * - **Bounded and resumable**: it stops when `budgetMs` is up, taking Sessions oldest-checked first,
- *   and a Session goes to the back of the queue only once its whole folder has been gone through
- *   without a failure — so a file Google refused is tried again on the next pass.
+ *   and a Session goes to the back of the queue once its whole folder has been gone through — failures
+ *   included, so a file Google keeps refusing never starves the Sessions behind it. A refused file is
+ *   tried again the next time its Session comes round.
  * - **One pass at a time**: a lease on the connection, claimed by compare-and-set.
  * - **Per file, a failure is reported and the pass goes on**, except a rate limit or a refused token,
  *   which stop the pass. Nothing is written to the Activity Log; failures are logged on the server.
@@ -157,7 +158,7 @@ async function copyAll(
       const done = await copySession(caller, drive, folders, session, deadline, failures, tally);
       if (!done.finished) break;
       finished += 1;
-      if (done.clean) await markFootageUploadChecked(caller, session.sessionId);
+      await markFootageUploadChecked(caller, session.sessionId);
     } catch (error) {
       if (!(error instanceof StopPass)) throw error;
       failures.push({
@@ -192,8 +193,9 @@ async function sessionName(caller: DriveCaller, sessionId: string): Promise<stri
 }
 
 /**
- * Go through one Session's upload folder, counting each copy into `tally`. `finished` is false when
- * the deadline came first (its Session stays at the front of the queue); `clean` when no file failed.
+ * Go through one Session's upload folder, counting each copy into `tally` and each failure into
+ * `failures`. `finished` is false when the deadline came first: its Session stays at the front of the
+ * queue.
  */
 async function copySession(
   caller: DriveCaller,
@@ -203,7 +205,7 @@ async function copySession(
   deadline: number,
   failures: FootageCopyFailure[],
   tally: { copied: number },
-): Promise<{ finished: boolean; clean: boolean }> {
+): Promise<{ finished: boolean }> {
   const target = await sessionFootageFolderTarget(caller, session.sessionId);
   const name = target ? sessionFootageFolderName(target.session) : session.sessionId;
   const fail = (reason: FootageCopyFailureReason, child?: DriveChild) => {
@@ -216,11 +218,15 @@ async function copySession(
     });
   };
 
-  // The archive Session folder: made if missing (with its trip's), never remade when trashed or gone.
+  // The archive Session folder: made if missing (with its trip's), never remade when trashed or gone,
+  // and never made at all for a cancelled Session (it gets no folder it did not already have).
   let archiveId = session.archiveFolderId;
   try {
     if (!archiveId) {
-      if (!target?.perjadin) return { finished: true, clean: true };
+      if (!target?.perjadin || target.status === "cancelled") {
+        fail("folder-missing");
+        return { finished: true };
+      }
       const ensured = await ensureSessionFootageFolder(caller, drive, folders, {
         perjadin: target.perjadin,
         session: target.session,
@@ -230,32 +236,31 @@ async function copySession(
       if (ensured.outcome !== "ok") {
         // `footage-folders-busy` is a race with another maker: the next pass finishes it.
         if (ensured.reason !== "footage-folders-busy") fail(ensured.reason);
-        return { finished: true, clean: false };
+        return { finished: true };
       }
       archiveId = ensured.sessionFolderId;
     } else {
       const archive = await drive.getFile(archiveId);
       if (!archive || archive.trashed) {
         fail(archive ? "folder-trashed" : "folder-missing");
-        return { finished: true, clean: false };
+        return { finished: true };
       }
     }
   } catch (error) {
     fail(failureOf(error));
-    return { finished: true, clean: false };
+    return { finished: true };
   }
 
   // What the archive already holds: copies by their original's id, subfolders by their source's.
   const copiedFrom = new Set<string>();
-  const subfolderFor = new Map<string, string>();
+  const subfolderFor = new Map<string, { id: string; trashed: boolean }>();
   try {
     await readArchive(drive, archiveId, copiedFrom, subfolderFor);
   } catch (error) {
     fail(failureOf(error));
-    return { finished: true, clean: false };
+    return { finished: true };
   }
 
-  let clean = true;
   // Breadth-first through the upload folder, each folder paired with where its copies go.
   const queue: { uploadId: string; archiveId: string }[] = [
     { uploadId: session.uploadFolderId, archiveId },
@@ -267,25 +272,29 @@ async function copySession(
       children = await drive.listChildren(uploadId);
     } catch (error) {
       fail(failureOf(error));
-      clean = false;
       continue;
     }
     for (const child of children) {
-      if (Date.now() > deadline) return { finished: false, clean: false };
+      if (Date.now() > deadline) return { finished: false };
       if (child.trashed || child.mimeType === SHORTCUT_MIME_TYPE) continue;
       try {
         if (child.mimeType === FOLDER_MIME_TYPE) {
-          let sub = subfolderFor.get(child.id);
-          if (!sub) {
-            sub = (
+          const found = subfolderFor.get(child.id);
+          // An archive subfolder in the Drive trash is not remade, and nothing is copied into it.
+          if (found?.trashed) {
+            fail("folder-trashed", child);
+            continue;
+          }
+          const sub =
+            found?.id ??
+            (
               await drive.createFolder({
                 name: child.name,
                 parentId: into,
                 appProperties: { sugtSourceFolderId: child.id, sugtSessionId: session.sessionId },
               })
             ).id;
-            subfolderFor.set(child.id, sub);
-          }
+          subfolderFor.set(child.id, { id: sub, trashed: false });
           queue.push({ uploadId: child.id, archiveId: sub });
         } else if (!copiedFrom.has(child.id)) {
           await drive.copyFile(child.id, {
@@ -300,11 +309,10 @@ async function copySession(
         // A file gone between the list and the copy has nothing left to copy.
         if (isDriveFailure(error) && error.status === 404) continue;
         fail(failureOf(error), child);
-        clean = false;
       }
     }
   }
-  return { finished: true, clean };
+  return { finished: true };
 }
 
 /** Read the archive Session folder, subfolders included, into the two lookups. */
@@ -312,7 +320,7 @@ async function readArchive(
   drive: DriveClient,
   folderId: string,
   copiedFrom: Set<string>,
-  subfolderFor: Map<string, string>,
+  subfolderFor: Map<string, { id: string; trashed: boolean }>,
 ): Promise<void> {
   const queue = [folderId];
   while (queue.length > 0) {
@@ -321,7 +329,7 @@ async function readArchive(
       if (source) copiedFrom.add(source);
       if (child.mimeType === FOLDER_MIME_TYPE) {
         const sourceFolder = child.appProperties.sugtSourceFolderId;
-        if (sourceFolder && !child.trashed) subfolderFor.set(sourceFolder, child.id);
+        if (sourceFolder) subfolderFor.set(sourceFolder, { id: child.id, trashed: child.trashed });
         queue.push(child.id);
       }
     }

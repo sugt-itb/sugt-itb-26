@@ -159,7 +159,6 @@ describe("the check, in order", () => {
       footage: "ok",
       footageUpload: "ok",
       footageCopy: { ran: true, copied: 0, failed: 0, remaining: 0, failures: [] },
-      fullDriveScope: true,
       sweep: {
         ran: true,
         synced: 0,

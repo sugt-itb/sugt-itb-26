@@ -1723,8 +1723,8 @@ never is.
 **The daily copy** (#562, ADR-0063) keeps **no row per file**: each copy in the archive carries its
 original's id in Drive (`appProperties.sugtSourceFileId`), and that is how the next pass knows what
 is done. `session.drive_footage_upload_checked_at` is when the copy last went through a Session's
-whole upload folder with nothing failing — null until then — and the pass takes Sessions in that
-order, never-checked first, so one cut short by its time budget does not starve the same Sessions.
+whole upload folder — failures included, so a file Google keeps refusing cannot hold the queue —
+null until then, and the pass takes Sessions in that order, never-checked first, so one cut short by its time budget does not starve the same Sessions.
 
 ## Money
 
@@ -2556,8 +2556,9 @@ cards (#504). Nothing it reads returns money, a comment, a name or a row.
 
 **The cron is its own arm too** (#562, ADR-0063). The daily Foto & Video copy runs with nobody
 signed in, so it is a `CronCaller`. It reaches only the queries the company Drive's own housekeeping
-uses — the stored credential and token refresh, the footage folder ids and their claims, and the
-copy's lease and checked times — each of which takes `DriveCaller` (`Person | CronCaller`).
+uses — the stored credential and token refresh, the footage folder ids and their claims, a trip's
+folder ids and what they are named from (`perjadinDriveFolder`), and the copy's lease and checked
+times — each of which takes `DriveCaller` (`Person | CronCaller`).
 
 **A person on two overlapping Perjadins.** Genuinely preventable with `btree_gist` and an
 exclusion constraint, and genuinely useful — but it would mean denormalising the date range

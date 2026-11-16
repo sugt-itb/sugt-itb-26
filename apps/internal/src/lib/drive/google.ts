@@ -527,7 +527,7 @@ export function openDrive(accessToken: string): DriveClient {
         const params = new URLSearchParams({
           q: `'${folderId.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}' in parents`,
           fields:
-            "nextPageToken,files(id,name,mimeType,trashed,appProperties,owners(emailAddress))",
+            "nextPageToken,files(id,name,mimeType,trashed,appProperties,shortcutDetails,owners(emailAddress))",
           pageSize: "1000",
           ...(pageToken ? { pageToken } : {}),
         });

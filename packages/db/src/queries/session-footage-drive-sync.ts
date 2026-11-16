@@ -33,7 +33,7 @@ import { requireStaff } from "./staff-only";
  * **Who may call what.** The sweep's bookkeeping on footage rows stays Staff-only. Finding and
  * claiming the **folders** is open to any signed-in Person, a Pimpinan included (#561, ADR-0063):
  * Lihat arsip makes a Session's archive folder on whoever's click, as the company account's own
- * housekeeping. It writes folder ids the app owns, never a Person's record, so the "a Pimpinan writes
+ * housekeeping. The daily copy does the same with no Person at all (`DriveCaller`, #562). It writes folder ids the app owns, never a Person's record, so the "a Pimpinan writes
  * nothing" rule (ADR-0025) is about something else.
  */
 
@@ -197,8 +197,8 @@ export type SessionFootageFolderTarget = {
 /**
  * **One Session, for the Foto & Video and Lihat arsip buttons** (#552, #561): its mode and status,
  * what its folders are named from, and the folder ids of both trees claimed so far. `null` when there
- * is no such Session — a text compare, so a malformed id is simply none. Open to any signed-in Person:
- * opening a folder is a read, and making one is housekeeping.
+ * is no such Session — a text compare, so a malformed id is simply none. Open to any signed-in Person,
+ * and to the daily cron (#562): opening a folder is a read, and making one is housekeeping.
  */
 export async function sessionFootageFolderTarget(
   _caller: DriveCaller,
@@ -248,7 +248,7 @@ export async function sessionFootageFolderTarget(
 
 /**
  * Claim the Perjadin's footage folder in `tree` (the archive unless said); answers whichever id won.
- * Any signed-in Person (#561, ADR-0063).
+ * Any signed-in Person, or the daily cron (#561, #562, ADR-0063).
  */
 export async function claimPerjadinFootageFolder(
   _caller: DriveCaller,
@@ -275,7 +275,7 @@ export async function claimPerjadinFootageFolder(
 
 /**
  * Claim the Session's footage folder in `tree` (the archive unless said); answers whichever id won.
- * Any signed-in Person (#561, ADR-0063).
+ * Any signed-in Person, or the daily cron (#561, #562, ADR-0063).
  */
 export async function claimSessionFootageFolder(
   _caller: DriveCaller,

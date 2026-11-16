@@ -224,18 +224,17 @@ describe("the copy", () => {
     expect(first.ran && first.failures).toEqual([
       {
         sessionId: sessions[0]!.id,
-        sessionName: expect.stringContaining("2026-10-13"),
+        sessionName: expect.stringContaining(`S-${sessions[0]!.id.slice(0, 8)}`),
         fileName: "IMG_0004.JPG",
         uploader: STAFF,
         reason: "storage-full",
       },
     ]);
-    // Not gone through cleanly, so still first in the queue for the next pass.
-    expect((await foldersOf(sessions[0]!.id)).checkedAt).toBeNull();
+    // Gone through all the same, so it cannot hold the queue: it waits its turn like any other.
+    expect((await foldersOf(sessions[0]!.id)).checkedAt).not.toBeNull();
 
     drive.refusedCopies.delete(full);
     await expect(pass()).resolves.toMatchObject({ copied: 1, failed: 0 });
-    expect((await foldersOf(sessions[0]!.id)).checkedAt).not.toBeNull();
   });
 
   it("stops the whole pass at a rate limit, and the next pass carries on", async () => {
@@ -267,6 +266,49 @@ describe("the copy", () => {
       [null, "folder-trashed"],
     ]);
     expect(drive.files.size).toBe(size);
+  });
+
+  it("never makes an archive folder for a cancelled Session that has none", async () => {
+    const { sessions, upload } = await scene();
+    await db
+      .update(schema.session)
+      .set({ status: "cancelled", cancelledReason: "Hujan", driveFootageFolderId: null })
+      .where(eq(schema.session.id, sessions[0]!.id));
+    drive.upload(upload[0]!, { name: "a.jpg", owner: STAFF });
+    const size = drive.files.size;
+
+    const report = await pass();
+
+    expect(report.ran && report.failures.map((f) => [f.sessionId, f.reason])).toEqual([
+      [sessions[0]!.id, "folder-missing"],
+    ]);
+    expect(drive.files.size).toBe(size);
+    expect((await foldersOf(sessions[0]!.id)).archive).toBeNull();
+  });
+
+  it("does not remake an archive subfolder in the trash, nor copy into it", async () => {
+    const { upload, archive } = await scene();
+    const sub = drive.upload(upload[0]!, {
+      name: "Hari 2",
+      owner: STAFF,
+      mimeType: FOLDER_MIME_TYPE,
+    });
+    drive.upload(sub, { name: "a.jpg", owner: STAFF });
+    await pass();
+    const archived = [...drive.files.values()].find(
+      (f) => f.appProperties.sugtSourceFolderId === sub,
+    )!;
+    drive.trash(archived.id);
+    drive.upload(sub, { name: "b.jpg", owner: STAFF });
+    const size = drive.files.size;
+
+    const report = await pass();
+
+    expect(report.ran && report.failures.map((f) => [f.fileName, f.reason])).toEqual([
+      ["Hari 2", "folder-trashed"],
+    ]);
+    expect(drive.files.size).toBe(size);
+    expect(tree(archive[0]!)).toEqual([]);
   });
 
   it("goes through a cancelled Session's upload folder too", async () => {
@@ -377,7 +419,7 @@ describe("the daily cron", () => {
 
 describe("Periksa koneksi", () => {
   it("runs the pass and reports copied, failed and remaining, with each failure's reason", async () => {
-    const { upload } = await scene();
+    const { sessions, upload } = await scene();
     drive.upload(upload[0]!, { name: "a.jpg", owner: STAFF });
     const refused = drive.upload(upload[1]!, { name: "b.jpg", owner: STAFF });
     drive.refusedCopies.set(refused, { status: 403, reason: "storageQuotaExceeded" });
@@ -391,7 +433,9 @@ describe("Periksa koneksi", () => {
     );
     expect(said.failures).toEqual([
       expect.stringMatching(
-        /^2026-10-14 · .* · SMAN 1 Bontang · S-\w{8} · b\.jpg \(budi@gmail\.com\): Penyimpanan Google Drive pengunggah penuh\.$/,
+        new RegExp(
+          `^2026-10-1[34] · .* · SMAN 1 Bontang · S-${sessions[1]!.id.slice(0, 8)} · b\\.jpg \\(budi@gmail\\.com\\): Penyimpanan Google Drive pengunggah penuh\\.$`,
+        ),
       ),
     ]);
   });

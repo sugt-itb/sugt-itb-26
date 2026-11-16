@@ -18,7 +18,7 @@ import { copyFootageToArchive, type FootageCopyReport } from "./copy-footage";
 import { ensureDokumenFolders, ensureFootageFolders } from "./dokumen-folders";
 import { readyFolders, type ReadyFolders } from "./fixed-folders";
 import { sessionFootageFolderName } from "./footage-files";
-import { type DriveClient, grantsFullDrive, isDriveFailure, openDrive } from "./google";
+import { type DriveClient, isDriveFailure, openDrive } from "./google";
 import { reconcileTransaction, type UnsyncedReason } from "./reconcile";
 import { type DocumentUnsyncedReason, reconcileDocument } from "./reconcile-document";
 import { type FootageUnsyncedReason, reconcileFootage } from "./reconcile-footage";
@@ -351,8 +351,6 @@ export type DriveCheckReport =
        * usable (`skipped`), the full `drive` scope missing, or another pass under way.
        */
       footageCopy: FootageCopyReport | { ran: false; reason: "skipped" };
-      /** Whether the token carries the full `drive` scope (#562); without it, reconnect. */
-      fullDriveScope: boolean;
     };
 
 /**
@@ -479,7 +477,6 @@ export async function checkDriveConnection(person: Person): Promise<DriveCheckRe
       sweep,
       names,
       footageCopy,
-      fullDriveScope: grantsFullDrive(token.scope),
     };
   } catch (error) {
     if (isDriveFailure(error)) return { token: "unreachable" };

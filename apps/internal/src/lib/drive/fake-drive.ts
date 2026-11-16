@@ -22,7 +22,7 @@ import {
  *   refused with a 400, as Drive refuses it.
  * - **Every item has an owner** (#562): what the app makes, a copy included, is the company account's
  *   (`COMPANY_ACCOUNT`); `upload` puts a file there as a Staff member, owned by them. A copy a test
- *   makes Drive refuse (`refuseCopy`) fails with Google's own reason.
+ *   makes Drive refuse (`refusedCopies`) fails with Google's own reason.
  *
  * Later tickets extend it rather than mocking Drive ad hoc. `calls` counts every operation, so a
  * test can assert that a refused write reached Drive **zero** times.
@@ -279,11 +279,6 @@ export class FakeDrive implements DriveClient {
       owner,
       mimeType: SHORTCUT_MIME_TYPE,
     });
-  }
-
-  /** Whose a stored item is. */
-  ownerOf(id: string): string {
-    return this.require("ownerOf", id).owner;
   }
 
   /** Move to the Drive trash, as a person would. Children follow. */

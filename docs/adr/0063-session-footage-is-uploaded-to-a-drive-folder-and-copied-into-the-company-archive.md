@@ -94,9 +94,9 @@ _Added 2026-11-16 by [#562](https://github.com/sugt-itb/sugt-itb-26/issues/562).
   version) is not re-copied either**: the archive keeps the version that was there at the first copy.
 - **Bounded and resumable.** One pass stops after 40 seconds, inside the 60-second `maxDuration` its
   routes declare (Vercel Hobby). Sessions are taken oldest-checked first, never-checked before all
-  (`session.drive_footage_upload_checked_at`). A Session goes to the back of the queue only once its
-  whole folder was gone through with no file failing, so a refused file is tried again on the next
-  pass. A rate limit, or Google refusing the token, stops the pass; any other failure stops only that
+  (`session.drive_footage_upload_checked_at`). A Session goes to the back of the queue once its whole
+  folder has been gone through, failures included, so a file Google keeps refusing never starves the
+  Sessions behind it; the refused file is tried again when its Session next comes round. A rate limit, or Google refusing the token, stops the pass; any other failure stops only that
   file and is reported with a reason a person can act on, such as "Penyimpanan Google Drive pengunggah
   penuh".
 - **One pass at a time, by a lease.** `drive_connection.footage_copy_lease_until` is claimed by

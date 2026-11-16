@@ -16,7 +16,7 @@ import type { Grant, Role } from "@sugt/domain";
  * | `UnifiedDashboardCaller` | the company's Unified Dashboard, with a verified JWT    | the Programme summary; no money | nothing                     |
  * | `ParticipantToken`       | a live Session feedback token                           | nothing                         | `participant_feedback` only |
  * | `PerjadinToken`          | a live Perjadin feedback token                          | nothing                         | `perjadin_evaluation` only  |
- * | `CronCaller`             | Vercel Cron, holding `CRON_SECRET`                      | the company Drive's bookkeeping | the same, nothing a person entered |
+ * | `CronCaller`             | Vercel Cron, holding `CRON_SECRET`                      | the company Drive's bookkeeping | the same; nothing else      |
  *
  * See `docs/data-model.md`, *what the database does not hold*.
  */

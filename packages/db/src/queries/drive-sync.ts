@@ -65,7 +65,8 @@ function selectPerjadinDriveFolders() {
 /**
  * What renaming a Perjadin's Drive folder reads (#376) — after a date correction, and again in the
  * reconcile, fresh, just before it re-asserts the name. `null` when there is no such trip. Open to
- * any signed-in Person: Lihat arsip re-asserts the name on anyone's click (#561).
+ * any signed-in Person — Lihat arsip re-asserts the name on anyone's click (#561) — and to the daily
+ * cron, which does the same when it makes an archive folder (#562).
  */
 export async function perjadinDriveFolder(
   _caller: DriveCaller,
