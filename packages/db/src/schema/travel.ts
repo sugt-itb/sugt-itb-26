@@ -497,9 +497,10 @@ export const activityLog = pgTable(
  * - an **SPPD** (#441) is one School's Surat Perintah Perjalanan Dinas for this trip: a School and
  *   nothing else, not even a date.
  *
- * **The School must be one of the trip's Schools** — held by the application
- * (`recordPerjadinDocument`), not here, for the reason offline Sessions give: Sub-Clusters are
- * editable, so a foreign key into the grouping would forbid regrouping (ADR-0016).
+ * **The School had to be one of the trip's Schools** — held by the application when a document was
+ * recorded, not here, for the reason offline Sessions give: Sub-Clusters are editable, so a foreign
+ * key into the grouping would forbid regrouping (ADR-0016). **Nothing records or deletes one any
+ * more** (ADR-0061, #559): the rows already here stay, read-only, and their Drive sync still runs.
  *
  * `id` is generated before the insert, because the file's name carries it (`D-{doc8}`). There is no
  * duplicate rule for the three attendance kinds: two sheets of one kind and date are allowed, and
@@ -556,7 +557,7 @@ export const perjadinDocument = pgTable(
       sql`${t.kind} <> 'SPPD' or (${t.schoolId} is not null and ${t.documentDate} is null and ${t.participantType} is null and ${t.startsAt} is null and ${t.endsAt} is null)`,
     ),
     check("perjadin_document_times_check", sql`${t.endsAt} > ${t.startsAt}`),
-    // The dialog lists a trip's documents; Postgres does not index the FK on its own (#270).
+    // `/perjadin/[id]` lists a trip's documents; Postgres does not index the FK on its own (#270).
     index("perjadin_document_perjadin_id_idx").on(t.perjadinId),
     // At most one SPPD per School on one Perjadin (#441); another Perjadin's does not count.
     uniqueIndex("perjadin_document_sppd_unique")

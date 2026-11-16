@@ -13,8 +13,8 @@ import {
 } from "./upload-messages";
 
 /**
- * **The two guards every upload to Drive shares** (ADR-0040, ADR-0042) — receipts and Perjadin
- * Documents alike — kept here so the two sets of Server Actions cannot drift apart.
+ * **The two guards every upload to Drive shares** (ADR-0040, ADR-0046) — receipts and Session
+ * Footage alike — kept here so the two sets of Server Actions cannot drift apart.
  */
 
 /**
@@ -55,8 +55,8 @@ export async function driveRefusal(
  * **Is this the file the browser said it uploaded, for this Perjadin?** The first half of verifying
  * any upload before it is recorded — the server never saw the bytes. It must sit in `_staging`,
  * untrashed, carry this Perjadin's `sugtPerjadinId`, and be no larger than the cap by Drive's own
- * count. What its first bytes must be is the caller's to sniff: a receipt's four types, or a PDF.
- * `maxBytes` is the cap: the receipts' and documents' by default; Session Footage passes the largest
+ * count. What its first bytes must be is the caller's to sniff: a receipt's four types, or a
+ * footage kind. `maxBytes` is the cap: the receipts' by default; Session Footage passes the largest
  * of its kinds, and checks the sniffed kind's own cap after.
  */
 export function isStagedUploadFor(

@@ -37,3 +37,10 @@ once in the tool and exports the acquittal. It also amends
 - **The one-to-five receipt rule now has one write to hold it.** `attachTransactionEvidence` still
   refuses a sixth receipt. Nothing refuses a line with none, because nothing creates a line.
 - **Drive stays connected.** It still serves Unggah bukti, Dokumen and Foto & Video.
+
+## Amendment (2026-11-16): Drive no longer serves Dokumen
+
+Drive no longer serves Dokumen uploads
+([ADR-0061](./0061-trip-paperwork-is-not-filed-in-the-app.md),
+[#559](https://github.com/sugt-itb/sugt-itb-26/issues/559)). It still serves Unggah bukti and Foto &
+Video, and finishes the sync of documents already recorded.

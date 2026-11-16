@@ -22,7 +22,9 @@ import type { DriveClient } from "./google";
  * ```
  *
  * **Ensured wherever a document or footage needs them** — a connect, Periksa koneksi, and the
- * reconciles — so a connection made before them gets them without reconnecting. One rule for both
+ * reconciles — so a connection made before them gets them without reconnecting. No new document is
+ * uploaded (ADR-0061), but `Dokumen/` is still ensured, so one recorded before that and left
+ * unsynced can still be finished by the sweep. One rule for both
  * trees (`ensureTree`), each with its own two stored ids and its own claim. They are kept out of
  * `ensureFixedFolders`' readiness on purpose: a receipt never waits on them.
  *

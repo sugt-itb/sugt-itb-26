@@ -1,6 +1,6 @@
 /**
- * **The sentences an upload control says when Drive cannot take an upload** (ADR-0040, ADR-0042) —
- * a row's Unggah bukti or the Dokumen dialog — in one place, because the page's gate
+ * **The sentences an upload control says when Drive cannot take an upload** (ADR-0040, ADR-0046) —
+ * a row's Unggah bukti or the Foto & Video dialog — in one place, because the page's gate
  * (`upload-gate.ts`, on the server) and the dialogs' refusals (in the browser) say them both. Plain
  * strings and types, nothing server-only, so the client can import it.
  */

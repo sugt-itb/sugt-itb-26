@@ -1,6 +1,6 @@
 /**
  * **Sending one large file to a Drive resumable session in pieces** (#424, ADR-0046) — for Session
- * Footage only; receipts and Dokumen still go in one `PUT` (`putToDriveSession`). A 1 GB video sent in
+ * Footage only; receipts still go in one `PUT` (`putToDriveSession`). A 1 GB video sent in
  * one request over a phone's connection fails often and restarts from zero; in pieces, a drop costs
  * one piece at most.
  *

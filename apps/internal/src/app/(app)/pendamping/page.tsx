@@ -18,8 +18,8 @@ export const metadata: Metadata = { title: "Pendamping" };
 /**
  * **Pendamping** — a Staff member's own trips, and nothing else (#396): a one-line greeting,
  * **Perjalanan Dinas Anda** (the trips not yet over) and **Perjalanan Dinas Sebelumnya** (the ones
- * that are). A past trip keeps every action, because the transactions and the attendance sheets are
- * often finished after it. The cards carry no Laporan line (#419); the Laporan is reached through Edit.
+ * that are). A past trip keeps every action, because its photos and videos are often uploaded after
+ * it. The cards carry no Laporan line (#419); the Laporan is reached through Edit.
  *
  * **"Pendamping" here is a route/label and collides in name only** with the Perjadin role label
  * (`PERJADIN_ROLE_LABELS.Staff` → "Pendamping"): this is the Staff landing screen, not that trip role.
@@ -44,7 +44,7 @@ export default async function Page({ searchParams }: PageProps<"/pendamping">) {
   const params = hasGrant(person, "Perjadin Editor") ? await searchParams : null;
   const tab: PendampingTab = params?.tab === "lain" ? "lain" : "anda";
 
-  // Each trip card's Dokumen is closed, with the reason, while Drive is (ADR-0040). Always
+  // Each Session's Foto & Video upload is closed, with the reason, while Drive is (ADR-0040). Always
   // the viewer's gate, on Pendamping Lain too: the viewer is who uploads.
   if (params === null || tab === "anda") {
     const [trips, gate] = await Promise.all([myPerjadin(person), uploadGate(person)]);
@@ -150,7 +150,7 @@ function PendampingTrips({
       />
       <MyPerjadinSection
         title="Perjalanan Dinas Sebelumnya"
-        description="Perjalanan yang sudah selesai, yang terbaru di atas. Dokumennya masih bisa dikerjakan."
+        description="Perjalanan yang sudah selesai, yang terbaru di atas."
         trips={trips.previous}
         uploadGate={gate}
         canWrite={canWrite}

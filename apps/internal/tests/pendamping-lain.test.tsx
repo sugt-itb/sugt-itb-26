@@ -11,7 +11,7 @@ import {
   pendampingOptions,
   pendampingPerjadin,
   perjadinDetail,
-  recordPerjadinDocument,
+  recordSessionFootage,
   togglePreparationItem,
   type Person,
 } from "@sugt/db/queries";
@@ -330,7 +330,7 @@ describe("the page", () => {
 
 describe("a write on Pendamping Lain is the viewer's", () => {
   it.each(["sari", "budi"] as const)(
-    "ticks Persiapan, marks a Session delivered and uploads a Dokumen, logged under %s, who is not in the Group",
+    "ticks Persiapan, marks a Session delivered and records its Foto & Video, logged under %s, who is not in the Group",
     async (name) => {
       const who = await people();
       const viewer = who[name];
@@ -350,19 +350,19 @@ describe("a write on Pendamping Lain is the viewer's", () => {
       });
 
       await expect(
-        recordPerjadinDocument(viewer, {
-          perjadinId: a.id,
-          documentId: randomUUID(),
+        recordSessionFootage(viewer, {
+          footageId: randomUUID(),
+          sessionId: a.sessionId,
+          contentType: "image/jpeg",
+          originalFilename: "kelas.jpg",
           driveFileId: randomUUID(),
-          byteSize: 2048,
-          kind: "Daftar Hadir Pendamping",
-          documentDate: daysFromToday(7),
+          byteSize: 4096,
         }),
-      ).resolves.toEqual({ outcome: "recorded" });
+      ).resolves.toMatchObject({ outcome: "recorded" });
       const entries = await db
         .select()
         .from(schema.activityLog)
-        .where(eq(schema.activityLog.action, "document_uploaded"));
+        .where(eq(schema.activityLog.action, "footage_uploaded"));
       expect(entries.map((entry) => entry.actorPersonId)).toEqual([viewer.id]);
     },
   );

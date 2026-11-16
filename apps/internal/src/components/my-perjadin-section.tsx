@@ -2,7 +2,6 @@
 
 import { FeedbackTokenDialog } from "-/components/feedback-token";
 import { FotoVideoDialog } from "-/components/foto-video-dialog";
-import { PerjadinDokumenDialog } from "-/components/perjadin-dokumen-dialog";
 import { PerjadinFeedbackTokenDialog } from "-/components/perjadin-feedback-token";
 import { SessionMarkDeliveredDialog } from "-/components/perjadin-mark-delivered";
 import { PerjadinPreparationDialog } from "-/components/perjadin-preparation";
@@ -61,8 +60,8 @@ function MyPerjadinSection({
   /**
    * **Whether the viewer writes these trips** (ADR-0048), computed from the viewer and not from whose
    * trips they are. On a person's own `/pendamping` it is always true — every trip listed is one
-   * whose Group they are in. Without it, every write control on the cards is absent: Dokumen,
-   * Tandai, the Persiapan boxes and Foto & Video's upload and Hapus.
+   * whose Group they are in. Without it, every write control on the cards is absent: Tandai, the
+   * Persiapan boxes and Foto & Video's upload and Hapus.
    */
   canWrite: boolean;
 }) {
@@ -142,6 +141,7 @@ function TripCard({
   // ticked, amber part-way, emerald once every item is done — so the two screens read the pill the
   // same way. This one stays a button (the checklist opens from it).
   const preparationTone = progressTone(preparationDone, preparationTotal);
+  const timeline = tripTimeline(trip);
 
   return (
     <AccordionItem
@@ -200,24 +200,8 @@ function TripCard({
             <TripMoney spentIdr={trip.spentIdr} />
 
             {/* A full-width two-column grid on a phone, each button stretched to its cell. An odd
-                last button takes the whole row, so three buttons leave no gap beside it. */}
+                last button takes the whole row, so it never leaves a gap beside it. */}
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap [&>:last-child:nth-child(odd)]:col-span-2">
-              {canWrite && (
-                <PerjadinDokumenDialog
-                  perjadinId={trip.id}
-                  name={perjadinName(trip)}
-                  uploadGate={uploadGate}
-                  trigger={
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="rounded-full"
-                    >
-                      Dokumen
-                    </Button>
-                  }
-                />
-              )}
               <PerjadinFeedbackTokenDialog
                 perjadinId={trip.id}
                 trigger={
@@ -238,13 +222,15 @@ function TripCard({
                 Edit
               </LinkButton>
             </div>
-            {/* Said as text, not only as the disabled button's title: a title never shows on touch. */}
-            {canWrite && !uploadGate.open && (
+            {/* Why Foto & Video's upload, on the timeline below, is closed while Drive is (ADR-0040) —
+                said on the card too, so it shows before any dialog is opened. A card with no Session
+                has no Foto & Video, so nothing for it to explain. */}
+            {canWrite && !uploadGate.open && timeline.length > 0 && (
               <p className="-mt-2 text-xs text-muted-foreground">{uploadGate.reason}</p>
             )}
 
             <TripTimeline
-              nodes={tripTimeline(trip)}
+              nodes={timeline}
               uploadGate={uploadGate}
               canWrite={canWrite}
             />

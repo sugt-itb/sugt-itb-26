@@ -11,8 +11,7 @@ import { MAX_FOOTAGE_BYTES, type SessionFootageKind } from "@sugt/domain";
 
 /**
  * **What the Foto & Video popup says and checks** (#425, ADR-0046) — plain functions, kept apart from
- * the components so the rules and the copy are tested without a DOM, as `perjadin-dokumen-form.ts`
- * is for Dokumen.
+ * the components so the rules and the copy are tested without a DOM, as `table-sort.ts` is.
  */
 
 /** At most this many files in one Unggah: a batch is sent one file at a time, and this bounds it. */

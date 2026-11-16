@@ -2,8 +2,8 @@ import { type DriveClient, DriveRequestError } from "./google";
 
 /**
  * **Move a file to the Drive trash, unless it is there already or gone** — both count as done, so a
- * Hapus that failed after this step can simply be pressed again (ADR-0042). Shared by the Dokumen, the
- * Foto & Video and the receipt Hapus.
+ * Hapus that failed after this step can simply be pressed again (ADR-0042). Shared by the Foto & Video
+ * and the receipt Hapus; Dokumen's is gone (ADR-0061).
  */
 export async function trashIfLive(drive: DriveClient, driveFileId: string): Promise<void> {
   const file = await drive.getFile(driveFileId);

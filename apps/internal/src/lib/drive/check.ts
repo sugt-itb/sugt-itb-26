@@ -320,7 +320,8 @@ export type DriveCheckReport =
  *    on either — inherited or direct — means the folder has been moved under a link-shared folder, or
  *    shared by hand, and files nobody should see can be opened by link.
  * 4. **The Dokumen and Foto & Video folders** (`ensureDokumenFolders`, `ensureFootageFolders`), made
- *    if missing, when the tree is usable.
+ *    if missing, when the tree is usable. Dokumen takes no new upload (ADR-0061), but a document
+ *    recorded before that and left unsynced still needs its folders to be finished.
  * 5. **The sweep** (`sweepUnsynced`), only when the tree is usable; otherwise how much waits.
  * 6. **The folder names** (`reassertPerjadinFolderNames`, #407), only when the tree is usable, within
  *    what the sweep left of `SWEEP_BUDGET_MS`. This is how folders made before ADR-0044 take the new

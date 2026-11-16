@@ -17,8 +17,10 @@ import { reassertPerjadinFolderName } from "./reconcile";
 /**
  * **The document reconcile** (ADR-0042, #397): put one recorded Perjadin Document in its place in
  * the company Drive, and say when it is done. Idempotent — run it again and it does only what is
- * still owed — and tracked by `perjadin_document.drive_synced_at`. It runs inline after an upload
- * is recorded, and Periksa koneksi's sweep and a reconnect re-run it.
+ * still owed — and tracked by `perjadin_document.drive_synced_at`. It used to run inline after an
+ * upload was recorded; nothing uploads a document any more (ADR-0061, #559), so now only Periksa
+ * koneksi's sweep and a reconnect run it, to finish a document recorded before that and left
+ * unsynced.
  *
  * In order:
  * 1. **The fixed Dokumen folders** (`ensureDokumenFolders`), made if a connection predates them.
