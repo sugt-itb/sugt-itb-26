@@ -3,6 +3,7 @@ import {
   claimFootageFolder,
   dokumenFolderIds,
   footageFolderIds,
+  type FootageTree,
   type Person,
 } from "@sugt/db/queries";
 
@@ -10,15 +11,16 @@ import { PELAKSANAAN_OFFLINE_FOLDER_NAME } from "./fixed-folders";
 import type { DriveClient } from "./google";
 
 /**
- * **`Dokumen/` and `Foto & Video/`, each with its `Pelaksanaan Offline/`** (ADR-0042, ADR-0046), the
- * fixed part of the documents' and the Session Footage's trees, under the root beside
- * `Bukti Transaksi/`:
+ * **`Dokumen/`, `Foto & Video/` and `Foto & Video — Unggahan/`, each with its `Pelaksanaan Offline/`**
+ * (ADR-0042, ADR-0046, ADR-0063), the fixed part of the documents', the Session Footage archive's and
+ * the footage upload tree's, under the root beside `Bukti Transaksi/`:
  *
  * ```
  * SUGT ITB 2026 Internal App Object Storage/
  * ├── Bukti Transaksi/Pelaksanaan Offline/
  * ├── Dokumen/Pelaksanaan Offline/
- * └── Foto & Video/Pelaksanaan Offline/
+ * ├── Foto & Video/Pelaksanaan Offline/
+ * └── Foto & Video — Unggahan/Pelaksanaan Offline/
  * ```
  *
  * **Ensured wherever a document or footage needs them** — a connect, Periksa koneksi, and the
@@ -37,6 +39,7 @@ import type { DriveClient } from "./google";
 
 export const DOKUMEN_FOLDER_NAME = "Dokumen";
 export const FOOTAGE_FOLDER_NAME = "Foto & Video";
+export const FOOTAGE_UPLOAD_FOLDER_NAME = "Foto & Video — Unggahan";
 
 /** One tree's two fixed folders, as ensured. */
 export type EnsuredTreeFolders = {
@@ -137,25 +140,30 @@ export async function ensureDokumenFolders(
   return { dokumenFolderId: treeFolderId, ...rest };
 }
 
-/** `Foto & Video/` and its `Pelaksanaan Offline/` (ADR-0046). */
+/**
+ * `Foto & Video/` and its `Pelaksanaan Offline/` (ADR-0046) — the archive — or, with `tree: "upload"`,
+ * `Foto & Video — Unggahan/` and its `Pelaksanaan Offline/` (#561, ADR-0063).
+ */
 export async function ensureFootageFolders(
   person: Person,
   drive: DriveClient,
   rootFolderId: string,
+  tree: FootageTree = "archive",
 ): Promise<EnsuredTreeFolders | null> {
   return ensureTree(drive, rootFolderId, {
-    name: FOOTAGE_FOLDER_NAME,
+    name: tree === "archive" ? FOOTAGE_FOLDER_NAME : FOOTAGE_UPLOAD_FOLDER_NAME,
     read: async () => {
-      const ids = await footageFolderIds(person);
+      const ids = await footageFolderIds(person, tree);
       return {
         treeFolderId: ids?.footageFolderId ?? null,
         pelaksanaanOfflineFolderId: ids?.footagePelaksanaanOfflineFolderId ?? null,
       };
     },
     claimTree: (expected, next) =>
-      claimFootageFolder(person, { folder: "footageFolderId", expected, next }),
+      claimFootageFolder(person, { tree, folder: "footageFolderId", expected, next }),
     claimPelaksanaan: (expected, next, parentId) =>
       claimFootageFolder(person, {
+        tree,
         folder: "footagePelaksanaanOfflineFolderId",
         expected,
         next,

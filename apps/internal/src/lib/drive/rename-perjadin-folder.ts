@@ -6,8 +6,8 @@ import { openDrive } from "./google";
 
 /**
  * **Rename a Perjadin's Drive folders after its name changed** (#376, #407, ADR-0040), so the company
- * Drive shows `perjadinFolderName` (ADR-0044) — its receipts folder and, once it has one, its Dokumen
- * folder (ADR-0042). Called when either of the trip's dates is corrected, and when a Session write
+ * Drive shows `perjadinFolderName` (ADR-0044) — its receipts folder and, once it has them, its Dokumen
+ * folder (ADR-0042), its Foto & Video folder (ADR-0046) and its upload folder (#561). Called when either of the trip's dates is corrected, and when a Session write
  * changes the trip's Schools: a Session added at a School not yet on it, one moved to another
  * School, or a School's last live Session cancelled. File names carry neither, so nothing else moves.
  * A Sub-Cluster rename calls nothing: the next reconcile on each trip, or Periksa koneksi, re-asserts
@@ -24,12 +24,13 @@ import { openDrive } from "./google";
 export async function renamePerjadinFolder(person: Person, perjadinId: string): Promise<void> {
   try {
     const trip = await perjadinDriveFolder(person, perjadinId);
-    // The receipts folder, the Dokumen folder (ADR-0042) and the Foto & Video folder (ADR-0046)
-    // carry the same name.
+    // The receipts folder, the Dokumen folder (ADR-0042), the Foto & Video folder (ADR-0046) and its
+    // upload folder (#561) carry the same name.
     const folderIds = [
       trip?.driveFolderId,
       trip?.driveDokumenFolderId,
       trip?.driveFootageFolderId,
+      trip?.driveFootageUploadFolderId,
     ].filter((id): id is string => Boolean(id));
     if (!trip || folderIds.length === 0) return;
 

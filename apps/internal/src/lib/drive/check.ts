@@ -4,6 +4,7 @@ import {
   perjadinDriveFolders,
   recordDriveFolders,
   sessionFootageFolders,
+  sessionFootageUploadFolders,
   unsyncedDocuments,
   unsyncedFootage,
   unsyncedTransactions,
@@ -20,7 +21,10 @@ import { type DriveClient, isDriveFailure, openDrive } from "./google";
 import { reconcileTransaction, type UnsyncedReason } from "./reconcile";
 import { type DocumentUnsyncedReason, reconcileDocument } from "./reconcile-document";
 import { type FootageUnsyncedReason, reconcileFootage } from "./reconcile-footage";
-import { reassertSessionFootageNames } from "./rename-session-footage";
+import {
+  reassertSessionFootageNames,
+  reassertSessionUploadFolderName,
+} from "./rename-session-footage";
 
 /**
  * **Periksa koneksi** (ADR-0040, #375): whether the company Drive connection works, whether its tree
@@ -172,7 +176,13 @@ export type FolderNameFailure = {
   /** The name it should carry — the one Periksa koneksi tells the Administrator about. */
   name: string;
   /** A Perjadin's three folders, then a Session's footage folder (ADR-0046) with its files. */
-  folder: "bukti-transaksi" | "dokumen" | "foto-video" | "sesi-foto-video";
+  folder:
+    | "bukti-transaksi"
+    | "dokumen"
+    | "foto-video"
+    | "sesi-foto-video"
+    | "foto-video-unggah"
+    | "sesi-foto-video-unggah";
   reason: "folder-trashed" | "folder-missing" | "drive-failed";
 };
 
@@ -185,8 +195,10 @@ export type FolderNameReport = {
 
 /**
  * **Re-assert every Perjadin folder's name** (#407): the Drive folders of every Perjadin that has
- * one, receipts then Dokumen then Foto & Video, in trip-id order — and then every Session's footage
- * folder and its files (ADR-0046), named for the Session's date, time and School. A Perjadin folder is
+ * one, receipts then Dokumen then Foto & Video then its upload folder (#561), in trip-id order — then
+ * every Session's footage folder and its files (ADR-0046), named for the Session's date, time and
+ * School, and last every Session's upload folder, the folder alone (its files are Staff-owned and
+ * never renamed). A Perjadin folder is
  * read and renamed only when its name is not `perjadinFolderName` — an out-of-date one from before
  * ADR-0044, a Sub-Cluster renamed since, or a rename after a write that did not happen — and a Session
  * folder only when it is not `sessionFootageFolderName`, its files renamed first
@@ -209,6 +221,7 @@ export async function reassertPerjadinFolderNames(
       ["bukti-transaksi", trip.driveFolderId],
       ["dokumen", trip.driveDokumenFolderId],
       ["foto-video", trip.driveFootageFolderId],
+      ["foto-video-unggah", trip.driveFootageUploadFolderId],
     ] as const;
     return owned.flatMap(([folder, id]) =>
       id ? [{ perjadinId: trip.naming.id, folder, id, name }] : [],
@@ -261,9 +274,34 @@ export async function reassertPerjadinFolderNames(
     }
   }
 
+  // The upload tree's Session folders (#561): the folder only, never the Staff-owned files in it.
+  const uploads = await sessionFootageUploadFolders(person);
+  let uploadsChecked = 0;
+  for (const upload of uploads) {
+    if (renamed >= limit || Date.now() - startedAt > budgetMs) break;
+    uploadsChecked += 1;
+    const failure = {
+      perjadinId: upload.perjadinId,
+      name: sessionFootageFolderName(upload.naming),
+      folder: "sesi-foto-video-unggah" as const,
+    };
+    try {
+      const named = await reassertSessionUploadFolderName(drive, upload);
+      renamed += named.renamed;
+      if (named.problem) failures.push({ ...failure, reason: named.problem });
+    } catch (error) {
+      if (!isDriveFailure(error)) throw error;
+      failures.push({ ...failure, reason: "drive-failed" });
+    }
+  }
+
   return {
     renamed,
-    remaining: folders.length - checked + (sessions.length - sessionsChecked),
+    remaining:
+      folders.length -
+      checked +
+      (sessions.length - sessionsChecked) +
+      (uploads.length - uploadsChecked),
     failures,
   };
 }
@@ -299,6 +337,8 @@ export type DriveCheckReport =
       dokumen: "ok" | "created" | "busy" | "skipped";
       /** `Foto & Video/` and its `Pelaksanaan Offline/` (ADR-0046), the same way. */
       footage: "ok" | "created" | "busy" | "skipped";
+      /** `Foto & Video — Unggahan/` and its `Pelaksanaan Offline/` (#561, ADR-0063), the same way. */
+      footageUpload: "ok" | "created" | "busy" | "skipped";
       /** The sweep — or, when the tree is not usable and it did not run, how much waits. */
       sweep:
         | ({ ran: true } & SweepReport)
@@ -319,8 +359,8 @@ export type DriveCheckReport =
  * 3. **The safety check**: `permissions.list` on the root and on `_staging`. An `anyone` permission
  *    on either — inherited or direct — means the folder has been moved under a link-shared folder, or
  *    shared by hand, and files nobody should see can be opened by link.
- * 4. **The Dokumen and Foto & Video folders** (`ensureDokumenFolders`, `ensureFootageFolders`), made
- *    if missing, when the tree is usable. Dokumen takes no new upload (ADR-0061), but a document
+ * 4. **The Dokumen, Foto & Video and Foto & Video — Unggahan folders** (`ensureDokumenFolders`,
+ *    `ensureFootageFolders` for each footage tree), made if missing, when the tree is usable. Dokumen takes no new upload (ADR-0061), but a document
  *    recorded before that and left unsynced still needs its folders to be finished.
  * 5. **The sweep** (`sweepUnsynced`), only when the tree is usable; otherwise how much waits.
  * 6. **The folder names** (`reassertPerjadinFolderNames`, #407), only when the tree is usable, within
@@ -385,6 +425,16 @@ export async function checkDriveConnection(person: Person): Promise<DriveCheckRe
         : ensuredFootage.created
           ? ("created" as const)
           : ("ok" as const);
+    const ensuredUpload = ready
+      ? await ensureFootageFolders(person, drive, ready.rootFolderId, "upload")
+      : null;
+    const footageUpload = !ready
+      ? ("skipped" as const)
+      : !ensuredUpload
+        ? ("busy" as const)
+        : ensuredUpload.created
+          ? ("created" as const)
+          : ("ok" as const);
     const sweptFrom = Date.now();
     const sweep = ready
       ? { ran: true as const, ...(await sweepUnsynced(person, drive, ready)) }
@@ -402,7 +452,7 @@ export async function checkDriveConnection(person: Person): Promise<DriveCheckRe
           })),
         }
       : { ran: false as const };
-    return { token: "ok", folders, exposed, dokumen, footage, sweep, names };
+    return { token: "ok", folders, exposed, dokumen, footage, footageUpload, sweep, names };
   } catch (error) {
     if (isDriveFailure(error)) return { token: "unreachable" };
     throw error;

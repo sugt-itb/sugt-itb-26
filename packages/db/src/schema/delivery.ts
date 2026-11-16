@@ -87,6 +87,9 @@ export const session = pgTable(
     // The Session's own folder under its Perjadin's `Foto & Video/` folder (ADR-0046), claimed by
     // compare-and-set the first time its footage is reconciled. Only an offline Session ever has one.
     driveFootageFolderId: text("drive_footage_folder_id"),
+    // The Session's folder in its Perjadin's upload folder (#561, ADR-0063): what Foto & Video opens.
+    // Named as the archive folder above, claimed the same way. Only an offline Session has one.
+    driveFootageUploadFolderId: text("drive_footage_upload_folder_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -252,8 +255,10 @@ export const sessionPimpinan = pgTable(
  * follows from the type the server sniffed, and the size is Drive's: both CHECKs below hold what
  * the upload already checked, so no write path can store a 2 GB "photo".
  *
- * **Offline only, and not cancelled at upload time**, are the application's rules
- * (`recordSessionFootage`); footage of a Session cancelled later stays. The foreign key to `session`
+ * **Offline only, and not cancelled at upload time**, were the upload's rules; footage of a Session
+ * cancelled later stays. **Nothing writes new rows since #561 (ADR-0063)**: Staff put footage
+ * into the Session's upload folder in Drive, which the app cannot see. The table, its rows and its
+ * CHECKs are kept for what is still read — the sweep, the renames and the old Log entries. The foreign key to `session`
  * has no cascade: offline Sessions are only ever cancelled, never deleted, and a delete that would
  * orphan Drive files is refused rather than followed.
  *
@@ -286,7 +291,7 @@ export const sessionFootage = pgTable(
       "session_footage_content_type_check",
       sql`(${t.kind} = 'foto' and ${t.contentType} in ('image/jpeg', 'image/png', 'image/heic', 'image/webp')) or (${t.kind} = 'video' and ${t.contentType} in ('video/mp4', 'video/quicktime'))`,
     ),
-    // `MAX_FOOTAGE_PHOTO_BYTES` and `MAX_FOOTAGE_VIDEO_BYTES`, as literals.
+    // The 50 MiB photo and 1000 MiB video caps the upload held (#424), as literals.
     check(
       "session_footage_byte_size_check",
       sql`${t.byteSize} > 0 and ${t.byteSize} <= case ${t.kind} when 'foto' then 52428800 else 1048576000 end`,

@@ -75,6 +75,8 @@ const PERJADIN_FOLDER_LABELS: Record<FolderNameFailure["folder"], string> = {
   dokumen: "Dokumen",
   "foto-video": "Foto & Video",
   "sesi-foto-video": "Foto & Video Sesi",
+  "foto-video-unggah": "Foto & Video — Unggahan",
+  "sesi-foto-video-unggah": "Foto & Video — Unggahan Sesi",
 };
 
 const DOKUMEN_LINES: Record<"ok" | "created" | "busy", string> = {
@@ -87,6 +89,12 @@ const FOOTAGE_LINES: Record<"ok" | "created" | "busy", string> = {
   ok: "Folder Foto & Video: ada.",
   created: "Folder Foto & Video: dibuat.",
   busy: "Folder Foto & Video: sedang disiapkan proses lain — periksa lagi.",
+};
+
+const FOOTAGE_UPLOAD_LINES: Record<"ok" | "created" | "busy", string> = {
+  ok: "Folder Foto & Video — Unggahan: ada.",
+  created: "Folder Foto & Video — Unggahan: dibuat.",
+  busy: "Folder Foto & Video — Unggahan: sedang disiapkan proses lain — periksa lagi.",
 };
 
 /** The prominent warning when a link-shared folder reaches the root or `_staging`. */
@@ -137,6 +145,7 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
         ),
         ...(report.dokumen === "skipped" ? [] : [DOKUMEN_LINES[report.dokumen]]),
         ...(report.footage === "skipped" ? [] : [FOOTAGE_LINES[report.footage]]),
+        ...(report.footageUpload === "skipped" ? [] : [FOOTAGE_UPLOAD_LINES[report.footageUpload]]),
         ...(sweep.ran
           ? [
               `${sweep.synced} transaksi disinkronkan, ${sweep.waiting} masih menunggu.`,

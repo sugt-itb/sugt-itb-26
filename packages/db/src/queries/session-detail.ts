@@ -75,6 +75,14 @@ export type SessionDetail = {
   /** Set on a cancelled Session and null on every other, by CHECK. */
   cancelledReason: string | null;
   /**
+   * Whether the Session has its Foto & Video archive folder in the company Drive yet (#552, #561). A
+   * cancelled Session shows Lihat arsip only when it has one, since the route never makes a folder for
+   * it.
+   */
+  hasFootageFolder: boolean;
+  /** Whether it has its upload folder (#561) yet: the same rule, for the Foto & Video button. */
+  hasFootageUploadFolder: boolean;
+  /**
    * The Session's PIC — **only an offline Session has one now (#284)**: it is the PIC of the
    * Perjadin the Session sits on. An **online** Session no longer tracks a PIC (a third-party LMS
    * runs online delivery), so both are `null` for it. This is the offline detail surface, and an
@@ -147,6 +155,8 @@ export async function sessionDetail(_caller: Person, id: string): Promise<Sessio
       timeZone: province.timeZone,
       status: session.status,
       cancelledReason: session.cancelledReason,
+      hasFootageFolder: sql<boolean>`${session.driveFootageFolderId} is not null`,
+      hasFootageUploadFolder: sql<boolean>`${session.driveFootageUploadFolderId} is not null`,
 
       picPersonId: pic.id,
       picFullName: pic.fullName,
@@ -199,6 +209,8 @@ export async function sessionDetail(_caller: Person, id: string): Promise<Sessio
     timeZone: row.timeZone,
     status: row.status,
     cancelledReason: row.cancelledReason,
+    hasFootageFolder: row.hasFootageFolder,
+    hasFootageUploadFolder: row.hasFootageUploadFolder,
     picPersonId: row.picPersonId,
     picFullName: row.picFullName,
     perjadin:

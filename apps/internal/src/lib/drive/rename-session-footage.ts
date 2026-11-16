@@ -1,8 +1,10 @@
 import {
   driveCredentials,
   sessionFootageFolders,
+  sessionFootageUploadFolders,
   type Person,
   type SessionFootageFolder,
+  type SessionFootageUploadFolder,
 } from "@sugt/db/queries";
 
 import { refreshDriveToken } from "./access-token";
@@ -66,21 +68,45 @@ export async function reassertSessionFootageNames(
 }
 
 /**
+ * Put one Session's **upload folder** (#561, ADR-0063) under the archive folder's name. Only the
+ * folder: the files in it are Staff-owned, and the app never renames them. A trashed or missing
+ * folder is reported and left alone. A Drive failure throws, for the caller to answer.
+ */
+export async function reassertSessionUploadFolderName(
+  drive: DriveClient,
+  upload: SessionFootageUploadFolder,
+): Promise<Omit<SessionFootageNameResult, "finished">> {
+  const found = await drive.getFile(upload.folderId);
+  if (!found) return { renamed: 0, problem: "folder-missing" };
+  if (found.trashed) return { renamed: 0, problem: "folder-trashed" };
+  const name = sessionFootageFolderName(upload.naming);
+  if (found.name === name) return { renamed: 0, problem: null };
+  await drive.updateFile(upload.folderId, { name });
+  return { renamed: 1, problem: null };
+}
+
+/**
  * **Rename one Session's footage after its date or time changed** — best effort, after the commit,
  * like `renamePerjadinFolder`: a Session with no footage folder costs one read, and any failure is
  * logged and left to Periksa koneksi. Never throws, so it cannot undo the change it follows.
  */
 export async function renameSessionFootage(person: Person, sessionId: string): Promise<void> {
   try {
-    const [folder] = await sessionFootageFolders(person, sessionId);
-    if (!folder) return;
+    const [[folder], [upload]] = await Promise.all([
+      sessionFootageFolders(person, sessionId),
+      sessionFootageUploadFolders(person, sessionId),
+    ]);
+    if (!folder && !upload) return;
 
     const credentials = await driveCredentials(person);
     if (credentials?.status !== "connected") return;
     const token = await refreshDriveToken(person, credentials);
     if (token.outcome !== "ok") return;
 
-    await reassertSessionFootageNames(openDrive(token.accessToken), folder);
+    const drive = openDrive(token.accessToken);
+    if (folder) await reassertSessionFootageNames(drive, folder);
+    // The upload folder (#561) takes the same name; the Staff-owned files in it are never renamed.
+    if (upload) await reassertSessionUploadFolderName(drive, upload);
   } catch (error) {
     console.error(`Renaming the footage of Session ${sessionId} in Drive failed.`, error);
   }

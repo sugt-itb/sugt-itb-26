@@ -1684,31 +1684,40 @@ create table session_footage (
 
 alter table perjadin add column drive_footage_folder_id text;
 alter table session  add column drive_footage_folder_id text;
+alter table perjadin add column drive_footage_upload_folder_id text;  -- #561
+alter table session  add column drive_footage_upload_folder_id text;  -- #561
 ```
 
-**One offline Session's photos and videos, one file each** (#424,
+**One offline Session's photos and videos, one file each, as the old upload recorded them** (#424,
 [ADR-0046](./adr/0046-session-footage-is-stored-in-the-company-google-drive.md)), shown as "Foto &
-Video". **The database holds** each file's kind against its type and its kind's cap
-(`MAX_FOOTAGE_PHOTO_BYTES`, `MAX_FOOTAGE_VIDEO_BYTES` as literals), so no write can store a 2 GB
-"photo", and that the uploader is Staff, by the composite key a PIC's is held by. `content_type` is
-the type the server **sniffed**; a HEIF file is stored as `image/heic`.
+Video". **Nothing writes to this table any more** (#561,
+[ADR-0063](./adr/0063-session-footage-is-uploaded-to-a-drive-folder-and-copied-into-the-company-archive.md)): Staff now put
+footage into the Session's upload folder in the company Drive, which the app cannot see, and a daily
+job copies it into the archive, so there is no row, no type or size check and no Activity Log entry
+for it. The table, its rows and its CHECKs are
+kept, with no migration, because three things still read them: Periksa koneksi's sweep, which finishes a
+row an upload left unsynced; the renames, which name the files the old upload made; and the old
+`footage_uploaded` / `footage_deleted` entries on `/log`.
 
-**The application holds the rest**: in `recordSessionFootage`, the Session is offline and not
-cancelled when the footage is added — checked again under a row lock inside the commit — and, in
-the upload's verify step before it, the file was opened for this Session and its declared kind
-matches the sniffed one. Footage of a Session cancelled later stays. The key to
+**The database holds** each row's kind against its type and its kind's cap (50 MiB for a photo,
+1000 MiB for a video, as literals), and that the uploader is Staff, by the composite key a PIC's is held
+by. `content_type` is the type the upload **sniffed**; a HEIF file is stored as `image/heic`. The key to
 `session` has **no cascade**: offline Sessions are only ever cancelled, so a delete that would orphan
-Drive files is refused rather than followed.
+Drive files is refused rather than followed. `drive_synced_at` is null until the reconcile names, files
+and shares a row's file.
 
-**The row and its Activity Log entry are written in one transaction** (`footage_uploaded`), with
-`drive_synced_at` null until the reconcile names, files and shares the file. `id` is generated before
-the insert, because the file's name carries it (`M-{footage8}`). **Hapus** is the order Dokumen's Hapus used: the
-file to the Drive trash first, then the row and a `footage_deleted` entry in one transaction.
-
-**Folders.** `perjadin.drive_footage_folder_id` is the trip's folder under `Foto & Video/Pelaksanaan
-Offline`, named as its other two; `session.drive_footage_folder_id` is the Session's folder inside it,
-`{held_on} · {HH.MM} · {School} · S-{session8}`. Both are claimed by compare-and-set
-(`where … is null`). A Session's folder and files are renamed when its date or time moves.
+**Folders, in two trees.** The **archive**: `perjadin.drive_footage_folder_id` is the trip's folder
+under `Foto & Video/Pelaksanaan Offline`, named as its other two; `session.drive_footage_folder_id` is
+the Session's folder inside it, `{held_on} · {HH.MM} · {School} · S-{session8}`. The **upload tree**
+(#561): `perjadin.drive_footage_upload_folder_id` and `session.drive_footage_upload_folder_id` are the
+same two folders, with the same names, under `Foto & Video — Unggahan/Pelaksanaan Offline`. **They are
+made on the first click** — the archive's by Lihat arsip, by anyone signed in; both trees' by Foto &
+Video, by the trip's writers — and each is claimed by compare-and-set (`where … is null`). The sharing
+is Drive's side, re-applied on each click, and the database holds none of it: a Session's archive
+folder can be viewed by anyone with its link, and the trip's upload folder can be edited by the trip's
+writers. Every one of these folders, and the files the old upload placed in the archive, are renamed
+when the trip's name or the Session's date, time or School changes; a Staff file in the upload tree
+never is.
 
 ## Money
 
@@ -2192,6 +2201,8 @@ create table drive_connection (
   dokumen_pelaksanaan_offline_folder_id text,
   footage_folder_id              text,
   footage_pelaksanaan_offline_folder_id text,
+  footage_upload_folder_id       text,
+  footage_upload_pelaksanaan_offline_folder_id text,
   folder_problem                 text check (folder_problem in
                                    ('root-trashed', 'root-missing',
                                     'staging-trashed', 'staging-missing',
@@ -2234,11 +2245,15 @@ koneksi and the document reconcile each make whichever is unset, missing or tras
 compare-and-set, so no Administrator has to reconnect for them. **`footage_folder_id` and
 `footage_pelaksanaan_offline_folder_id`** are `Foto & Video/` and its `Pelaksanaan Offline/`
 (ADR-0046), kept and ensured the same way — on connect, by Periksa koneksi and by the footage
-reconcile.
+reconcile. **`footage_upload_folder_id` and `footage_upload_pelaksanaan_offline_folder_id`** are
+`Foto & Video — Unggahan/` and its `Pelaksanaan Offline/` (#561, ADR-0063), the upload tree beside
+it, ensured where the archive's are and by the Foto & Video button.
 
 **Who reaches it.** The card's read and the connect writes need the Administrator Grant. The
-credential read, and the two writes a token refresh makes (`last_used_at`, broken), need Staff,
-because any Staff member uploads through the connection.
+credential read, and the two writes a token refresh makes (`last_used_at`, broken), carry no guard of
+their own: an upload reaches them after its own write guard, and Lihat arsip reaches them on anyone's
+click, a Pimpinan's included, to make and share a Session's archive folder as the company account's
+housekeeping (ADR-0063). The ciphertext never leaves the server.
 
 ---
 

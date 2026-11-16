@@ -11,12 +11,10 @@ import {
   pendampingOptions,
   pendampingPerjadin,
   perjadinDetail,
-  recordSessionFootage,
   togglePreparationItem,
   type Person,
 } from "@sugt/db/queries";
 import type { Grant } from "@sugt/domain";
-import { eq } from "drizzle-orm";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -330,7 +328,7 @@ describe("the page", () => {
 
 describe("a write on Pendamping Lain is the viewer's", () => {
   it.each(["sari", "budi"] as const)(
-    "ticks Persiapan, marks a Session delivered and records its Foto & Video, logged under %s, who is not in the Group",
+    "ticks Persiapan and marks a Session delivered as %s, who is not in the Group",
     async (name) => {
       const who = await people();
       const viewer = who[name];
@@ -348,22 +346,6 @@ describe("a write on Pendamping Lain is the viewer's", () => {
       await expect(markSessionDelivered(viewer, a.sessionId)).resolves.toEqual({
         outcome: "delivered",
       });
-
-      await expect(
-        recordSessionFootage(viewer, {
-          footageId: randomUUID(),
-          sessionId: a.sessionId,
-          contentType: "image/jpeg",
-          originalFilename: "kelas.jpg",
-          driveFileId: randomUUID(),
-          byteSize: 4096,
-        }),
-      ).resolves.toMatchObject({ outcome: "recorded" });
-      const entries = await db
-        .select()
-        .from(schema.activityLog)
-        .where(eq(schema.activityLog.action, "footage_uploaded"));
-      expect(entries.map((entry) => entry.actorPersonId)).toEqual([viewer.id]);
     },
   );
 });

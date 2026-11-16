@@ -1,68 +1,61 @@
-"use client";
-
-import { FotoVideoDialog } from "-/components/foto-video-dialog";
-import { FotoVideoList } from "-/components/foto-video-list";
-import type { UploadGate } from "-/lib/drive/upload-gate";
-import type { SessionFootageRow } from "@sugt/db/queries";
-import { Button } from "@sugt/ui/components/button";
+import { FotoVideoLinks } from "-/components/foto-video-link";
+import { FOTO_VIDEO_UPLOAD_NOTE } from "-/lib/foto-video";
 
 /**
- * **The Foto & Video section on `/sesi/[id]`** (#425), so a Pimpinan — who cannot open `/pendamping`
- * — sees a Session's photos and videos too. The list, with **Buka** for everyone; for whoever writes
- * the Session's trip (its Group, a Perjadin Editor or an Administrator — ADR-0048), **Hapus** and the upload
- * popup. A cancelled Session keeps its list but offers no upload. An upload or a Hapus
- * revalidates this page in its own Server Action, so the list here follows without a refresh.
+ * **The Foto & Video section on `/sesi/[id]`** (#425, #561), so a Pimpinan — who cannot open
+ * `/pendamping` — reaches a Session's photos and videos too. Since ADR-0063 it is two links, each
+ * opening one of the Session's folders in the company Google Drive in a new tab:
+ *
+ * - **Foto & Video**, the upload folder, for the trip's writers (`canUpload`: its Group, a Perjadin
+ *   Editor, an Administrator), with the note that files are copied to the archive once a day;
+ * - **Lihat arsip**, the company-owned archive, for everyone signed in.
+ *
+ * A **cancelled** Session shows a link only when its folder already exists, since the routes never
+ * make one for it; with neither, the section says so.
  */
 function FotoVideoSection({
   sessionId,
-  heldOn,
-  schoolName,
-  footage,
-  canWrite,
   cancelled,
-  uploadGate,
+  canUpload,
+  hasArchiveFolder,
+  hasUploadFolder,
 }: {
   sessionId: string;
-  heldOn: string;
-  schoolName: string;
-  footage: SessionFootageRow[];
-  canWrite: boolean;
   cancelled: boolean;
-  uploadGate: UploadGate;
+  /** Whether the viewer writes the trip (ADR-0048). */
+  canUpload: boolean;
+  /** Whether the Session's archive folder exists in Drive yet. */
+  hasArchiveFolder: boolean;
+  /** Whether the Session's upload folder exists in Drive yet. */
+  hasUploadFolder: boolean;
 }) {
+  const offersArchive = !cancelled || hasArchiveFolder;
+  const offersUpload = canUpload && (!cancelled || hasUploadFolder);
+  const folders = [
+    ...(offersUpload ? (["upload"] as const) : []),
+    ...(offersArchive ? (["archive"] as const) : []),
+  ];
   return (
     <section className="flex flex-col gap-3 border-b border-border px-4 py-5 sm:px-7">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-heading text-sm font-medium">Foto & Video</h2>
-        {canWrite && !cancelled && (
-          <FotoVideoDialog
-            sessionId={sessionId}
-            heldOn={heldOn}
-            schoolName={schoolName}
-            uploadGate={uploadGate}
-            canUpload
-            canDelete
-            trigger={
-              <Button
-                variant="secondary"
-                size="sm"
-                className="rounded-full"
-              >
-                Unggah Foto & Video
-              </Button>
-            }
-          />
+        {folders.length > 0 && (
+          <span className="flex flex-wrap gap-2">
+            <FotoVideoLinks
+              sessionId={sessionId}
+              from={`/sesi/${sessionId}`}
+              folders={folders}
+            />
+          </span>
         )}
       </div>
-      {/* Hapus is closed while Drive is down; said as text, since a disabled button's title never
-          shows on touch. */}
-      {canWrite && !uploadGate.open && (
-        <p className="text-xs text-muted-foreground">{uploadGate.reason}</p>
-      )}
-      <FotoVideoList
-        footage={footage}
-        hapus={canWrite ? { gate: uploadGate, onDeleted: () => undefined } : undefined}
-      />
+      <p className="text-xs text-muted-foreground">
+        {offersUpload
+          ? FOTO_VIDEO_UPLOAD_NOTE
+          : offersArchive
+            ? "Foto dan video sesi ini disimpan di arsipnya di Google Drive."
+            : "Sesi ini dibatalkan dan tidak punya folder Foto & Video."}
+      </p>
     </section>
   );
 }

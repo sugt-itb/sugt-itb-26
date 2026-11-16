@@ -75,7 +75,6 @@ async function screens(viewer: Person, perjadinId: string) {
         title="Perjalanan Dinas Anda"
         description=""
         trips={trips.current}
-        uploadGate={{ open: true }}
         canWrite
       />,
     ),
