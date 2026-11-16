@@ -152,13 +152,15 @@ export async function shareArchiveFolder(drive: DriveClient, folderId: string): 
  * - Nothing else is touched: the owner, a commenter, anything inherited.
  * - **An email Drive refuses** (not a Google account, say) is skipped and logged; it fails nothing.
  *
+ * Answers whether it changed anything: a folder already right costs one list and no write (#563).
  * Any other Drive failure throws.
  */
 export async function shareUploadFolder(
   drive: DriveClient,
   folderId: string,
   writerEmails: readonly string[],
-): Promise<void> {
+): Promise<boolean> {
+  let changed = false;
   const own = (await drive.listPermissions(folderId)).filter((permission) => !permission.inherited);
 
   const wanted = new Set(writerEmails.map((email) => email.toLowerCase()));
@@ -169,33 +171,38 @@ export async function shareUploadFolder(
   for (const writer of writers) {
     const email = writer.emailAddress?.toLowerCase();
     if (email && wanted.has(email)) present.add(email);
-    else await drive.deletePermission(folderId, writer.id);
+    else {
+      await drive.deletePermission(folderId, writer.id);
+      changed = true;
+    }
   }
 
   for (const email of wanted) {
     if (present.has(email)) continue;
     try {
       await drive.createPermission(folderId, { type: "user", role: "writer", emailAddress: email });
+      changed = true;
     } catch (error) {
       if (!isDriveFailure(error)) throw error;
       console.error(`Drive refused to share upload folder ${folderId} with ${email}.`, error);
     }
   }
+  return changed;
 }
 
 /**
  * **Apply a Perjadin's upload-folder sharing** from who may write the trip now (ADR-0048,
  * `perjadinWriterEmails`): its Group's active members, every active Perjadin Editor and every active
- * Administrator. The one function #563 — re-sharing the moment a Group, Grant or Person changes —
- * calls too.
+ * Administrator. Also what re-shares the moment a Group or Person changes, and Periksa koneksi's
+ * sharing pass (#563). Answers whether the folder's sharing changed.
  */
 export async function applyFootageUploadSharing(
   person: Person,
   drive: DriveClient,
   perjadinId: string,
   uploadPerjadinFolderId: string,
-): Promise<void> {
-  await shareUploadFolder(
+): Promise<boolean> {
+  return shareUploadFolder(
     drive,
     uploadPerjadinFolderId,
     await perjadinWriterEmails(person, perjadinId),

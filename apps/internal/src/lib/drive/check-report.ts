@@ -5,6 +5,7 @@ import type {
   FolderCheck,
   FolderNameFailure,
   FootageSweepFailure,
+  SharingFailure,
   SweepFailure,
 } from "./check";
 import type {
@@ -102,6 +103,13 @@ const FOOTAGE_UPLOAD_LINES: Record<"ok" | "created" | "busy", string> = {
   busy: "Folder Foto & Video — Unggahan: sedang disiapkan proses lain — periksa lagi.",
 };
 
+/** Why an upload folder's edit access was not re-applied (#563). */
+const SHARING_FAILURE_REASONS: Record<SharingFailure["reason"], string> = {
+  "folder-trashed": "folder ada di tempat sampah Google Drive, akses tidak diperbarui",
+  "folder-missing": "folder sudah tidak ada di Google Drive, akses tidak diperbarui",
+  "drive-failed": "Google Drive gagal menjawab, akses tidak diperbarui",
+};
+
 /** Why a Foto & Video file, or a Session's folder, was not copied to the archive (#562). */
 const COPY_FAILURE_REASONS: Record<FootageCopyFailureReason, string> = {
   "storage-full": "Penyimpanan Google Drive pengunggah penuh",
@@ -175,7 +183,7 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
         failures: [],
       };
     case "ok": {
-      const { sweep, names } = report;
+      const { sweep, names, sharing } = report;
       const lines = [
         "Token Google Drive berfungsi.",
         ...report.folders.map(
@@ -196,8 +204,17 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
         ...(names.ran
           ? [`${names.renamed} nama folder dan berkas diganti, ${names.remaining} folder tersisa.`]
           : []),
+        ...(sharing.ran
+          ? [
+              `${sharing.updated} folder unggah Foto & Video: akses diperbarui, ${sharing.remaining} tersisa.`,
+            ]
+          : []),
         ...footageCopyLines(report.footageCopy),
       ];
+      const sharingFailures = (sharing.ran ? sharing.failures : []).map(
+        (failure) =>
+          `${failure.name} (Foto & Video — Unggahan): ${SHARING_FAILURE_REASONS[failure.reason]}.`,
+      );
       const copyFailures = report.footageCopy.ran
         ? report.footageCopy.failures.map(footageCopyFailure)
         : [];
@@ -222,9 +239,10 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
                 (failure) =>
                   `${failure.name} (${PERJADIN_FOLDER_LABELS[failure.folder]}): ${NAME_FAILURE_REASONS[failure.reason]}.`,
               ),
+              ...sharingFailures,
               ...copyFailures,
             ]
-          : copyFailures,
+          : [...sharingFailures, ...copyFailures],
       };
     }
   }

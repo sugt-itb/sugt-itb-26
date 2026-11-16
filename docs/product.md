@@ -361,9 +361,11 @@ Foto & Video buttons on the card's own row: footage belongs to a Session, not to
   [Pengaturan](#pengaturan--the-company-google-drive); Foto & Video makes the archive's too. Later
   clicks open the same folders.
 - **Who may add to the upload folder is Drive's sharing**: the trip's writers can edit it, by sign-in
-  email, and nobody can open it by link. Each click of Foto & Video re-applies that list, so a Person
-  who has left the Group loses edit access at the next click on that trip, and an editor someone added
-  by hand in Drive is removed then too.
+  email, and nobody can open it by link. The list is re-applied right after the trip's Group or PIC
+  changes and right after a Person is deactivated (#563), so a Person who leaves the Group loses edit
+  access at once; on each click of Foto & Video; and by Periksa koneksi, which is also how a Perjadin
+  Editor or Administrator Grant change reaches every trip. An editor someone added by hand in Drive is
+  removed each time too.
 - **When a folder cannot be opened**, the new tab comes back to this page with a red notice: "Google
   Drive belum tersedia — coba lagi nanti." while Drive is down and the folder does not exist yet, or a
   sentence asking an Administrator to restore the folder from the Google Drive trash when it is there.
@@ -1170,6 +1172,10 @@ says only an Administrator reads the roster, adds people and deactivates them.
   daring dan Pretest", Dashboard Editor "termasuk Dashboard Viewer", Dashboard Viewer "membaca
   Dashboard". Only Grants actually held are chips: choosing Dashboard Editor shows Dashboard Editor
   alone. A Pimpinan or deactivated row shows "—".
+- **After a Perjadin Editor or Administrator Grant is assigned or revoked**, the row says once:
+  "Akses edit folder unggah Foto & Video diperbarui lewat Periksa koneksi, atau saat Foto & Video
+  dibuka berikutnya." Such a Grant reaches every trip's upload folder, so Drive learns it on the next
+  Periksa koneksi press or the trip's next Foto & Video click, not at once (#563).
 - **An Administrator cannot revoke their own Administrator Grant**: that chip is locked on their
   row, and the write refuses it. With the rule above, no Administrator can remove their own
   access.
@@ -1252,6 +1258,14 @@ was recorded while the connection was down, as Periksa koneksi does below.
   folder in the Drive trash or gone is listed with the reason and left alone. Folders made before
   the name changed, or whose Sub-Cluster was renamed since, take the new name here — press again
   until nothing is left;
+- **every trip's Foto & Video upload folder shared to who writes it now** (#563) — its Group, every
+  Perjadin Editor and every Administrator — so a Grant assigned or revoked reaches Drive: "{n} folder
+  unggah Foto & Video: akses diperbarui, {m} tersisa", with the reason for a folder in the trash or gone,
+  which is left alone. It stops after 25 changed folders, or after half of what is left of the press's
+  time, so the copy below always gets the rest; press again until nothing is left. It runs before the
+  copy because edit access left on a folder after someone lost it is the more urgent of the two, and
+  the copy also runs every night on its own. Only edit access on upload folders is touched: the
+  owner, and every archive folder and its link share, never are;
 - the **daily Foto & Video copy** (below), run now within what is left of the press's time: "{n}
   berkas Foto & Video disalin ke arsip, {m} gagal, {k} sesi belum diperiksa", with each failure's
   Session, file name, uploader and reason, such as "Penyimpanan Google Drive pengunggah penuh". Without

@@ -44,8 +44,9 @@ ADR-0047's.
   ([ADR-0055](./0055-the-perjadin-report-is-neither-filed-nor-due.md))_
 - Dokumen and Foto & Video: the upload openers, the record, and Hapus — _amended 2026-11-16: Foto &
   Video has no upload, record or Hapus any more. Who may add footage is enforced by Drive's edit access
-  on the trip's upload folder, re-applied from this rule when a writer clicks Foto & Video, so leaving a
-  Group takes effect late
+  on the trip's upload folder, re-applied from this rule when a writer clicks Foto & Video, straight
+  after a Group change or a revocation (#563), and by Periksa koneksi — so leaving a Group takes effect
+  at once, and only a Grant change waits for Periksa koneksi or the next click
   ([ADR-0063](./0063-session-footage-is-uploaded-to-a-drive-folder-and-copied-into-the-company-archive.md))_
 
 The guard runs on the write's own transaction where it has one, so the membership it reads is the state

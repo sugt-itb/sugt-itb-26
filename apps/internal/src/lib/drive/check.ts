@@ -26,6 +26,7 @@ import {
   reassertSessionFootageNames,
   reassertSessionUploadFolderName,
 } from "./rename-session-footage";
+import { applyFootageUploadSharing } from "./session-footage-folder";
 
 /**
  * **Periksa koneksi** (ADR-0040, #375): whether the company Drive connection works, whether its tree
@@ -307,6 +308,81 @@ export async function reassertPerjadinFolderNames(
   };
 }
 
+/**
+ * After how many Perjadin upload folders whose sharing it changed one press stops (#563). A folder
+ * already right costs a read and a list and does not count, as a right name does not in the rename
+ * pass — so the next press, which starts from the first trip again, gets further.
+ */
+export const SHARING_LIMIT = 25;
+
+/** A Perjadin upload folder whose sharing the pass could not re-apply (#563). */
+export type SharingFailure = {
+  perjadinId: string;
+  /** The folder's name, as `perjadinFolderName` gives it — what the Administrator is told. */
+  name: string;
+  reason: "folder-trashed" | "folder-missing" | "drive-failed";
+};
+
+export type SharingReport = {
+  /** Folders whose sharing this press changed to match the trip's writers. */
+  updated: number;
+  /** Folders this press did not reach — past the bound or the budget. */
+  remaining: number;
+  failures: SharingFailure[];
+};
+
+/**
+ * **Re-apply every Perjadin upload folder's sharing** (#563, ADR-0063): exactly the trip's active
+ * writers edit (`applyFootageUploadSharing`). The backstop for every change to who writes a trip — a
+ * Grant assigned or revoked above all, which reaches every trip and is never applied inline — and for
+ * an inline re-share that failed. Only `user`/`writer` permissions on upload folders: the owner, and
+ * every archive folder and its link share, are never touched.
+ *
+ * Bounded like the rename pass: it stops after `limit` folders it changed or once `budgetMs` has
+ * passed, and reports what it did not reach; the next press re-reads the ones already right and
+ * carries on. A folder trashed or deleted by hand is reported and skipped, never recreated, and never
+ * shared in the trash.
+ */
+export async function reapplyUploadSharing(
+  person: Person,
+  drive: DriveClient,
+  { limit = SHARING_LIMIT, budgetMs = SWEEP_BUDGET_MS }: { limit?: number; budgetMs?: number } = {},
+): Promise<SharingReport> {
+  const folders = (await perjadinDriveFolders(person)).flatMap((trip) =>
+    trip.driveFootageUploadFolderId
+      ? [
+          {
+            perjadinId: trip.naming.id,
+            folderId: trip.driveFootageUploadFolderId,
+            name: perjadinFolderName(trip.naming),
+          },
+        ]
+      : [],
+  );
+
+  const failures: SharingFailure[] = [];
+  const startedAt = Date.now();
+  let updated = 0;
+  let checked = 0;
+  for (const { perjadinId, folderId, name } of folders) {
+    if (updated >= limit || Date.now() - startedAt > budgetMs) break;
+    checked += 1;
+    try {
+      const folder = await drive.getFile(folderId);
+      if (!folder || folder.trashed) {
+        failures.push({ perjadinId, name, reason: folder ? "folder-trashed" : "folder-missing" });
+      } else if (await applyFootageUploadSharing(person, drive, perjadinId, folderId)) {
+        updated += 1;
+      }
+    } catch (error) {
+      if (!isDriveFailure(error)) throw error;
+      failures.push({ perjadinId, name, reason: "drive-failed" });
+    }
+  }
+
+  return { updated, remaining: folders.length - checked, failures };
+}
+
 /** One of the four fixed folders, as Periksa koneksi found it. */
 export type FolderCheck = {
   folder: "root" | "staging" | "bukti-transaksi" | "pelaksanaan-offline";
@@ -346,6 +422,8 @@ export type DriveCheckReport =
         | { ran: false; waiting: number; documentsWaiting: number; footageWaiting: number };
       /** The Perjadin folder names re-asserted (#407) — skipped, like the sweep, while the tree is not usable. */
       names: ({ ran: true } & FolderNameReport) | { ran: false };
+      /** Every Perjadin upload folder's sharing re-applied (#563) — skipped the same way. */
+      sharing: ({ ran: true } & SharingReport) | { ran: false };
       /**
        * The daily Foto & Video copy (#562), run here on demand — or why it did not run: the tree not
        * usable (`skipped`), the full `drive` scope missing, or another pass under way.
@@ -372,7 +450,10 @@ export type DriveCheckReport =
  * 6. **The folder names** (`reassertPerjadinFolderNames`, #407), only when the tree is usable, within
  *    what the sweep left of `SWEEP_BUDGET_MS`. This is how folders made before ADR-0044 take the new
  *    name: the Administrator presses again until none is left.
- * 7. **The Foto & Video copy** (`copyFootageToArchive`, #562), the daily pass run on demand, within
+ * 7. **The upload folders' sharing** (`reapplyUploadSharing`, #563), only when the tree is usable,
+ *    within at most half of what is left of the same budget: each trip's upload folder shared to
+ *    who writes it now.
+ * 8. **The Foto & Video copy** (`copyFootageToArchive`, #562), the daily pass run on demand, within
  *    what is left of the same budget — skipped while the tree is not usable or the token lacks the
  *    full `drive` scope.
  *
@@ -461,11 +542,18 @@ export async function checkDriveConnection(person: Person): Promise<DriveCheckRe
           })),
         }
       : { ran: false as const };
+    // The sharing pass runs before the copy, since edit access left on a folder after someone left
+    // a Group is the more urgent of the two, but it gets at most half of what is left of the press:
+    // the copy keeps the rest, and the daily cron gives the copy a whole budget of its own besides.
+    const left = () => Math.max(0, SWEEP_BUDGET_MS - (Date.now() - sweptFrom));
+    const sharing = ready
+      ? {
+          ran: true as const,
+          ...(await reapplyUploadSharing(person, drive, { budgetMs: left() / 2 })),
+        }
+      : { ran: false as const };
     const footageCopy = ready
-      ? await copyFootageToArchive(person, drive, ready, {
-          scope: token.scope,
-          budgetMs: Math.max(0, SWEEP_BUDGET_MS - (Date.now() - sweptFrom)),
-        })
+      ? await copyFootageToArchive(person, drive, ready, { scope: token.scope, budgetMs: left() })
       : { ran: false as const, reason: "skipped" as const };
     return {
       token: "ok",
@@ -476,6 +564,7 @@ export async function checkDriveConnection(person: Person): Promise<DriveCheckRe
       footageUpload,
       sweep,
       names,
+      sharing,
       footageCopy,
     };
   } catch (error) {
