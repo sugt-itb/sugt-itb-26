@@ -1,13 +1,13 @@
 "use client";
 
 import { FeedbackTokenDialog } from "-/components/feedback-token";
-import { FotoVideoDialog } from "-/components/foto-video-dialog";
+import { FotoVideoLinks } from "-/components/foto-video-link";
 import { PerjadinFeedbackTokenDialog } from "-/components/perjadin-feedback-token";
 import { SessionMarkDeliveredDialog } from "-/components/perjadin-mark-delivered";
 import { PerjadinPreparationDialog } from "-/components/perjadin-preparation";
 import { progressTone } from "-/components/progress-tone";
 import { tripTimeline, type TimelineNode } from "-/components/trip-timeline";
-import type { UploadGate } from "-/lib/drive/upload-gate";
+import { FOTO_VIDEO_UPLOAD_NOTE, fotoVideoFrom } from "-/lib/foto-video";
 import { perjadinName, perjadinSchoolsLine } from "-/lib/perjadin-name";
 import type { MyPerjadinTrip } from "@sugt/db/queries";
 import { formatRupiah, formatSessionStartTimeWithWib } from "@sugt/domain";
@@ -27,6 +27,7 @@ import {
 import { LinkButton } from "@sugt/ui/components/link-button";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useId, useState } from "react";
 
 /**
@@ -50,18 +51,16 @@ function MyPerjadinSection({
   title,
   description,
   trips,
-  uploadGate,
   canWrite,
 }: {
   title: string;
   description: string;
   trips: MyPerjadinTrip[];
-  uploadGate: UploadGate;
   /**
    * **Whether the viewer writes these trips** (ADR-0048), computed from the viewer and not from whose
    * trips they are. On a person's own `/pendamping` it is always true — every trip listed is one
    * whose Group they are in. Without it, every write control on the cards is absent: Tandai, the
-   * Persiapan boxes and Foto & Video's upload and Hapus.
+   * Persiapan boxes and Foto & Video (only Lihat arsip stays).
    */
   canWrite: boolean;
 }) {
@@ -85,7 +84,6 @@ function MyPerjadinSection({
           <TripCard
             key={trip.id}
             trip={trip}
-            uploadGate={uploadGate}
             canWrite={canWrite}
           />
         ))}
@@ -124,15 +122,7 @@ function MyPerjadinSection({
  * its own click and opens the checklist without toggling. The chevron is decorative and outside the
  * trigger, rotated from the item's `data-open`.
  */
-function TripCard({
-  trip,
-  uploadGate,
-  canWrite,
-}: {
-  trip: MyPerjadinTrip;
-  uploadGate: UploadGate;
-  canWrite: boolean;
-}) {
+function TripCard({ trip, canWrite }: { trip: MyPerjadinTrip; canWrite: boolean }) {
   // The pill's `x/N` is read straight off the checklist the card also hands the dialog — one payload
   // for both, so the pill and the boxes can never disagree. `N` is the trip's own (ADR-0045).
   const preparationDone = trip.preparation.filter((item) => item.checked).length;
@@ -222,18 +212,15 @@ function TripCard({
                 Edit
               </LinkButton>
             </div>
-            {/* Why Foto & Video's upload, on the timeline below, is closed while Drive is (ADR-0040) —
-                said on the card too, so it shows before any dialog is opened. A card with no Session
-                has no Foto & Video, so nothing for it to explain. */}
-            {canWrite && !uploadGate.open && timeline.length > 0 && (
-              <p className="-mt-2 text-xs text-muted-foreground">{uploadGate.reason}</p>
-            )}
 
             <TripTimeline
               nodes={timeline}
-              uploadGate={uploadGate}
               canWrite={canWrite}
             />
+            {/* Said once under the timeline's Foto & Video buttons rather than on every Session. */}
+            {canWrite && timeline.length > 0 && (
+              <p className="-mt-2 text-xs text-muted-foreground">{FOTO_VIDEO_UPLOAD_NOTE}</p>
+            )}
           </div>
 
           <AnggotaRoster anggota={trip.anggota} />
@@ -414,12 +401,10 @@ function NarasumberToggle({
  */
 function TripTimeline({
   nodes,
-  uploadGate,
   canWrite,
 }: {
   nodes: TimelineNode[];
-  uploadGate: UploadGate;
-  /** Tandai and Foto & Video's upload and Hapus are the trip's writers' (ADR-0048). */
+  /** Tandai is the trip's writers' (ADR-0048). */
   canWrite: boolean;
 }) {
   if (nodes.length === 0) return null;
@@ -446,7 +431,6 @@ function TripTimeline({
             <span className="sr-only">{node.done ? "Selesai: " : "Belum: "}</span>
             <SessionNode
               node={node}
-              uploadGate={uploadGate}
               canWrite={canWrite}
             />
           </div>
@@ -478,20 +462,15 @@ function TimelineMarker({ done }: { done: boolean }) {
 /**
  * `{heldOn} · {start time} · {School}`, then the Session's own controls: **Tandai** only while it is
  * `arranged` (a delivered Session has no transition left, so the pill goes once it lands),
- * **Feedback** — the Participant-Feedback QR — which stays after delivery, and **Foto & Video**
- * (#425), the Session's photos and videos, in both sections since footage is often uploaded after
- * the trip. It opens even while Drive is down, so the files can be viewed; uploading is closed then.
+ * **Feedback** — the Participant-Feedback QR — which stays after delivery, then **Foto & Video** and
+ * **Lihat arsip** (#425, #561), links to the Session's upload folder and archive in the company
+ * Google Drive, in both sections since footage is often added after the trip. Foto & Video is the
+ * trip's writers' only; who may add to the folder is its sharing, not this button.
  */
-function SessionNode({
-  node,
-  uploadGate,
-  canWrite,
-}: {
-  node: TimelineNode;
-  uploadGate: UploadGate;
-  canWrite: boolean;
-}) {
+function SessionNode({ node, canWrite }: { node: TimelineNode; canWrite: boolean }) {
   const { school, session } = node;
+  // Back to this very view if the folder cannot open — Pendamping Lain's choice included.
+  const from = fotoVideoFrom(usePathname() ?? "/pendamping", useSearchParams());
   const text = `${session.heldOn} · ${formatSessionStartTimeWithWib(session.startsAt, school.timeZone)} · ${school.name}`;
 
   return (
@@ -528,24 +507,13 @@ function SessionNode({
             </Button>
           }
         />
-        <FotoVideoDialog
+        {/* The Session's Drive folders, in a new tab (#561): the upload folder for the trip's writers,
+            the archive for everyone. The timeline holds no cancelled Session. */}
+        <FotoVideoLinks
           sessionId={session.sessionId}
-          heldOn={session.heldOn}
-          schoolName={school.name}
-          uploadGate={uploadGate}
-          // The timeline holds no cancelled Session; who writes the trip uploads and deletes.
-          canUpload={canWrite}
-          canDelete={canWrite}
-          trigger={
-            <Button
-              variant="secondary"
-              size="sm"
-              className="rounded-full"
-              aria-label={`Foto & Video ${text}`}
-            >
-              Foto & Video
-            </Button>
-          }
+          from={from}
+          folders={canWrite ? ["upload", "archive"] : ["archive"]}
+          label={text}
         />
       </span>
     </>

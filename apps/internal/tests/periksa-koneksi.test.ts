@@ -155,6 +155,7 @@ describe("the check, in order", () => {
       exposed: [],
       dokumen: "ok",
       footage: "ok",
+      footageUpload: "ok",
       sweep: {
         ran: true,
         synced: 0,

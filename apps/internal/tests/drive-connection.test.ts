@@ -3,7 +3,11 @@ import Page from "-/app/(app)/pengaturan/page";
 import { GET } from "-/app/api/drive/callback/route";
 import { driveAccessToken } from "-/lib/drive/access-token";
 import { completeDriveConnection, DRIVE_STATE_COOKIE } from "-/lib/drive/connect";
-import { DOKUMEN_FOLDER_NAME } from "-/lib/drive/dokumen-folders";
+import {
+  DOKUMEN_FOLDER_NAME,
+  FOOTAGE_FOLDER_NAME,
+  FOOTAGE_UPLOAD_FOLDER_NAME,
+} from "-/lib/drive/dokumen-folders";
 import { FakeDrive, MY_DRIVE } from "-/lib/drive/fake-drive";
 import {
   BUKTI_TRANSAKSI_FOLDER_NAME,
@@ -342,6 +346,22 @@ describe("a successful connect", () => {
       dokumenFolderId: dokumen[0]!.id,
       dokumenPelaksanaanOfflineFolderId: dokumenOffline[0]!.id,
     });
+
+    // Both footage trees too: the archive (ADR-0046) and the upload tree (#561), side by side.
+    const [ids] = await rows();
+    for (const [name, treeId, pelaksanaanId] of [
+      [FOOTAGE_FOLDER_NAME, ids!.footageFolderId, ids!.footagePelaksanaanOfflineFolderId],
+      [
+        FOOTAGE_UPLOAD_FOLDER_NAME,
+        ids!.footageUploadFolderId,
+        ids!.footageUploadPelaksanaanOfflineFolderId,
+      ],
+    ] as const) {
+      const tree = drive.named(name);
+      expect(tree).toHaveLength(1);
+      expect(tree[0]).toMatchObject({ id: treeId, parents: [root[0]!.id] });
+      expect(drive.files.get(pelaksanaanId!)?.parents).toEqual([treeId]);
+    }
   });
 
   it("on reconnect, overwrites the token, reuses valid ids and recreates a missing subfolder", async () => {

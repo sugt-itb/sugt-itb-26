@@ -79,6 +79,9 @@ export const perjadin = pgTable(
     // The Perjadin's folder under `Foto & Video/Pelaksanaan Offline` (ADR-0046), claimed the same way
     // the first time footage of one of its Sessions is reconciled. Named as the two above.
     driveFootageFolderId: text("drive_footage_folder_id"),
+    // Its folder under `Foto & Video — Unggahan/Pelaksanaan Offline` (#561, ADR-0063), where its
+    // writers have edit access by email. Claimed the same way, named the same as the three above.
+    driveFootageUploadFolderId: text("drive_footage_upload_folder_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

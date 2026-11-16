@@ -134,7 +134,7 @@ inside their border on a phone (#419). Tables still scroll sideways inside their
 `/log`'s filters stack below 640px, and on the Laporan each transaction's receipts wrap under
 it.
 
-**An upload to Google Drive says that it is running** (#420). A line's Unggah bukti and Foto & Video's Unggah show a spinner with "Mengunggah ke Google Drive…" — "Mengunggah 2 dari 3
+**An upload to Google Drive says that it is running** (#420). A line's Unggah bukti shows a spinner with "Mengunggah ke Google Drive…" — "Mengunggah 2 dari 3
 berkas ke Google Drive…" when several files go at once — and "Jangan tutup halaman ini sampai
 selesai." under it. Once the files are in Drive it reads "Menyimpan…" while the app records them.
 There is no progress bar. In a popup it sits directly above the buttons; for Unggah bukti it sits
@@ -343,32 +343,31 @@ This is how the trip is usually staffed, shown, not a rule: nothing about enteri
 [Perjadin](#perjadin)).
 
 **Each Session row of the timeline has its own buttons**: **Tandai** while it is still arranged,
-**Feedback**, and **Foto & Video** (#425) — in both sections, since footage is often uploaded after
-the trip. A cancelled Session is not in the timeline, so it has none. There is no Foto & Video
-button on the card's own row: footage belongs to a Session, not to the trip.
+**Feedback**, **Foto & Video** and **Lihat arsip** (#425, #561) — in both sections, since footage is
+often added after the trip. A cancelled Session is not in the timeline, so it has none. There are no
+Foto & Video buttons on the card's own row: footage belongs to a Session, not to the trip.
 
-**Foto & Video** opens a large popup titled "Foto & Video — 12 Okt 2026 · SMA Pradita Dirgantara",
-described "Upload dokumentasi kegiatan luring untuk sesi ini"
-([ADR-0046](./adr/0046-session-footage-is-stored-in-the-company-google-drive.md)):
+**Both open one of the Session's two folders in the company Google Drive, in a new tab** (#561,
+[ADR-0063](./adr/0063-session-footage-is-uploaded-to-a-drive-folder-and-copied-into-the-company-archive.md)). The app uploads, lists and checks nothing.
 
-- **Pilih foto/video** takes several files at once — photos JPG, PNG, HEIC or WebP up to 50 MB,
-  videos MP4 or MOV up to 1000 MB, at most 30 in one go. Each picked file is listed with its kind and
-  size and a × to drop it. A file of another type, empty, or over its cap is named at once with the
-  reason ("Jenis berkas tidak didukung", "Foto lebih dari 50 MB", "Video lebih dari 1000 MB") and
-  left out; past 30, the rest are left out with a sentence saying so.
-- **Unggah** sends them one at a time, each straight to Google Drive in pieces, under the usual
-  status — "Mengunggah 2 dari 5 berkas ke Google Drive…", "Jangan tutup halaman ini sampai selesai.",
-  "Menyimpan…" — with the popup locked and the browser asking before the page is left. Afterwards it
-  says "{n} berkas terunggah", names each file that failed with its reason, and offers **Coba lagi**
-  for just those; picking more files keeps that summary. Files whose place in Drive is not yet
-  finished are counted ("{k} berkas belum tersinkron…"). A file picked twice is
-  left out the second time ("Sudah dipilih").
-- **Sudah diunggah** lists the Session's files, newest first: Foto or Video, the file's own name, its
-  size, who uploaded it and when, **Buka** (it opens in Drive in a new tab), "belum tersinkron" while
-  it is not yet in place, and **Hapus**, which asks "Hapus berkas ini? File akan dipindahkan ke Sampah
-  Google Drive." first.
-- **While Drive is down** the popup still opens and lists the files; uploading and Hapus are closed,
-  with the reason said as text.
+- **Foto & Video** opens the Session's **upload folder** (_Folder Unggah_), and only the trip's
+  writers see it: its Group, every Perjadin Editor and every Administrator. Staff put photos and videos
+  there through Drive's web page or app; the files stay theirs. Under the timeline, once per card, a
+  note says: _"Unggah langsung di Google Drive. Berkas disalin ke arsip perusahaan sekali sehari;
+  setelah itu berkas asli boleh Anda hapus."_
+- **Lihat arsip** opens the Session's **archive** (_Arsip_): the company-owned copies, which anyone
+  with the link can view.
+- **The first click makes the folders** — the Session's and the trip's around it, named as in
+  [Pengaturan](#pengaturan--the-company-google-drive); Foto & Video makes the archive's too. Later
+  clicks open the same folders.
+- **Who may add to the upload folder is Drive's sharing**: the trip's writers can edit it, by sign-in
+  email, and nobody can open it by link. Each click of Foto & Video re-applies that list, so a Person
+  who has left the Group loses edit access at the next click on that trip, and an editor someone added
+  by hand in Drive is removed then too.
+- **When a folder cannot be opened**, the new tab comes back to this page with a red notice: "Google
+  Drive belum tersedia — coba lagi nanti." while Drive is down and the folder does not exist yet, or a
+  sentence asking an Administrator to restore the folder from the Google Drive trash when it is there.
+  A folder that already exists opens even while Drive is down.
 
 **The card has no Dokumen** (#559,
 [ADR-0061](./adr/0061-trip-paperwork-is-not-filed-in-the-app.md)): a trip's attendance sheets and
@@ -437,12 +436,13 @@ Administrator has it implicitly. **Catat Sesi Daring** on `/sesi-daring` and the
 and delete controls on `/sesi-daring/[id]` are theirs alone. Everyone signed in still reads every
 online Session.
 
-**An offline Session's own page, `/sesi/[id]`, has a Foto & Video section** (#425), so a Pimpinan —
-who has no `/pendamping` — sees its photos and videos too. Everyone signed in gets the list with
-**Buka**; whoever writes the Session's trip — its Group, a Perjadin Editor or an Administrator (ADR-0048) —
-also gets **Hapus** and **Unggah Foto & Video**, which opens the same popup, and the Session's own
-writes (Tandai terlaksana, Batalkan Sesi, the date edit). A
-cancelled Session keeps its list but offers no upload. An online Session has none.
+**An offline Session's own page, `/sesi/[id]`, has a Foto & Video section** (#425, #561), so a
+Pimpinan — who has no `/pendamping` — reaches its photos and videos too. It has the same two buttons:
+**Lihat arsip** for everyone signed in, and **Foto & Video**, with its note under it, for the trip's
+writers. A cancelled Session shows a button only if its folder was made before it was cancelled, and
+says it has none when neither was. An online Session has no section. Whoever writes the
+Session's trip — its Group, a Perjadin Editor or an Administrator (ADR-0048) — also gets the Session's
+own writes (Tandai terlaksana, Batalkan Sesi, the date edit).
 
 **Only an offline Session has a PIC** — its Perjadin's. An online Session has none: a third-party
 LMS runs delivery, so DITSAMA staffs no PIC and an online Session files no Session Record
@@ -652,8 +652,9 @@ Administrator** ([ADR-0048](./adr/0048-a-perjadin-is-written-by-its-group.md), #
 in reads every trip. On `/perjadin/[id]`, `/perjadin/[id]/laporan` and `/sesi/[id]`, anyone else sees
 everything with every write control absent — Ubah tanggal, Ubah Group, the
 Narasumber edits, Tambah/Ubah/Batalkan Sesi (a Session's Pimpinan with it), Ubah Pimpinan, Tandai,
-the Persiapan boxes, Unggah bukti, each line's Hapus, Foto & Video's upload and Hapus — and a forced
-request answers 403.
+the Persiapan boxes, Unggah bukti, each line's Hapus, Foto & Video — and a forced request answers 403
+(Foto & Video's route answers 404). Lihat arsip is a link for everyone; who may add footage is the
+upload folder's sharing in Drive (ADR-0063).
 Only **Evaluasi Perjadin**'s link stays open to everyone signed in. A Staff member added to a Group
 writes that trip from then on; one who leaves it stops at once. `/pendamping` lists only a person's own
 trips, so every control on its cards stays theirs.
@@ -1193,8 +1194,8 @@ can sign in to reach this screen. See
 
 **Only an Administrator sees Pengaturan**, in the sidebar and at `/pengaturan`. Anyone else,
 Pimpinan included, gets the 403. It holds one card for now: the company Google Drive that
-holds transaction evidence, Dokumen and Foto & Video, and serves Unggah bukti and Foto & Video's
-uploads — Dokumen no longer uploads (ADR-0061), but the documents already recorded stay there and
+holds transaction evidence, Dokumen and Foto & Video, and serves Unggah bukti and the Foto & Video
+folders — Dokumen no longer uploads (ADR-0061), but the documents already recorded stay there and
 still finish syncing
 ([ADR-0040](./adr/0040-transaction-evidence-is-stored-in-the-company-google-drive.md)).
 
@@ -1229,15 +1230,17 @@ was recorded while the connection was down, as Periksa koneksi does below.
   utama dapat dibuka siapa saja yang punya link — pindahkan keluar dari folder yang dibagikan."
 - whether `Dokumen/` and its `Pelaksanaan Offline/` are there, making them if not: "Folder Dokumen:
   ada." or "Folder Dokumen: dibuat." A connection made before Dokumen existed gets them here,
-  without reconnecting. Then the same for `Foto & Video/`: "Folder Foto & Video: ada." or "…dibuat.";
+  without reconnecting. Then the same for `Foto & Video/`: "Folder Foto & Video: ada." or "…dibuat.",
+  and for `Foto & Video — Unggahan/`: "Folder Foto & Video — Unggahan: ada." or "…dibuat.";
 - a **sweep** of the transactions whose receipts are not yet in place in Drive, oldest first, up to
   25 per press: "{n} transaksi disinkronkan, {m} masih menunggu", with the reason for any that could
   not be finished, such as a folder in the Drive trash, which is never recreated. Then the same for
   Perjadin Documents: "{n} dokumen disinkronkan, {m} masih menunggu", and for Foto & Video: "{n}
   foto/video disinkronkan, {m} masih menunggu";
-- **every Perjadin folder's name**, receipts, Dokumen and Foto & Video, brought to the trip's name
-  (`Kelompok 10 · 12–13 Okt 2026 · SMAN 1 Bontang · P-1a2b3c4d`), and every Session's Foto & Video
-  folder and files brought to the Session's date, time and School: "{n} nama folder dan berkas
+- **every Perjadin folder's name**, receipts, Dokumen, Foto & Video and its upload folder, brought to
+  the trip's name (`Kelompok 10 · 12–13 Okt 2026 · SMAN 1 Bontang · P-1a2b3c4d`), and every Session's
+  Foto & Video folder and files, then its upload folder (never the files in it), brought to the
+  Session's date, time and School: "{n} nama folder dan berkas
   diganti, {m} folder tersisa". It stops after 25 renamed folders, or when the press's time is up,
   even part-way through one Session's files; a folder already right is only read, and a Session
   folder already right means its files are too, so they are not read at all. A
@@ -1247,10 +1250,11 @@ was recorded while the connection was down, as Periksa koneksi does below.
 
 A trip's folders are also renamed by themselves, right after the change is saved, when either of
 its dates changes or its Schools do: a Session added at a new School, moved to another School, or a
-School's last Session cancelled. A Session's Foto & Video folder and files are renamed the same way
-when its date or start time changes. If Drive fails then, the next Periksa koneksi catches it.
+School's last Session cancelled. A Session's Foto & Video folder and files, and its upload folder,
+are renamed the same way when its date or start time changes. If Drive fails then, the next Periksa koneksi catches it.
 
-**The whole tree in the company Drive** — each folder private, and only the files marked shared:
+**The whole tree in the company Drive** — private except what is marked shared, which since #561
+includes each Session's archive folder and each trip's upload folder:
 
 ```
 SUGT ITB 2026 _staging — jangan dibagikan/          every upload lands here first, then is moved
@@ -1265,22 +1269,32 @@ SUGT ITB 2026 Internal App Object Storage/
 │       │   └── 2026-10-12 · SMA Pradita Dirgantara · Siswa · Daftar Hadir Peserta · D-5c6d7e8f.pdf   shared
 │       └── SPPD/
 │           └── SMA Pradita Dirgantara · SPPD · D-1a2b3c4d.pdf   shared
-└── Foto & Video/Pelaksanaan Offline/
-    └── Kelompok 12 · 11–14 Okt 2026 · … · P-1a2b3c4d/
-        └── 2026-10-12 · 08.00 · SMA Pradita Dirgantara · S-3e4f5a6b/   one per offline Session
-            ├── 2026-10-12 · SMA Pradita Dirgantara · Foto · M-7c8d9e0f.jpg    shared
-            └── 2026-10-12 · SMA Pradita Dirgantara · Video · M-1d2e3f4a.mp4   shared
+├── Foto & Video/Pelaksanaan Offline/                      the archive: company-owned
+│   └── Kelompok 12 · 11–14 Okt 2026 · … · P-1a2b3c4d/      private
+│       └── 2026-10-12 · 08.00 · SMA Pradita Dirgantara · S-3e4f5a6b/   viewable by link — Lihat arsip
+│           ├── IMG_2041.HEIC                                         copied from the upload folder (#562)
+│           └── 2026-10-12 · SMA Pradita Dirgantara · Foto · M-7c8d9e0f.jpg    uploaded before #561, shared
+└── Foto & Video — Unggahan/Pelaksanaan Offline/           the upload tree: Staff-owned files
+    └── Kelompok 12 · 11–14 Okt 2026 · … · P-1a2b3c4d/      editable by the trip's writers, by email
+        └── 2026-10-12 · 08.00 · SMA Pradita Dirgantara · S-3e4f5a6b/   Foto & Video
+            └── IMG_2041.HEIC                                         added in Drive, its own name
 ```
 
-**Foto & Video** ([ADR-0046](./adr/0046-session-footage-is-stored-in-the-company-google-drive.md))
-holds the photos (JPEG, PNG, HEIC or WebP, up to 50 MB) and videos (MP4 or MOV, up to 1000 MB) of
-each offline Session, uploaded as they were taken — a photo keeps its location data — and shared one
-file at a time. A large file is sent to Drive in 16 MB pieces and picks up where it stopped if the
-connection drops. The trip's Group, a Perjadin Editor or an Administrator uploads them from each Session's **Foto & Video** on `/pendamping` and on `/sesi/[id]`;
-anyone signed in views them on `/sesi/[id]`.
+**Foto & Video** ([ADR-0046](./adr/0046-session-footage-is-stored-in-the-company-google-drive.md),
+[ADR-0063](./adr/0063-session-footage-is-uploaded-to-a-drive-folder-and-copied-into-the-company-archive.md)) holds the photos and videos of each offline Session, in **two trees with the same
+folder names**. The trip's writers add footage to the **upload tree** directly, through Drive, from
+each Session's **Foto & Video** on `/pendamping` and `/sesi/[id]`; those files are owned by, and use the
+storage of, whoever uploaded them. Each trip's upload folder is editable by its Group, every Perjadin
+Editor and every Administrator, by sign-in email, and never shared by link. Once a day the company
+account copies new uploads into the **archive** (#562), whose Session folders anyone with the link
+can view; the trip's archive folder and everything above it stay private. Anyone signed in opens the
+archive from **Lihat arsip**. The app sees none of the files, so it checks no type or size, and a photo
+keeps its location data. A file deleted from the upload folder before that day's copy is lost. Files
+uploaded through the app before #561 stay in the archive, each shared on its own.
 
 **A badge on Pengaturan** in the sidebar tells an Administrator that Drive needs them: not
-connected, broken, or its folders unresolved — the states in which nobody can upload a receipt or Foto & Video.
+connected, broken, or its folders unresolved — the states in which nobody can upload a receipt, and a
+Foto & Video folder not made yet cannot be made.
 
 **On the acquittal**, a line whose receipts are recorded but not yet in place in Drive shows a small
 "belum tersinkron" mark. Its tooltip reads "Bukti belum tersinkron ke Google Drive — Administrator

@@ -29,11 +29,6 @@ import {
   markSessionDeliveredAction,
   moveSessionDateAction,
 } from "-/app/(app)/sesi/[id]/actions";
-import {
-  deleteFootageAction,
-  openFootageUploadAction,
-  recordFootageAction,
-} from "-/app/(app)/sesi/[id]/foto-video/actions";
 import SesiPage from "-/app/(app)/sesi/[id]/page";
 import { driveAccessToken } from "-/lib/drive/access-token";
 import { requirePerson } from "-/lib/person";
@@ -44,11 +39,9 @@ import {
   attachTransactionEvidence,
   cancelSession,
   changePerjadinPic,
-  deleteSessionFootage,
   deleteTransaction,
   editPerjadinSession,
   fileSessionRecord,
-  footageSession,
   isNotOnPerjadinError,
   isNotStaffError,
   issuePerjadinFeedbackToken,
@@ -56,7 +49,6 @@ import {
   moveSessionDate,
   perjadinDetail,
   receiptsOnLine,
-  recordSessionFootage,
   removePerjadinTeacher,
   renamePerjadinTeacher,
   setPerjadinStaff,
@@ -244,8 +236,6 @@ async function perjadinA(who: People, where: Place) {
     transactionId: line.id,
     uploadedByPersonId: who.rina.id,
   });
-  const footageId = randomUUID();
-  await recordSessionFootage(who.rina, footage(arranged.id, footageId));
   return {
     id: trip.id,
     arrangedId: arranged.id,
@@ -253,22 +243,10 @@ async function perjadinA(who: People, where: Place) {
     teacherId: teacher!.id,
     transactionId: line.id,
     evidenceId: receipt.id,
-    footageId,
   };
 }
 
 type PerjadinA = Awaited<ReturnType<typeof perjadinA>>;
-
-function footage(sessionId: string, footageId = randomUUID()) {
-  return {
-    footageId,
-    sessionId,
-    contentType: "image/jpeg" as const,
-    originalFilename: "kelas.jpg",
-    driveFileId: randomUUID(),
-    byteSize: 4096,
-  };
-}
 
 const receipt = () => [
   { driveFileId: randomUUID(), contentType: "image/jpeg" as const, byteSize: 120_000 },
@@ -376,9 +354,6 @@ const WRITES: [
     undefined,
   ],
   ["Hapus transaksi", (c, a) => deleteTransaction(c, a.transactionId), "deleted"],
-  ["Foto & Video open", (c, a) => footageSession(c, a.arrangedId), "ok"],
-  ["Foto & Video record", (c, a) => recordSessionFootage(c, footage(a.arrangedId)), "recorded"],
-  ["Foto & Video Hapus", (c, a) => deleteSessionFootage(c, a.footageId), "deleted"],
 ];
 
 describe("every write on Perjadin A, by each of the ticket's people", () => {
@@ -521,7 +496,6 @@ describe("the actions answer a non-member with a 403", () => {
           }),
       ],
       ["Unggah bukti", () => finalizeReceiptsAction(a.id, a.transactionId, [])],
-      ["Foto & Video record", () => recordFootageAction({ sessionId: a.arrangedId } as never)],
     ];
 
     for (const [name, call] of calls) {
@@ -544,12 +518,6 @@ describe("the actions answer a non-member with a 403", () => {
         ),
       ),
     ).resolves.toBe(FORBIDDEN);
-    await expect(
-      digestOf(
-        openFootageUploadAction(a.arrangedId, { contentType: "image/jpeg", size: 1_000 } as never),
-      ),
-    ).resolves.toBe(FORBIDDEN);
-    await expect(digestOf(deleteFootageAction(a.footageId))).resolves.toBe(FORBIDDEN);
     await expect(digestOf(deleteReceiptAction(a.evidenceId))).resolves.toBe(FORBIDDEN);
     await expect(digestOf(deleteTransactionAction(a.transactionId))).resolves.toBe(FORBIDDEN);
 
@@ -626,23 +594,30 @@ describe("the write controls follow who writes the trip", () => {
     }
   });
 
-  it("hides /sesi/[id]'s Tandai and Foto & Video upload from a non-member", async () => {
+  it("hides /sesi/[id]'s Tandai and Foto & Video from a non-member, who still gets Lihat arsip", async () => {
     const who = await people();
     const a = await perjadinA(who, await place());
     const render = async (viewer: Person) => {
       signedInAs(viewer);
       return renderToStaticMarkup(
-        await SesiPage({ params: Promise.resolve({ id: a.arrangedId }) } as never),
+        await SesiPage({
+          params: Promise.resolve({ id: a.arrangedId }),
+          searchParams: Promise.resolve({}),
+        } as never),
       );
     };
 
     const forDewi = await render(who.dewi);
     expect(forDewi).not.toContain("Tandai terlaksana");
-    expect(forDewi).not.toContain("Unggah Foto");
-    expect(forDewi).toContain("kelas.jpg");
+    // The upload folder is the trip's writers' (#561); the archive is a read, for everyone.
+    expect(forDewi).not.toContain(`/sesi/${a.arrangedId}/foto-video/unggah`);
+    expect(forDewi).toContain(`/sesi/${a.arrangedId}/foto-video/arsip`);
 
     for (const writer of [who.andi, who.budi]) {
-      expect(await render(writer)).toContain("Tandai terlaksana");
+      const html = await render(writer);
+      expect(html).toContain("Tandai terlaksana");
+      expect(html).toContain(`/sesi/${a.arrangedId}/foto-video/unggah`);
+      expect(html).toContain(`/sesi/${a.arrangedId}/foto-video/arsip`);
     }
   });
 

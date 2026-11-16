@@ -118,6 +118,15 @@ export async function completeDriveConnection(input: {
         error,
       );
     });
+    // `Foto & Video — Unggahan/` and its `Pelaksanaan Offline/` (#561, ADR-0063), the same way.
+    await ensureFootageFolders(person, drive, folders.rootFolderId, "upload").catch(
+      (error: unknown) => {
+        console.error(
+          "Ensuring the Foto & Video — Unggahan folders after connecting Google Drive failed.",
+          error,
+        );
+      },
+    );
     await sweepUnsynced(person, drive, folders).catch((error: unknown) => {
       console.error("The sweep after reconnecting Google Drive threw.", error);
     });

@@ -4,6 +4,7 @@ import {
   type DriveClient,
   type DriveFile,
   type DrivePermission,
+  type NewDrivePermission,
 } from "./google";
 
 /**
@@ -15,6 +16,8 @@ import {
  * - **Permissions are inherited**: `listPermissions` on an item includes every permission on a folder
  *   above it, marked `inherited` — what Periksa koneksi's safety check reads.
  * - **Uploads declare their size**: `land` — the browser's `PUT` — refuses bytes of another length.
+ * - **Some emails cannot be shared with**: one in `refusedEmails` — not a Google account, say — is
+ *   refused with a 400, as Drive refuses it.
  *
  * Later tickets extend it rather than mocking Drive ad hoc. `calls` counts every operation, so a
  * test can assert that a refused write reached Drive **zero** times.
@@ -24,7 +27,7 @@ type StoredFile = Omit<DriveFile, "trashed"> & {
   /** Trashed by itself; a child of a trashed folder is trashed too, without this flag. */
   explicitlyTrashed: boolean;
   content: Uint8Array;
-  permissions: { id: string; type: string; role: string }[];
+  permissions: { id: string; type: string; role: string; emailAddress: string | null }[];
 };
 
 type Session = {
@@ -42,6 +45,8 @@ export const MY_DRIVE = "root";
 export class FakeDrive implements DriveClient {
   readonly files = new Map<string, StoredFile>();
   readonly sessions = new Map<string, Session>();
+  /** Emails Drive will not share with — a test adds to it. */
+  readonly refusedEmails = new Set<string>();
   calls = 0;
   private nextId = 1;
 
@@ -110,10 +115,27 @@ export class FakeDrive implements DriveClient {
     return this.require("files.get(media)", id).content.slice(start, end + 1);
   }
 
-  async createPermission(id: string, permission: { type: "anyone"; role: "reader" }) {
+  async createPermission(id: string, permission: NewDrivePermission) {
     this.calls += 1;
     const file = this.require("permissions.create", id);
-    file.permissions.push({ id: `perm-${this.nextId++}`, ...permission });
+    const emailAddress = permission.type === "user" ? permission.emailAddress : null;
+    if (emailAddress !== null && this.refusedEmails.has(emailAddress)) {
+      throw new DriveRequestError("permissions.create", 400);
+    }
+    file.permissions.push({
+      id: `perm-${this.nextId++}`,
+      type: permission.type,
+      role: permission.role,
+      emailAddress,
+    });
+  }
+
+  async deletePermission(id: string, permissionId: string) {
+    this.calls += 1;
+    const file = this.require("permissions.delete", id);
+    const before = file.permissions.length;
+    file.permissions = file.permissions.filter((p) => p.id !== permissionId);
+    if (file.permissions.length === before) throw new DriveRequestError("permissions.delete", 404);
   }
 
   async listPermissions(id: string): Promise<DrivePermission[]> {
@@ -169,6 +191,18 @@ export class FakeDrive implements DriveClient {
         content: bytes,
       }),
     };
+  }
+
+  /** A permission someone added by hand in the Drive UI — the owner's, a commenter's, anything. */
+  share(id: string, permission: { type: string; role: string; emailAddress?: string }): string {
+    const permissionId = `perm-${this.nextId++}`;
+    this.require("share", id).permissions.push({
+      id: permissionId,
+      type: permission.type,
+      role: permission.role,
+      emailAddress: permission.emailAddress ?? null,
+    });
+    return permissionId;
   }
 
   /** Move to the Drive trash, as a person would. Children follow. */

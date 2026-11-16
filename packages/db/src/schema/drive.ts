@@ -53,6 +53,11 @@ export const driveConnection = pgTable(
     // ensured the same way, where footage needs them.
     footageFolderId: text("footage_folder_id"),
     footagePelaksanaanOfflineFolderId: text("footage_pelaksanaan_offline_folder_id"),
+    // `Foto & Video — Unggahan/` and its `Pelaksanaan Offline/` (#561, ADR-0063): the upload tree,
+    // where Staff put footage straight from Drive. Beside the archive above, never inside it, and
+    // ensured where the archive is.
+    footageUploadFolderId: text("footage_upload_folder_id"),
+    footageUploadPelaksanaanOfflineFolderId: text("footage_upload_pelaksanaan_offline_folder_id"),
     folderProblem: text("folder_problem").$type<DriveFolderProblem>(),
     status: text("status").$type<DriveConnectionStatus>().notNull(),
     brokenAt: timestamp("broken_at", { withTimezone: true }),
