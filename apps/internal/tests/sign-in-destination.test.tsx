@@ -1,6 +1,6 @@
 import DashboardPage from "-/app/(app)/page";
-import { GoogleSignInButton } from "-/app/masuk/google-sign-in-button";
 import SignInPage from "-/app/masuk/page";
+import { SignInButtons } from "-/app/masuk/sign-in-buttons";
 import { getPerson, requirePerson, type Person } from "-/lib/person";
 import { safeDestination, signInPath } from "-/lib/sign-in-destination";
 import { proxy } from "-/proxy";
@@ -183,7 +183,7 @@ describe("the sign-in screen (/masuk)", () => {
       type: unknown;
       props: { destination?: string | null; children?: unknown };
     };
-    if (element.type === GoogleSignInButton) return element.props.destination;
+    if (element.type === SignInButtons) return element.props.destination;
     for (const child of [element.props.children].flat()) {
       const found = buttonDestination(child);
       if (found !== undefined) return found;
@@ -217,6 +217,38 @@ describe("the sign-in screen (/masuk)", () => {
       expect(html).not.toContain("feedback");
       expect(html).not.toContain("NOT_ON_INVITE_LIST");
       expect(buttonDestination(page)).toBeNull();
+    });
+
+    it.each(["NOT_ON_INVITE_LIST", "unable_to_get_user_info", "account_not_linked", ""])(
+      "renders the same one sentence for ?error=%j, never echoing it (#565)",
+      async (error) => {
+        const html = renderToStaticMarkup(await render({ error }));
+
+        expect(html.match(/role="alert"/g)).toHaveLength(1);
+        expect(html).toContain(
+          "Akun ini tidak terdaftar. Coba akun lain, atau hubungi tim DITSAMA untuk mendapat akses.",
+        );
+        if (error) expect(html).not.toContain(error);
+      },
+    );
+
+    it("offers both ways in, ITB first, with the one hint (#565)", async () => {
+      const html = renderToStaticMarkup(await render({}));
+
+      const itb = html.indexOf("Masuk dengan akun ITB");
+      const google = html.indexOf("Masuk dengan Google");
+      expect(itb).toBeGreaterThan(-1);
+      expect(google).toBeGreaterThan(itb);
+      expect(html.match(/<button/g)).toHaveLength(2);
+      expect(html.match(/<svg aria-hidden="true"/g)).toHaveLength(2);
+      expect(html).toContain("Gunakan akun ITB atau akun Google yang terdaftar.");
+      // Each keeps its brand fill and label in dark mode too: no theme `dark:` or `hover:text-*`
+      // class is left on either button to override them.
+      for (const button of html.match(/<button[^>]*>/g)!) {
+        expect(button).not.toMatch(/dark:bg-|dark:hover:|hover:text-foreground/);
+      }
+      expect(html).toContain("bg-[#2F2F2F]");
+      expect(html).toContain("bg-[#FFFFFF]");
     });
   });
 

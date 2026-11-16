@@ -250,8 +250,17 @@ The single edge that crosses the library boundary sits on the library's side of 
 the Perjadin foreign key graph.
 
 A `databaseHooks.user.create.before` hook looks up `person` by lowercased email. No match
-means it throws, so **an uninvited Google account cannot create a user row at all** — the
+means it throws, so **an uninvited Google or ITB account cannot create a user row at all** — the
 invite list gates signup, not merely authorisation.
+
+**Two providers, one identity per Person** ([ADR-0062](./adr/0062-itb-microsoft-sign-in-beside-google.md),
+[#565](https://github.com/sugt-itb/sugt-itb-26/issues/565)). Google and ITB's Microsoft tenant each
+write an `account` row; Better Auth links a second provider to the existing `user` **by email**, so a
+Person who has used both has one `user` and two `account` rows, and a session per sign-in. Linking
+needs the provider to report the email verified; Google does, and the Microsoft provider reports it
+only after its guard: the address, from the ID token's `email` or else its `preferred_username`,
+lowercased, must be at `itb.ac.id` or a subdomain of it. Anything else — a tenant guest's Gmail —
+is refused before any account is linked or any row written. Nothing here is a new column.
 
 **`person_id` records which Person the identity was created for; it is not what a request
 resolves through.** The column is written once, when the `user` row is created. After a

@@ -1,5 +1,5 @@
 /**
- * Where a signed-out visitor was going, carried through Google sign-in (#502).
+ * Where a signed-out visitor was going, carried through sign-in (#502), Google or ITB alike.
  *
  * The proxy puts it on `/masuk?next=…`, the sign-in screen hands it to Better Auth as the
  * `callbackURL`, and the visitor lands on it. Nothing in that chain is allowed to trust the

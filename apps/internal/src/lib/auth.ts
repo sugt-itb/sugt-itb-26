@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 
 import { requireEnv } from "./env";
 import { findActivePersonByEmail } from "./invite-list";
+import { microsoftProvider } from "./itb-microsoft";
 
 /**
  * The one code a rejected visitor's browser ever carries back.
@@ -72,7 +73,12 @@ export const auth = betterAuth({
     },
   },
 
-  /** Google only. Email-and-password stays off, which is its default. */
+  /**
+   * **Google, and ITB's Microsoft tenant** (#565, ADR-0062). Two ways to prove you own an email;
+   * the invite list below is still the only gate, by email, whichever is used. One Person is one
+   * `user` with an `account` row per provider used, linked by email. Email-and-password stays off,
+   * which is its default.
+   */
   socialProviders: {
     google: {
       clientId: requireEnv("GOOGLE_CLIENT_ID"),
@@ -101,6 +107,14 @@ export const auth = betterAuth({
        */
       prompt: "select_account consent",
     },
+
+    /**
+     * **ITB's Microsoft (Entra ID) tenant only**, ITB addresses only — the guard runs before any
+     * account is linked, and reads the ID token alone, with no Graph request. See
+     * `./itb-microsoft.ts`. Booting fails here when `MICROSOFT_OAUTH_REDIRECT_URL` is not exactly
+     * this app's callback.
+     */
+    microsoft: microsoftProvider(),
   },
 
   session: {
@@ -121,7 +135,7 @@ export const auth = betterAuth({
       create: {
         /**
          * **The invite gate.** No active `person` row, no account — and the refusal
-         * lands before the insert, so an uninvited Google account leaves no trace in
+         * lands before the insert, so an uninvited Google or ITB account leaves no trace in
          * the database at all. That is order rather than rollback: every
          * `create.before` hook runs before the adapter's create is called.
          *
