@@ -1714,7 +1714,9 @@ the Session's folder inside it, `{held_on} · {HH.MM} · {School} · S-{session8
 same two folders, with the same names, under `Foto & Video — Unggahan/Pelaksanaan Offline`. **They are
 made on the first click** — the archive's by Lihat arsip, by anyone signed in; both trees' by Foto &
 Video, by the trip's writers — and each is claimed by compare-and-set (`where … is null`). The sharing
-is Drive's side, re-applied on each click, and the database holds none of it: a Session's archive
+is Drive's side, and the database holds none of it. The upload folder's writers are re-applied on
+each Foto & Video click, right after the trip's Group or PIC changes or one of its members is
+deactivated, and by Periksa koneksi (#563): a Session's archive
 folder can be viewed by anyone with its link, and the trip's upload folder can be edited by the trip's
 writers. Every one of these folders, and the files the old upload placed in the archive, are renamed
 when the trip's name or the Session's date, time or School changes; a Staff file in the upload tree

@@ -257,7 +257,7 @@ export {
   type RemovePreparationItemResult,
   type RewordPreparationItemResult,
 } from "./preparation-items";
-export { perjadinWriterEmails, uploadPerjadinsOfMember } from "./perjadin-writers";
+export { perjadinWriterEmails, perjadinsWithUploadFolderOfMember } from "./perjadin-writers";
 export {
   claimFootageCopyLease,
   footageCopySessions,

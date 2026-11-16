@@ -6,7 +6,7 @@ import {
   revokeGrantAction,
   revokePersonAction,
 } from "-/app/(app)/orang/actions";
-import { FOOTAGE_ACCESS_NOTE, touchesFootageAccess } from "-/lib/foto-video";
+import { FOOTAGE_ACCESS_NOTE, footageAccessChanged } from "-/lib/foto-video";
 import type { RosterEntry } from "@sugt/db/queries";
 import {
   type Grant,
@@ -279,11 +279,7 @@ function GrantPicker({
           result: await revokeGrantAction(personId, grant),
         })),
       ]);
-      // Only a change that went through reaches the Foto & Video upload folders.
-      const made = results.flatMap(({ grant, result }) =>
-        result.outcome === "assigned" || result.outcome === "revoked" ? [grant] : [],
-      );
-      if (touchesFootageAccess(made)) setFootageNote(true);
+      if (footageAccessChanged(results)) setFootageNote(true);
     });
   }
 

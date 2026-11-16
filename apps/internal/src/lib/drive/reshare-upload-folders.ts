@@ -1,13 +1,13 @@
 import {
   driveCredentials,
   perjadinDriveFolder,
-  uploadPerjadinsOfMember,
+  perjadinsWithUploadFolderOfMember,
   type Person,
 } from "@sugt/db/queries";
 
 import { refreshDriveToken } from "./access-token";
 import { openDrive } from "./google";
-import { applyFootageUploadSharing } from "./session-footage-folder";
+import { reapplyUploadFolder } from "./session-footage-folder";
 
 /**
  * **Re-share trips' Foto & Video upload folders after their writers changed** (#563, ADR-0063), so a
@@ -47,9 +47,7 @@ export async function reshareUploadFolders(
 
     for (const { perjadinId, folderId } of folders) {
       try {
-        const folder = await drive.getFile(folderId);
-        if (!folder || folder.trashed) continue;
-        await applyFootageUploadSharing(person, drive, perjadinId, folderId);
+        await reapplyUploadFolder(person, drive, perjadinId, folderId);
       } catch (error) {
         console.error(`Re-sharing Perjadin ${perjadinId}'s upload folder failed.`, error);
       }
@@ -68,7 +66,7 @@ export async function reshareUploadFolders(
 export async function reshareMemberUploadFolders(person: Person, personId: string): Promise<void> {
   let perjadinIds: string[];
   try {
-    perjadinIds = await uploadPerjadinsOfMember(person, personId);
+    perjadinIds = await perjadinsWithUploadFolderOfMember(person, personId);
   } catch (error) {
     console.error(
       `Reading the trips of Person ${personId} to re-share their upload folders failed.`,

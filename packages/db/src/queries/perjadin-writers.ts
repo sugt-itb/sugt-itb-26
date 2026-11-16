@@ -52,7 +52,7 @@ export async function perjadinWriterEmails(_caller: Person, perjadinId: string):
  * these at once. Membership rows outlive a revocation, so this reads the same before it and after.
  * Open to any signed-in Person, for the same reason `perjadinWriterEmails` is.
  */
-export async function uploadPerjadinsOfMember(
+export async function perjadinsWithUploadFolderOfMember(
   _caller: Person,
   personId: string,
 ): Promise<string[]> {

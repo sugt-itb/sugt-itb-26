@@ -82,3 +82,18 @@ export const FOOTAGE_ACCESS_NOTE =
 export function touchesFootageAccess(changed: readonly Grant[]): boolean {
   return changed.some((grant) => FOOTAGE_ACCESS_GRANTS.includes(grant));
 }
+
+/**
+ * **Whether the Grant screen's note is due** after one round of chip changes: some change to a
+ * Grant in `FOOTAGE_ACCESS_GRANTS` **went through** (`assigned` or `revoked`). A refused one — the
+ * Administrator's own Administrator chip, say — reached nothing, so says nothing.
+ */
+export function footageAccessChanged(
+  results: readonly { grant: Grant; result: { outcome: string } }[],
+): boolean {
+  return touchesFootageAccess(
+    results.flatMap(({ grant, result }) =>
+      result.outcome === "assigned" || result.outcome === "revoked" ? [grant] : [],
+    ),
+  );
+}

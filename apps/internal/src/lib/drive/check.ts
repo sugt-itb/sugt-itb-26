@@ -26,7 +26,7 @@ import {
   reassertSessionFootageNames,
   reassertSessionUploadFolderName,
 } from "./rename-session-footage";
-import { applyFootageUploadSharing } from "./session-footage-folder";
+import { reapplyUploadFolder } from "./session-footage-folder";
 
 /**
  * **Periksa koneksi** (ADR-0040, #375): whether the company Drive connection works, whether its tree
@@ -320,7 +320,7 @@ export type SharingFailure = {
   perjadinId: string;
   /** The folder's name, as `perjadinFolderName` gives it — what the Administrator is told. */
   name: string;
-  reason: "folder-trashed" | "folder-missing" | "drive-failed";
+  reason: FolderNameFailure["reason"];
 };
 
 export type SharingReport = {
@@ -368,12 +368,9 @@ export async function reapplyUploadSharing(
     if (updated >= limit || Date.now() - startedAt > budgetMs) break;
     checked += 1;
     try {
-      const folder = await drive.getFile(folderId);
-      if (!folder || folder.trashed) {
-        failures.push({ perjadinId, name, reason: folder ? "folder-trashed" : "folder-missing" });
-      } else if (await applyFootageUploadSharing(person, drive, perjadinId, folderId)) {
-        updated += 1;
-      }
+      const outcome = await reapplyUploadFolder(person, drive, perjadinId, folderId);
+      if (outcome === "changed") updated += 1;
+      else if (outcome !== "unchanged") failures.push({ perjadinId, name, reason: outcome });
     } catch (error) {
       if (!isDriveFailure(error)) throw error;
       failures.push({ perjadinId, name, reason: "drive-failed" });

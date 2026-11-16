@@ -5,7 +5,6 @@ import type {
   FolderCheck,
   FolderNameFailure,
   FootageSweepFailure,
-  SharingFailure,
   SweepFailure,
 } from "./check";
 import type {
@@ -101,13 +100,6 @@ const FOOTAGE_UPLOAD_LINES: Record<"ok" | "created" | "busy", string> = {
   ok: "Folder Foto & Video — Unggahan: ada.",
   created: "Folder Foto & Video — Unggahan: dibuat.",
   busy: "Folder Foto & Video — Unggahan: sedang disiapkan proses lain — periksa lagi.",
-};
-
-/** Why an upload folder's edit access was not re-applied (#563). */
-const SHARING_FAILURE_REASONS: Record<SharingFailure["reason"], string> = {
-  "folder-trashed": "folder ada di tempat sampah Google Drive, akses tidak diperbarui",
-  "folder-missing": "folder sudah tidak ada di Google Drive, akses tidak diperbarui",
-  "drive-failed": "Google Drive gagal menjawab, akses tidak diperbarui",
 };
 
 /** Why a Foto & Video file, or a Session's folder, was not copied to the archive (#562). */
@@ -213,7 +205,7 @@ export function describeDriveCheck(report: DriveCheckReport): DriveCheckSentence
       ];
       const sharingFailures = (sharing.ran ? sharing.failures : []).map(
         (failure) =>
-          `${failure.name} (Foto & Video — Unggahan): ${SHARING_FAILURE_REASONS[failure.reason]}.`,
+          `${failure.name} (${PERJADIN_FOLDER_LABELS["foto-video-unggah"]}): ${NAME_FAILURE_REASONS[failure.reason]}, akses tidak diperbarui.`,
       );
       const copyFailures = report.footageCopy.ran
         ? report.footageCopy.failures.map(footageCopyFailure)

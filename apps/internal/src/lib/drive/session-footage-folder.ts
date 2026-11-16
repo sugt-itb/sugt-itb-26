@@ -209,6 +209,25 @@ export async function applyFootageUploadSharing(
   );
 }
 
+/**
+ * **Re-apply one Perjadin upload folder's writers, if the folder is there** (#563) — what both the
+ * re-share after a Group change or a revocation and Periksa koneksi's sharing pass do per folder. A
+ * folder in the Drive trash, or gone, is shared nothing and answered as such. A Drive failure throws.
+ */
+export async function reapplyUploadFolder(
+  person: Person,
+  drive: DriveClient,
+  perjadinId: string,
+  folderId: string,
+): Promise<"changed" | "unchanged" | "folder-trashed" | "folder-missing"> {
+  const folder = await drive.getFile(folderId);
+  if (!folder) return "folder-missing";
+  if (folder.trashed) return "folder-trashed";
+  return (await applyFootageUploadSharing(person, drive, perjadinId, folderId))
+    ? "changed"
+    : "unchanged";
+}
+
 /** Which button: Foto & Video opens the upload tree's folder, Lihat arsip the archive's. */
 export type FootageFolderKind = FootageTree;
 

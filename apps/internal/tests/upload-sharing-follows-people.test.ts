@@ -6,7 +6,7 @@ import { describeDriveCheck } from "-/lib/drive/check-report";
 import { FakeDrive } from "-/lib/drive/fake-drive";
 import { DriveRequestError, openDrive } from "-/lib/drive/google";
 import { openSessionFootageFolder } from "-/lib/drive/session-footage-folder";
-import { touchesFootageAccess } from "-/lib/foto-video";
+import { footageAccessChanged, touchesFootageAccess } from "-/lib/foto-video";
 import { requirePerson } from "-/lib/person";
 import { db, schema } from "@sugt/db";
 import type { Person } from "@sugt/db/queries";
@@ -222,7 +222,9 @@ describe("a revocation, straight away", () => {
     const { admin, budi, a } = await scene();
     const folder = await clickFotoVideo(admin, a.sessionId, a.id);
     const queries = await import("@sugt/db/queries");
-    vi.spyOn(queries, "uploadPerjadinsOfMember").mockRejectedValueOnce(new Error("db down"));
+    vi.spyOn(queries, "perjadinsWithUploadFolderOfMember").mockRejectedValueOnce(
+      new Error("db down"),
+    );
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     await expect(revokePersonAction(budi.id)).resolves.toEqual({ outcome: "revoked" });
@@ -263,6 +265,36 @@ describe("a revocation, straight away", () => {
 });
 
 describe("Periksa koneksi's sharing pass", () => {
+  it("takes at most half of what is left of the press, so the copy still runs", async () => {
+    const { admin, citra, where, a } = await scene();
+    const trips = [a];
+    for (const day of ["2026-10-21", "2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25"]) {
+      trips.push(await trip(where, admin.id, day));
+    }
+    for (const t of trips) await clickFotoVideo(admin, t.sessionId, t.id);
+    const [row] = await db
+      .select({ id: schema.session.driveFootageUploadFolderId })
+      .from(schema.session)
+      .where(eq(schema.session.id, a.sessionId));
+    drive.upload(row!.id!, { name: "a.jpg", owner: "budi@gmail.com" });
+    await addGrant(citra.id, "Perjadin Editor");
+    // Each folder's sharing takes eight seconds of the clock: six would outlast the whole press.
+    const real = Date.now.bind(Date);
+    let offset = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => real() + offset);
+    const list = drive.listPermissions.bind(drive);
+    vi.spyOn(drive, "listPermissions").mockImplementation(async (id) => {
+      offset += 8_000;
+      return list(id);
+    });
+
+    const report = await checkDriveConnectionAction();
+
+    if (report.token !== "ok" || !report.sharing.ran) throw new Error("no sharing pass");
+    expect(report.sharing.remaining).toBeGreaterThan(0);
+    expect(report.footageCopy).toMatchObject({ ran: true, copied: 1 });
+  });
+
   it("brings every upload folder to a new Perjadin Editor once a press gets through them, leaving the archive alone", async () => {
     const { admin, citra, where, a } = await scene();
     const b = await trip(where, admin.id, "2026-10-21");
@@ -344,5 +376,17 @@ describe("the Grant screen's note", () => {
     expect(touchesFootageAccess(["Perjadin Editor"])).toBe(true);
     expect(touchesFootageAccess(["Daring Editor", "Administrator"])).toBe(true);
     expect(touchesFootageAccess(["Daring Editor", "Dashboard Viewer"])).toBe(false);
+  });
+
+  it("is said only when such a change went through", () => {
+    const made = (grant: "Perjadin Editor" | "Administrator", outcome: string) => ({
+      grant,
+      result: { outcome },
+    });
+    expect(footageAccessChanged([made("Perjadin Editor", "assigned")])).toBe(true);
+    expect(footageAccessChanged([made("Administrator", "revoked")])).toBe(true);
+    // Refused — the Administrator's own Administrator chip, or a target who is not Staff.
+    expect(footageAccessChanged([made("Administrator", "own-administrator")])).toBe(false);
+    expect(footageAccessChanged([made("Perjadin Editor", "not-staff-target")])).toBe(false);
   });
 });
