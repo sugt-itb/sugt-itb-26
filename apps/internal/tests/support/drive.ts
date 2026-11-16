@@ -26,10 +26,11 @@ import { vi } from "vitest";
 import { addActivityLogEntry, addTransaction } from "./fixtures";
 
 /**
- * **What a receipt test needs of Google Drive** (ADR-0040): the token endpoint, a connected Drive
- * with its fixed tree, receipt bytes, the browser's upload, and a line or a Perjadin Document already
- * recorded. Shared by the Unggah bukti, Hapus, Dokumen and Periksa koneksi tests, which each mock `openDrive` to hand back their own `FakeDrive` — a `vi.mock`
- * has to sit in the test file, so it is not here.
+ * **What a Drive test needs** (ADR-0040, ADR-0042): the token endpoint, a connected Drive with its
+ * fixed tree, receipt bytes, the browser's upload, and a line or a Perjadin Document already
+ * recorded. Shared by the Unggah bukti, Hapus, Dokumen and Periksa koneksi tests, which each mock
+ * `openDrive` to hand back their own `FakeDrive` — a `vi.mock` has to sit in the test file, so it is
+ * not here.
  */
 
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";

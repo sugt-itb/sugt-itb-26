@@ -1,8 +1,9 @@
 import PendampingPage from "-/app/(app)/pendamping/page";
 import PerjadinDetailPage from "-/app/(app)/perjadin/[id]/page";
+import { MyPerjadinSection } from "-/components/my-perjadin-section";
 import { FakeDrive } from "-/lib/drive/fake-drive";
 import { requirePerson } from "-/lib/person";
-import type { Person } from "@sugt/db/queries";
+import { myPerjadin, type Person } from "@sugt/db/queries";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +12,7 @@ import {
   addGrant,
   addPerjadin,
   addPerson,
+  addSchoolOnTrip,
   resetDatabase,
   wibDaysFromToday,
 } from "./support/fixtures";
@@ -103,6 +105,30 @@ describe("/pendamping", () => {
       expect(html).not.toContain(">Dokumen<");
       expect(html).not.toContain("Unggah dokumen");
     }
+  });
+});
+
+describe("the card's Drive-closed reason", () => {
+  it("is said only on a card whose timeline has a Foto & Video to explain", async () => {
+    const { rina, current, finished } = await scene();
+    await addSchoolOnTrip({ perjadin: current, name: "SMAN 1 Bontang" });
+    const reason = "Google Drive belum terhubung.";
+    const trips = await myPerjadin(rina);
+    const card = (trip: (typeof trips.current)[number]) =>
+      renderToStaticMarkup(
+        <MyPerjadinSection
+          title="Perjalanan Dinas"
+          description=""
+          trips={[trip]}
+          uploadGate={{ open: false, reason }}
+          canWrite
+        />,
+      );
+
+    const withSession = trips.current.find((trip) => trip.id === current.id)!;
+    const withoutSession = trips.previous.find((trip) => trip.id === finished.id)!;
+    expect(card(withSession)).toContain(`-mt-2 text-xs text-muted-foreground">${reason}</p>`);
+    expect(card(withoutSession)).not.toContain(reason);
   });
 });
 

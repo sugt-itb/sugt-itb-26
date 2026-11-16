@@ -141,6 +141,7 @@ function TripCard({
   // ticked, amber part-way, emerald once every item is done — so the two screens read the pill the
   // same way. This one stays a button (the checklist opens from it).
   const preparationTone = progressTone(preparationDone, preparationTotal);
+  const timeline = tripTimeline(trip);
 
   return (
     <AccordionItem
@@ -222,13 +223,14 @@ function TripCard({
               </LinkButton>
             </div>
             {/* Why Foto & Video's upload, on the timeline below, is closed while Drive is (ADR-0040) —
-                said on the card too, so it shows before any dialog is opened. */}
-            {canWrite && !uploadGate.open && (
+                said on the card too, so it shows before any dialog is opened. A card with no Session
+                has no Foto & Video, so nothing for it to explain. */}
+            {canWrite && !uploadGate.open && timeline.length > 0 && (
               <p className="-mt-2 text-xs text-muted-foreground">{uploadGate.reason}</p>
             )}
 
             <TripTimeline
-              nodes={tripTimeline(trip)}
+              nodes={timeline}
               uploadGate={uploadGate}
               canWrite={canWrite}
             />

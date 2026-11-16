@@ -194,7 +194,7 @@ The acquittal of one Perjadin — every transaction already recorded on the trip
 _Avoid_: report (unqualified), expense report, reimbursement (nothing is claimed back; the money was transferred upfront)
 
 **Activity Log**:
-The append-only record of who changed money, evidence, documents or **Session Footage** on a **Perjadin**, and when — one entry per act, written with the act itself. Read only by an **Administrator**. The UI says _Log_. Some acts are no longer done in the tool — setting the Advance, filing the Report, recording a transaction, uploading or deleting a **Perjadin Document** — so their past entries stay in the Log, still readable and searchable, and no new ones are written ([ADR-0061](./docs/adr/0061-trip-paperwork-is-not-filed-in-the-app.md)).
+The append-only record of who changed money, evidence, documents or **Session Footage** on a **Perjadin**, and when — one entry per act, written with the act itself. Read only by an **Administrator**. The UI says _Log_. Some acts are no longer done in the tool — setting the Advance, filing the Report, recording a transaction, uploading or deleting a **Perjadin Document** — so their past entries stay in the Log, still readable and searchable, and no new ones are written ([ADR-0051](./docs/adr/0051-the-advance-is-not-tracked.md), [ADR-0055](./docs/adr/0055-the-perjadin-report-is-neither-filed-nor-due.md), [ADR-0060](./docs/adr/0060-trip-spending-is-recorded-outside-the-app.md), [ADR-0061](./docs/adr/0061-trip-paperwork-is-not-filed-in-the-app.md)).
 _Avoid_: audit log ("audit" means the external auditor of ADR-0040), history, journal
 
 **Perjadin Document**:

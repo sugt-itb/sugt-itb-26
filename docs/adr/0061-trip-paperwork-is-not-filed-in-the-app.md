@@ -36,8 +36,9 @@ Hapus as live.
 ## Consequences
 
 - **No migration.** The `perjadin_document` table and its rows, `perjadin.drive_dokumen_folder_id`, the
-  kind folders and the files in Drive all stay, and so do `PERJADIN_DOCUMENT_KINDS` and
-  `PERJADIN_DOCUMENT_PARTICIPANT_TYPES`, which the list's labels and the schema's CHECKs still read.
+  kind folders and the files in Drive all stay, and so do `PERJADIN_DOCUMENT_KINDS`, which the list's
+  headings and the `kind` CHECK still read, and `PERJADIN_DOCUMENT_PARTICIPANT_TYPES`, whose type the
+  stored rows and their Log entries are read by.
 - **The rules a new document was checked against are gone with the record path.** The date inside the
   trip and a School that is one of the trip's Schools were held by the application, not the database;
   the CHECKs and the one-SPPD-per-School index still hold the rows that exist.

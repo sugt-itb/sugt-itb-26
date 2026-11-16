@@ -45,7 +45,7 @@ import type {
 
 /**
  * **Foto & Video's Server Actions** (#424, ADR-0046): a Session's footage, opening an upload,
- * recording it once it landed, and deleting it. The upload runs Dokumen's order — check, verify,
+ * recording it once it landed, and deleting it. The upload runs the receipts' order — check, verify,
  * commit, reconcile — and Hapus runs guard, trash, delete (ADR-0042), every check before Google is
  * asked anything. The trip's Group, a Perjadin Editor or an Administrator uploads and deletes (ADR-0048);
  * anyone signed in lists.
