@@ -692,7 +692,8 @@ export type SessionFootageContentType = keyof typeof SESSION_FOOTAGE_CONTENT_TYP
  * longer tracked, so nothing writes them, but the entries already in the Log stay readable and
  * searchable. `report_filed` is history only the same way (ADR-0055, #489): the Laporan is no
  * longer filed. So is `transaction_recorded` (ADR-0060, #541): nothing records a new line, but past entries
- * keep their label and the `/log` filter still finds them.
+ * keep their label and the `/log` filter still finds them. And so are `document_uploaded` and
+ * `document_deleted` (ADR-0061, #559): nothing uploads or deletes a Perjadin Document any more.
  */
 export const ACTIVITY_LOG_ACTIONS = [
   "advance_set",

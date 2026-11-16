@@ -15,7 +15,8 @@ import type { DriveClient } from "./google";
  * ```
  *
  * `Dokumen/` beside `Bukti Transaksi/` is ADR-0042's, and outside this readiness on purpose: it is
- * ensured where a document needs it (`dokumen-folders.ts`), so a receipt never waits on it.
+ * ensured where a document needs it (`dokumen-folders.ts`), so a receipt never waits on it. Nothing
+ * uploads a document any more (ADR-0061); it is kept for the ones already recorded.
  *
  * `_staging` sits outside the root because Drive permissions are inherited: if someone ever moves the
  * root under a link-shared company folder, files nobody has verified yet must not come with it.

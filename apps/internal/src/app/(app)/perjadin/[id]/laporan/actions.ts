@@ -254,7 +254,7 @@ export async function finalizeReceiptsAction(
 
 /**
  * **Hapus bukti — delete one receipt from its line** (#462, ADR-0050). **The file is trashed first,
- * then the row**, as Dokumen Hapus does (ADR-0042), so a row never vanishes while its link-shared
+ * then the row**, as Dokumen Hapus did (ADR-0042, until ADR-0061), so a row never vanishes while its link-shared
  * file stays live:
  *
  * 1. **Guard** — Staff, the receipt and its trip's writer (ADR-0048) — then **the count**: a line's

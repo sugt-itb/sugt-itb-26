@@ -69,3 +69,10 @@ Pimpinan write.
 The Editor Grant split ([ADR-0052](./0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md), #469). **Planning a Perjadin** needs **Perjadin Editor**; **recording,
 editing and deleting an online Session**, Tandai terlaksana and Batalkan Sesi on one, and `/pretest`
 need **Daring Editor**. Neither reads the Dashboard. An Administrator still does all of it.
+
+## Amendment (2026-11-16): no Dokumen to run
+
+"Dokumen" in the first consequence is history: nothing uploads or deletes a Perjadin Document any more
+([ADR-0061](./0061-trip-paperwork-is-not-filed-in-the-app.md),
+[#559](https://github.com/sugt-itb/sugt-itb-26/issues/559)). The documents already recorded are only
+read.

@@ -49,6 +49,10 @@ export async function generateMetadata({ params }: PageProps<"/perjadin/[id]">):
  *
  * **A trip with no line has no strip at all** (#541): nothing records one any more, so "Rp0" would read
  * as nothing spent, when the app has simply stopped tracking it. The Laporan's URL still answers.
+ *
+ * **A trip with no document has no Dokumen section** (#559), for the same reason: nothing uploads
+ * one any more (ADR-0061), so an empty heading would read as nothing filed. A trip with documents
+ * lists them read-only, each with its Drive link.
  */
 export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
   const person = await requirePerson();
@@ -60,8 +64,9 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
   // Fetched for any signed-in Person: money reads are open now (ADR-0026, #180), so a Pimpinan
   // sees the money strip too. Writing it is the trip's writers', enforced in each query.
   const acquittal = await perjadinAcquittal(person, id);
-  // The trip's attendance sheets and SPPDs (#398, #441): read-only here, for everyone who can see
-  // the page. Upload and Hapus live on the `/pendamping` card's Dokumen dialog.
+  // The trip's attendance sheets and SPPDs (#398, #441): read-only, for everyone who can see the
+  // page. Nothing uploads or deletes one any more (ADR-0061, #559); these are the ones recorded
+  // before that.
   const dokumen = await perjadinDokumen(person, id);
   // Who writes this trip (ADR-0048): its Group, a Perjadin Editor or an Administrator. Everyone else reads
   // it with every write control hidden; each write's query refuses them again, which is the real gate.
@@ -178,17 +183,18 @@ export default async function Page({ params }: PageProps<"/perjadin/[id]">) {
         canEdit={canWrite}
       />
 
-      <section className="border-t border-border px-4 py-5 sm:px-7">
-        <h2 className="font-heading text-sm font-medium">Dokumen</h2>
-        <p className="mt-1 mb-3 text-sm text-muted-foreground">
-          Daftar hadir dan SPPD perjalanan ini. Unggah dan hapus dari kartu perjalanan di
-          Pendamping.
-        </p>
-        <PerjadinDokumenList
-          documents={dokumen?.documents ?? []}
-          schools={dokumen?.schools ?? []}
-        />
-      </section>
+      {dokumen !== null && dokumen.documents.length > 0 && (
+        <section className="border-t border-border px-4 py-5 sm:px-7">
+          <h2 className="font-heading text-sm font-medium">Dokumen</h2>
+          <p className="mt-1 mb-3 text-sm text-muted-foreground">
+            Daftar hadir dan SPPD perjalanan ini.
+          </p>
+          <PerjadinDokumenList
+            documents={dokumen.documents}
+            schools={dokumen.schools}
+          />
+        </section>
+      )}
     </div>
   );
 }

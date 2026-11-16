@@ -1621,26 +1621,24 @@ content type is pinned to PDF.
 
 **At most one SPPD per (Perjadin, School)** is the partial unique index
 `perjadin_document_sppd_unique`. It is per Perjadin, never per School alone: the same School on
-another trip gets its own. `checkDocumentFields` checks it first — the upload opener asks it, so a
-second SPPD is refused before a byte moves (`sppd-exists`) — and `recordPerjadinDocument` asks again
-in its transaction; the index is what holds two uploads racing, the loser's violation coming back
-as the same `sppd-exists`.
+another trip gets its own.
 
-**The application holds the rest**, in `recordPerjadinDocument`: `document_date` lies inside the
-trip, and a Peserta sheet's School is one of **the trip's Schools** — it has a non-cancelled
-Session on this Perjadin (`isTripSchool`, the same rule `tripSchoolNames` reads names through) —
-refused as `school-not-on-perjadin` ([#410](https://github.com/sugt-itb/sugt-itb-26/issues/410)).
-An SPPD's School is held to the same rule.
-It used to be the trip's Sub-Cluster, but a Sub-Cluster may be covered by several trips (ADR-0043),
-so that offered Schools this trip never visits. The Dokumen dialog's picker offers exactly that set.
-The rule is checked on a new upload only: a sheet recorded for a School whose Sessions on the trip
-were all cancelled later stays listed and deletable. It cannot be a constraint: it reads the
-Sessions, which change after the sheet is written. The three attendance kinds have **no duplicate
-rule**: two sheets of one kind and date are two rows, told apart in Drive by `D-{doc8}`.
+**Nothing writes a row any more** (#559,
+[ADR-0061](./adr/0061-trip-paperwork-is-not-filed-in-the-app.md)): the paperwork is no longer filed
+in the tool, so there is no upload and no Hapus. The rows already here stay, read-only —
+`perjadinDokumen` is `/perjadin/[id]`'s read of them — and so do their files and folders in Drive.
+While a document was still recorded, the application held what the CHECKs cannot: `document_date`
+inside the trip, and a Peserta sheet's or an SPPD's School one of **the trip's Schools** — a
+non-cancelled Session on this Perjadin (`isTripSchool`,
+[#410](https://github.com/sugt-itb/sugt-itb-26/issues/410)). That rule read the Sessions, which
+change after a sheet is written, so a sheet for a School whose Sessions on the trip were all
+cancelled later stays listed. The three attendance kinds have **no duplicate rule**: two sheets of
+one kind and date are two rows, told apart in Drive by `D-{doc8}`.
 
-**The row and its Activity Log entry are written in one transaction**, and the row lands with
-`drive_synced_at` null; the reconcile sets it once the file is named, filed and shared. `id` is
-generated before the insert, because the file's name carries it.
+**A row and its `document_uploaded` Log entry were written in one transaction**, the row landing
+with `drive_synced_at` null; the reconcile sets it once the file is named, filed and shared, and
+Periksa koneksi's sweep still finishes a row left unsynced. `id` was generated before the insert,
+because the file's name carries it.
 
 **Folders.** `perjadin.drive_dokumen_folder_id` is the trip's folder under `Dokumen/Pelaksanaan
 Offline`, and `perjadin_document_folder` holds its four kind folders, each made on first use. Both
@@ -1648,13 +1646,10 @@ are claimed by compare-and-set: the first by `where drive_dokumen_folder_id is n
 the primary key, `on conflict do nothing`. A caller that lost trashes its own folder and uses the
 winner's.
 
-**Hapus trashes the file first, then deletes the row** (#398). Its file is public by link, so a row
-must never vanish while the file stays live: the file goes to the Drive trash, and only then are the
-row deleted and a `document_deleted` Log entry written, in one transaction. The entry is a snapshot
-of the row's fields, since the row is gone after it. A file already in the trash, or gone, counts as
-trashed, so if the delete fails after the trash, the row stays, pointing at a trashed file, and
-Hapus again finishes it. Hapus is refused while the connection is not usable. An emptied kind folder
-is left in place, and nothing is ever edited: a wrong upload is a Hapus and a new upload.
+**Hapus trashed the file first, then deleted the row** (#398), until ADR-0061 removed it: a row
+never vanished while its public file stayed live, and the row went with a `document_deleted` Log
+entry, a snapshot of its fields, in one transaction. Those entries, and `document_uploaded`'s, stay
+in the Log as history.
 
 ### Session Footage
 
@@ -1698,7 +1693,7 @@ Drive files is refused rather than followed.
 
 **The row and its Activity Log entry are written in one transaction** (`footage_uploaded`), with
 `drive_synced_at` null until the reconcile names, files and shares the file. `id` is generated before
-the insert, because the file's name carries it (`M-{footage8}`). **Hapus** is the Dokumen order: the
+the insert, because the file's name carries it (`M-{footage8}`). **Hapus** is the order Dokumen's Hapus used: the
 file to the Drive trash first, then the row and a `footage_deleted` entry in one transaction.
 
 **Folders.** `perjadin.drive_footage_folder_id` is the trip's folder under `Foto & Video/Pelaksanaan
@@ -1907,13 +1902,14 @@ create index activity_log_occurred_at_id_idx on activity_log (occurred_at desc, 
 **One row per act on a Perjadin's money, receipts, documents or report** (#395), read only by an
 Administrator on `/log`. The `action` values are character for character `ACTIVITY_LOG_ACTIONS` in
 `packages/domain/src/index.ts`. The two `document_*` values went into the CHECK with the rest, so the
-Dokumen uploads and Hapus needed no CHECK migration. The `footage_*` pair widened it in migration
+Dokumen uploads and Hapus needed no CHECK migration; both are history only since ADR-0061 (#559). The `footage_*` pair widened it in migration
 0044, and the two money deletes, `evidence_deleted` and `transaction_deleted` (ADR-0050), in
 migration 0049 — one migration for both.
 
 **Each entry is written in the same database transaction as the change it records**, so a refused
 or failed write logs nothing. The money writes log as below, each through `logActivity` in
-`queries/activity-log.ts`; the Dokumen and Foto & Video writes are described with their tables:
+`queries/activity-log.ts`; the Foto & Video writes are described with their table, and nothing
+writes `document_uploaded` or `document_deleted` since ADR-0061:
 
 | Write                       | `action`               | `details`                                                                                             |
 | --------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------- |

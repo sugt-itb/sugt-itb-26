@@ -440,19 +440,10 @@ export {
   type UnsyncedDocument,
 } from "./document-drive-sync";
 export {
-  checkDocumentFields,
-  deletePerjadinDocument,
   perjadinDokumen,
-  recordPerjadinDocument,
-  type DeletePerjadinDocumentResult,
-  type DocumentFields,
-  type DocumentFieldsRefusal,
   type DocumentSchool,
-  type NewPerjadinDocument,
   type PerjadinDocumentRow,
   type PerjadinDokumen,
-  type PesertaFields,
-  type RecordPerjadinDocumentResult,
 } from "./perjadin-documents";
 export {
   canViewDashboard,

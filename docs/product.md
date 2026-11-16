@@ -111,7 +111,7 @@ record's owner throughout. Publishing to the public site is Staff-only; every Gr
 contains a Staff member by construction, so no trip's material is unreachable.
 
 **Popups that take data are a big fixed panel** (#417), because Staff work the tool mostly from
-phones during a Perjadin. Dokumen, Catatan Sesi, Tambah/Ubah Sesi, Ubah Group,
+phones during a Perjadin. Catatan Sesi, Tambah/Ubah Sesi, Ubah Group,
 Ubah Sesi daring and both Persiapan popups open as a panel about 900px wide and nearly the screen's
 height on a laptop, and as the whole screen on a phone. It keeps that size however much is added —
 twenty checklist items — with the title pinned at the top, the buttons at the
@@ -124,12 +124,12 @@ inside their border on a phone (#419). Tables still scroll sideways inside their
 `/log`'s filters stack below 640px, and on the Laporan each transaction's receipts wrap under
 it.
 
-**An upload to Google Drive says that it is running** (#420). A line's Unggah bukti and Dokumen's Unggah show a spinner with "Mengunggah ke Google Drive…" — "Mengunggah 2 dari 3
+**An upload to Google Drive says that it is running** (#420). A line's Unggah bukti and Foto & Video's Unggah show a spinner with "Mengunggah ke Google Drive…" — "Mengunggah 2 dari 3
 berkas ke Google Drive…" when several files go at once — and "Jangan tutup halaman ini sampai
 selesai." under it. Once the files are in Drive it reads "Menyimpan…" while the app records them.
 There is no progress bar. In a popup it sits directly above the buttons; for Unggah bukti it sits
 under the line's receipts. Until it is over, the popup cannot be closed (its close button is
-disabled, and Esc and a click outside do nothing), its fields are disabled (so is Dokumen's Hapus),
+disabled, and Esc and a click outside do nothing), its fields are disabled,
 and reloading or closing the tab asks first. Then everything unlocks and the usual result shows.
 
 ### Coverage view — the landing screen
@@ -272,8 +272,7 @@ Group of:
 - **Perjalanan Dinas Anda**: the trips not yet over (ending today or later, in WIB), soonest
   first.
 - **Perjalanan Dinas Sebelumnya**: the trips that are over, the most recently ended first, with
-  every action still on them. It reads "Perjalanan yang sudah selesai, yang terbaru di atas.
-  Dokumennya masih bisa dikerjakan."
+  every action still on them. It reads "Perjalanan yang sudah selesai, yang terbaru di atas."
 
 **Every collapsed card looks the same** (#419), in both sections, whether the trip is past, current
 or future and whether or not the person is its PIC:
@@ -294,8 +293,8 @@ SMA Pradita Dirgantara, SMA Trensains Muhammadiyah Sragen
 
 A card opens to show **Uang Perjalanan Terpakai** — every transaction on the trip, all categories,
 the same figure as the trip's screen and its Laporan, and left out on a trip with none (#541) — then
-**Dokumen**, **Evaluasi Perjadin** and **Edit**, then the timeline of Sessions and who is on the trip.
-On a phone those three buttons are a full-width two-column grid with the last one across the whole
+**Evaluasi Perjadin** and **Edit**, then the timeline of Sessions and who is on the trip.
+On a phone those two buttons are a full-width two-column grid, an odd last one across the whole
 row, and the money row and each Session's buttons wrap rather than
 spill sideways. Each section shows three cards with **Tampilkan lebih banyak** for the rest, and is
 left out when it has none. With neither, the page says "Anda belum tergabung dalam Perjalanan
@@ -352,7 +351,7 @@ described "Upload dokumentasi kegiatan luring untuk sesi ini"
   "Menyimpan…" — with the popup locked and the browser asking before the page is left. Afterwards it
   says "{n} berkas terunggah", names each file that failed with its reason, and offers **Coba lagi**
   for just those; picking more files keeps that summary. Files whose place in Drive is not yet
-  finished are counted ("{k} berkas belum tersinkron…"), as Dokumen says it. A file picked twice is
+  finished are counted ("{k} berkas belum tersinkron…"). A file picked twice is
   left out the second time ("Sudah dipilih").
 - **Sudah diunggah** lists the Session's files, newest first: Foto or Video, the file's own name, its
   size, who uploaded it and when, **Buka** (it opens in Drive in a new tab), "belum tersinkron" while
@@ -361,40 +360,10 @@ described "Upload dokumentasi kegiatan luring untuk sesi ini"
 - **While Drive is down** the popup still opens and lists the files; uploading and Hapus are closed,
   with the reason said as text.
 
-**Dokumen**, on every card in both sections, opens **"Dokumen —
-{name}"**: the trip's attendance sheets and each School's SPPD
-([ADR-0042](./adr/0042-perjadin-documents-are-stored-in-the-company-google-drive.md)).
-
-- **The list**, under four headings: Daftar Hadir Peserta, Daftar Hadir Narasumber, Daftar Hadir
-  Pendamping and SPPD. A Peserta sheet reads `2026-10-14 · SMA Y · Siswa · 08.00–11.30 WITA`; the
-  Narasumber and Pendamping sheets read their date; an SPPD reads its School. The SPPD heading
-  carries **"SPPD: x/y sekolah"** — how many of the trip's Schools have their SPPD — so a missing
-  one shows. Each has a **Buka** link that opens the PDF in Drive in a new tab, and
-  "belum tersinkron" while it is not yet in place there. An empty heading says "Belum ada".
-- **Unggah dokumen**: pick the **Jenis dokumen**, then its fields.
-  - A Peserta sheet asks for **Tanggal Sesi**, **Waktu Mulai** and **Waktu Selesai** (with the
-    School's time zone beside them once it is picked), **Sekolah** (a plain list of the trip's
-    Schools — those with a Session on this trip that was not cancelled, so a School of the Kelompok
-    this trip never visits is not offered; one that is refused says "Sekolah ini tidak punya Sesi di
-    Perjadin ini.") and **Tipe Peserta** (`Siswa` or `GTK-MS`). A sheet already uploaded for a
-    School that has since left the trip stays listed and can still be deleted.
-  - A Narasumber or Pendamping sheet asks for **Tanggal Dokumen**.
-  - Both dates are limited to the trip's.
-  - An **SPPD** asks only for **Sekolah**: the trip's Schools, each one that already has its SPPD
-    on this trip marked **"sudah ada"** and not selectable. One School has at most one SPPD per
-    Perjadin; a second is refused before the upload starts with "{School} sudah punya SPPD untuk
-    Perjadin ini. Hapus dulu untuk menggantinya." Hapus then a new upload replaces it. The same
-    School on another Perjadin has its own.
-  - **File**: one PDF, "1 file .pdf, maks. 50 MB". Anything else is refused with "Hanya file .pdf",
-    and a larger file with the 50 MB message, before anything is uploaded.
-- **Unggah** uploads the PDF straight to Drive and records it. Any refusal keeps every field and
-  the picked file, so pressing Unggah again retries. A sheet recorded while Drive could not finish
-  putting it in place says so, and Periksa koneksi finishes it.
-- **Hapus** on each sheet asks first — "Hapus dokumen ini? File akan dipindahkan ke Sampah Google
-  Drive." — then moves the file to the Drive trash and removes the sheet. There is no editing: a
-  wrong upload is fixed by Hapus and a new upload.
-- The trip's Group, a Perjadin Editor or an Administrator uploads and deletes (ADR-0048). The button, and Hapus, are disabled with the reason while
-  Drive is not connected or broken, as Unggah bukti is.
+**The card has no Dokumen** (#559,
+[ADR-0061](./adr/0061-trip-paperwork-is-not-filed-in-the-app.md)): a trip's attendance sheets and
+SPPDs are no longer uploaded or deleted in the tool, by anyone, an Administrator included. The ones
+already uploaded are listed on the trip's screen.
 
 ### Concerns list
 
@@ -643,10 +612,17 @@ trip's own.
 
 The levels are edited on [Pengaturan Perjadin](#pengaturan-perjadin--the-preparation-checklist).
 
-**A Perjadin's screen ends with its Dokumen**: the attendance sheets and SPPDs uploaded from the
-`/pendamping` card, under the four kinds with the "SPPD: x/y sekolah" summary, each with a **Buka**
-link and "belum tersinkron" while it is not yet in place in Drive. It is read-only and shown to everyone signed in, a Pimpinan included;
-uploading and Hapus happen in the card's Dokumen dialog.
+**A Perjadin's screen ends with its Dokumen**, on a trip with at least one: the attendance sheets and
+SPPDs uploaded before uploads stopped (#559,
+[ADR-0061](./adr/0061-trip-paperwork-is-not-filed-in-the-app.md)), under four headings — Daftar
+Hadir Peserta, Daftar Hadir Narasumber, Daftar Hadir Pendamping and SPPD — with the
+"SPPD: x/y sekolah" summary, how many of the trip's Schools have their SPPD. A Peserta sheet reads
+`2026-10-14 · SMA Y · Siswa · 08.00–11.30 WITA`, the Narasumber and Pendamping sheets their date, an
+SPPD its School; an empty heading says "Belum ada". Each has a **Buka** link that opens the PDF in
+Drive in a new tab, and "belum tersinkron" while it is not yet in place there. It is read-only and
+shown to everyone signed in, a Pimpinan included; nothing uploads or deletes one. A trip with no
+document has no Dokumen section: an empty one would read as nothing filed, when the app has simply
+stopped tracking it.
 
 **The Perjadin list is a table** ([#343](https://github.com/sugt-itb/sugt-itb-26/issues/343)):
 Perjadin, Sekolah (Schools with a Session that was not cancelled), Mulai, Selesai, PIC,
@@ -1207,8 +1183,9 @@ can sign in to reach this screen. See
 
 **Only an Administrator sees Pengaturan**, in the sidebar and at `/pengaturan`. Anyone else,
 Pimpinan included, gets the 403. It holds one card for now: the company Google Drive that
-holds transaction evidence, Dokumen and Foto & Video, and serves Unggah bukti and both of the others'
-uploads
+holds transaction evidence, Dokumen and Foto & Video, and serves Unggah bukti and Foto & Video's
+uploads — Dokumen no longer uploads (ADR-0061), but the documents already recorded stay there and
+still finish syncing
 ([ADR-0040](./adr/0040-transaction-evidence-is-stored-in-the-company-google-drive.md)).
 
 The card is in one of four states:
@@ -1293,7 +1270,7 @@ connection drops. The trip's Group, a Perjadin Editor or an Administrator upload
 anyone signed in views them on `/sesi/[id]`.
 
 **A badge on Pengaturan** in the sidebar tells an Administrator that Drive needs them: not
-connected, broken, or its folders unresolved — the states in which nobody can upload a receipt or a Dokumen.
+connected, broken, or its folders unresolved — the states in which nobody can upload a receipt or Foto & Video.
 
 **On the acquittal**, a line whose receipts are recorded but not yet in place in Drive shows a small
 "belum tersinkron" mark. Its tooltip reads "Bukti belum tersinkron ke Google Drive — Administrator
@@ -1324,8 +1301,11 @@ A table, newest first, 50 rows a page:
   history only: nothing writes them since the Advance stopped being tracked (ADR-0051), and past
   entries still read as they did. Laporan dikirim is history only the same way: nothing writes it
   since the Laporan stopped being filed (ADR-0055). So is Catat transaksi, since nothing records a new
-  line (ADR-0060); its filter still finds past entries and Transaksi dihapus.
-- **Rincian** says what changed. A transaction's row links to its folder in Drive, when it has one.
+  line (ADR-0060); its filter still finds past entries and Transaksi dihapus. Dokumen diunggah and
+  Dokumen dihapus are history only too, since nothing uploads or deletes a document (ADR-0061); the
+  Dokumen filter still finds them.
+- **Rincian** says what changed. A transaction's row links to its folder in Drive, when it has one;
+  a document's or a Foto & Video file's row links to that file while it stands.
 
 **Above the table**, a search box, an Aksi filter and a Rentang tanggal:
 
