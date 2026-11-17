@@ -44,6 +44,10 @@ describe("keuanganSourceFromUrl", () => {
     ["a non-numeric gid", `https://docs.google.com/spreadsheets/d/${ID}/edit#gid=abc`],
     ["text that is not a URL", "Blok B"],
     ["an empty paste", "   "],
+    [
+      "an over-long address",
+      `https://docs.google.com/spreadsheets/d/${ID}/edit?x=${"a".repeat(2048)}#gid=1`,
+    ],
     ["a port", `https://docs.google.com:8443/spreadsheets/d/${ID}/edit#gid=1`],
     ["a username", `https://user@docs.google.com/spreadsheets/d/${ID}/edit#gid=1`],
     ["credentials", `https://user:pass@docs.google.com/spreadsheets/d/${ID}/edit#gid=1`],

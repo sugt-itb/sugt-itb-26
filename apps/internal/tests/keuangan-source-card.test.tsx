@@ -5,10 +5,12 @@ import { requirePerson } from "-/lib/person";
 import { db, schema } from "@sugt/db";
 import { setKeuanganSource, type Person } from "@sugt/db/queries";
 import type { Grant, Role } from "@sugt/domain";
+import { revalidatePath } from "next/cache";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { addGrant, addPerson, resetDatabase } from "./support/fixtures";
+import { digestOf, FORBIDDEN } from "./support/drive";
+import { addPerson, resetDatabase, withGrant } from "./support/fixtures";
 
 /**
  * **The Block B source card on `/pengaturan`** (#571): an Administrator pastes the Block B tab's
@@ -20,8 +22,6 @@ import { addGrant, addPerson, resetDatabase } from "./support/fixtures";
 
 vi.mock("-/lib/person", () => ({ requirePerson: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-
-const FORBIDDEN = "NEXT_HTTP_ERROR_FALLBACK;403";
 
 const OLD = {
   url: "https://docs.google.com/spreadsheets/d/made-up-old/edit#gid=1",
@@ -73,9 +73,9 @@ function blockB(drop?: string) {
 }
 
 async function staff(role: Role, email: string, grants: Grant[] = []): Promise<Person> {
-  const row = await addPerson({ fullName: email.split("@")[0]!, email, role });
-  for (const grant of grants) await addGrant(row.id, grant);
-  return { ...row, grants };
+  let person: Person = await addPerson({ fullName: email.split("@")[0]!, email, role });
+  for (const grant of grants) person = await withGrant(person, grant);
+  return person;
 }
 
 /** Stub `fetch` to answer every request with `body` as CSV, and record what was asked for. */
@@ -93,14 +93,6 @@ const fetchedUrls = (fetch: ReturnType<typeof stubSheet>) =>
 
 async function storedSource() {
   return db.select().from(schema.keuanganSource);
-}
-
-async function digestOf(call: Promise<unknown>) {
-  const thrown = await call.then(
-    () => null,
-    (error: unknown) => error,
-  );
-  return (thrown as { digest?: string } | null)?.digest;
 }
 
 beforeEach(async () => {
@@ -164,6 +156,7 @@ describe("saving the Block B source", () => {
     });
     expect(fetchedUrls(fetch)).toEqual([NEW_EXPORT]);
     await expect(storedSource()).resolves.toMatchObject([OLD]);
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it("keeps the old source when the sheet cannot be reached", async () => {
@@ -194,6 +187,9 @@ describe("saving the Block B source", () => {
     const result = await setKeuanganSourceAction(`  ${NEW_URL}\n`);
 
     expect(result).toEqual({ ok: true, kelompok: 2, totalRealisasi: 350_000 });
+    // Both pages that show the source re-render with the new one.
+    expect(revalidatePath).toHaveBeenCalledWith("/pengaturan");
+    expect(revalidatePath).toHaveBeenCalledWith("/keuangan");
     expect(fetchedUrls(fetch)).toEqual([NEW_EXPORT]);
     await expect(storedSource()).resolves.toEqual([
       {

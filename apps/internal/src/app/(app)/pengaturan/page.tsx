@@ -76,7 +76,7 @@ export default async function Page({ searchParams }: PageProps<"/pengaturan">) {
           connection={connection}
           accountEmail={accountEmail}
         />
-        <KeuanganSourceCardView source={keuanganSource} />
+        <KeuanganCard source={keuanganSource} />
       </div>
     </div>
   );
@@ -206,7 +206,7 @@ function DriveCard({
  * tab, and when and by whom it was set — or **Belum diatur**. This card is the only place the address
  * appears; `/keuangan` never shows it. A new address replaces the old one, and there is no remove.
  */
-function KeuanganSourceCardView({ source }: { source: KeuanganSourceCard | null }) {
+function KeuanganCard({ source }: { source: KeuanganSourceCard | null }) {
   return (
     <Card>
       <CardHeader>

@@ -81,7 +81,7 @@ export async function setKeuanganSourceAction(text: string): Promise<KeuanganSou
   const source = keuanganSourceFromUrl(text);
   if (!source.ok) return { ok: false, detail: source.detail };
 
-  const read = await fetchKeuanganSheet({ sheetId: source.sheetId, gid: source.gid });
+  const read = await fetchKeuanganSheet(source);
   if (!read.ok) return { ok: false, detail: read.detail };
 
   await staffSurface(async () =>

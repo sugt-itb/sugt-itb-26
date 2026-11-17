@@ -4,7 +4,8 @@ import { formatRupiah } from "@sugt/domain";
 import { Alert, AlertDescription } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
 import { Input } from "@sugt/ui/components/input";
-import { useState, useTransition } from "react";
+import { Label } from "@sugt/ui/components/label";
+import { useId, useState, useTransition } from "react";
 
 import { type KeuanganSourceSaveResult, setKeuanganSourceAction } from "./actions";
 
@@ -28,6 +29,9 @@ export function KeuanganSourceForm() {
   const [text, setText] = useState("");
   const [result, setResult] = useState<KeuanganSourceSaveResult | null>(null);
   const [saving, startSaving] = useTransition();
+  const inputId = useId();
+  const resultId = useId();
+  const refused = result !== null && !result.ok;
 
   return (
     <form
@@ -41,17 +45,16 @@ export function KeuanganSourceForm() {
         });
       }}
     >
-      <label
-        htmlFor="keuangan-source-url"
-        className="text-sm font-medium"
-      >
-        Alamat tab Blok B
-      </label>
+      <Label htmlFor={inputId}>Alamat tab Blok B</Label>
       <div className="flex flex-col gap-2 sm:flex-row">
+        {/* `type="text"`, not `url`: the browser's own check would pre-empt the reason the server gives. */}
         <Input
-          id="keuangan-source-url"
-          type="url"
+          id={inputId}
+          type="text"
+          inputMode="url"
           required
+          aria-invalid={refused || undefined}
+          aria-describedby={result ? resultId : undefined}
           placeholder="https://docs.google.com/spreadsheets/d/…/edit#gid=…"
           value={text}
           onChange={(event) => {
@@ -66,7 +69,10 @@ export function KeuanganSourceForm() {
         </Button>
       </div>
       {result && (
-        <Alert variant={result.ok ? "default" : "destructive"}>
+        <Alert
+          id={resultId}
+          variant={result.ok ? "default" : "destructive"}
+        >
           <AlertDescription>{keuanganSaveMessage(result)}</AlertDescription>
         </Alert>
       )}
