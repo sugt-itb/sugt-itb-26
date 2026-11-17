@@ -3,32 +3,50 @@ import { randomUUID } from "node:crypto";
 import { openReceiptSessionsAction } from "-/app/(app)/perjadin/[id]/laporan/actions";
 import type { FakeDrive } from "-/lib/drive/fake-drive";
 import { ensureFixedFolders, readyFolders, type ReadyFolders } from "-/lib/drive/fixed-folders";
+import { DRIVE_SCOPE } from "-/lib/drive/google";
 import { evidenceFileName, transactionFolderName } from "-/lib/drive/receipt-files";
 import { reconcileTransaction } from "-/lib/drive/reconcile";
+import { reconcileDocument } from "-/lib/drive/reconcile-document";
 import { encryptRefreshToken } from "-/lib/drive/token-crypto";
 import { db, schema } from "@sugt/db";
-import type { Person } from "@sugt/db/queries";
-import type { TransactionCategory, TransactionParticipantType } from "@sugt/domain";
+import {
+  activityLogAksi,
+  activityLogRincian,
+  type ActivityLogEntry,
+  type Person,
+} from "@sugt/db/queries";
+import type {
+  PerjadinDocumentKind,
+  PerjadinDocumentParticipantType,
+  TransactionCategory,
+  TransactionParticipantType,
+} from "@sugt/domain";
 import { eq } from "drizzle-orm";
 import { vi } from "vitest";
 
 import { addActivityLogEntry, addTransaction } from "./fixtures";
 
 /**
- * **What a receipt test needs of Google Drive** (ADR-0040): the token endpoint, a connected Drive
- * with its fixed tree, receipt bytes, the browser's upload, and a line already recorded. Shared by
- * the Unggah bukti, Hapus and Periksa koneksi tests, which each mock `openDrive` to hand back their own `FakeDrive` — a `vi.mock`
- * has to sit in the test file, so it is not here.
+ * **What a Drive test needs** (ADR-0040, ADR-0042): the token endpoint, a connected Drive with its
+ * fixed tree, receipt bytes, the browser's upload, and a line or a Perjadin Document already
+ * recorded. Shared by the Unggah bukti, Hapus, Dokumen and Periksa koneksi tests, which each mock
+ * `openDrive` to hand back their own `FakeDrive` — a `vi.mock` has to sit in the test file, so it is
+ * not here.
  */
 
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
-/** Google's token endpoint, answering every refresh with an access token. Anything else throws. */
-export function stubTokenEndpoint() {
+/**
+ * Google's token endpoint, answering every refresh with an access token carrying `scope` — the full
+ * `drive` scope unless a test says otherwise (#562). Anything else throws.
+ */
+export function stubTokenEndpoint({
+  scope = `openid email ${DRIVE_SCOPE}`,
+}: { scope?: string } = {}) {
   vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
     const url = input instanceof Request ? input.url : String(input);
     if (url !== TOKEN_ENDPOINT) throw new Error(`Unexpected outbound request: ${url}`);
-    return Response.json({ access_token: "access" });
+    return Response.json({ access_token: "access", scope });
   });
 }
 
@@ -50,13 +68,18 @@ export function pdf(size = 2048) {
  * The company Drive connection, with its fixed tree built in `drive` and a token that decrypts —
  * `connected` by default, or `broken`. Answers the tree's ids. `Dokumen/` and its `Pelaksanaan
  * Offline/` (ADR-0042) are built too, as a connect now builds them, unless `dokumen` is false — a
- * connection made before them — and likewise `Foto & Video/` (ADR-0046) unless `footage` is false.
+ * connection made before them — and likewise `Foto & Video/` (ADR-0046) unless `footage` is false,
+ * and `Foto & Video — Unggahan/` (#561) unless `footageUpload` is.
  */
 export async function connectDrive(
   drive: FakeDrive,
   connectedByPersonId: string,
   status: "connected" | "broken" = "connected",
-  { dokumen = true, footage = true }: { dokumen?: boolean; footage?: boolean } = {},
+  {
+    dokumen = true,
+    footage = true,
+    footageUpload = true,
+  }: { dokumen?: boolean; footage?: boolean; footageUpload?: boolean } = {},
 ): Promise<ReadyFolders> {
   const ensured = await ensureFixedFolders(drive, {
     rootFolderId: null,
@@ -78,6 +101,18 @@ export async function connectDrive(
   const footagePelaksanaanOfflineFolderId = footageFolderId
     ? (await drive.createFolder({ name: "Pelaksanaan Offline", parentId: footageFolderId })).id
     : null;
+  const footageUploadFolderId = footageUpload
+    ? (
+        await drive.createFolder({
+          name: "Foto & Video — Unggahan",
+          parentId: folders.rootFolderId,
+        })
+      ).id
+    : null;
+  const footageUploadPelaksanaanOfflineFolderId = footageUploadFolderId
+    ? (await drive.createFolder({ name: "Pelaksanaan Offline", parentId: footageUploadFolderId }))
+        .id
+    : null;
   const token = encryptRefreshToken("refresh");
   await db.insert(schema.driveConnection).values({
     accountEmail: "bukti@perusahaan.test",
@@ -89,6 +124,8 @@ export async function connectDrive(
     dokumenPelaksanaanOfflineFolderId,
     footageFolderId,
     footagePelaksanaanOfflineFolderId,
+    footageUploadFolderId,
+    footageUploadPelaksanaanOfflineFolderId,
     status,
     brokenAt: status === "broken" ? new Date() : null,
     connectedByPersonId,
@@ -240,6 +277,108 @@ export async function addLineLeftInStaging(
     uploadedByPersonId: person.id,
   });
   return { transactionId: row.id, folderId: staged.id, fileId: fileId! };
+}
+
+/** A Perjadin Document's fields as they were recorded before #559. */
+export type RecordedDocumentFields = {
+  perjadinId: string;
+  kind: PerjadinDocumentKind;
+  /** `YYYY-MM-DD`; `null` on an SPPD. */
+  documentDate: string | null;
+  /** A Daftar Hadir Peserta's or an SPPD's School. */
+  schoolId?: string;
+  /** A Daftar Hadir Peserta's cohort and local span, `HH:MM`. */
+  peserta?: {
+    participantType: PerjadinDocumentParticipantType;
+    startsAt: string;
+    endsAt: string;
+  };
+};
+
+type DocumentLogEntry = Extract<ActivityLogEntry, { action: "document_uploaded" }>;
+
+/**
+ * **A Perjadin Document recorded before #559, its reconcile never finished**: nothing uploads one
+ * any more (ADR-0061), so it is inserted directly — its PDF landed unnamed in `_staging` with the
+ * trip's `sugtPerjadinId`, as the upload left it, the row unsynced, and its `document_uploaded` Log
+ * entry as `logActivity` wrote it. The sweep must still finish one. Answers the ids.
+ */
+export async function addDocumentLeftInStaging(
+  drive: FakeDrive,
+  folders: ReadyFolders,
+  person: Person,
+  fields: RecordedDocumentFields,
+): Promise<{ documentId: string; fileId: string }> {
+  const bytes = pdf();
+  const { sessionUri } = await drive.openResumableSession({
+    name: `${randomUUID()}.pdf`,
+    parentId: folders.stagingFolderId,
+    mimeType: "application/pdf",
+    size: bytes.length,
+    origin: "https://sugt.test",
+    appProperties: { sugtPerjadinId: fields.perjadinId },
+  });
+  const fileId = drive.land(sessionUri, bytes).id;
+
+  const documentId = randomUUID();
+  await db.insert(schema.perjadinDocument).values({
+    id: documentId,
+    perjadinId: fields.perjadinId,
+    kind: fields.kind,
+    documentDate: fields.documentDate,
+    schoolId: fields.schoolId ?? null,
+    participantType: fields.peserta?.participantType ?? null,
+    startsAt: fields.peserta?.startsAt ?? null,
+    endsAt: fields.peserta?.endsAt ?? null,
+    driveFileId: fileId,
+    contentType: "application/pdf",
+    byteSize: bytes.length,
+    uploadedByPersonId: person.id,
+  });
+
+  const [found] = fields.schoolId
+    ? await db
+        .select({ name: schema.school.name, timeZone: schema.province.timeZone })
+        .from(schema.school)
+        .innerJoin(schema.province, eq(schema.province.code, schema.school.provinceCode))
+        .where(eq(schema.school.id, fields.schoolId))
+    : [];
+  const entry: DocumentLogEntry = {
+    action: "document_uploaded",
+    details: {
+      documentId,
+      kind: fields.kind,
+      documentDate: fields.documentDate,
+      ...(found && { schoolName: found.name }),
+      ...(found && fields.peserta && { ...fields.peserta, timeZone: found.timeZone }),
+    },
+  };
+  await addActivityLogEntry({
+    perjadinId: fields.perjadinId,
+    actorPersonId: person.id,
+    actorEmail: person.email,
+    action: entry.action,
+    details: entry.details,
+    searchText:
+      `${activityLogAksi(entry.action, false)} · ${activityLogRincian(entry)}`.toLowerCase(),
+  });
+  return { documentId, fileId };
+}
+
+/**
+ * **A Perjadin Document recorded before #559 and put in place**: `addDocumentLeftInStaging`, then the
+ * real reconcile, which names the file, files it under its kind and shares it. Answers whether that
+ * finished, with the ids.
+ */
+export async function addRecordedDocument(
+  drive: FakeDrive,
+  folders: ReadyFolders,
+  person: Person,
+  fields: RecordedDocumentFields,
+) {
+  const left = await addDocumentLeftInStaging(drive, folders, person, fields);
+  const reconciled = await reconcileDocument(person, drive, folders, left.documentId);
+  return { ...left, synced: reconciled.outcome === "synced" };
 }
 
 /** The digest a refused Server Action threw — `NEXT_HTTP_ERROR_FALLBACK;403` for `forbidden()`. */

@@ -3,7 +3,7 @@ import { DESTINATION_PARAM, safeDestination } from "-/lib/sign-in-destination";
 import type { Metadata, Route } from "next";
 import { redirect } from "next/navigation";
 
-import { GoogleSignInButton } from "./google-sign-in-button";
+import { SignInButtons } from "./sign-in-buttons";
 
 export const metadata: Metadata = { title: "Masuk" };
 
@@ -68,11 +68,10 @@ export default async function SignInPage({
           </p>
         )}
 
-        <GoogleSignInButton destination={destination} />
+        <SignInButtons destination={destination} />
 
         <p className="text-xs text-muted-foreground">
-          Gunakan akun Google yang terdaftar. Tim DITSAMA memakai akun Google apa pun yang sudah
-          terdaftar.
+          Gunakan akun ITB atau akun Google yang terdaftar.
         </p>
       </div>
     </main>

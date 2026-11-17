@@ -64,7 +64,7 @@ function persiapanProgramCanEdit(node: unknown): boolean | undefined {
 }
 
 describe("the Dashboard (/)", () => {
-  it.each(["Perjadin Editor", "Daring Editor"] as const)(
+  it.each(["Perjadin Editor", "Daring Editor", "Keuangan"] as const)(
     "redirects a Staff member holding only %s to /pendamping",
     async (grant) => {
       signIn(await staffWith([grant], "only@itb.ac.id"));
@@ -124,7 +124,12 @@ describe("writing a Perjadin off one's Group", () => {
     await expect(
       requirePerjadinWriter(await staffWith(["Perjadin Editor"], "budi@itb.ac.id"), trip.id),
     ).resolves.toBeUndefined();
-    for (const grant of ["Daring Editor", "Dashboard Editor", "Dashboard Viewer"] as const) {
+    for (const grant of [
+      "Daring Editor",
+      "Dashboard Editor",
+      "Dashboard Viewer",
+      "Keuangan",
+    ] as const) {
       const other = await staffWith([grant], `${grant.replace(" ", "-").toLowerCase()}@itb.ac.id`);
       const refusal = await requirePerjadinWriter(other, trip.id).catch((error: unknown) => error);
       expect(isNotOnPerjadinError(refusal), grant).toBe(true);

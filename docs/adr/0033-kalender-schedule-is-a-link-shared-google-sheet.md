@@ -53,3 +53,10 @@ maintain it with, for data DITSAMA already keeps in a sheet everyone on the team
 The Sheets API would add an auth story (an API key or service account, its rotation, its storage)
 for a sheet that is already world-readable by link. Both cost more than the link-shared CSV, whose
 only real weakness — a tightened share — is caught and shown rather than hidden.
+
+## Amendment (2026-11-17): `/keuangan` reuses this route, but stores its URL
+
+`/keuangan` reads a link-shared copy of Finance's spreadsheet the same way: its CSV export, a plain
+`fetch`, the same `parseCsv`, now in `lib/csv.ts` ([ADR-0064](./0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md)). One thing differs: each fresh copy has
+a new URL, so its source is **data** an Administrator sets on `/pengaturan` and the database stores
+(`keuangan_source`), not an environment variable as `JADWAL_SHEET_CSV_URL` is here.

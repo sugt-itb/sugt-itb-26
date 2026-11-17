@@ -45,8 +45,8 @@ import {
 /**
  * **Hapus bukti** (#462, ADR-0050): one receipt off its line. The file goes to the Drive trash
  * first, then the row and its `evidence_deleted` Log entry go in one transaction, counted under the
- * line's lock — a line keeps at least one receipt. The fakes of `dokumen-hapus.test.ts`, with
- * `deleteTransactionEvidence` wrapped so a test can fail it or race it.
+ * line's lock — a line keeps at least one receipt. The fakes of the other Drive tests
+ * (`./support/drive.ts`), with `deleteTransactionEvidence` wrapped so a test can fail it or race it.
  */
 
 vi.mock("-/lib/person", () => ({ requirePerson: vi.fn() }));

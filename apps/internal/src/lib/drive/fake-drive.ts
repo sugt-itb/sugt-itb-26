@@ -1,9 +1,12 @@
 import {
   DriveRequestError,
   FOLDER_MIME_TYPE,
+  SHORTCUT_MIME_TYPE,
+  type DriveChild,
   type DriveClient,
   type DriveFile,
   type DrivePermission,
+  type NewDrivePermission,
 } from "./google";
 
 /**
@@ -15,6 +18,11 @@ import {
  * - **Permissions are inherited**: `listPermissions` on an item includes every permission on a folder
  *   above it, marked `inherited` — what Periksa koneksi's safety check reads.
  * - **Uploads declare their size**: `land` — the browser's `PUT` — refuses bytes of another length.
+ * - **Some emails cannot be shared with**: one in `refusedEmails` — not a Google account, say — is
+ *   refused with a 400, as Drive refuses it.
+ * - **Every item has an owner** (#562): what the app makes, a copy included, is the company account's
+ *   (`COMPANY_ACCOUNT`); `upload` puts a file there as a Staff member, owned by them. A copy a test
+ *   makes Drive refuse (`refusedCopies`) fails with Google's own reason.
  *
  * Later tickets extend it rather than mocking Drive ad hoc. `calls` counts every operation, so a
  * test can assert that a refused write reached Drive **zero** times.
@@ -24,7 +32,9 @@ type StoredFile = Omit<DriveFile, "trashed"> & {
   /** Trashed by itself; a child of a trashed folder is trashed too, without this flag. */
   explicitlyTrashed: boolean;
   content: Uint8Array;
-  permissions: { id: string; type: string; role: string }[];
+  permissions: { id: string; type: string; role: string; emailAddress: string | null }[];
+  /** Whose file it is: `COMPANY_ACCOUNT` for anything the app made. */
+  owner: string;
 };
 
 type Session = {
@@ -39,9 +49,16 @@ type Session = {
 /** The id Drive gives the top of My Drive. A folder created with no parent lands there. */
 export const MY_DRIVE = "root";
 
+/** The connected company account: the owner of everything the app makes. */
+export const COMPANY_ACCOUNT = "sugt-company@gmail.com";
+
 export class FakeDrive implements DriveClient {
   readonly files = new Map<string, StoredFile>();
   readonly sessions = new Map<string, Session>();
+  /** Emails Drive will not share with — a test adds to it. */
+  readonly refusedEmails = new Set<string>();
+  /** Files whose copy Drive refuses, with the HTTP status and Google's reason — a test adds to it. */
+  readonly refusedCopies = new Map<string, { status: number; reason: string }>();
   calls = 0;
   private nextId = 1;
 
@@ -110,10 +127,27 @@ export class FakeDrive implements DriveClient {
     return this.require("files.get(media)", id).content.slice(start, end + 1);
   }
 
-  async createPermission(id: string, permission: { type: "anyone"; role: "reader" }) {
+  async createPermission(id: string, permission: NewDrivePermission) {
     this.calls += 1;
     const file = this.require("permissions.create", id);
-    file.permissions.push({ id: `perm-${this.nextId++}`, ...permission });
+    const emailAddress = permission.type === "user" ? permission.emailAddress : null;
+    if (emailAddress !== null && this.refusedEmails.has(emailAddress)) {
+      throw new DriveRequestError("permissions.create", 400);
+    }
+    file.permissions.push({
+      id: `perm-${this.nextId++}`,
+      type: permission.type,
+      role: permission.role,
+      emailAddress,
+    });
+  }
+
+  async deletePermission(id: string, permissionId: string) {
+    this.calls += 1;
+    const file = this.require("permissions.delete", id);
+    const before = file.permissions.length;
+    file.permissions = file.permissions.filter((p) => p.id !== permissionId);
+    if (file.permissions.length === before) throw new DriveRequestError("permissions.delete", 404);
   }
 
   async listPermissions(id: string): Promise<DrivePermission[]> {
@@ -126,6 +160,43 @@ export class FakeDrive implements DriveClient {
       ancestor.permissions.map((p) => ({ ...p, inherited: true })),
     );
     return [...own, ...inherited];
+  }
+
+  async listChildren(folderId: string): Promise<DriveChild[]> {
+    this.calls += 1;
+    return [...this.files.values()]
+      .filter((file) => file.parents.includes(folderId))
+      .map((file) => {
+        const view = this.view(file.id)!;
+        return {
+          id: view.id,
+          name: view.name,
+          mimeType: view.mimeType,
+          trashed: view.trashed,
+          appProperties: { ...view.appProperties },
+          ownerEmail: file.owner,
+        };
+      });
+  }
+
+  async copyFile(
+    id: string,
+    input: { name: string; parentId: string; appProperties: Record<string, string> },
+  ) {
+    this.calls += 1;
+    const original = this.require("files.copy", id);
+    const refused = this.refusedCopies.get(id);
+    if (refused) throw new DriveRequestError("files.copy", refused.status, refused.reason);
+    this.require("files.copy", input.parentId);
+    return {
+      id: this.store({
+        name: input.name,
+        mimeType: original.mimeType,
+        parents: [input.parentId],
+        appProperties: input.appProperties,
+        content: original.content.slice(),
+      }),
+    };
   }
 
   async openResumableSession(input: {
@@ -171,6 +242,45 @@ export class FakeDrive implements DriveClient {
     };
   }
 
+  /** A permission someone added by hand in the Drive UI — the owner's, a commenter's, anything. */
+  share(id: string, permission: { type: string; role: string; emailAddress?: string }): string {
+    const permissionId = `perm-${this.nextId++}`;
+    this.require("share", id).permissions.push({
+      id: permissionId,
+      type: permission.type,
+      role: permission.role,
+      emailAddress: permission.emailAddress ?? null,
+    });
+    return permissionId;
+  }
+
+  /**
+   * **A Staff member puts a file (or a folder) into a folder through Drive** (#562): owned by them,
+   * not by the company account.
+   */
+  upload(
+    parentId: string,
+    input: { name: string; owner: string; mimeType?: string; content?: string },
+  ): string {
+    this.require("upload", parentId);
+    return this.store({
+      name: input.name,
+      mimeType: input.mimeType ?? "image/jpeg",
+      parents: [parentId],
+      content: new TextEncoder().encode(input.content ?? input.name),
+      owner: input.owner,
+    });
+  }
+
+  /** A Staff member adds a Drive shortcut to `targetId` in a folder. */
+  shortcut(parentId: string, targetId: string, owner: string): string {
+    return this.upload(parentId, {
+      name: `Pintasan ke ${this.require("shortcut", targetId).name}`,
+      owner,
+      mimeType: SHORTCUT_MIME_TYPE,
+    });
+  }
+
   /** Move to the Drive trash, as a person would. Children follow. */
   trash(id: string) {
     this.require("trash", id).explicitlyTrashed = true;
@@ -197,6 +307,7 @@ export class FakeDrive implements DriveClient {
     parents: string[];
     appProperties?: Record<string, string>;
     content?: Uint8Array;
+    owner?: string;
   }): string {
     const id = `fake-${this.nextId++}`;
     const content = input.content ?? new Uint8Array();
@@ -210,6 +321,7 @@ export class FakeDrive implements DriveClient {
       explicitlyTrashed: false,
       content,
       permissions: [],
+      owner: input.owner ?? COMPANY_ACCOUNT,
     });
     return id;
   }
@@ -217,7 +329,13 @@ export class FakeDrive implements DriveClient {
   private view(id: string): DriveFile | null {
     const file = this.files.get(id);
     if (!file) return null;
-    const { explicitlyTrashed, content: _content, permissions: _permissions, ...rest } = file;
+    const {
+      explicitlyTrashed,
+      content: _content,
+      permissions: _permissions,
+      owner: _owner,
+      ...rest
+    } = file;
     const trashed = explicitlyTrashed || this.ancestors(id).some((a) => a.explicitlyTrashed);
     return { ...rest, parents: [...rest.parents], trashed };
   }

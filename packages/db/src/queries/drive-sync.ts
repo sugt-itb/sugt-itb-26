@@ -16,7 +16,7 @@ import {
 import { db } from "../client";
 import { subCluster } from "../schema/reference";
 import { perjadin, transaction, transactionEvidence } from "../schema/travel";
-import type { Person } from "./caller";
+import type { DriveCaller, Person } from "./caller";
 import { perjadinFolderNaming, type PerjadinFolderNaming } from "./perjadin-naming";
 import { requireStaff } from "./staff-only";
 
@@ -25,8 +25,10 @@ import { requireStaff } from "./staff-only";
  * company Drive tree. The reconcile itself talks to Google and lives in `@sugt/internal`; this module
  * is only its database half.
  *
- * Every function is Staff-only: the reconcile runs after a Staff member records or adds a receipt,
- * or when an Administrator — Staff too — sweeps what is unsynced. A Pimpinan writes nothing.
+ * Every function is Staff-only — the reconcile runs after a Staff member records or adds a receipt,
+ * or when an Administrator, Staff too, sweeps what is unsynced — **except `perjadinDriveFolder`**, a
+ * read of what a trip's folders are named from, which Lihat arsip calls on anyone's click (#561,
+ * ADR-0063). A Pimpinan still writes no record a person entered.
  *
  * **No row lock is held across a call to Google.** The Perjadin's and the transaction's folder ids
  * are claimed by compare-and-set instead: the update writes only where the column is still null, and
@@ -40,6 +42,8 @@ export type PerjadinDriveFolder = {
   driveDokumenFolderId: string | null;
   /** Its folder under `Foto & Video/Pelaksanaan Offline` (ADR-0046), named the same way. */
   driveFootageFolderId: string | null;
+  /** Its folder under `Foto & Video — Unggahan/Pelaksanaan Offline` (#561), named the same way. */
+  driveFootageUploadFolderId: string | null;
   naming: PerjadinFolderNaming;
 };
 
@@ -50,6 +54,7 @@ function selectPerjadinDriveFolders() {
       driveFolderId: perjadin.driveFolderId,
       driveDokumenFolderId: perjadin.driveDokumenFolderId,
       driveFootageFolderId: perjadin.driveFootageFolderId,
+      driveFootageUploadFolderId: perjadin.driveFootageUploadFolderId,
       naming: perjadinFolderNaming,
     })
     .from(perjadin)
@@ -59,20 +64,20 @@ function selectPerjadinDriveFolders() {
 
 /**
  * What renaming a Perjadin's Drive folder reads (#376) — after a date correction, and again in the
- * reconcile, fresh, just before it re-asserts the name. `null` when there is no such trip.
+ * reconcile, fresh, just before it re-asserts the name. `null` when there is no such trip. Open to
+ * any signed-in Person — Lihat arsip re-asserts the name on anyone's click (#561) — and to the daily
+ * cron, which does the same when it makes an archive folder (#562).
  */
 export async function perjadinDriveFolder(
-  caller: Person,
+  _caller: DriveCaller,
   perjadinId: string,
 ): Promise<PerjadinDriveFolder | null> {
-  requireStaff(caller);
-
   const [trip] = await selectPerjadinDriveFolders().where(eq(perjadin.id, perjadinId));
   return trip ?? null;
 }
 
 /**
- * **Every Perjadin that has a Drive folder** — receipts, Dokumen, Foto & Video, or several — with what its folders are
+ * **Every Perjadin that has a Drive folder** — receipts, Dokumen, Foto & Video, its upload folder, or several — with what its folders are
  * named from, for Periksa koneksi's pass that re-asserts every folder name (#407). Ordered by trip
  * id, so a press that stops early stops at the same place each time, and the next one re-reads the
  * folders it already checked — right, or reported trashed or gone — before carrying on.
@@ -86,6 +91,7 @@ export async function perjadinDriveFolders(caller: Person): Promise<PerjadinDriv
         isNotNull(perjadin.driveFolderId),
         isNotNull(perjadin.driveDokumenFolderId),
         isNotNull(perjadin.driveFootageFolderId),
+        isNotNull(perjadin.driveFootageUploadFolderId),
       ),
     )
     .orderBy(asc(perjadin.id));

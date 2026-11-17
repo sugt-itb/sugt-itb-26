@@ -76,6 +76,11 @@ export async function authUsers() {
   return db.select().from(schema.user);
 }
 
+/** Every `better_auth.account` row: one per provider a sign-in identity has used. */
+export async function authAccounts() {
+  return db.select().from(schema.account);
+}
+
 /** Every `better_auth.session` row. */
 export async function authSessions() {
   return db.select().from(schema.authSession);
@@ -802,6 +807,7 @@ export async function resetDatabase() {
       public."preparation_card",
       public."preparation_checklist_item",
       public."drive_connection",
+      public."keuangan_source",
       public."activity_log",
       public."perjadin_document",
       public."perjadin_document_folder",

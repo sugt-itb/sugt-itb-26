@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   Gauge,
+  Landmark,
   LayoutDashboard,
   ListVideo,
   type LucideIcon,
@@ -26,6 +27,8 @@ export type NavItem = {
   daringEditorOnly?: boolean;
   /** Shown only to a Person who may read the Dashboard (`canViewDashboard`). Absent means "no gate". */
   dashboardView?: boolean;
+  /** Shown only to a Person who may read `/keuangan` (`canViewKeuangan`). Absent means "no gate". */
+  keuanganView?: boolean;
   /** Shown only to an Administrator. Absent means "no gate". */
   administratorOnly?: boolean;
   /** Carries the badge while the company Google Drive needs an Administrator (#375). */
@@ -73,7 +76,13 @@ export type VisibleNavItem = NavItem & { badge: boolean };
  * exactly the callers it would bounce. The shell computes `canViewDashboard` once (the one predicate
  * the page guard shares) and passes the boolean down.
  *
- * `administratorOnly` is a fourth (#372): **Pengaturan** is shown only to an Administrator, because
+ * `keuanganView` is a fourth (#550), shaped like `dashboardView` and for the same reason: **Keuangan**
+ * is shown only to whoever `canViewKeuangan` admits — a Staff Person holding the Keuangan Grant (an
+ * Administrator implies it) or a `Pimpinan` by Role — because its page `forbidden()`s everyone else.
+ * So it is `staffOnly: false`: a Staff-only flag would hide it from a Pimpinan. It sits after
+ * Pendamping and keeps that place when Pendamping moves to the top.
+ *
+ * `administratorOnly` is a fifth (#372): **Pengaturan** is shown only to an Administrator, because
  * its page `forbidden()`s everyone else — the same "worse than no link" rule once more. **Log**,
  * the Activity Log (#395), carries it for the same reason, and so does **Orang** (#488), whose
  * roster only an Administrator reads.
@@ -93,6 +102,7 @@ const NAV: NavItem[] = [
     daringEditorOnly: true,
   },
   { href: "/pendamping", label: "Pendamping", icon: LayoutDashboard, staffOnly: true },
+  { href: "/keuangan", label: "Keuangan", icon: Landmark, staffOnly: false, keuanganView: true },
   { href: "/perjadin", label: "Perjadin", icon: Plane, staffOnly: false },
   { href: "/sesi-daring", label: "Sesi Daring", icon: ListVideo, staffOnly: false },
   { href: "/feedback", label: "Feedback", icon: MessageSquare, staffOnly: false },
@@ -120,12 +130,14 @@ export function sidebarItems({
   role,
   canEditDaring,
   canViewDashboard,
+  canViewKeuangan,
   canAdminister,
   driveNeedsAttention,
 }: {
   role: Role;
   canEditDaring: boolean;
   canViewDashboard: boolean;
+  canViewKeuangan: boolean;
   canAdminister: boolean;
   /** Receipts cannot be uploaded until an Administrator fixes the Drive connection. */
   driveNeedsAttention: boolean;
@@ -135,6 +147,7 @@ export function sidebarItems({
       (!item.staffOnly || role === "Staff") &&
       (!item.daringEditorOnly || canEditDaring) &&
       (!item.dashboardView || canViewDashboard) &&
+      (!item.keuanganView || canViewKeuangan) &&
       (!item.administratorOnly || canAdminister),
   ).map((item) => ({ ...item, badge: Boolean(item.driveBadge) && driveNeedsAttention }));
   if (canViewDashboard) return visible;

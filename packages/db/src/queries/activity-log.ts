@@ -65,8 +65,9 @@ export type FootageLogDetails = {
 };
 
 /**
- * What `details` holds for each action. `document_deleted` is the same snapshot as
- * `document_uploaded`, taken of the row as it is deleted (#398), since the row is then gone. The two
+ * What `details` holds for each action. `document_deleted` was the same snapshot as
+ * `document_uploaded`, taken of the row as it was deleted (#398), since the row was then gone; both
+ * are history only, since nothing uploads or deletes a Perjadin Document (ADR-0061, #559). The two
  * money deletes (ADR-0050) are snapshots for the same reason: `evidence_deleted` of the receipt and
  * its line (#462), `transaction_deleted` of the whole line (#463). The two `advance_*` shapes are
  * history only: nothing writes them since the Advance stopped being tracked (ADR-0051, #464). Nor
@@ -127,12 +128,21 @@ export type ActivityLogEntry = {
 
 /**
  * The actions the app still writes. `advance_set` and `advance_changed` (ADR-0051, #464),
- * `report_filed` (ADR-0055, #489) and `transaction_recorded` (ADR-0060, #541) are history only: the Log reads
- * and renders them, and `logActivity` cannot be handed one.
+ * `report_filed` (ADR-0055, #489), `transaction_recorded` (ADR-0060, #541) and `document_uploaded`
+ * and `document_deleted` (ADR-0061, #559) are history only: the Log reads and renders them, and
+ * `logActivity` cannot be handed one.
  */
 export type WritableActivityLogEntry = Exclude<
   ActivityLogEntry,
-  { action: "advance_set" | "advance_changed" | "report_filed" | "transaction_recorded" }
+  {
+    action:
+      | "advance_set"
+      | "advance_changed"
+      | "report_filed"
+      | "transaction_recorded"
+      | "document_uploaded"
+      | "document_deleted";
+  }
 >;
 
 /** The Aksi column: the action's label, and "(dari data lama)" after it on a backfilled row. */
@@ -238,7 +248,8 @@ export const ACTIVITY_LOG_PAGE_SIZE = 50;
  * dikirim covers two actions: the "Catat transaksi" filter and Unggah bukti each carry their own
  * Hapus (ADR-0050). Uang Perjalanan and Laporan dikirim find history only — nothing writes `advance_*`
  * (ADR-0051) or `report_filed` (ADR-0055) any more. Nothing writes `transaction_recorded` either
- * (#541), so that filter finds past entries plus Transaksi dihapus, which is still written.
+ * (#541), so that filter finds past entries plus Transaksi dihapus, which is still written. Dokumen
+ * finds history only too: nothing uploads or deletes a Perjadin Document (ADR-0061, #559).
  */
 export const ACTIVITY_LOG_AKSI_FILTERS = {
   "uang-perjalanan": { label: "Uang Perjalanan", actions: ["advance_set", "advance_changed"] },

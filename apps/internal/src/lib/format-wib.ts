@@ -33,10 +33,25 @@ const INDONESIAN_WIB = new Intl.DateTimeFormat("id-ID", {
 });
 
 /**
- * `14 Okt 2026, 08.05` — an instant in WIB, written the Indonesian way. **The one exception to #166's
- * ISO form**: `/log`'s Waktu column (#395), where product.md asks for exactly this. Anywhere else,
- * use `formatWib`.
+ * `14 Okt 2026, 08.05` — an instant in WIB, written the Indonesian way. **One of two exceptions to
+ * #166's ISO form**: `/log`'s Waktu column (#395), where product.md asks for exactly this. The other
+ * is `formatWibDayIndonesian`, below. Anywhere else, use `formatWib`.
  */
 export function formatWibIndonesian(when: Date): string {
   return INDONESIAN_WIB.format(when);
+}
+
+const INDONESIAN_WIB_DAY = new Intl.DateTimeFormat("id-ID", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "Asia/Jakarta",
+});
+
+/**
+ * `4 Nov 2026` — the WIB day an instant falls on, written the Indonesian way. The other exception to
+ * #166's ISO form: `/keuangan`'s "Sumber diatur …" line (#550), whose ticket asks for exactly this.
+ */
+export function formatWibDayIndonesian(when: Date): string {
+  return INDONESIAN_WIB_DAY.format(when);
 }

@@ -1,6 +1,6 @@
+import { FotoVideoNotice } from "-/components/foto-video-notice";
 import { MyPerjadinSection } from "-/components/my-perjadin-section";
 import { PendampingPicker, type PendampingTab, PendampingTabs } from "-/components/pendamping-tabs";
-import { uploadGate, type UploadGate } from "-/lib/drive/upload-gate";
 import { requirePerson, type Person } from "-/lib/person";
 import {
   hasGrant,
@@ -18,8 +18,8 @@ export const metadata: Metadata = { title: "Pendamping" };
 /**
  * **Pendamping** — a Staff member's own trips, and nothing else (#396): a one-line greeting,
  * **Perjalanan Dinas Anda** (the trips not yet over) and **Perjalanan Dinas Sebelumnya** (the ones
- * that are). A past trip keeps every action, because the transactions and the attendance sheets are
- * often finished after it. The cards carry no Laporan line (#419); the Laporan is reached through Edit.
+ * that are). A past trip keeps every action, because its photos and videos are often uploaded after
+ * it. The cards carry no Laporan line (#419); the Laporan is reached through Edit.
  *
  * **"Pendamping" here is a route/label and collides in name only** with the Perjadin role label
  * (`PERJADIN_ROLE_LABELS.Staff` → "Pendamping"): this is the Staff landing screen, not that trip role.
@@ -44,15 +44,12 @@ export default async function Page({ searchParams }: PageProps<"/pendamping">) {
   const params = hasGrant(person, "Perjadin Editor") ? await searchParams : null;
   const tab: PendampingTab = params?.tab === "lain" ? "lain" : "anda";
 
-  // Each trip card's Dokumen is closed, with the reason, while Drive is (ADR-0040). Always
-  // the viewer's gate, on Pendamping Lain too: the viewer is who uploads.
   if (params === null || tab === "anda") {
-    const [trips, gate] = await Promise.all([myPerjadin(person), uploadGate(person)]);
+    const trips = await myPerjadin(person);
     const own = (
       <OwnPage
         person={person}
         trips={trips}
-        gate={gate}
       />
     );
     return (
@@ -63,10 +60,9 @@ export default async function Page({ searchParams }: PageProps<"/pendamping">) {
   }
 
   const chosen = typeof params.pendamping === "string" ? params.pendamping : null;
-  const [options, viewed, gate] = await Promise.all([
+  const [options, viewed] = await Promise.all([
     pendampingOptions(person),
     chosen === null ? null : pendampingPerjadin(person, chosen),
-    uploadGate(person),
   ]);
 
   return (
@@ -88,7 +84,6 @@ export default async function Page({ searchParams }: PageProps<"/pendamping">) {
         {viewed?.outcome === "ok" && (
           <PendampingTrips
             trips={viewed.perjadin}
-            gate={gate}
             canWrite
           />
         )}
@@ -98,11 +93,17 @@ export default async function Page({ searchParams }: PageProps<"/pendamping">) {
 }
 
 function PageFrame({ children }: { children: ReactNode }) {
-  return <div className="flex min-h-full flex-col gap-6 px-4 py-5 sm:p-7">{children}</div>;
+  return (
+    <div className="flex min-h-full flex-col gap-6 px-4 py-5 sm:p-7">
+      {/* Foto & Video or Lihat arsip sent the tab back (#561); read in the browser, never by this render. */}
+      <FotoVideoNotice />
+      {children}
+    </div>
+  );
 }
 
 /** Today's page: the greeting, then the viewer's own trips. */
-function OwnPage({ person, trips, gate }: { person: Person; trips: MyPerjadin; gate: UploadGate }) {
+function OwnPage({ person, trips }: { person: Person; trips: MyPerjadin }) {
   return (
     <>
       <h1 className="font-heading text-lg font-semibold">
@@ -114,7 +115,6 @@ function OwnPage({ person, trips, gate }: { person: Person; trips: MyPerjadin; g
       */}
       <PendampingTrips
         trips={trips}
-        gate={gate}
         canWrite
       />
     </>
@@ -125,15 +125,7 @@ function OwnPage({ person, trips, gate }: { person: Person; trips: MyPerjadin; g
  * **One Pendamping's two sections**, or their empty state — the same words whoever is looking, since
  * Pendamping Lain is a screenshot of that Person's page. `canWrite` is the **viewer's** (#439).
  */
-function PendampingTrips({
-  trips,
-  gate,
-  canWrite,
-}: {
-  trips: MyPerjadin;
-  gate: UploadGate;
-  canWrite: boolean;
-}) {
+function PendampingTrips({ trips, canWrite }: { trips: MyPerjadin; canWrite: boolean }) {
   if (trips.current.length === 0 && trips.previous.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">Anda belum tergabung dalam Perjalanan Dinas.</p>
@@ -145,14 +137,12 @@ function PendampingTrips({
         title="Perjalanan Dinas Anda"
         description="Perjalanan yang belum selesai, dan yang bisa Anda kerjakan pada masing-masing."
         trips={trips.current}
-        uploadGate={gate}
         canWrite={canWrite}
       />
       <MyPerjadinSection
         title="Perjalanan Dinas Sebelumnya"
-        description="Perjalanan yang sudah selesai, yang terbaru di atas. Dokumennya masih bisa dikerjakan."
+        description="Perjalanan yang sudah selesai, yang terbaru di atas."
         trips={trips.previous}
-        uploadGate={gate}
         canWrite={canWrite}
       />
     </>

@@ -4,7 +4,7 @@ import { SignOutButton } from "-/components/sign-out-button";
 import { uploadGate } from "-/lib/drive/upload-gate";
 import { getPerson } from "-/lib/person";
 import { SIGN_IN_PATH } from "-/lib/sign-in-destination";
-import { canViewDashboard, hasGrant } from "@sugt/db/queries";
+import { canViewDashboard, canViewKeuangan, hasGrant } from "@sugt/db/queries";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -59,6 +59,7 @@ export default async function SignedInLayout({
       personName={person.fullName}
       canEditDaring={hasGrant(person, "Daring Editor")}
       canViewDashboard={canViewDashboard(person)}
+      canViewKeuangan={canViewKeuangan(person)}
       canAdminister={canAdminister}
       driveNeedsAttention={driveNeedsAttention}
       sidebarState={sidebarState}

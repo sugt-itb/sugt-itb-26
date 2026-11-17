@@ -5,9 +5,10 @@ import { readyFolders } from "./fixed-folders";
 import { DRIVE_FOLDERS_UNRESOLVED, DRIVE_NOT_CONNECTED, driveBrokenSince } from "./upload-messages";
 
 /**
- * **Can a file be uploaded to Drive right now?** (ADR-0040, #373) Every row's Unggah bukti and the
- * Dokumen dialog (ADR-0042) render disabled, with this reason, when it cannot
- * — wherever they render: the acquittal and the trip cards on `/pendamping`.
+ * **Can a file be uploaded to Drive right now?** (ADR-0040, #373) Every row's Unggah bukti and Foto
+ * & Video's upload (ADR-0046) render disabled, with this reason, when it cannot — wherever they
+ * render: the acquittal, `/sesi/[id]` and the trip cards on `/pendamping`. Dokumen no longer
+ * uploads (ADR-0061).
  *
  * The page's answer is a courtesy. The Server Actions refuse the same states themselves
  * (`driveAccessToken`), since nothing a page renders runs before a Server Action, and answer with

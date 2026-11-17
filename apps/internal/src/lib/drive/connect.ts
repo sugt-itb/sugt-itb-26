@@ -11,7 +11,7 @@ import {
 import { sweepUnsynced } from "./check";
 import { ensureDokumenFolders, ensureFootageFolders } from "./dokumen-folders";
 import { ensureFixedFolders, readyFolders } from "./fixed-folders";
-import { DRIVE_FILE_SCOPE, exchangeDriveCode, openDrive } from "./google";
+import { exchangeDriveCode, grantsFullDrive, openDrive } from "./google";
 import { encryptRefreshToken } from "./token-crypto";
 
 /**
@@ -55,7 +55,8 @@ export type DriveConnectOutcome = (typeof DRIVE_CONNECT_OUTCOMES)[number];
  * 3. The caller still holds Administrator — re-checked here, since minutes passed at Google.
  * 4. The code exchanges for tokens.
  * 5. The id_token's email is `GOOGLE_DRIVE_ACCOUNT_EMAIL`, case-insensitively.
- * 6. The Drive scope was granted — Google lets the account untick it on the consent screen.
+ * 6. The full Drive scope (`drive`, #562) was granted — Google lets the account untick it on the
+ *    consent screen.
  * 7. A refresh token came back.
  *
  * Then the token is encrypted and stored — **overwriting** any old one, never revoking it — and the
@@ -86,13 +87,16 @@ export async function completeDriveConnection(input: {
   const accountEmail = requireEnv("GOOGLE_DRIVE_ACCOUNT_EMAIL");
   if (exchange.email?.toLowerCase() !== accountEmail.toLowerCase()) return "wrong-account";
 
-  if (!exchange.scope.split(" ").includes(DRIVE_FILE_SCOPE)) return "scope-missing";
+  // The full `drive` scope (#562): the daily Foto & Video copy reads files Staff put in the upload
+  // folders, which `drive.file` cannot see.
+  if (!grantsFullDrive(exchange.scope)) return "scope-missing";
 
   if (!exchange.refreshToken) return "no-refresh-token";
 
   await saveDriveConnection(person, {
     accountEmail: exchange.email,
     refreshToken: encryptRefreshToken(exchange.refreshToken),
+    scope: exchange.scope,
   });
 
   // The row was just written, so it is there; its ids are whatever the last connect settled.
@@ -118,6 +122,15 @@ export async function completeDriveConnection(input: {
         error,
       );
     });
+    // `Foto & Video — Unggahan/` and its `Pelaksanaan Offline/` (#561, ADR-0063), the same way.
+    await ensureFootageFolders(person, drive, folders.rootFolderId, "upload").catch(
+      (error: unknown) => {
+        console.error(
+          "Ensuring the Foto & Video — Unggahan folders after connecting Google Drive failed.",
+          error,
+        );
+      },
+    );
     await sweepUnsynced(person, drive, folders).catch((error: unknown) => {
       console.error("The sweep after reconnecting Google Drive threw.", error);
     });

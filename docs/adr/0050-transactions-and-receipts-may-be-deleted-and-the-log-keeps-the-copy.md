@@ -112,3 +112,11 @@ and the process lets a PIC strike out a wrong entry.
 - **A rare double failure is left to a person.** If a Hapus loses the race in step 3 and Drive then
   fails to take its file back out of the trash, the surviving row points at a trashed file. The
   action logs which receipt, and restoring the file from the Drive trash by hand puts it right.
+
+## Amendment (2026-11-16): Dokumen Hapus is gone
+
+Dokumen's Hapus, cited above as the order these deletes follow, no longer exists
+([ADR-0061](./0061-trip-paperwork-is-not-filed-in-the-app.md),
+[#559](https://github.com/sugt-itb/sugt-itb-26/issues/559)). The trash-then-row order still holds for
+Hapus bukti, Hapus transaksi and Foto & Video's Hapus. Past Dokumen entries on `/log` still link their
+file while the document stands.

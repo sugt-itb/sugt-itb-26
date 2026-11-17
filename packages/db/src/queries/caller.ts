@@ -16,6 +16,7 @@ import type { Grant, Role } from "@sugt/domain";
  * | `UnifiedDashboardCaller` | the company's Unified Dashboard, with a verified JWT    | the Programme summary; no money | nothing                     |
  * | `ParticipantToken`       | a live Session feedback token                           | nothing                         | `participant_feedback` only |
  * | `PerjadinToken`          | a live Perjadin feedback token                          | nothing                         | `perjadin_evaluation` only  |
+ * | `CronCaller`             | Vercel Cron, holding `CRON_SECRET`                      | the company Drive's bookkeeping | the same; nothing else      |
  *
  * See `docs/data-model.md`, *what the database does not hold*.
  */
@@ -24,7 +25,8 @@ export type Caller =
   | ServiceCaller
   | UnifiedDashboardCaller
   | ParticipantToken
-  | PerjadinToken;
+  | PerjadinToken
+  | CronCaller;
 
 /**
  * Somebody signed in, whose `person` row is still `active`.
@@ -93,6 +95,24 @@ export type UnifiedDashboardCaller = {
   /** Named so the type is not structurally empty, and so a log line says who called. */
   readonly kind: "unified-dashboard";
 };
+
+/**
+ * **Vercel Cron, holding `CRON_SECRET`** (#562): the daily Foto & Video copy, run with nobody signed
+ * in. No Person at all. It reaches only the company Drive's own bookkeeping — the stored credential,
+ * the token refresh, the footage folder ids and their claims, the copy lease and the per-Session
+ * checked time — which are the app's housekeeping on the company account rather than anybody's write
+ * (ADR-0063). A query it may use names it in its signature, through `DriveCaller`.
+ */
+export type CronCaller = {
+  /** Named so the type is not structurally empty, and so a log line says who called. */
+  readonly kind: "cron";
+};
+
+/**
+ * **Who may use the company Drive's bookkeeping**: anyone signed in, or the daily cron (#562). The
+ * arm the Drive housekeeping queries take, so the cron reaches them and nothing else.
+ */
+export type DriveCaller = Person | CronCaller;
 
 /**
  * A live Session feedback token. **It reads nothing** — `docs/data-model.md` gives it

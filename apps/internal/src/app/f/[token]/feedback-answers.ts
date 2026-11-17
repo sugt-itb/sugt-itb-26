@@ -9,7 +9,7 @@ import {
 
 /**
  * **What the Participant Feedback form keeps and sends** (#446) — plain functions, kept apart from
- * the `"use client"` form so each is tested without mounting it, as `perjadin-dokumen-form.ts` is.
+ * the `"use client"` form so each is tested without mounting it, as `foto-video-form.ts` is.
  */
 
 /** What the form holds per Aspect while it is filled: a Rating, or a comment's text. */

@@ -110,3 +110,9 @@ The `/monitoring` budget card is gone, so a Pimpinan no longer reads a programme
 `/keuangan` and its Grant are gone ([ADR-0059](./0059-programme-wide-money-is-not-in-the-app.md), #533), so no
 money read is gated by a Grant. What remains to read is each Perjadin's own money, open to everyone
 signed in.
+
+## Amendment (2026-11-17): one money read is gated again
+
+`/keuangan` returns as a read-only view of Finance's spreadsheet, gated by the Keuangan Grant or a
+Pimpinan's Role ([ADR-0064](./0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md), [#549](https://github.com/sugt-itb/sugt-itb-26/issues/549)). It reads Finance's sheet, with names and receipt links, not the app's
+own money records. Each Perjadin's money stays open to everyone signed in.

@@ -1,12 +1,12 @@
 import { FeedbackTokenDialog } from "-/components/feedback-token";
+import { FotoVideoNotice } from "-/components/foto-video-notice";
 import { FotoVideoSection } from "-/components/foto-video-section";
 import { MODE_LABELS, SessionStatusBadge } from "-/components/session-labels";
 import { SessionRecords } from "-/components/session-records";
 import { SessionWrites } from "-/components/session-writes";
-import { uploadGate } from "-/lib/drive/upload-gate";
 import { perjadinName } from "-/lib/perjadin-name";
 import { requirePerson } from "-/lib/person";
-import { canWritePerjadin, sessionDetail, sessionFootageList } from "@sugt/db/queries";
+import { canWritePerjadin, sessionDetail } from "@sugt/db/queries";
 import { formatSessionStartTimeWithWib } from "@sugt/domain";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -29,8 +29,8 @@ export async function generateMetadata({ params }: PageProps<"/sesi/[id]">): Pro
  * **Detail Sesi** — one Session: what has been filed against it, who still owes what, and
  * the PIC.
  *
- * One `requirePerson()`, the Session's query, then its Foto & Video and — for whoever writes its
- * trip — the upload gate, read together (#425). **No role check on the read**, because a
+ * One `requirePerson()`, then the Session's query, which also says whether its Foto & Video folders
+ * exist yet (#552, #561). **No role check on the read**, because a
  * Session carries no money and ADR-0004 opens delivery data to everyone signed in — a
  * professor opening the Session they taught to see who else still owes a Record is the
  * ordinary case, not an edge one.
@@ -60,14 +60,11 @@ export default async function Page({ params }: PageProps<"/sesi/[id]">) {
   // An offline Session is written by its trip's Group, a Perjadin Editor or an Administrator (ADR-0048).
   const canWrite =
     session.perjadin !== null && (await canWritePerjadin(person, session.perjadin.id));
-  const [footage, gate] = await Promise.all([
-    sessionFootageList(person, session.id),
-    // Only the trip's writers upload or Hapus; for anyone else the gate is never read.
-    canWrite ? uploadGate(person) : Promise.resolve({ open: false as const, reason: "" }),
-  ]);
 
   return (
     <div className="flex min-h-full flex-col">
+      {/* Foto & Video or Lihat arsip sent the tab back: the folder could not be opened (#561). */}
+      <FotoVideoNotice className="mx-4 mt-4 w-auto sm:mx-7" />
       <header className="border-b border-border px-4 py-5 sm:px-7">
         <Link
           href={`/sekolah/${session.schoolSlug}`}
@@ -122,17 +119,16 @@ export default async function Page({ params }: PageProps<"/sesi/[id]">) {
       )}
 
       {/*
-        Foto & Video (#425, ADR-0046): the list for everyone signed in, a Pimpinan included; Hapus
-        and the upload popup for the trip's writers, the upload hidden on a cancelled Session.
+        Foto & Video (#425, #561, ADR-0063): Lihat arsip for everyone signed in, a Pimpinan
+        included, and Foto & Video — the upload folder — for the trip's writers. On a cancelled
+        Session, each only when its folder already exists.
       */}
       <FotoVideoSection
         sessionId={session.id}
-        heldOn={session.heldOn}
-        schoolName={session.schoolName}
-        footage={footage}
-        canWrite={canWrite}
         cancelled={session.status === "cancelled"}
-        uploadGate={gate}
+        canUpload={canWrite}
+        hasArchiveFolder={session.hasFootageFolder}
+        hasUploadFolder={session.hasFootageUploadFolder}
       />
 
       {canWrite && <SessionWrites session={session} />}

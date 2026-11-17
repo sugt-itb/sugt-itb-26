@@ -4,36 +4,25 @@ import {
   updatePerjadinDatesAction,
 } from "-/app/(app)/perjadin/[id]/actions";
 import { moveSessionDateAction } from "-/app/(app)/sesi/[id]/actions";
-import {
-  deleteFootageAction,
-  openFootageUploadAction,
-  recordFootageAction,
-} from "-/app/(app)/sesi/[id]/foto-video/actions";
+import { GET as openArchive } from "-/app/(app)/sesi/[id]/foto-video/arsip/route";
+import { GET as openUpload } from "-/app/(app)/sesi/[id]/foto-video/unggah/route";
 import { describeDriveCheck } from "-/lib/drive/check-report";
-import { FOOTAGE_FOLDER_NAME } from "-/lib/drive/dokumen-folders";
+import { FOOTAGE_FOLDER_NAME, FOOTAGE_UPLOAD_FOLDER_NAME } from "-/lib/drive/dokumen-folders";
 import { FakeDrive } from "-/lib/drive/fake-drive";
 import type { ReadyFolders } from "-/lib/drive/fixed-folders";
 import { DriveRequestError, openDrive } from "-/lib/drive/google";
 import { reconcileFootage } from "-/lib/drive/reconcile-footage";
 import { requirePerson } from "-/lib/person";
 import { db, schema } from "@sugt/db";
-import {
-  activityLogAksi,
-  activityLogRincian,
-  deleteSessionFootage,
-  recordSessionFootage,
-  sessionFootageList,
-  type Person,
-} from "@sugt/db/queries";
-import { MAX_FOOTAGE_PHOTO_BYTES, MAX_FOOTAGE_VIDEO_BYTES } from "@sugt/domain";
+import type { Person } from "@sugt/db/queries";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { logActivity } from "../../../packages/db/src/queries/activity-log";
-import { connectDrive, digestOf, FORBIDDEN, jpeg, pdf, stubTokenEndpoint } from "./support/drive";
+import { connectDrive, stubTokenEndpoint } from "./support/drive";
 import {
   addCluster,
   addGrant,
+  addGroupMember,
   addOfflineSession,
   addPerjadin,
   addPerson,
@@ -42,13 +31,19 @@ import {
   addSession,
   addSubCluster,
   resetDatabase,
+  revokePerson,
 } from "./support/fixtures";
 
 /**
- * **Session Footage goes to the company Google Drive** (#424, ADR-0046), against the real database
- * and the in-memory `FakeDrive` — the same fakes as the Dokumen tests: Google's token endpoint, Drive,
- * the browser's upload (`land`), the signed-in Person, the request's `Origin` and `next/cache`. The
- * guards, the sniff, the names, the write order, the reconcile and the renames are the real code.
+ * **Session Footage in the company Google Drive** (#424, #561; ADR-0046, ADR-0063), against the real
+ * database and the in-memory `FakeDrive` — Google's token endpoint, Drive, the signed-in Person and
+ * `next/cache` are faked; the routes, the folders, the sharing, the sweep and the renames are the
+ * real code.
+ *
+ * Nothing uploads through the app: **Foto & Video** opens the Session's upload folder, and **Lihat
+ * arsip** its archive folder, each making and sharing folders on the way. What is left of the old
+ * upload is the rows it recorded, which the sweep and the renames still look after; `recorded` puts
+ * one in place as an upload once did.
  */
 
 vi.mock("-/lib/person", () => ({ requirePerson: vi.fn() }));
@@ -57,41 +52,22 @@ vi.mock("-/lib/drive/google", async (importOriginal) => ({
   openDrive: vi.fn(),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("next/headers", () => ({
-  headers: vi.fn(async () => new Headers({ origin: "https://preview-42.sugt.test" })),
-}));
-// The Activity Log write, wrapped so one test can refuse it inside the commit's transaction.
-vi.mock("../../../packages/db/src/queries/activity-log", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../packages/db/src/queries/activity-log")>();
-  return { ...actual, logActivity: vi.fn(actual.logActivity) };
-});
-vi.mock("@sugt/db/queries", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@sugt/db/queries")>();
-  return { ...actual, deleteSessionFootage: vi.fn(actual.deleteSessionFootage) };
-});
 
 let drive: FakeDrive;
 let folders: ReadyFolders;
 /** The scene's Staff Administrator, signed in. */
 let staffPerson: Person;
 
-/** Bytes that sniff as an ISO-BMFF file of the given major brand: `isom` is an MP4. */
-function isoBmff(brand: string, size = 4096) {
-  const bytes = new Uint8Array(size);
-  bytes.set([0, 0, 0, 0x18]);
-  bytes.set(new TextEncoder().encode(`ftyp${brand}`), 4);
-  return bytes;
-}
-
 /**
- * A Staff Administrator, a Pimpinan, a trip to Kelompok 18 with one offline Session on 14 Okt at
- * 08:00 at "SMAN 1/Bontang", a cancelled one, an online one, and Drive connected.
+ * A Staff Administrator, a Pimpinan, a Staff member on no Group, a trip to Kelompok 18 with one
+ * offline Session on 14 Okt at 08:00 at "SMAN 1/Bontang", a cancelled one, an online one, and Drive
+ * connected.
  */
 async function scene(
   options: {
     connection?: "connected" | "broken" | "none";
     footage?: boolean;
+    footageUpload?: boolean;
   } = {},
 ) {
   const staff = await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" });
@@ -131,39 +107,118 @@ async function scene(
     status: "cancelled",
   });
   const online = await addSession({ schoolId: school.id, heldOn: "2026-10-20" });
+  const outsider = await addPerson({ fullName: "Eka", email: "eka@itb.ac.id", role: "Staff" });
 
   const connection = options.connection ?? "connected";
   if (connection !== "none") {
-    folders = await connectDrive(drive, staff.id, connection, { footage: options.footage });
+    folders = await connectDrive(drive, staff.id, connection, {
+      footage: options.footage,
+      footageUpload: options.footageUpload,
+    });
   }
   drive.calls = 0;
   const admin = { ...staff, grants: ["Administrator"] } as Person;
   staffPerson = admin;
   vi.mocked(requirePerson).mockResolvedValue(admin);
-  return { staff: admin, pimpinan, trip, school, session, cancelled, online };
+  return {
+    staff: admin,
+    pimpinan: { ...pimpinan, grants: [] } as Person,
+    outsider: { ...outsider, grants: [] } as Person,
+    trip,
+    school,
+    session,
+    cancelled,
+    online,
+  };
 }
 
-/** The upload as the browser does it: open, then send the bytes. Answers the landed file's id. */
-async function upload(sessionId: string, bytes: Uint8Array, contentType = "image/jpeg") {
-  const opened = await openFootageUploadAction(sessionId, { size: bytes.length, contentType });
-  if (opened.outcome !== "ready") throw new Error(`Upload refused: ${opened.outcome}`);
-  return drive.land(opened.sessionUri, bytes).id;
-}
-
-async function uploadAndRecord(sessionId: string, bytes = jpeg(), contentType = "image/jpeg") {
-  const driveFileId = await upload(sessionId, bytes);
-  const recorded = await recordFootageAction({
-    sessionId,
-    driveFileId,
-    originalFilename: "IMG_0001.JPG",
-    contentType,
+/**
+ * A file of footage as the upload left it before #561: a JPEG in `_staging`, tagged with the trip and
+ * the Session, and its `session_footage` row. `placed` runs the reconcile, as the upload did.
+ */
+async function recorded(
+  session: { id: string; perjadinId: string | null },
+  options: { placed?: boolean } = {},
+) {
+  const file = await drive.createFile({
+    name: "upload.jpg",
+    parentId: folders.stagingFolderId,
+    mimeType: "image/jpeg",
+    content: "jpeg",
   });
-  if (recorded.outcome !== "recorded") throw new Error(`Record refused: ${recorded.outcome}`);
-  return { driveFileId, footageId: recorded.footageId, synced: recorded.synced };
+  await drive.updateFile(file.id, {
+    appProperties: { sugtPerjadinId: session.perjadinId!, sugtSessionId: session.id },
+  });
+  const [row] = await db
+    .insert(schema.sessionFootage)
+    .values({
+      sessionId: session.id,
+      kind: "foto",
+      contentType: "image/jpeg",
+      originalFilename: "IMG_0001.JPG",
+      byteSize: 4,
+      driveFileId: file.id,
+      uploadedByPersonId: staffPerson.id,
+    })
+    .returning();
+  if (options.placed ?? true) {
+    const placed = await reconcileFootage(staffPerson, drive, folders, row!.id);
+    if (placed.outcome !== "synced") throw new Error(`Not placed: ${JSON.stringify(placed)}`);
+  }
+  return { driveFileId: file.id, footageId: row!.id };
+}
+
+/** A click on Foto & Video (`upload`) or Lihat arsip (`archive`), from `dari`: the route's answer. */
+function click(sessionId: string, folder: "upload" | "archive" = "upload", dari = "/pendamping") {
+  const [route, segment] = folder === "upload" ? [openUpload, "unggah"] : [openArchive, "arsip"];
+  return route(
+    new Request(
+      `http://localhost:3001/sesi/${sessionId}/foto-video/${segment}?dari=${encodeURIComponent(dari)}`,
+    ),
+    { params: Promise.resolve({ id: sessionId }) },
+  );
+}
+
+/** The Drive folder a 303 opens, or `null` when it sent the tab elsewhere. */
+function openedFolder(response: Response): string | null {
+  expect(response.status).toBe(303);
+  const location = response.headers.get("location")!;
+  const prefix = "https://drive.google.com/drive/folders/";
+  return location.startsWith(prefix) ? location.slice(prefix.length) : null;
 }
 
 const footage = () => db.select().from(schema.sessionFootage);
-const logged = () => db.select().from(schema.activityLog);
+/** The Session's folder ids in each tree. */
+const sessionFoldersOf = async (sessionId: string) =>
+  (
+    await db
+      .select({
+        archive: schema.session.driveFootageFolderId,
+        upload: schema.session.driveFootageUploadFolderId,
+      })
+      .from(schema.session)
+      .where(eq(schema.session.id, sessionId))
+  )[0]!;
+/** The Perjadin's folder ids in each tree. */
+const perjadinFoldersOf = async (perjadinId: string) =>
+  (
+    await db
+      .select({
+        archive: schema.perjadin.driveFootageFolderId,
+        upload: schema.perjadin.driveFootageUploadFolderId,
+      })
+      .from(schema.perjadin)
+      .where(eq(schema.perjadin.id, perjadinId))
+  )[0]!;
+const allFolders = () => [...drive.files.values()].filter((f) => f.mimeType.endsWith("folder"));
+
+/** A folder's own permissions, as `type role email` strings, sorted. */
+async function sharesOn(folderId: string) {
+  return (await drive.listPermissions(folderId))
+    .filter((permission) => !permission.inherited)
+    .map((p) => [p.type, p.role, p.emailAddress].filter(Boolean).join(" "))
+    .sort();
+}
 
 beforeEach(async () => {
   await resetDatabase();
@@ -175,343 +230,310 @@ beforeEach(async () => {
   stubTokenEndpoint();
 });
 
-describe("refused before Google is asked anything", () => {
-  it("refuses a non-Staff caller with zero Drive calls", async () => {
-    const { pimpinan, session } = await scene();
-    vi.mocked(requirePerson).mockResolvedValue(pimpinan as Person);
-
-    await expect(
-      digestOf(openFootageUploadAction(session.id, { size: 10, contentType: "image/jpeg" })),
-    ).resolves.toBe(FORBIDDEN);
-    expect(drive.calls).toBe(0);
-  });
-
-  it("refuses an online Session and a cancelled one", async () => {
-    const { online, cancelled } = await scene();
-
-    await expect(
-      openFootageUploadAction(online.id, { size: 10, contentType: "image/jpeg" }),
-    ).resolves.toEqual({ outcome: "session-online" });
-    await expect(
-      openFootageUploadAction(cancelled.id, { size: 10, contentType: "image/jpeg" }),
-    ).resolves.toEqual({ outcome: "session-cancelled" });
-    await expect(
-      openFootageUploadAction("00000000-0000-0000-0000-000000000000", {
-        size: 10,
-        contentType: "image/jpeg",
-      }),
-    ).resolves.toEqual({ outcome: "no-such-session" });
-    expect(drive.calls).toBe(0);
-  });
-
-  it("refuses a type that is not footage, and a file over its kind's cap", async () => {
-    const { session } = await scene();
-    const open = (size: number, contentType: string) =>
-      openFootageUploadAction(session.id, { size, contentType });
-
-    await expect(open(10, "application/pdf")).resolves.toEqual({ outcome: "unsupported-type" });
-    await expect(open(10, "image/gif")).resolves.toEqual({ outcome: "unsupported-type" });
-    await expect(open(MAX_FOOTAGE_PHOTO_BYTES + 1, "image/jpeg")).resolves.toEqual({
-      outcome: "too-large",
-      kind: "foto",
-      limit: MAX_FOOTAGE_PHOTO_BYTES,
-    });
-    await expect(open(MAX_FOOTAGE_VIDEO_BYTES + 1, "video/mp4")).resolves.toEqual({
-      outcome: "too-large",
-      kind: "video",
-      limit: MAX_FOOTAGE_VIDEO_BYTES,
-    });
-    await expect(open(0, "image/jpeg")).resolves.toEqual(
-      expect.objectContaining({ outcome: "too-large" }),
-    );
-    expect(drive.calls).toBe(0);
-
-    // A video may be far larger than a photo.
-    await expect(open(MAX_FOOTAGE_PHOTO_BYTES + 1, "video/quicktime")).resolves.toEqual(
-      expect.objectContaining({ outcome: "ready", kind: "video" }),
-    );
-  });
-
-  it("refuses with the gate's reason while Drive is not connected", async () => {
-    const { session } = await scene({ connection: "none" });
-
-    await expect(
-      openFootageUploadAction(session.id, { size: 10, contentType: "image/jpeg" }),
-    ).resolves.toEqual(expect.objectContaining({ outcome: "drive-disconnected" }));
-  });
-
-  it("opens the session in _staging, sized and tagged with the trip and the Session", async () => {
+describe("Foto & Video: the Session's upload folder", () => {
+  it("makes both trees' folders on the first click, named alike, and opens the upload one; later clicks reuse them", async () => {
     const { session, trip } = await scene();
 
-    const opened = await openFootageUploadAction(session.id, {
-      size: 4096,
-      contentType: "video/mp4",
+    const first = openedFolder(await click(session.id));
+
+    const sessionFolders = await sessionFoldersOf(session.id);
+    const tripFolders = await perjadinFoldersOf(trip.id);
+    expect(first).toBe(sessionFolders.upload);
+    const sessionName = `2026-10-14 · 08.00 · SMAN 1-Bontang · S-${session.id.slice(0, 8)}`;
+    const tripName = `Kelompok 18 · 12–16 Okt 2026 · SMAN 1/Bontang · P-${trip.id.slice(0, 8)}`;
+    for (const tree of ["archive", "upload"] as const) {
+      expect(drive.files.get(sessionFolders[tree]!)).toMatchObject({
+        name: sessionName,
+        parents: [tripFolders[tree]],
+      });
+      expect(drive.files.get(tripFolders[tree]!)?.name).toBe(tripName);
+    }
+    // The upload tree sits under its own fixed folders, beside the archive's.
+    const uploadPelaksanaan = drive.files.get(tripFolders.upload!)!.parents[0]!;
+    const uploadRoot = drive.files.get(uploadPelaksanaan)!.parents[0]!;
+    expect(drive.files.get(uploadRoot)).toMatchObject({
+      name: FOOTAGE_UPLOAD_FOLDER_NAME,
+      parents: [folders.rootFolderId],
     });
 
-    expect(opened).toEqual(expect.objectContaining({ outcome: "ready", kind: "video" }));
-    const [open] = [...drive.sessions.values()];
-    expect(open).toEqual(
-      expect.objectContaining({
-        parentId: folders.stagingFolderId,
-        size: 4096,
-        origin: "https://preview-42.sugt.test",
-        appProperties: { sugtPerjadinId: trip.id, sugtSessionId: session.id },
-      }),
+    const folderCount = allFolders().length;
+    expect(openedFolder(await click(session.id))).toBe(sessionFolders.upload);
+    expect(allFolders()).toHaveLength(folderCount);
+    // Nothing is recorded and nothing logged: the app cannot see what goes in the folder.
+    await expect(footage()).resolves.toEqual([]);
+    await expect(db.select().from(schema.activityLog)).resolves.toEqual([]);
+  });
+
+  it("keeps one folder of each when two clicks race: the loser trashes its own", async () => {
+    const { session, trip } = await scene();
+
+    const [a, b] = await Promise.all([click(session.id), click(session.id)]);
+
+    const { upload } = await sessionFoldersOf(session.id);
+    expect(openedFolder(a)).toBe(upload);
+    expect(openedFolder(b)).toBe(upload);
+    const live = (name: string) => drive.named(name).filter((file) => !file.trashed);
+    // One in each tree.
+    expect(live(`2026-10-14 · 08.00 · SMAN 1-Bontang · S-${session.id.slice(0, 8)}`)).toHaveLength(
+      2,
     );
-    expect(open?.name).toMatch(/^[0-9a-f-]{36}\.mp4$/);
-  });
-});
-
-describe("verifying what landed", () => {
-  it("refuses bytes that are no footage type, or the other kind than declared, recording nothing", async () => {
-    const { session } = await scene();
-
-    const notFootage = await upload(session.id, pdf(4096), "image/jpeg");
-    await expect(
-      recordFootageAction({
-        sessionId: session.id,
-        driveFileId: notFootage,
-        originalFilename: "a.jpg",
-        contentType: "image/jpeg",
-      }),
-    ).resolves.toEqual({ outcome: "unsupported-type" });
-
-    const videoAsPhoto = await upload(session.id, isoBmff("isom"), "image/jpeg");
-    await expect(
-      recordFootageAction({
-        sessionId: session.id,
-        driveFileId: videoAsPhoto,
-        originalFilename: "b.jpg",
-        contentType: "image/jpeg",
-      }),
-    ).resolves.toEqual({ outcome: "type-mismatch" });
-
-    await expect(footage()).resolves.toEqual([]);
-    await expect(logged()).resolves.toEqual([]);
-    // Both are left unnamed in private `_staging`.
-    expect(drive.files.get(notFootage)?.parents).toEqual([folders.stagingFolderId]);
+    expect(
+      live(`Kelompok 18 · 12–16 Okt 2026 · SMAN 1/Bontang · P-${trip.id.slice(0, 8)}`),
+    ).toHaveLength(2);
   });
 
-  it("refuses a file uploaded for another trip", async () => {
-    const { session } = await scene();
-    const stray = await drive.createFile({
-      name: "x.jpg",
-      parentId: folders.stagingFolderId,
-      mimeType: "image/jpeg",
-      content: "\xff\xd8\xff",
-    });
+  it("refuses anyone who does not write the trip, a Pimpinan included, asking Drive nothing", async () => {
+    const { session, pimpinan, outsider } = await scene();
 
-    await expect(
-      recordFootageAction({
-        sessionId: session.id,
-        driveFileId: stray.id,
-        originalFilename: "x.jpg",
-        contentType: "image/jpeg",
-      }),
-    ).resolves.toEqual({ outcome: "file-unverified" });
+    for (const who of [pimpinan, outsider]) {
+      vi.mocked(requirePerson).mockResolvedValue(who);
+      expect((await click(session.id)).status).toBe(404);
+    }
+    expect(drive.calls).toBe(0);
+    expect(await sessionFoldersOf(session.id)).toEqual({ archive: null, upload: null });
   });
 
-  it("refuses a file opened for another Session of the same trip", async () => {
-    const { session, school, trip } = await scene();
-    const other = await addOfflineSession({
-      schoolId: school.id,
-      heldOn: "2026-10-13",
-      startsAt: "10:00",
-      perjadinId: trip.id,
-    });
-    const driveFileId = await upload(other.id, jpeg());
+  it("opens for a member of the trip's Group who holds no Grant", async () => {
+    const { session, trip } = await scene();
+    const member = await addPerson({ fullName: "Budi", email: "budi@itb.ac.id", role: "Staff" });
+    await addGroupMember(trip.id, member.id);
+    vi.mocked(requirePerson).mockResolvedValue({ ...member, grants: [] } as Person);
 
-    await expect(
-      recordFootageAction({
-        sessionId: session.id,
-        driveFileId,
-        originalFilename: "a.jpg",
-        contentType: "image/jpeg",
-      }),
-    ).resolves.toEqual({ outcome: "file-unverified" });
+    expect(openedFolder(await click(session.id))).toBe((await sessionFoldersOf(session.id)).upload);
   });
 
-  it("waits for a cancellation in flight, and refuses once it commits", async () => {
-    const { session, staff } = await scene();
-    const driveFileId = await upload(session.id, jpeg());
-    let release!: () => void;
-    const held = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    let locked!: () => void;
-    const lockTaken = new Promise<void>((resolve) => {
-      locked = resolve;
-    });
-    // Another request cancelling the Session, its transaction still open while the footage commits.
-    const cancelling = db.transaction(async (tx) => {
-      await tx
-        .update(schema.session)
-        .set({ status: "cancelled", cancelledReason: "Hujan" })
-        .where(eq(schema.session.id, session.id));
-      locked();
-      await held;
-    });
-    await lockTaken;
+  it("answers 404 for an online Session and for no Session, asking Drive nothing", async () => {
+    const { online } = await scene();
 
-    const recording = recordSessionFootage(staff, {
-      footageId: "00000000-0000-4000-8000-0000000000f1",
-      sessionId: session.id,
-      contentType: "image/jpeg",
-      originalFilename: "a.jpg",
-      driveFileId,
-      byteSize: 4096,
-    });
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    release();
-    await cancelling;
-
-    await expect(recording).resolves.toEqual({ outcome: "session-cancelled" });
-    await expect(footage()).resolves.toEqual([]);
+    for (const folder of ["upload", "archive"] as const) {
+      expect((await click(online.id, folder)).status).toBe(404);
+      expect((await click("bukan-sesi", folder)).status).toBe(404);
+    }
+    expect(drive.calls).toBe(0);
   });
 
-  it("refuses a Session cancelled after the upload opened", async () => {
-    const { session } = await scene();
-    const driveFileId = await upload(session.id, jpeg());
+  it("never makes a folder for a cancelled Session, and opens the one it already has", async () => {
+    const { cancelled } = await scene();
+
+    for (const folder of ["upload", "archive"] as const) {
+      expect((await click(cancelled.id, folder)).status).toBe(404);
+    }
+    expect(await sessionFoldersOf(cancelled.id)).toEqual({ archive: null, upload: null });
+    expect(drive.calls).toBe(0);
+
+    await db
+      .update(schema.session)
+      .set({ driveFootageFolderId: "archive-before", driveFootageUploadFolderId: "upload-before" })
+      .where(eq(schema.session.id, cancelled.id));
+    expect(openedFolder(await click(cancelled.id, "upload"))).toBe("upload-before");
+    expect(openedFolder(await click(cancelled.id, "archive"))).toBe("archive-before");
+  });
+
+  it("still re-applies the sharing on a cancelled Session's existing folders", async () => {
+    const { session, trip, staff } = await scene();
+    openedFolder(await click(session.id));
     await db
       .update(schema.session)
       .set({ status: "cancelled", cancelledReason: "Hujan" })
       .where(eq(schema.session.id, session.id));
+    const { archive, upload } = await sessionFoldersOf(session.id);
+    const tripUpload = (await perjadinFoldersOf(trip.id)).upload!;
+    for (const id of [archive!, tripUpload]) {
+      for (const permission of await drive.listPermissions(id)) {
+        if (!permission.inherited) await drive.deletePermission(id, permission.id);
+      }
+    }
+    const before = allFolders().length;
 
-    await expect(
-      recordFootageAction({
-        sessionId: session.id,
-        driveFileId,
-        originalFilename: "a.jpg",
-        contentType: "image/jpeg",
-      }),
-    ).resolves.toEqual({ outcome: "session-cancelled" });
-    await expect(footage()).resolves.toEqual([]);
+    expect(openedFolder(await click(session.id, "archive"))).toBe(archive);
+    expect(openedFolder(await click(session.id, "upload"))).toBe(upload);
+
+    expect(await sharesOn(archive!)).toEqual(["anyone reader"]);
+    expect(await sharesOn(tripUpload)).toEqual([`user writer ${staff.email}`]);
+    expect(allFolders()).toHaveLength(before);
+  });
+
+  it("opens an existing folder while Drive is not usable, and sends a new one back", async () => {
+    const { session } = await scene({ connection: "broken" });
+
+    const back = await click(session.id, "upload", "/pendamping");
+    expect(openedFolder(back)).toBeNull();
+    expect(back.headers.get("location")).toBe(
+      "http://localhost:3001/pendamping?foto-video=drive-unavailable",
+    );
+
+    await db
+      .update(schema.session)
+      .set({ driveFootageUploadFolderId: "folder-made-before" })
+      .where(eq(schema.session.id, session.id));
+    expect(openedFolder(await click(session.id))).toBe("folder-made-before");
+  });
+
+  it.each(["archive", "upload"] as const)(
+    "does not remake a trashed %s Perjadin folder, and says an Administrator must restore it",
+    async (tree) => {
+      const { session, trip } = await scene();
+      openedFolder(await click(session.id));
+      const tripFolder = (await perjadinFoldersOf(trip.id))[tree]!;
+      drive.trash(tripFolder);
+      const before = drive.files.size;
+
+      const back = await click(session.id, "upload", `/sesi/${session.id}`);
+
+      expect(back.headers.get("location")).toBe(
+        `http://localhost:3001/sesi/${session.id}?foto-video=folder-gone`,
+      );
+      expect(drive.files.size).toBe(before);
+      expect((await perjadinFoldersOf(trip.id))[tree]).toBe(tripFolder);
+    },
+  );
+
+  it("goes back to the Session's page when `dari` points off the app", async () => {
+    const { session } = await scene({ connection: "broken" });
+
+    for (const offsite of ["//evil.example/x", "/\t/evil.example/x"]) {
+      const back = await click(session.id, "upload", offsite);
+      expect(back.headers.get("location")).toBe(
+        `http://localhost:3001/sesi/${session.id}?foto-video=drive-unavailable`,
+      );
+    }
   });
 });
 
-describe("an upload, recorded and reconciled", () => {
-  it("names the Session folder and the file, shares the file only, and logs the upload", async () => {
+describe("Lihat arsip: the Session's archive folder", () => {
+  it("opens for anyone signed in, a Pimpinan included, and makes the archive tree only", async () => {
+    const { session, trip, pimpinan, outsider } = await scene();
+
+    for (const who of [pimpinan, outsider]) {
+      vi.mocked(requirePerson).mockResolvedValue(who);
+      expect(openedFolder(await click(session.id, "archive"))).toBe(
+        (await sessionFoldersOf(session.id)).archive,
+      );
+    }
+    expect((await sessionFoldersOf(session.id)).upload).toBeNull();
+    expect((await perjadinFoldersOf(trip.id)).upload).toBeNull();
+  });
+
+  it("is viewable by anyone with its link; the Perjadin archive folder and above are not", async () => {
     const { session, trip } = await scene();
+    openedFolder(await click(session.id, "archive"));
+    const sessionFolder = (await sessionFoldersOf(session.id)).archive!;
+    const tripFolder = (await perjadinFoldersOf(trip.id)).archive!;
 
-    const { driveFileId, footageId, synced } = await uploadAndRecord(session.id);
-
-    expect(synced).toBe(true);
-    const file = drive.files.get(driveFileId)!;
-    expect(file.name).toBe(`2026-10-14 · SMAN 1-Bontang · Foto · M-${footageId.slice(0, 8)}.jpg`);
-    expect(file.appProperties).toEqual(
-      expect.objectContaining({ sugtPerjadinId: trip.id, sugtFootageId: footageId }),
-    );
-
-    const sessionFolder = drive.files.get(file.parents[0]!)!;
-    expect(sessionFolder.name).toBe(
-      `2026-10-14 · 08.00 · SMAN 1-Bontang · S-${session.id.slice(0, 8)}`,
-    );
-    expect(sessionFolder.appProperties).toEqual({
-      sugtPerjadinId: trip.id,
-      sugtSessionId: session.id,
-    });
-    const tripFolder = drive.files.get(sessionFolder.parents[0]!)!;
-    expect(tripFolder.name).toBe(
-      `Kelompok 18 · 12–16 Okt 2026 · SMAN 1/Bontang · P-${trip.id.slice(0, 8)}`,
-    );
-    const pelaksanaan = drive.files.get(tripFolder.parents[0]!)!;
-    expect(drive.files.get(pelaksanaan.parents[0]!)?.name).toBe(FOOTAGE_FOLDER_NAME);
-
-    // The file is shared; no folder is.
-    expect(await drive.listPermissions(driveFileId)).toEqual([
-      expect.objectContaining({ type: "anyone", role: "reader" }),
-    ]);
-    for (const folder of [sessionFolder, tripFolder]) {
-      await expect(drive.listPermissions(folder.id)).resolves.toEqual([]);
+    expect(await sharesOn(sessionFolder)).toEqual(["anyone reader"]);
+    for (const folder of [
+      tripFolder,
+      drive.files.get(tripFolder)!.parents[0]!,
+      folders.rootFolderId,
+    ]) {
+      expect(await drive.listPermissions(folder)).toEqual([]);
     }
 
-    const [row] = await footage();
-    expect(row).toEqual(
-      expect.objectContaining({
-        id: footageId,
-        kind: "foto",
-        contentType: "image/jpeg",
-        originalFilename: "IMG_0001.JPG",
-        byteSize: 4096,
-      }),
-    );
-    expect(row?.driveSyncedAt).not.toBeNull();
-
-    const [entry] = await logged();
-    expect(entry).toEqual(
-      expect.objectContaining({ action: "footage_uploaded", perjadinId: trip.id }),
-    );
-    expect(activityLogAksi("footage_uploaded", false)).toBe("Foto/Video diunggah");
-    expect(
-      activityLogRincian({ action: "footage_uploaded", details: entry!.details } as never),
-    ).toBe("Foto · IMG_0001.JPG · 2026-10-14 · SMAN 1/Bontang");
+    // Removed by hand, it comes back on the next click — once.
+    const [link] = await drive.listPermissions(sessionFolder);
+    await drive.deletePermission(sessionFolder, link!.id);
+    openedFolder(await click(session.id, "archive"));
+    openedFolder(await click(session.id, "archive"));
+    expect(await sharesOn(sessionFolder)).toEqual(["anyone reader"]);
   });
 
-  it("stores a video under its sniffed type, and reuses the Session's folder", async () => {
+  it("is link-shared by Foto & Video's click too, which makes it", async () => {
     const { session } = await scene();
-    const first = await uploadAndRecord(session.id);
-    const second = await uploadAndRecord(session.id, isoBmff("qt  "), "video/quicktime");
+    openedFolder(await click(session.id, "upload"));
 
-    const [a, b] = [drive.files.get(first.driveFileId)!, drive.files.get(second.driveFileId)!];
-    expect(b.parents).toEqual(a.parents);
-    expect(b.name).toMatch(/ · Video · M-[0-9a-f]{8}\.mov$/);
-    const rows = await sessionFootageList(staffPerson, session.id);
-    // Newest first.
-    expect(rows.map((row) => [row.kind, row.contentType])).toEqual([
-      ["video", "video/quicktime"],
-      ["foto", "image/jpeg"],
+    expect(await sharesOn((await sessionFoldersOf(session.id)).archive!)).toEqual([
+      "anyone reader",
     ]);
   });
+});
 
-  it("commits the row and its Log entry together: the Log refused, the row undone", async () => {
-    const { session } = await scene();
-    const driveFileId = await upload(session.id, jpeg());
-    // The Log entry is written after the row, inside the same transaction: refuse it, and the row
-    // already inserted must go with it.
-    vi.mocked(logActivity).mockRejectedValueOnce(new Error("log refused"));
+describe("the upload folder's sharing", () => {
+  it("gives edit access to exactly the trip's active writers, with no link share and nothing else touched", async () => {
+    const { session, trip, staff, pimpinan } = await scene();
+    const member = await addPerson({ fullName: "Budi", email: "Budi@itb.ac.id", role: "Staff" });
+    await addGroupMember(trip.id, member.id);
+    const editor = await addPerson({ fullName: "Citra", email: "citra@itb.ac.id", role: "Staff" });
+    await addGrant(editor.id, "Perjadin Editor");
+    const admin = await addPerson({ fullName: "Dodi", email: "dodi@itb.ac.id", role: "Staff" });
+    await addGrant(admin.id, "Administrator");
+    // Not a writer: a revoked Group member (and the scene's Eka, on no Group).
+    const gone = await addPerson({ fullName: "Gita", email: "gita@itb.ac.id", role: "Staff" });
+    await addGroupMember(trip.id, gone.id);
+    await revokePerson(gone.id);
+    // A first click makes the folder; then hands in Drive add an editor, a commenter and the owner.
+    openedFolder(await click(session.id));
+    const tripFolder = (await perjadinFoldersOf(trip.id)).upload!;
+    drive.share(tripFolder, { type: "user", role: "writer", emailAddress: "lama@itb.ac.id" });
+    drive.share(tripFolder, { type: "user", role: "owner", emailAddress: "sugt@gmail.com" });
+    drive.share(tripFolder, { type: "user", role: "commenter", emailAddress: "tamu@gmail.com" });
+    const createPermission = vi.spyOn(drive, "createPermission");
 
-    await expect(
-      recordFootageAction({
-        sessionId: session.id,
-        driveFileId,
-        originalFilename: "a.jpg",
-        contentType: "image/jpeg",
-      }),
-    ).rejects.toThrow("log refused");
-    await expect(footage()).resolves.toEqual([]);
-    await expect(logged()).resolves.toEqual([]);
+    openedFolder(await click(session.id));
+
+    expect(await sharesOn(tripFolder)).toEqual(
+      [
+        "user commenter tamu@gmail.com",
+        "user owner sugt@gmail.com",
+        "user writer budi@itb.ac.id",
+        "user writer citra@itb.ac.id",
+        "user writer dodi@itb.ac.id",
+        `user writer ${staff.email}`,
+      ].sort(),
+    );
+    expect(await sharesOn(tripFolder)).not.toContain(`user writer ${pimpinan.email}`);
+    // Re-applied: only what was missing is added — nothing was.
+    expect(createPermission).not.toHaveBeenCalled();
+    // The Session's upload folder inherits it and carries nothing of its own; no link share anywhere
+    // in the upload tree.
+    const sessionFolder = (await sessionFoldersOf(session.id)).upload!;
+    const permissions = await drive.listPermissions(sessionFolder);
+    expect(permissions.filter((p) => !p.inherited)).toEqual([]);
+    expect(permissions.some((p) => p.type === "anyone")).toBe(false);
   });
 
-  it("records a Drive file once: a retry while it is unsynced answers the first row", async () => {
-    const { session } = await scene();
-    const driveFileId = await upload(session.id, jpeg());
-    const record = () =>
-      recordFootageAction({
-        sessionId: session.id,
-        driveFileId,
-        originalFilename: "a.jpg",
-        contentType: "image/jpeg",
-      });
+  it("skips an email Drive refuses, and shares with the rest", async () => {
+    const { session, trip, staff } = await scene();
+    const member = await addPerson({ fullName: "Budi", email: "budi@yahoo.com", role: "Staff" });
+    await addGroupMember(trip.id, member.id);
+    drive.refusedEmails.add("budi@yahoo.com");
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-    // The first answer is lost and its reconcile failed, so the file is still in `_staging`: the
-    // browser's retry passes verify again and reaches the commit.
-    vi.spyOn(drive, "createFolder").mockRejectedValueOnce(
-      new DriveRequestError("files.create", 503),
-    );
-    const first = await record();
-    const second = await record();
+    expect(openedFolder(await click(session.id))).toBe((await sessionFoldersOf(session.id)).upload);
 
-    expect(second).toEqual(
-      expect.objectContaining({
-        outcome: "recorded",
-        footageId: first.outcome === "recorded" ? first.footageId : "",
-      }),
-    );
-    await expect(footage()).resolves.toHaveLength(1);
-    await expect(logged()).resolves.toHaveLength(1);
+    expect(await sharesOn((await perjadinFoldersOf(trip.id)).upload!)).toEqual([
+      `user writer ${staff.email}`,
+    ]);
+    expect(error).toHaveBeenCalled();
   });
 
-  it("keeps the footage, unsynced, when the reconcile fails; a second run finishes it, once", async () => {
+  it("still opens the folder when sharing fails", async () => {
+    const { session } = await scene();
+    vi.spyOn(drive, "listPermissions").mockRejectedValue(
+      new DriveRequestError("permissions.list", 503),
+    );
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(openedFolder(await click(session.id))).toBe((await sessionFoldersOf(session.id)).upload);
+    expect(error).toHaveBeenCalled();
+  });
+
+  it("neither it nor the archive's link share sets off Periksa koneksi's warning", async () => {
+    const { session } = await scene();
+    openedFolder(await click(session.id, "upload"));
+    openedFolder(await click(session.id, "archive"));
+    const { archive, upload } = await sessionFoldersOf(session.id);
+    expect(await sharesOn(archive!)).toEqual(["anyone reader"]);
+    expect((await drive.listPermissions(upload!)).length).toBeGreaterThan(0);
+
+    const report = await checkDriveConnectionAction();
+
+    if (report.token !== "ok") throw new Error(report.token);
+    expect(report.exposed).toEqual([]);
+  });
+});
+
+describe("footage recorded before #561", () => {
+  it("keeps old footage unsynced while its folder is trashed; a later run finishes it, once", async () => {
     const { session, staff } = await scene();
     // The Session's folder will be made in a trip folder trashed by hand.
     const tripFolder = await drive.createFolder({ name: "x", parentId: folders.rootFolderId });
@@ -521,9 +543,12 @@ describe("an upload, recorded and reconciled", () => {
       .where(eq(schema.perjadin.id, session.perjadinId!));
     drive.trash(tripFolder.id);
 
-    const { driveFileId, footageId, synced } = await uploadAndRecord(session.id);
+    const { driveFileId, footageId } = await recorded(session, { placed: false });
 
-    expect(synced).toBe(false);
+    await expect(reconcileFootage(staff, drive, folders, footageId)).resolves.toEqual({
+      outcome: "unsynced",
+      reason: "folder-trashed",
+    });
     const [row] = await footage();
     expect(row?.driveSyncedAt).toBeNull();
     expect(row?.driveSyncFailedAt).not.toBeNull();
@@ -539,85 +564,44 @@ describe("an upload, recorded and reconciled", () => {
       outcome: "synced",
     });
     expect(drive.files.get(driveFileId)!.name).toBe(before);
-    await expect(drive.listPermissions(driveFileId)).resolves.toHaveLength(1);
+    // The file's own link share, once; the archive Session folder's reaches it by inheritance.
+    expect(await sharesOn(driveFileId)).toEqual(["anyone reader"]);
     expect(
       drive.named(`2026-10-14 · 08.00 · SMAN 1-Bontang · S-${session.id.slice(0, 8)}`),
     ).toHaveLength(1);
   });
 });
 
-describe("Hapus", () => {
-  it("trashes the file first, then deletes the row and logs it", async () => {
-    const { session } = await scene();
-    const { driveFileId, footageId } = await uploadAndRecord(session.id);
-
-    await expect(deleteFootageAction(footageId)).resolves.toEqual({ outcome: "deleted" });
-
-    expect((await drive.getFile(driveFileId))?.trashed).toBe(true);
-    await expect(footage()).resolves.toEqual([]);
-    const actions = (await logged()).map((entry) => entry.action).toSorted();
-    expect(actions).toEqual(["footage_deleted", "footage_uploaded"]);
-    expect(activityLogAksi("footage_deleted", false)).toBe("Foto/Video dihapus");
-  });
-
-  it("keeps the row when trashing fails, and deletes nothing", async () => {
-    const { session } = await scene();
-    const { footageId } = await uploadAndRecord(session.id);
-    vi.spyOn(drive, "trashFile").mockRejectedValueOnce(new DriveRequestError("files.update", 503));
-
-    await expect(deleteFootageAction(footageId)).resolves.toEqual({
-      outcome: "drive-unreachable",
-    });
-    await expect(footage()).resolves.toHaveLength(1);
-    expect(vi.mocked(deleteSessionFootage)).not.toHaveBeenCalled();
-  });
-
-  it("completes when the file is already in the trash or gone, and refuses a Pimpinan", async () => {
-    const { session, pimpinan } = await scene();
-    const { driveFileId, footageId } = await uploadAndRecord(session.id);
-    drive.remove(driveFileId);
-
-    vi.mocked(requirePerson).mockResolvedValue(pimpinan as Person);
-    await expect(digestOf(deleteFootageAction(footageId))).resolves.toBe(FORBIDDEN);
-
-    vi.mocked(requirePerson).mockResolvedValue(staffPerson);
-    await expect(deleteFootageAction(footageId)).resolves.toEqual({ outcome: "deleted" });
-    await expect(deleteFootageAction(footageId)).resolves.toEqual({
-      outcome: "no-such-footage",
-    });
-  });
-
-  it("stays with a Session cancelled later", async () => {
-    const { session } = await scene();
-    await uploadAndRecord(session.id);
-    await db
-      .update(schema.session)
-      .set({ status: "cancelled", cancelledReason: "Hujan" })
-      .where(eq(schema.session.id, session.id));
-
-    await expect(sessionFootageList(staffPerson, session.id)).resolves.toHaveLength(1);
-  });
-});
-
 describe("renames", () => {
-  it("renames the Session's folder and files when its date and time move", async () => {
+  it("renames the Session's folders and archived files when its date and time move, never a Staff upload", async () => {
     const { session } = await scene();
-    const { driveFileId, footageId } = await uploadAndRecord(session.id);
+    const { driveFileId, footageId } = await recorded(session);
+    openedFolder(await click(session.id));
+    const { upload } = await sessionFoldersOf(session.id);
+    const staffUpload = await drive.createFile({
+      name: "IMG_2001.JPG",
+      parentId: upload!,
+      mimeType: "image/jpeg",
+      content: "jpeg",
+    });
 
     await expect(moveSessionDateAction(session.id, "2026-10-15", "13:30")).resolves.toEqual(
       expect.objectContaining({ outcome: "moved" }),
     );
 
     const file = drive.files.get(driveFileId)!;
+    const name = `2026-10-15 · 13.30 · SMAN 1-Bontang · S-${session.id.slice(0, 8)}`;
     expect(file.name).toBe(`2026-10-15 · SMAN 1-Bontang · Foto · M-${footageId.slice(0, 8)}.jpg`);
-    expect(drive.files.get(file.parents[0]!)?.name).toBe(
-      `2026-10-15 · 13.30 · SMAN 1-Bontang · S-${session.id.slice(0, 8)}`,
-    );
+    expect(drive.files.get(file.parents[0]!)?.name).toBe(name);
+    expect(drive.files.get(upload!)?.name).toBe(name);
+    expect(drive.files.get(staffUpload.id)?.name).toBe("IMG_2001.JPG");
   });
 
   it("renames them after Ubah Sesi on the trip too", async () => {
     const { session, trip, school } = await scene();
-    const { driveFileId } = await uploadAndRecord(session.id);
+    const { driveFileId } = await recorded(session);
+    openedFolder(await click(session.id));
+    const { upload } = await sessionFoldersOf(session.id);
 
     await editPerjadinSessionAction(trip.id, session.id, {
       schoolId: school.id,
@@ -630,78 +614,110 @@ describe("renames", () => {
     const file = drive.files.get(driveFileId)!;
     expect(file.name.startsWith("2026-10-16 · ")).toBe(true);
     expect(drive.files.get(file.parents[0]!)?.name.startsWith("2026-10-16 · 10.00 · ")).toBe(true);
+    expect(drive.files.get(upload!)?.name.startsWith("2026-10-16 · 10.00 · ")).toBe(true);
   });
 });
 
-describe("the Perjadin's Foto & Video folder", () => {
-  it("is renamed with the trip's other folders when its dates are corrected", async () => {
+describe("the Perjadin's Foto & Video folders", () => {
+  it("are renamed with the trip's other folders when its dates are corrected", async () => {
     const { session, trip } = await scene();
-    await uploadAndRecord(session.id);
-    const [before] = await db.select().from(schema.perjadin).where(eq(schema.perjadin.id, trip.id));
+    openedFolder(await click(session.id));
+    const tripFolders = await perjadinFoldersOf(trip.id);
 
     await expect(
       updatePerjadinDatesAction(trip.id, { startsOn: "2026-10-13", endsOn: "2026-10-16" }),
     ).resolves.toMatchObject({ outcome: "updated" });
 
-    expect(drive.files.get(before!.driveFootageFolderId!)!.name).toBe(
-      `Kelompok 18 · 13–16 Okt 2026 · SMAN 1/Bontang · P-${trip.id.slice(0, 8)}`,
-    );
+    for (const id of [tripFolders.archive!, tripFolders.upload!]) {
+      expect(drive.files.get(id)!.name).toBe(
+        `Kelompok 18 · 13–16 Okt 2026 · SMAN 1/Bontang · P-${trip.id.slice(0, 8)}`,
+      );
+    }
   });
 
-  it("is brought back to its name by Periksa koneksi", async () => {
+  it("are brought back to their names by Periksa koneksi, the upload Session folder too", async () => {
     const { session, trip } = await scene();
-    await uploadAndRecord(session.id);
-    const [row] = await db.select().from(schema.perjadin).where(eq(schema.perjadin.id, trip.id));
-    await drive.updateFile(row!.driveFootageFolderId!, { name: "lama" });
+    openedFolder(await click(session.id));
+    const tripFolders = await perjadinFoldersOf(trip.id);
+    const { upload } = await sessionFoldersOf(session.id);
+    for (const id of [tripFolders.archive!, tripFolders.upload!, upload!]) {
+      await drive.updateFile(id, { name: "lama" });
+    }
 
-    await checkDriveConnectionAction();
+    const report = await checkDriveConnectionAction();
 
-    expect(drive.files.get(row!.driveFootageFolderId!)!.name).toBe(
-      `Kelompok 18 · 12–16 Okt 2026 · SMAN 1/Bontang · P-${trip.id.slice(0, 8)}`,
+    for (const id of [tripFolders.archive!, tripFolders.upload!]) {
+      expect(drive.files.get(id)!.name).toBe(
+        `Kelompok 18 · 12–16 Okt 2026 · SMAN 1/Bontang · P-${trip.id.slice(0, 8)}`,
+      );
+    }
+    expect(drive.files.get(upload!)!.name).toBe(
+      `2026-10-14 · 08.00 · SMAN 1-Bontang · S-${session.id.slice(0, 8)}`,
     );
+    expect(report.token === "ok" && report.names.ran && report.names.renamed).toBe(3);
+  });
+
+  it("reports a trashed upload Session folder in Periksa koneksi and leaves it in the trash", async () => {
+    const { session } = await scene();
+    openedFolder(await click(session.id));
+    const { upload } = await sessionFoldersOf(session.id);
+    drive.trash(upload!);
+
+    const report = await checkDriveConnectionAction();
+
+    if (report.token !== "ok" || !report.names.ran) throw new Error("no names pass");
+    expect(report.names.failures).toEqual([
+      expect.objectContaining({ folder: "sesi-foto-video-unggah", reason: "folder-trashed" }),
+    ]);
+    expect((await drive.getFile(upload!))?.trashed).toBe(true);
   });
 });
 
 describe("Periksa koneksi", () => {
-  it("makes the Foto & Video folders for a connection made before them", async () => {
-    await scene({ footage: false });
+  it("makes both trees' fixed Foto & Video folders for a connection made before them", async () => {
+    await scene({ footage: false, footageUpload: false });
 
     const report = await checkDriveConnectionAction();
 
     if (report.token !== "ok") throw new Error(report.token);
     expect(report.footage).toBe("created");
-    expect(describeDriveCheck(report).lines).toContain("Folder Foto & Video: dibuat.");
+    expect(report.footageUpload).toBe("created");
+    expect(describeDriveCheck(report).lines).toEqual(
+      expect.arrayContaining([
+        "Folder Foto & Video: dibuat.",
+        "Folder Foto & Video — Unggahan: dibuat.",
+      ]),
+    );
     const [ids] = await db
       .select({
         tree: schema.driveConnection.footageFolderId,
         pelaksanaan: schema.driveConnection.footagePelaksanaanOfflineFolderId,
+        uploadTree: schema.driveConnection.footageUploadFolderId,
+        uploadPelaksanaan: schema.driveConnection.footageUploadPelaksanaanOfflineFolderId,
       })
       .from(schema.driveConnection);
     expect(drive.files.get(ids!.tree!)?.name).toBe(FOOTAGE_FOLDER_NAME);
     expect(drive.files.get(ids!.pelaksanaan!)?.parents).toEqual([ids!.tree]);
+    expect(drive.files.get(ids!.uploadTree!)).toMatchObject({
+      name: FOOTAGE_UPLOAD_FOLDER_NAME,
+      parents: [folders.rootFolderId],
+    });
+    expect(drive.files.get(ids!.uploadPelaksanaan!)?.parents).toEqual([ids!.uploadTree]);
 
     const again = await checkDriveConnectionAction();
-    expect(again.token === "ok" && again.footage).toBe("ok");
+    if (again.token !== "ok") throw new Error(again.token);
+    expect([again.footage, again.footageUpload]).toEqual(["ok", "ok"]);
+    expect(describeDriveCheck(again).lines).toContain("Folder Foto & Video — Unggahan: ada.");
   });
 
   it("sweeps unsynced footage and re-asserts the Session folder's and files' names", async () => {
     const { session } = await scene();
-    const { driveFileId, footageId } = await uploadAndRecord(session.id);
-    // Names gone stale by hand, and a second file whose reconcile failed.
+    const { driveFileId, footageId } = await recorded(session);
+    // Names gone stale by hand, and a second file an upload left in `_staging` before #561.
     const sessionFolderId = drive.files.get(driveFileId)!.parents[0]!;
     await drive.updateFile(sessionFolderId, { name: "lama" });
     await drive.updateFile(driveFileId, { name: "lama.jpg" });
-    const owed = await upload(session.id, jpeg());
-    vi.spyOn(drive, "createPermission").mockRejectedValueOnce(
-      new DriveRequestError("permissions.create", 503),
-    );
-    const second = await recordFootageAction({
-      sessionId: session.id,
-      driveFileId: owed,
-      originalFilename: "b.jpg",
-      contentType: "image/jpeg",
-    });
-    expect(second).toEqual(expect.objectContaining({ outcome: "recorded", synced: false }));
+    const { driveFileId: owed } = await recorded(session, { placed: false });
 
     const report = await checkDriveConnectionAction();
 

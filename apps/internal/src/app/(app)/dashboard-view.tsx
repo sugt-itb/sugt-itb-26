@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@sugt/ui/components/table";
 
-import type { PivotTable, ProgressSummary } from "./dashboard-derive";
+import type { PivotTable, ProgressSummary, SummaryFigure } from "./dashboard-derive";
 
 /**
  * The Dashboard view — the presentational half of the screen, now fed **real** figures. Every
@@ -62,19 +62,19 @@ export function DashboardView({
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <SummaryCard
           label="Progress Pretest"
-          percent={summary.pretest}
+          figure={summary.pretest}
         />
         <SummaryCard
           label="Progress Daring"
-          percent={summary.daring}
+          figure={summary.daring}
         />
         <SummaryCard
           label="Progress Luring"
-          percent={summary.luring}
+          figure={summary.luring}
         />
         <SummaryCard
           label="Progress Posttest"
-          percent={summary.posttest}
+          figure={summary.posttest}
         />
       </div>
 
@@ -107,13 +107,17 @@ export function DashboardView({
   );
 }
 
-/** One progress summary card: a label and a single whole-number percentage (#313). */
-function SummaryCard({ label, percent }: { label: string; percent: number }) {
+/**
+ * One progress summary card (#313, #551): a label, the whole-number percentage, and under it the
+ * detail line the percent came from (`"12/47 sekolah"`) — both built by `deriveDashboard`.
+ */
+function SummaryCard({ label, figure }: { label: string; figure: SummaryFigure }) {
   return (
     <Card>
       <CardHeader>
         <CardDescription>{label}</CardDescription>
-        <CardTitle className="font-heading text-3xl tabular-nums">{percent}%</CardTitle>
+        <CardTitle className="font-heading text-3xl tabular-nums">{figure.percent}%</CardTitle>
+        <p className="text-sm text-muted-foreground tabular-nums">{figure.detail}</p>
       </CardHeader>
     </Card>
   );

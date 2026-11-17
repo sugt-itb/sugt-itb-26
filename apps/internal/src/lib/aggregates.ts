@@ -1,5 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
-
+import { presentsBearer } from "-/lib/bearer";
 import { requireEnv } from "-/lib/env";
 import { publicUrlFor } from "-/lib/story-photo-url";
 import type { ServiceCaller } from "@sugt/db/queries";
@@ -54,23 +53,12 @@ export type StoryPayload = {
 
 /**
  * Who is calling, from the `Authorization: Bearer …` header — a `ServiceCaller` when the token is
- * exactly `AGGREGATES_SECRET`, `null` otherwise. `null` is the route's 401, and a 401 is what a
- * browser with no token gets, which is why these routes are never browser-reachable.
- *
- * The compare is constant-time, and length is checked first: `timingSafeEqual` throws on
- * unequal-length buffers, so a wrong-length token would otherwise be a 500 rather than a 401.
+ * exactly `AGGREGATES_SECRET` (`presentsBearer`, constant-time), `null` otherwise. `null` is the
+ * route's 401, and a 401 is what a browser with no token gets, which is why these routes are never
+ * browser-reachable.
  */
 export function authorizeServiceCaller(request: Request): ServiceCaller | null {
-  const header = request.headers.get("authorization");
-  const prefix = "Bearer ";
-  if (!header?.startsWith(prefix)) return null;
-
-  const presented = Buffer.from(header.slice(prefix.length));
-  const expected = Buffer.from(requireEnv("AGGREGATES_SECRET"));
-  if (presented.length !== expected.length) return null;
-  if (!timingSafeEqual(presented, expected)) return null;
-
-  return { kind: "service" };
+  return presentsBearer(request, requireEnv("AGGREGATES_SECRET")) ? { kind: "service" } : null;
 }
 
 /** Stamp the scope data with its version. No URLs and no derived counts — the reader derives those. */
