@@ -5,7 +5,7 @@ import type { Grant } from "@sugt/domain";
 import { describe, expect, it } from "vitest";
 
 import {
-  applyRemainingMigrations,
+  applyMigrationsThrough,
   scratchDatabaseThrough,
   withClient,
 } from "./support/scratch-database";
@@ -14,9 +14,13 @@ import {
  * **Migration 0056 retires the Keuangan Grant** (#533, ADR-0059). Every `'Keuangan'` row goes, including
  * the record of who held it, and the CHECK then refuses the value. Every other Grant a holder has stays,
  * and someone who held only this one becomes grant-less Staff, who land on `/pendamping`.
+ *
+ * Each case stops at 0056 itself: 0059 widens the CHECK again for the Keuangan Grant's return (#549),
+ * so the CHECK's end state no longer refuses it, but what 0056 did on the day it ran stays pinned.
  */
 
 const scratch = scratchDatabaseThrough("0055_drop_one_online_session_per_school_per_day");
+const THROUGH = "0056_retire_keuangan_grant";
 
 const ONLY = randomUUID();
 const BOTH = randomUUID();
@@ -59,7 +63,7 @@ describe("migration 0056", () => {
   it("deletes every Keuangan row and leaves every other Grant", async () => {
     await seed();
 
-    await applyRemainingMigrations(scratch.url);
+    await applyMigrationsThrough(scratch.url, THROUGH);
 
     await expect(grantsOf(ONLY)).resolves.toEqual([]);
     await expect(grantsOf(BOTH)).resolves.toEqual([
@@ -75,7 +79,7 @@ describe("migration 0056", () => {
   it("leaves someone who held only Keuangan unable to read the Dashboard, so on /pendamping", async () => {
     await seed();
 
-    await applyRemainingMigrations(scratch.url);
+    await applyMigrationsThrough(scratch.url, THROUGH);
 
     const grants = (await grantsOf(ONLY)) as Grant[];
     expect(
@@ -90,7 +94,7 @@ describe("migration 0056", () => {
   });
 
   it("makes the constraint refuse Keuangan and still accept the five Grants", async () => {
-    await applyRemainingMigrations(scratch.url);
+    await applyMigrationsThrough(scratch.url, THROUGH);
     await withClient(
       scratch.url,
       (sql) => sql`

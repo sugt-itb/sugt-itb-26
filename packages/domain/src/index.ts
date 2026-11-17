@@ -293,7 +293,7 @@ export const PERJADIN_ROLE_LABELS: Record<Role, string> = {
  * `(id, role)` foreign keys, and being Staff-only they can never punch through "a Pimpinan writes
  * nothing" (ADR-0025). See `docs/adr/0028-grants-are-a-second-additive-access-axis.md`.
  *
- * Five named Grants (ADR-0052, #469; ADR-0059, #533):
+ * Six named Grants (ADR-0052, #469; ADR-0059, #533; ADR-0064, #549):
  * - **Administrator** — administers Grants (assign/revoke any Grant on any Staff Person, including
  *   making another Administrator) and **implies every other Grant**, so an Administrator satisfies
  *   any grant check without holding that grant's own row.
@@ -305,8 +305,11 @@ export const PERJADIN_ROLE_LABELS: Record<Role, string> = {
  *   Dashboard Viewer** (`GRANT_IMPLIED_BY`, beside `hasGrant`).
  * - **Dashboard Viewer** — may read the Dashboard, and nothing more. A Pimpinan never holds it —
  *   Grants are Staff-only (ADR-0028); a Pimpinan's Dashboard access comes from their role.
+ * - **Keuangan** — reads `/keuangan`, the Block B budget view of Finance's spreadsheet (ADR-0064).
+ *   A Pimpinan reads it by Role, as the Dashboard (`canViewKeuangan`).
  *
- * **No other Grant implies another**: Perjadin Editor and Daring Editor do not read the Dashboard.
+ * **No other Grant implies another**: Perjadin Editor and Daring Editor do not read the Dashboard,
+ * and Keuangan implies nothing.
  *
  * Unlike `TRANSACTION_CATEGORIES`, these **are** terms the Programme's language defines — `CONTEXT.md`
  * glosses them under **Access** — so they belong here beside `ROLES`. The list is mirrored by
@@ -319,6 +322,7 @@ export const GRANTS = [
   "Daring Editor",
   "Dashboard Editor",
   "Dashboard Viewer",
+  "Keuangan",
 ] as const;
 export type Grant = (typeof GRANTS)[number];
 
@@ -334,6 +338,7 @@ export const GRANT_LABELS: Record<Grant, string> = {
   "Daring Editor": "Daring Editor",
   "Dashboard Editor": "Dashboard Editor",
   "Dashboard Viewer": "Dashboard Viewer",
+  Keuangan: "Keuangan",
 };
 
 /**
@@ -346,6 +351,7 @@ export const GRANT_DESCRIPTIONS: Record<Grant, string> = {
   "Daring Editor": "Sesi daring dan Pretest",
   "Dashboard Editor": "termasuk Dashboard Viewer",
   "Dashboard Viewer": "membaca Dashboard",
+  Keuangan: "membaca anggaran Blok B di Keuangan",
 };
 
 /**

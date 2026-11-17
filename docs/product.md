@@ -1167,10 +1167,10 @@ says only an Administrator reads the roster, adds people and deactivates them.
   gets a 403, and nothing is written.
 - **An Administrator cannot Nonaktifkan themselves**: their own row has no button, and the write
   refuses it. Deactivating another Administrator is allowed.
-- **Akses** is a column of Grants. Each active Staff row has a searchable multi-select of the five
+- **Akses** is a column of Grants. Each active Staff row has a searchable multi-select of the six
   Grants, held ones as chips; adding or removing a chip assigns or revokes at once. Each option carries a line saying what it gates — Administrator "semua akses", Perjadin Editor "merencanakan dan menulis setiap Perjadin, serta membuka Pendamping Lain", Daring Editor "Sesi
   daring dan Pretest", Dashboard Editor "termasuk Dashboard Viewer", Dashboard Viewer "membaca
-  Dashboard". Only Grants actually held are chips: choosing Dashboard Editor shows Dashboard Editor
+  Dashboard", Keuangan "membaca anggaran Blok B di Keuangan". Only Grants actually held are chips: choosing Dashboard Editor shows Dashboard Editor
   alone. A Pimpinan or deactivated row shows "—".
 - **After a Perjadin Editor or Administrator Grant is assigned or revoked**, the row says once:
   "Akses edit folder unggah Foto & Video diperbarui lewat Periksa koneksi, atau saat Foto & Video

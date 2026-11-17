@@ -42,3 +42,9 @@ Group and leadership follow it.
   view should follow this ADR rather than ADR-0026.
 - The export carries no Perjadin column, by decision: it is a line-by-line ledger, and a reader who
   needs the trip filters by it first.
+
+## Amendment (2026-11-17): the name returns for a different page
+
+`/keuangan` and the Keuangan Grant return ([ADR-0064](./0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md), [#549](https://github.com/sugt-itb/sugt-itb-26/issues/549)), but not this page. The new `/keuangan`
+shows Finance's spreadsheet and lists no `transaction` rows, so nothing above about the table, its
+filters or its export applies to it. The shared CSV writer's formula guard still stands.

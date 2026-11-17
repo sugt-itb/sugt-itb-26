@@ -62,6 +62,19 @@ export function applyRemainingMigrations(url: string) {
   return withClient(url, (sql) => migrate(drizzle(sql), { migrationsFolder }));
 }
 
+/**
+ * Apply the migrations after the scratch database's stopping point **up to and including `tag`**, and
+ * no further — for a test of what one migration did that a later one has since reversed.
+ */
+export async function applyMigrationsThrough(url: string, tag: string) {
+  const folder = await migrationsThrough(tag);
+  try {
+    await withClient(url, (sql) => migrate(drizzle(sql), { migrationsFolder: folder }));
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+}
+
 /** One short-lived connection, closed whatever `run` does. */
 export async function withClient<T>(url: string, run: (sql: postgres.Sql) => Promise<T>) {
   const sql = postgres(url, { prepare: false, max: 1, onnotice: () => undefined });

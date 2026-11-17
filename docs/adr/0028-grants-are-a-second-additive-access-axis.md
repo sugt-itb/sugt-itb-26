@@ -145,3 +145,10 @@ restores one.) On `/orang` the Grants are now a searchable multi-select with chi
 The Grant set is now five: Administrator, Perjadin Editor, Daring Editor, Dashboard Editor and Dashboard
 Viewer ([ADR-0059](./0059-programme-wide-money-is-not-in-the-app.md), #533). The migration deleted every
 Keuangan row, including the record of who held it.
+
+## Amendment (2026-11-17): Keuangan returns
+
+The Grant set is six again: Administrator, Perjadin Editor, Daring Editor, Dashboard Editor, Dashboard
+Viewer and **Keuangan**, which reads `/keuangan` ([ADR-0064](./0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md), [#549](https://github.com/sugt-itb/sugt-itb-26/issues/549)). The migration only widens the CHECK;
+the holders #533 deleted are not restored. Keuangan implies nothing, and a Pimpinan reads the page by
+Role, not by holding it.

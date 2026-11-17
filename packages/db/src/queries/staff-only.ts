@@ -143,8 +143,8 @@ export class NotGrantedError extends Error {
     super(
       `A ${grant}-granted surface was handed ${person.role} caller ${person.id}, who holds ` +
         `[${person.grants.join(", ") || "no grants"}]. A Grant is Staff-only ` +
-        `(ADR-0028, ADR-0047); the write that reaches one is refused server-side, so this is a bug in ` +
-        `whoever offered the write, not a state a user can reach.`,
+        `(ADR-0028, ADR-0047); a write or a gated read that reaches one is refused server-side, so ` +
+        `this is a bug in whoever offered it, not a state a user can reach.`,
     );
   }
 }
@@ -225,6 +225,30 @@ export function requireGrant(person: Person, grant: Grant): void {
 export function canViewDashboard(person: Person): boolean {
   if (person.role === "Pimpinan") return true;
   return hasGrant(person, "Dashboard Viewer");
+}
+
+/**
+ * **May this Person read `/keuangan`?** (ADR-0064, #549) The one predicate behind the page guard,
+ * the sidebar link and `keuanganSourceForRead`, so the link is shown exactly when the page is
+ * reachable. The same shape as `canViewDashboard`:
+ * - **A `Pimpinan` reads it by Role.** Grants are Staff-only (ADR-0028), so a Pimpinan holds none.
+ * - **A `Staff` reads it by holding `Keuangan`**, which only Administrator implies.
+ *
+ * Another documented exception to "reading is open to any signed-in Person" (ADR-0026): the view
+ * shows Finance's spreadsheet, with names and receipt links, not the app's own records.
+ */
+export function canViewKeuangan(person: Person): boolean {
+  if (person.role === "Pimpinan") return true;
+  return hasGrant(person, "Keuangan");
+}
+
+/**
+ * The `/keuangan` read's choke point: `canViewKeuangan`, refusing with the same `NotGrantedError` a
+ * Grant check throws, which `staffSurface()` turns into a 403. A Pimpinan passes by Role, so this is
+ * not `requireGrant(person, "Keuangan")`.
+ */
+export function requireKeuanganReader(person: Person): void {
+  if (!canViewKeuangan(person)) throw new NotGrantedError(person, "Keuangan");
 }
 
 const NOT_ON_PERJADIN_ERROR_CODE = "sugt/not-on-perjadin";
