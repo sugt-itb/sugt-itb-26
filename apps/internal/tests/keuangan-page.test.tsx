@@ -1,25 +1,30 @@
+import { toggled } from "-/app/(app)/keuangan/keuangan-table";
 import Page from "-/app/(app)/keuangan/page";
 import { fetchKeuanganSheet, type KeuanganSheet } from "-/lib/keuangan-sheet";
 import { requirePerson } from "-/lib/person";
-import { keuanganSourceForRead, type Person } from "@sugt/db/queries";
+import { db, schema } from "@sugt/db";
+import { keuanganSourceForRead, setKeuanganSource, type Person } from "@sugt/db/queries";
 import type { Grant, Role } from "@sugt/domain";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { addPerson, resetDatabase } from "./support/fixtures";
+
 /**
  * **`/keuangan`, the page** (#550): a read-only view of the Block B tab of Finance's spreadsheet.
  *
- * The two reads are stubbed at their seams — the stored source (`keuanganSourceForRead`, #549) and
- * the sheet reader (`fetchKeuanganSheet`, #548), each tested on its own — so this file pins what the
- * page does with them: who reaches it, what it reads and in which order, and what it renders. Made-up
- * data only: the repo is public.
+ * The stored source is real: `setKeuanganSource` writes it to the test database and the page reads it
+ * through the real `keuanganSourceForRead` (#549), wrapped only to count its calls. The sheet reader
+ * (`fetchKeuanganSheet`, #548, tested on its own) is stubbed, since the sheet is the one thing no test
+ * can reach. So this file pins what the page does with them: who reaches it, what it reads and in
+ * which order, and what it renders. Made-up data only: the repo is public.
  */
 
 vi.mock("-/lib/person", () => ({ requirePerson: vi.fn() }));
-vi.mock("@sugt/db/queries", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@sugt/db/queries")>()),
-  keuanganSourceForRead: vi.fn(),
-}));
+vi.mock("@sugt/db/queries", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@sugt/db/queries")>();
+  return { ...actual, keuanganSourceForRead: vi.fn(actual.keuanganSourceForRead) };
+});
 vi.mock("-/lib/keuangan-sheet", async (importOriginal) => ({
   ...(await importOriginal<typeof import("-/lib/keuangan-sheet")>()),
   fetchKeuanganSheet: vi.fn(),
@@ -35,11 +40,19 @@ const person = (role: Role, grants: Grant[] = []): Person => ({
   grants,
 });
 
-const SOURCE = {
-  sheetId: "made-up-sheet",
-  gid: "7",
-  updatedAt: new Date("2026-11-04T03:00:00Z"),
-};
+/** An Administrator sets the source, as `/pengaturan` will (#571); its time is pinned to 4 Nov. */
+async function storeSource() {
+  const admin = await addPerson({ fullName: "Ani", email: "ani@itb.ac.id", role: "Staff" });
+  await setKeuanganSource(
+    { ...admin, grants: ["Administrator"] },
+    {
+      url: "https://docs.google.com/spreadsheets/d/made-up-sheet/edit#gid=7",
+      sheetId: "made-up-sheet",
+      gid: "7",
+    },
+  );
+  await db.update(schema.keuanganSource).set({ updatedAt: new Date("2026-11-04T03:00:00Z") });
+}
 
 const SHEET: KeuanganSheet = {
   kelompok: [
@@ -112,12 +125,17 @@ const render = async () => renderToStaticMarkup(await Page());
 /** The page as `viewer` sees it, with the source set and the sheet reading cleanly. */
 async function renderAs(viewer: Person) {
   vi.mocked(requirePerson).mockResolvedValue(viewer);
-  vi.mocked(keuanganSourceForRead).mockResolvedValue(SOURCE);
+  await storeSource();
   vi.mocked(fetchKeuanganSheet).mockResolvedValue({ ok: true, sheet: SHEET });
   return render();
 }
 
-beforeEach(() => {
+/** The markup from `start` up to (not including) `end`. */
+const between = (html: string, start: string, end: string) =>
+  html.slice(html.indexOf(start), html.indexOf(end, html.indexOf(start)));
+
+beforeEach(async () => {
+  await resetDatabase();
   vi.clearAllMocks();
   vi.unstubAllEnvs();
   vi.stubEnv("__NEXT_EXPERIMENTAL_AUTH_INTERRUPTS", "1");
@@ -163,7 +181,6 @@ describe("with no source set", () => {
     "shows %s the notice, and the /pengaturan link only to an Administrator",
     async (_, viewer, link) => {
       vi.mocked(requirePerson).mockResolvedValue(viewer);
-      vi.mocked(keuanganSourceForRead).mockResolvedValue(null);
 
       const html = await render();
 
@@ -185,9 +202,12 @@ describe("the budget", () => {
     const second = html.indexOf(">Kelompok 2<");
     expect(first).toBeGreaterThan(-1);
     expect(second).toBeGreaterThan(first);
-    // Kelompok 1's totals, rounded to the rupiah.
-    expect(html).toContain("Rp350.500");
-    expect(html).toContain("Rp649.500");
+    // Kelompok 1's totals as the reader computed them — new money only — rounded to the rupiah.
+    const summary = between(html, ">Kelompok 1<", 'id="kelompok-0-rows"');
+    expect(summary).toContain("Rp1.000.000");
+    expect(summary).toContain("Rp350.500");
+    expect(summary).toContain("Rp649.500");
+    expect(summary).not.toContain("Rp1.750.000");
     // The grand total.
     expect(html).toContain("Rp2.000.000");
     expect(html).toContain("Rp1.850.500");
@@ -198,11 +218,12 @@ describe("the budget", () => {
     const html = await renderAs(admin);
 
     expect(html).toMatch(/aria-expanded="false" aria-controls="kelompok-0-rows"/);
+    expect(html).toMatch(/<tr[^>]*id="kelompok-0-rows"[^>]*hidden=""/);
     const rows = html.slice(html.indexOf('id="kelompok-0-rows"'));
     expect(rows).toContain("SMA Contoh Satu");
     expect(rows).toContain(">Konsumsi<");
     expect(rows).toContain("12 Okt 2026");
-    expect(rows).toContain("Nov 2026");
+    expect(rows).toContain(">Nov 2026<");
     expect(rows).toContain("Rp1.500");
     expect(fetchKeuanganSheet).toHaveBeenCalledTimes(1);
   });
@@ -226,8 +247,18 @@ describe("the budget", () => {
   it("marks a negative Sisa", async () => {
     const html = await renderAs(admin);
 
-    expect(html).toMatch(/<[^>]*data-negative="true"[^>]*>-Rp500\.000</);
+    const kelompok2 = between(html, ">Kelompok 2<", 'id="kelompok-1-rows"');
+    expect(kelompok2).toMatch(/<[^>]*data-negative="true"[^>]*>-Rp500\.000</);
     expect(html).not.toMatch(/data-negative="true"[^>]*>Rp/);
+
+    vi.mocked(fetchKeuanganSheet).mockResolvedValue({
+      ok: true,
+      sheet: { ...SHEET, totals: { ...SHEET.totals, sisa: -1_000 } },
+    });
+    const overspent = await render();
+    expect(overspent.slice(overspent.indexOf("<tfoot"))).toMatch(
+      /<[^>]*data-negative="true"[^>]*>-Rp1\.000</,
+    );
   });
 
   it("says where the figures come from and when the source was set, not by whom", async () => {
@@ -250,7 +281,7 @@ describe("the budget", () => {
 describe("a failed read", () => {
   it("shows the generic banner and no figures, never the detailed reason", async () => {
     vi.mocked(requirePerson).mockResolvedValue(person("Staff", ["Keuangan"]));
-    vi.mocked(keuanganSourceForRead).mockResolvedValue(SOURCE);
+    await storeSource();
     vi.mocked(fetchKeuanganSheet).mockResolvedValue({
       ok: false,
       error: "Gagal memuat data keuangan dari spreadsheet",
@@ -263,5 +294,16 @@ describe("a failed read", () => {
     expect(html).not.toContain("Baris 12");
     expect(html).not.toContain("<table");
     expect(html).not.toContain("Rp");
+  });
+});
+
+describe("opening a Kelompok", () => {
+  it("opens a closed one and closes an open one, leaving the others as they were", () => {
+    const none = new Set<number>();
+    const first = toggled(none, 0);
+    expect([...first]).toEqual([0]);
+    expect([...toggled(first, 2)].sort()).toEqual([0, 2]);
+    expect([...toggled(toggled(first, 2), 0)]).toEqual([2]);
+    expect([...none]).toEqual([]);
   });
 });

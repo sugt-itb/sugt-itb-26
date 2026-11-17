@@ -1,3 +1,4 @@
+import { formatWibDayIndonesian } from "-/lib/format-wib";
 import { fetchKeuanganSheet } from "-/lib/keuangan-sheet";
 import { requirePerson } from "-/lib/person";
 import { canViewKeuangan, hasGrant, keuanganSourceForRead } from "@sugt/db/queries";
@@ -30,14 +31,6 @@ export const metadata: Metadata = { title: "Keuangan" };
  */
 export const dynamic = "force-dynamic";
 
-/** `4 Nov 2026`, the day the source was set, in WIB. */
-const SET_ON = new Intl.DateTimeFormat("id-ID", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "Asia/Jakarta",
-});
-
 export default async function Page() {
   const person = await requirePerson();
   if (!canViewKeuangan(person)) forbidden();
@@ -54,7 +47,7 @@ export default async function Page() {
         {source && (
           <p className="mt-1 text-sm text-muted-foreground">
             Angka dibaca dari spreadsheet Keuangan dan hanya untuk dibaca; ini bukan Uang Perjalanan
-            Terpakai sebuah Perjadin. Sumber diatur {SET_ON.format(source.updatedAt)}.
+            Terpakai sebuah Perjadin. Sumber diatur {formatWibDayIndonesian(source.updatedAt)}.
           </p>
         )}
       </header>

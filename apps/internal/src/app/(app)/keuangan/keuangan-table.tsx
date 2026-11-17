@@ -29,13 +29,6 @@ import { Fragment, useState } from "react";
  */
 export function KeuanganTable({ sheet }: { sheet: KeuanganSheet }) {
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
-  const toggle = (index: number) => {
-    setOpen((current) => {
-      const next = new Set(current);
-      if (!next.delete(index)) next.add(index);
-      return next;
-    });
-  };
 
   return (
     <Table>
@@ -60,9 +53,9 @@ export function KeuanganTable({ sheet }: { sheet: KeuanganSheet }) {
                     aria-expanded={isOpen}
                     aria-controls={rowsId}
                     onClick={() => {
-                      toggle(index);
+                      setOpen((current) => toggled(current, index));
                     }}
-                    className="flex items-center gap-1.5 text-left font-medium"
+                    className="flex items-center gap-1.5 rounded-sm text-left font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
                   >
                     <ChevronRight
                       aria-hidden
@@ -107,6 +100,13 @@ export function KeuanganTable({ sheet }: { sheet: KeuanganSheet }) {
       </TableFooter>
     </Table>
   );
+}
+
+/** Which Kelompok are open after one is pressed: it opens if closed and closes if open. */
+export function toggled(open: ReadonlySet<number>, index: number): ReadonlySet<number> {
+  const next = new Set(open);
+  if (!next.delete(index)) next.add(index);
+  return next;
 }
 
 /** One Kelompok, opened: its full text, Schools and all, then its rows with the sheet's own values. */

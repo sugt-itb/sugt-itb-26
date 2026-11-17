@@ -44,7 +44,6 @@ describe("sidebarItems", () => {
     const ADMIN = [...WITH_KEUANGAN, "/orang", "/log", "/pengaturan"];
     expect(hrefsFor("Staff", ["Administrator"])).toEqual(ADMIN);
     expect(hrefsFor("Staff", ["Administrator", "Dashboard Viewer"])).toEqual(ADMIN);
-    expect(WITH_KEUANGAN.slice(3, 6)).toEqual(["/pendamping", "/keuangan", "/perjadin"]);
   });
 
   it("keeps Keuangan in its place when Pendamping moves to the top for a Keuangan-only Staff", () => {
