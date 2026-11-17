@@ -1196,6 +1196,49 @@ The founding Staff rows are seeded, because nothing else can be: without a Perso
 can sign in to reach this screen. See
 [ADR-0013](./adr/0013-people-are-added-in-the-tool-and-their-role-is-write-once.md).
 
+### Keuangan — the Block B budget, from Finance's spreadsheet
+
+`/keuangan` ([#550](https://github.com/sugt-itb/sugt-itb-26/issues/550),
+[ADR-0064](./adr/0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md)) shows how Block
+B's budget (_Pembelajaran Luring_) stands per Kelompok, read live from the Block B tab of a prepared
+copy of Finance's spreadsheet. **It is read-only**: no forms, no export, no link to the spreadsheet,
+and nothing on it is entered in the app. Finance keeps working in the sheet. Its figures are not a
+trip's Uang Perjalanan Terpakai, and the two can differ.
+
+**Who sees it:** a Staff Person holding **Keuangan**, an **Administrator**, or a **Pimpinan**, in the
+sidebar right after Pendamping and at `/keuangan`. Anyone else gets the 403, and neither the stored
+source nor the sheet is read for them.
+
+The page is titled **Blok B — Pembelajaran Luring**, with one line under it saying the figures come
+from Finance's spreadsheet, are read-only, and when the source was set (`Sumber diatur 4 Nov 2026`),
+since each copy is a snapshot. It does not say who set it.
+
+- **The summary** is one row per Kelompok, in sheet order — its first line, Alokasi, Realisasi and
+  Sisa — and a **Total** row. Alokasi counts new money only; carried balances are not added again.
+- **Opening a Kelompok** expands it in place, with no further loading: its full text with its
+  Schools, then its rows — **Tanggal**, **Kegiatan**, **Link**, **Alokasi**, **Realisasi** and
+  **Sisa** — with the sheet's own values. Text is shown exactly as the sheet has it. A row whose own
+  Kegiatan is empty shows it blank rather than repeating the line above.
+- **Tanggal** is `12 Okt 2026`, `Okt 2026` for a row with no day, and blank for a row with none.
+- **Money** is shown to the rupiah. A **negative Sisa** is in the destructive colour.
+- **Link** opens the receipt in a new tab where the sheet has a URL for it; a label with none, such
+  as `Bluebird`, is plain text.
+- On a phone each table scrolls sideways in its own box, not the page.
+
+**With no source set**, the page says `Sumber data keuangan belum diatur.` and shows no table. An
+Administrator also gets a link to `/pengaturan`; nobody else does.
+
+**When the sheet cannot be read** — the copy is no longer link-shared, its layout moved, a total
+does not match — the page shows `Gagal memuat data keuangan dari spreadsheet` and no figures at
+all, never part of them. The specific reason is shown on `/pengaturan`, not here.
+
+**The source is set on `/pengaturan`** ([#571](https://github.com/sugt-itb/sugt-itb-26/issues/571)):
+an Administrator pastes the Block B tab's address. It is saved only if the whole tab reads and
+parses; otherwise the card says why, naming the row or column, and the previous source stays. After
+saving, the card shows the number of Kelompok and the grand total Realisasi, to check against the
+sheet's own total row. The address and who set it are shown there only. Preparing the copy is
+[#547](https://github.com/sugt-itb/sugt-itb-26/issues/547).
+
 ### Pengaturan — the company Google Drive
 
 **Only an Administrator sees Pengaturan**, in the sidebar and at `/pengaturan`. Anyone else,

@@ -32,6 +32,7 @@ function AppShell({
   personName,
   canEditDaring,
   canViewDashboard,
+  canViewKeuangan,
   canAdminister,
   driveNeedsAttention,
   sidebarState,
@@ -44,6 +45,8 @@ function AppShell({
   canEditDaring: boolean;
   /** Whether the viewer may read the Dashboard (`/`) — gates its nav link (#322). */
   canViewDashboard: boolean;
+  /** Whether the viewer may read `/keuangan` (`canViewKeuangan`) — gates its nav link (#550). */
+  canViewKeuangan: boolean;
   /** Whether the viewer holds the Administrator Grant — gates the `/pengaturan` nav link (#372). */
   canAdminister: boolean;
   /** Whether Drive needs an Administrator — the badge on Pengaturan (#375). False for anyone else. */
@@ -60,6 +63,7 @@ function AppShell({
       personName={personName}
       canEditDaring={canEditDaring}
       canViewDashboard={canViewDashboard}
+      canViewKeuangan={canViewKeuangan}
       canAdminister={canAdminister}
       driveNeedsAttention={driveNeedsAttention}
       footerAction={footerAction}
@@ -104,6 +108,7 @@ function SidebarBody({
   personName,
   canEditDaring,
   canViewDashboard,
+  canViewKeuangan,
   canAdminister,
   driveNeedsAttention,
   footerAction,
@@ -112,6 +117,7 @@ function SidebarBody({
   personName: string;
   canEditDaring: boolean;
   canViewDashboard: boolean;
+  canViewKeuangan: boolean;
   canAdminister: boolean;
   driveNeedsAttention: boolean;
   footerAction?: React.ReactNode;
@@ -124,6 +130,7 @@ function SidebarBody({
         role={role}
         canEditDaring={canEditDaring}
         canViewDashboard={canViewDashboard}
+        canViewKeuangan={canViewKeuangan}
         canAdminister={canAdminister}
         driveNeedsAttention={driveNeedsAttention}
       />
