@@ -1,8 +1,5 @@
-import { readdirSync } from "node:fs";
-import { sep } from "node:path";
-
 import { sidebarItems } from "-/components/sidebar-items";
-import { canViewDashboard, hasGrant, type Person } from "@sugt/db/queries";
+import { canViewDashboard, canViewKeuangan, hasGrant, type Person } from "@sugt/db/queries";
 import type { Grant, Role } from "@sugt/domain";
 import { describe, expect, it } from "vitest";
 
@@ -18,6 +15,7 @@ function hrefsFor(role: Role, grants: Grant[]) {
     role,
     canEditDaring: hasGrant(person, "Daring Editor"),
     canViewDashboard: canViewDashboard(person),
+    canViewKeuangan: canViewKeuangan(person),
     canAdminister: hasGrant(person, "Administrator"),
     driveNeedsAttention: false,
   }).map((item) => item.href);
@@ -37,32 +35,56 @@ const FULL = [
 ];
 
 describe("sidebarItems", () => {
-  it("gives a Staff Administrator every link, with Orang, Log then Pengaturan last", () => {
-    const ADMIN = [...FULL, "/orang", "/log", "/pengaturan"];
+  /** `FULL` with Keuangan in its place, right after Pendamping and before Perjadin (#550). */
+  const WITH_KEUANGAN = FULL.flatMap((href) =>
+    href === "/pendamping" ? [href, "/keuangan"] : [href],
+  );
+
+  it("gives a Staff Administrator every link, Keuangan after Pendamping, and Orang, Log then Pengaturan last", () => {
+    const ADMIN = [...WITH_KEUANGAN, "/orang", "/log", "/pengaturan"];
     expect(hrefsFor("Staff", ["Administrator"])).toEqual(ADMIN);
     expect(hrefsFor("Staff", ["Administrator", "Dashboard Viewer"])).toEqual(ADMIN);
+    expect(WITH_KEUANGAN.slice(3, 6)).toEqual(["/pendamping", "/keuangan", "/perjadin"]);
   });
 
-  it("leaves no keuangan route anywhere in the app, so the old links are the normal 404 (#533)", () => {
-    const app = new URL("../src/app", import.meta.url);
-    const segments = readdirSync(app, { recursive: true, encoding: "utf8" }).flatMap((entry) =>
-      entry.split(sep),
-    );
-
-    expect(segments).toContain("perjadin");
-    expect(segments.filter((segment) => segment.includes("keuangan"))).toEqual([]);
+  it("keeps Keuangan in its place when Pendamping moves to the top for a Keuangan-only Staff", () => {
+    expect(hrefsFor("Staff", ["Keuangan"])).toEqual([
+      "/pendamping",
+      "/kalender",
+      "/keuangan",
+      "/perjadin",
+      "/sesi-daring",
+      "/feedback",
+      "/cerita",
+      "/sekolah",
+      "/kelompok-sekolah",
+    ]);
   });
 
-  it("shows no Keuangan link to anyone, an Administrator included (#533)", () => {
+  it("shows Keuangan to a Keuangan holder with the Dashboard, after Pendamping", () => {
+    expect(hrefsFor("Staff", ["Keuangan", "Dashboard Viewer"])).toEqual([
+      "/",
+      "/kalender",
+      "/pendamping",
+      "/keuangan",
+      "/perjadin",
+      "/sesi-daring",
+      "/feedback",
+      "/cerita",
+      "/sekolah",
+      "/kelompok-sekolah",
+    ]);
+  });
+
+  it("shows no Keuangan link to Staff without the Grant", () => {
     for (const grants of [
       [],
-      ["Administrator"],
       ["Perjadin Editor"],
-      ["Dashboard Editor", "Daring Editor"],
+      ["Daring Editor"],
+      ["Dashboard Editor", "Dashboard Viewer"],
     ] as const) {
       expect(hrefsFor("Staff", [...grants])).not.toContain("/keuangan");
     }
-    expect(hrefsFor("Pimpinan", [])).not.toContain("/keuangan");
   });
 
   it("shows Orang to an Administrator only: not to any other Grant, nor to a Pimpinan (#488)", () => {
@@ -130,10 +152,11 @@ describe("sidebarItems", () => {
     ]);
   });
 
-  it("gives a Pimpinan the Dashboard first and no Staff-only or Grant-gated links", () => {
+  it("gives a Pimpinan the Dashboard first, Keuangan by Role, and no Staff-only or Grant-gated links", () => {
     expect(hrefsFor("Pimpinan", [])).toEqual([
       "/",
       "/kalender",
+      "/keuangan",
       "/perjadin",
       "/sesi-daring",
       "/feedback",
@@ -155,6 +178,7 @@ describe("sidebarItems", () => {
         role: "Staff",
         canEditDaring: true,
         canViewDashboard: true,
+        canViewKeuangan: true,
         canAdminister: hasGrant(admin, "Administrator"),
         driveNeedsAttention,
       });
