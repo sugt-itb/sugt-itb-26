@@ -105,14 +105,16 @@ describe("the Block B source", () => {
     const ani = await resolved("Staff", "ani@itb.ac.id", ["Administrator"]);
     const budi = await resolved("Staff", "budi@itb.ac.id", ["Administrator"]);
     await setKeuanganSource(ani, FIRST);
-    const first = await keuanganSourceCard(ani);
+    // Back-date the first save, so a second save that kept its time could not pass for a fresh one.
+    const longAgo = new Date("2026-01-01T00:00:00Z");
+    await db.update(schema.keuanganSource).set({ updatedAt: longAgo });
 
     await setKeuanganSource(budi, SECOND);
 
     await expect(db.select().from(schema.keuanganSource)).resolves.toHaveLength(1);
     const second = await keuanganSourceCard(ani);
     expect(second).toEqual({ ...SECOND, updatedAt: expect.any(Date), setByName: "budi" });
-    expect(second!.updatedAt.getTime()).toBeGreaterThanOrEqual(first!.updatedAt.getTime());
+    expect(second!.updatedAt.getTime()).toBeGreaterThan(longAgo.getTime());
   });
 
   it("gives the page's readers the sheet id, the gid and when — never the URL or the setter", async () => {

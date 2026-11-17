@@ -63,17 +63,16 @@ describe("the Keuangan Grant and source migration", () => {
           (${ANI}, 'Ani', 'ani@itb.ac.id', 'Staff'),
           (${BUDI}, 'Budi', 'budi@itb.ac.id', 'Staff')`,
     );
-    for (const grant of ["Administrator", "Daring Editor"]) await insertGrant(ANI, grant);
+    const FIVE = SIX.filter((grant) => grant !== "Keuangan");
+    for (const grant of FIVE) await insertGrant(ANI, grant);
     await insertGrant(BUDI, "Perjadin Editor");
 
     await applyRemainingMigrations(scratch.url);
 
-    await expect(grantsOf(ANI)).resolves.toEqual(["Administrator", "Daring Editor"]);
+    await expect(grantsOf(ANI)).resolves.toEqual(FIVE);
     await expect(grantsOf(BUDI)).resolves.toEqual(["Perjadin Editor"]);
 
-    for (const grant of ["Dashboard Editor", "Dashboard Viewer", "Keuangan", "Perjadin Editor"]) {
-      await insertGrant(ANI, grant);
-    }
+    await insertGrant(ANI, "Keuangan");
     await expect(grantsOf(ANI)).resolves.toEqual(SIX);
 
     await expect(insertGrant(BUDI, "Bendahara")).rejects.toMatchObject({

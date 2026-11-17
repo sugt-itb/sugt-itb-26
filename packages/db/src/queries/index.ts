@@ -468,6 +468,7 @@ export {
   NotOnPerjadinError,
   NotStaffError,
   requireGrant,
+  requireKeuanganReader,
   requirePerjadinWriter,
   requireSessionWriter,
   requireStaff,

@@ -4,7 +4,7 @@ import { db } from "../client";
 import { keuanganSource } from "../schema/keuangan";
 import { person } from "../schema/people";
 import type { Person } from "./caller";
-import { canViewKeuangan, NotGrantedError, requireGrant } from "./staff-only";
+import { requireGrant, requireKeuanganReader } from "./staff-only";
 
 /**
  * **The Block B source: which spreadsheet tab `/keuangan` reads** (ADR-0064, #549). One row or none
@@ -47,7 +47,7 @@ export type KeuanganSourceForRead = { sheetId: string; gid: string; updatedAt: D
  * Refuses anyone else with `NotGrantedError`, the same 403 a missed page check would answer.
  */
 export async function keuanganSourceForRead(caller: Person): Promise<KeuanganSourceForRead | null> {
-  if (!canViewKeuangan(caller)) throw new NotGrantedError(caller, "Keuangan");
+  requireKeuanganReader(caller);
 
   const [row] = await db
     .select({

@@ -143,8 +143,8 @@ export class NotGrantedError extends Error {
     super(
       `A ${grant}-granted surface was handed ${person.role} caller ${person.id}, who holds ` +
         `[${person.grants.join(", ") || "no grants"}]. A Grant is Staff-only ` +
-        `(ADR-0028, ADR-0047); the write that reaches one is refused server-side, so this is a bug in ` +
-        `whoever offered the write, not a state a user can reach.`,
+        `(ADR-0028, ADR-0047); a write or a gated read that reaches one is refused server-side, so ` +
+        `this is a bug in whoever offered it, not a state a user can reach.`,
     );
   }
 }
@@ -240,6 +240,15 @@ export function canViewDashboard(person: Person): boolean {
 export function canViewKeuangan(person: Person): boolean {
   if (person.role === "Pimpinan") return true;
   return hasGrant(person, "Keuangan");
+}
+
+/**
+ * The `/keuangan` read's choke point: `canViewKeuangan`, refusing with the same `NotGrantedError` a
+ * Grant check throws, which `staffSurface()` turns into a 403. A Pimpinan passes by Role, so this is
+ * not `requireGrant(person, "Keuangan")`.
+ */
+export function requireKeuanganReader(person: Person): void {
+  if (!canViewKeuangan(person)) throw new NotGrantedError(person, "Keuangan");
 }
 
 const NOT_ON_PERJADIN_ERROR_CODE = "sugt/not-on-perjadin";

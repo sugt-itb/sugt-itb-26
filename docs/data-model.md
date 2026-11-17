@@ -1978,6 +1978,36 @@ one string) and the PIC's name, `like` on the
 already lower-cased `search_text`. If search over a much larger table ever becomes slow, a `pg_trgm` trigram index on the
 searched text is the known fix.
 
+### The Block B source for `/keuangan`
+
+`/keuangan` shows the Block B tab of a link-shared copy of Finance's spreadsheet, read as CSV on every
+request ([ADR-0064](./adr/0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md)). The budget is never stored; only the pointer to the tab is, because each fresh copy
+has a new URL and an Administrator sets it on `/pengaturan` ([#549](https://github.com/sugt-itb/sugt-itb-26/issues/549),
+[#571](https://github.com/sugt-itb/sugt-itb-26/issues/571)).
+
+```sql
+create table keuangan_source (
+  singleton         boolean primary key default true check (singleton),
+  url               text not null,
+  sheet_id          text not null,
+  gid               text not null,
+  updated_at        timestamptz not null default now(),
+  set_by_person_id  uuid not null references person (id)
+);
+```
+
+**The database holds that there is one source or none**, as `drive_connection` does: `singleton` is
+the primary key and CHECKed true. No row means "not set yet". Saving again **replaces** the row, an
+upsert, and nothing deletes it.
+
+**The application holds the rest.** `url` is the text the Administrator pasted; `sheet_id` and `gid`
+are what `keuanganSourceFromUrl` read from it, and the export URL is built from those two alone, so
+the pasted text is never fetched. A source is saved only after the sheet reads and parses, which the
+action checks, not the database. **Who reaches it:** `keuanganSourceCard` and `setKeuanganSource` need
+the Administrator Grant, and the write refuses anyone else itself. `keuanganSourceForRead`, for the
+page, admits whoever `canViewKeuangan` admits (Keuangan, an Administrator, or a Pimpinan by Role) and
+returns only `sheet_id`, `gid` and `updated_at`, never the URL or the setter.
+
 ---
 
 ## Stories
@@ -2278,36 +2308,6 @@ click, a Pimpinan's included, to make and share a Session's archive folder as th
 housekeeping (ADR-0063). The daily copy reaches them with no Person at all, as Vercel Cron holding
 `CRON_SECRET` (a `CronCaller`, #562), and the copy's own lease and checked times with them. The ciphertext never leaves the server.
 
-### The Block B source for `/keuangan`
-
-`/keuangan` shows the Block B tab of a link-shared copy of Finance's spreadsheet, read as CSV on every
-request ([ADR-0064](./adr/0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md)). The budget is never stored; only the pointer to the tab is, because each fresh copy
-has a new URL and an Administrator sets it on `/pengaturan` ([#549](https://github.com/sugt-itb/sugt-itb-26/issues/549),
-[#571](https://github.com/sugt-itb/sugt-itb-26/issues/571)).
-
-```sql
-create table keuangan_source (
-  singleton         boolean primary key default true check (singleton),
-  url               text not null,
-  sheet_id          text not null,
-  gid               text not null,
-  updated_at        timestamptz not null default now(),
-  set_by_person_id  uuid not null references person (id)
-);
-```
-
-**The database holds that there is one source or none**, as `drive_connection` does: `singleton` is
-the primary key and CHECKed true. No row means "not set yet". Saving again **replaces** the row, an
-upsert, and nothing deletes it.
-
-**The application holds the rest.** `url` is the text the Administrator pasted; `sheet_id` and `gid`
-are what `keuanganSourceFromUrl` read from it, and the export URL is built from those two alone, so
-the pasted text is never fetched. A source is saved only after the sheet reads and parses, which the
-action checks, not the database. **Who reaches it:** `keuanganSourceCard` and `setKeuanganSource` need
-the Administrator Grant, and the write refuses anyone else itself. `keuanganSourceForRead`, for the
-page, admits whoever `canViewKeuangan` admits (Keuangan, an Administrator, or a Pimpinan by Role) and
-returns only `sheet_id`, `gid` and `updated_at`, never the URL or the setter.
-
 ---
 
 ## Where the code lives
@@ -2542,7 +2542,8 @@ number nobody is disputing is the kind of invented friction
 and delivery-arranging Staff-only to **write** — is application code, not RLS.
 [ADR-0004](./adr/0004-delivery-data-is-open-internally-money-is-not.md) drew the line at
 delivery-vs-money; [ADR-0026](./adr/0026-money-is-open-to-read-and-staff-only-to-write.md) (#180)
-redrew it as read-vs-write, so money reads are open now (a Pimpinan reads all money) and it is money
+redrew it as read-vs-write, so money reads are open now (a Pimpinan reads all money; the one gated
+read, `/keuangan`, shows Finance's spreadsheet, not these tables, ADR-0064) and it is money
 _writes_ that the guard closes. Better Auth means there is no `auth.uid()` in Postgres, so policies
 would need `SET LOCAL` on every transaction plus a non-superuser role with `FORCE ROW LEVEL
 SECURITY`: a great deal of machinery for one role rule. Every money-_writing_ query therefore takes
