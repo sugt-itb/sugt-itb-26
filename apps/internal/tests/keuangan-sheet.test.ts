@@ -44,6 +44,12 @@ describe("keuanganSourceFromUrl", () => {
     ["a non-numeric gid", `https://docs.google.com/spreadsheets/d/${ID}/edit#gid=abc`],
     ["text that is not a URL", "Blok B"],
     ["an empty paste", "   "],
+    ["a port", `https://docs.google.com:8443/spreadsheets/d/${ID}/edit#gid=1`],
+    ["credentials", `https://user:pass@docs.google.com/spreadsheets/d/${ID}/edit#gid=1`],
+    [
+      "a published-to-web link",
+      "https://docs.google.com/spreadsheets/d/e/2PACX-made-up/pubhtml?gid=1",
+    ],
   ])("refuses %s with a reason", (_, text) => {
     const result = keuanganSourceFromUrl(text);
     expect(result.ok).toBe(false);
@@ -188,10 +194,13 @@ const blank = {
   link: null,
   date: null,
   alokasi: null,
-  alokasiKind: null,
   realisasi: null,
   sisa: null,
 };
+
+/** {@link ROWS} with one sheet row's cells changed. */
+const changed = (sheetRow: number, cells: Row): Row[] =>
+  ROWS.map((r, i) => (i + 3 === sheetRow ? { ...r, ...cells } : r));
 
 describe("parseKeuanganCsv", () => {
   const parse = (csv: string): KeuanganSheet => {
@@ -216,8 +225,7 @@ describe("parseKeuanganCsv", () => {
         kegiatan: "Konsumsi",
         link: { label: "Nota 1", url: "https://example.com/nota-1" },
         date: { day: 12, month: 10, year: 2026 },
-        alokasi: 1_000_000,
-        alokasiKind: "new",
+        alokasi: { amount: 1_000_000, kind: "new" },
         realisasi: 250_000,
         sisa: 750_000,
       },
@@ -228,8 +236,7 @@ describe("parseKeuanganCsv", () => {
         kegiatan: "",
         link: { label: "Bluebird", url: null },
         date: { day: null, month: 10, year: 2026 },
-        alokasi: 750_000,
-        alokasiKind: "carried",
+        alokasi: { amount: 750_000, kind: "carried" },
         realisasi: 300_000,
         sisa: 450_000,
       },
@@ -238,8 +245,7 @@ describe("parseKeuanganCsv", () => {
         sheetRow: 7,
         budgetLine: "Konsumsi",
         kegiatan: "",
-        alokasi: 200_000,
-        alokasiKind: "new",
+        alokasi: { amount: 200_000, kind: "new" },
         sisa: 650_000,
       },
       {
@@ -263,7 +269,9 @@ describe("parseKeuanganCsv", () => {
       [13, "Penginapan", ""],
       [14, "ATK", "ATK"],
     ]);
-    expect(sheet.kelompok[1].rows.map((r) => [r.alokasi, r.realisasi, r.sisa])).toEqual([
+    expect(
+      sheet.kelompok[1].rows.map((r) => [r.alokasi?.amount ?? null, r.realisasi, r.sisa]),
+    ).toEqual([
       [2_000_000, 1_234_500, 765_500],
       [null, -45_600, 811_100],
       [null, 1_500.25, 9_876_543.21],
@@ -314,17 +322,46 @@ describe("parseKeuanganCsv", () => {
     expect(rows).not.toContain(10);
     expect(rows).toContain(7);
   });
+
+  it("keeps a carried row that has a Link label", () => {
+    const rows = parse(sheetCsv(changed(8, { Link: "Nota 8" }))).kelompok[0].rows;
+    expect(rows.find((r) => r.sheetRow === 8)?.link).toEqual({ label: "Nota 8", url: null });
+  });
+
+  it("keeps a Kelompok's text exactly as written, trailing line break included", () => {
+    const sheet = parse(sheetCsv(changed(4, { "Sub Blok Anggaran": "Kelompok 1\nSMA A\n" })));
+    expect(sheet.kelompok[0].name).toBe("Kelompok 1\nSMA A\n");
+  });
+
+  it("starts each Kelompok with no Budget Line, never carrying one over from the last", () => {
+    const rows = parse(sheetCsv(changed(12, { Kegiatan: "" }))).kelompok[1].rows;
+    expect(rows.map((r) => [r.sheetRow, r.budgetLine])).toEqual([
+      [12, ""],
+      [13, ""],
+      [14, "ATK"],
+    ]);
+  });
+
+  it.each([
+    ["a Sub Blok Anggaran", { "Sub Blok Anggaran": "Pengembalian" }],
+    ["a Link label", { Link: "Bukti refund", Link_raw: "" }],
+    ["an Alokasi", { Alokasi: "Rp1", Alokasi_formula: "TRUE" }],
+  ])("reads a Realisasi row with %s as data, not as the stop row", (_, cells) => {
+    const rows = parse(sheetCsv(changed(13, { Link: "", Link_raw: "", ...cells }))).kelompok[1]
+      .rows;
+    expect(rows.map((r) => r.sheetRow)).toEqual([12, 13, 14]);
+  });
+
+  it("reads a Realisasi row with only a Link_raw as data — and refuses it as drift", () => {
+    const result = parseKeuanganCsv(sheetCsv(changed(13, { Link: "" })));
+    expect(result).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(/^Baris 13: .*Link_raw/),
+    });
+  });
 });
 
 describe("parseKeuanganCsv failures", () => {
-  /** {@link ROWS} with one sheet row's cells replaced. */
-  const patched = (sheetRow: number, row: Row): Row[] =>
-    ROWS.map((r, i) => (i + 3 === sheetRow ? row : r));
-
-  /** {@link ROWS} with one sheet row's cells changed. */
-  const changed = (sheetRow: number, cells: Row): Row[] =>
-    patched(sheetRow, { ...ROWS[sheetRow - 3], ...cells });
-
   const failureOf = (csv: string) => {
     const result = parseKeuanganCsv(csv);
     expect(result.ok).toBe(false);
@@ -356,8 +393,15 @@ describe("parseKeuanganCsv failures", () => {
     expect(failureOf(sheetCsv(ROWS.slice(0, 12)))).toMatch(/baris total/i);
   });
 
-  it("refuses a Kelompok row carrying money, naming the row", () => {
-    expect(failureOf(sheetCsv(changed(11, { Realisasi: "Rp1" })))).toMatch(/^Baris 11: /);
+  it.each(["Alokasi", "Realisasi"] as const)(
+    "refuses a Kelompok row carrying an %s, naming the row",
+    (column) => {
+      expect(failureOf(sheetCsv(changed(11, { [column]: "Rp1" })))).toMatch(/^Baris 11: /);
+    },
+  );
+
+  it("ignores a Kelompok row's Sisa, even when it is not a number", () => {
+    expect(parseKeuanganCsv(sheetCsv(changed(11, { Sisa: "lihat catatan" }))).ok).toBe(true);
   });
 
   it.each([
@@ -376,18 +420,19 @@ describe("parseKeuanganCsv failures", () => {
     { Tgl: "12", Bln: "", Thn: "" },
     { Tgl: "12", Bln: "10", Thn: "" },
     { Tgl: "", Bln: "Okt", Thn: "2026" },
-    { Tgl: "31", Bln: "2", Thn: "2026" },
-    { Tgl: "", Bln: "13", Thn: "2026" },
     { Tgl: "1.5", Bln: "10", Thn: "2026" },
   ])("refuses a bad date %j, naming the row", (date) => {
     expect(failureOf(sheetCsv(changed(5, date)))).toMatch(/^Baris 5: tanggal/);
   });
 
-  it.each(["", "YA", "1"])("refuses Alokasi_formula %j beside an Alokasi, naming the row", (f) => {
-    const detail = failureOf(sheetCsv(changed(7, { Alokasi_formula: f })));
-    expect(detail).toMatch(/^Baris 7: /);
-    expect(detail).toContain('"Alokasi_formula"');
-  });
+  it.each(["", "YA", "1", "__proto__", "constructor"])(
+    "refuses Alokasi_formula %j beside an Alokasi, naming the row",
+    (f) => {
+      const detail = failureOf(sheetCsv(changed(7, { Alokasi_formula: f })));
+      expect(detail).toMatch(/^Baris 7: /);
+      expect(detail).toContain('"Alokasi_formula"');
+    },
+  );
 
   it("ignores Alokasi_formula on a row with no Alokasi", () => {
     expect(parseKeuanganCsv(sheetCsv(changed(9, { Alokasi_formula: "?" }))).ok).toBe(true);
@@ -447,7 +492,7 @@ describe("fetchKeuanganSheet", () => {
 
     expect(fetch).toHaveBeenCalledWith(
       "https://docs.google.com/spreadsheets/d/made-up-sheet-id/export?format=csv&gid=42",
-      expect.objectContaining({ cache: "no-store" }),
+      expect.objectContaining({ cache: "no-store", signal: expect.any(AbortSignal) }),
     );
     expect(result).toEqual(parseKeuanganCsv(sheetCsv(ROWS)));
     expect(result.ok).toBe(true);

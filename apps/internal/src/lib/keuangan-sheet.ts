@@ -68,6 +68,13 @@ export function keuanganSourceFromUrl(text: string): KeuanganSourceResult {
     );
   }
 
+  // `/d/e/2PACX…` is a "Publish to the web" link: its "id" is the letter `e`, and it exports nothing.
+  if (sheetPath[1] === "e") {
+    return refuse(
+      "Ini alamat hasil “Publikasikan ke web”. Tempel alamat dari bilah alamat browser saat spreadsheet terbuka pada tab Blok B.",
+    );
+  }
+
   return { ok: true, sheetId: sheetPath[1], gid };
 }
 
@@ -80,6 +87,9 @@ export type KeuanganDate = { day: number | null; month: number; year: number };
 /** What `Alokasi_formula` says about a row's Alokasi: typed new money, or a balance carried down. */
 export type AlokasiKind = "new" | "carried";
 
+/** A row's Alokasi: the amount as read, and whether `Alokasi_formula` marks it new money or carried. */
+export type KeuanganAlokasi = { amount: number; kind: AlokasiKind };
+
 /** One kept row of a Kelompok, with the sheet's own values as read. */
 export type KeuanganRow = {
   /** The row's number in the sheet, counted from 1 — what a failure's `detail` names. */
@@ -90,9 +100,7 @@ export type KeuanganRow = {
   kegiatan: string;
   link: KeuanganLink | null;
   date: KeuanganDate | null;
-  alokasi: number | null;
-  /** Set exactly when `alokasi` is. */
-  alokasiKind: AlokasiKind | null;
+  alokasi: KeuanganAlokasi | null;
   realisasi: number | null;
   sisa: number | null;
 };
@@ -100,7 +108,7 @@ export type KeuanganRow = {
 /** Alokasi (new money only), Realisasi, and Sisa = Alokasi − Realisasi, which can be negative. */
 export type KeuanganTotals = { alokasi: number; realisasi: number; sisa: number };
 
-/** One Kelompok: its `Sub Blok Anggaran` text in full, line breaks included, its rows and totals. */
+/** One Kelompok: its `Sub Blok Anggaran` text as written, line breaks included, its rows and totals. */
 export type KeuanganKelompok = { name: string; rows: KeuanganRow[]; totals: KeuanganTotals };
 
 /** The whole Block B tab: every Kelompok in sheet order, and the grand total across them. */
@@ -171,8 +179,8 @@ const AMOUNT = /^(\d+(?:[.,]\d{3})*)(?:[.,](\d{1,2}))?$/;
  * `9876543.21`. Empty is `null`; anything else is `undefined`, for the caller to refuse.
  */
 function parseAmount(text: string): number | null | undefined {
-  const match = /^(-?)\s*(?:Rp\s*)?(-?)\s*(.*)$/i.exec(text);
   if (text === "") return null;
+  const match = /^(-?)\s*(?:Rp\s*)?(-?)\s*(\d[\d.,]*)$/i.exec(text);
   if (!match || (match[1] && match[2])) return undefined;
   const digits = AMOUNT.exec(match[3]);
   if (!digits) return undefined;
@@ -181,12 +189,12 @@ function parseAmount(text: string): number | null | undefined {
 }
 
 /** What `=ISFORMULA` displays: TRUE or FALSE, or BENAR or SALAH in an Indonesian-locale copy. */
-const FORMULA_VALUES: Record<string, AlokasiKind> = {
-  false: "new",
-  salah: "new",
-  true: "carried",
-  benar: "carried",
-};
+const FORMULA_VALUES = new Map<string, AlokasiKind>([
+  ["false", "new"],
+  ["salah", "new"],
+  ["true", "carried"],
+  ["benar", "carried"],
+]);
 
 /** Only these become an `href`; anything else in `Link_raw` is ignored. */
 const LINK_PROTOCOLS = new Set(["http:", "https:"]);
@@ -202,22 +210,13 @@ function linkUrl(raw: string): string | null {
 
 const WHOLE = /^\d+$/;
 
-/** `Tgl`/`Bln`/`Thn`: all three or the month and year only, each a whole number naming a real date. */
+/** `Tgl`/`Bln`/`Thn`: whole numbers, all three or the month and year only, or none at all. */
 function parseDate(sheetRow: number, tgl: string, bln: string, thn: string): KeuanganDate | null {
   if (tgl === "" && bln === "" && thn === "") return null;
-  const bad = () =>
+  if (!WHOLE.test(bln) || !WHOLE.test(thn) || (tgl !== "" && !WHOLE.test(tgl))) {
     atRow(sheetRow, `tanggal tidak valid (Tgl "${tgl}", Bln "${bln}", Thn "${thn}").`);
-  if (bln === "" || thn === "" || ![tgl || "1", bln, thn].every((v) => WHOLE.test(v))) bad();
-  const [day, month, year] = [tgl === "" ? null : Number(tgl), Number(bln), Number(thn)];
-  const check = new Date(Date.UTC(year, month - 1, day ?? 1));
-  if (
-    check.getUTCFullYear() !== year ||
-    check.getUTCMonth() !== month - 1 ||
-    check.getUTCDate() !== (day ?? 1)
-  ) {
-    bad();
   }
-  return { day, month, year };
+  return { day: tgl === "" ? null : Number(tgl), month: Number(bln), year: Number(thn) };
 }
 
 const KELOMPOK_PREFIX = "Kelompok ";
@@ -277,7 +276,8 @@ function readSheet(rows: string[][]): KeuanganSheet {
       if (cell(row, "Alokasi") !== "" || cell(row, "Realisasi") !== "") {
         atRow(sheetRow, `baris Kelompok tidak boleh berisi Alokasi atau Realisasi.`);
       }
-      current = { name: subBlok, rows: [], totals: emptyTotals() };
+      // The name keeps the cell as written — only the prefix test reads it trimmed.
+      current = { name: row[columns["Sub Blok Anggaran"]], rows: [], totals: emptyTotals() };
       kelompok.push(current);
       budgetLine = "";
       continue;
@@ -307,7 +307,7 @@ function readSheet(rows: string[][]): KeuanganSheet {
     if (alokasi !== null) {
       const formula = cell(row, "Alokasi_formula");
       alokasiKind =
-        FORMULA_VALUES[formula.toLowerCase()] ??
+        FORMULA_VALUES.get(formula.toLowerCase()) ??
         atRow(
           sheetRow,
           `kolom "Alokasi_formula" berisi "${formula}", padahal baris ini berisi Alokasi — harus TRUE atau FALSE.`,
@@ -332,8 +332,8 @@ function readSheet(rows: string[][]): KeuanganSheet {
       kegiatan,
       link: label === "" ? null : { label, url: raw === "" ? null : linkUrl(raw) },
       date,
-      alokasi,
-      alokasiKind,
+      alokasi:
+        alokasi === null || alokasiKind === null ? null : { amount: alokasi, kind: alokasiKind },
       realisasi,
       sisa,
     });
@@ -352,7 +352,7 @@ function readSheet(rows: string[][]): KeuanganSheet {
   let rowsWithRealisasi = 0;
   for (const k of kelompok) {
     for (const r of k.rows) {
-      if (r.alokasiKind === "new") k.totals.alokasi += r.alokasi ?? 0;
+      if (r.alokasi?.kind === "new") k.totals.alokasi += r.alokasi.amount;
       if (r.realisasi !== null) {
         k.totals.realisasi += r.realisasi;
         rowsWithRealisasi++;

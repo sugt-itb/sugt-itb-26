@@ -4,14 +4,14 @@
  * The **writer**, {@link csvDocument} (#472), is shared by the Laporan and `/feedback` exports, so the
  * files open the same way in a spreadsheet.
  *
- * - **A leading UTF-8 BOM**, because the reader is Excel, and Excel reads a UTF-8 CSV as the system
+ * - **A leading UTF-8 BOM**, because the file is opened in Excel, and Excel reads a UTF-8 CSV as the system
  *   code page without one. That mangles every Indonesian category name.
  * - **Every field quoted**, an embedded quote doubled — the whole of RFC 4180's escaping. A
  *   description is free text and a name can carry a comma, and a rule with no exceptions is one nobody
  *   has to check. Rows end in CRLF.
  * - **Formula-injection guard**: a text cell starting with `=`, `+`, `-`, `@`, a tab or a carriage
  *   return gets a leading `'`, so a spreadsheet shows it as text instead of running it. A **number**
- *   cell is written as its plain digits and never touched, so an amount stays a number to the reader.
+ *   cell is written as its plain digits and never touched, so an amount stays a number in the sheet.
  *
  * The **reader**, {@link parseCsv}, is shared by the two link-shared Google Sheets read through their
  * CSV export (ADR-0033): `/kalender`'s schedule (`jadwal-sheet.ts`) and `/keuangan`'s Block B tab
@@ -37,8 +37,8 @@ export function csvDocument(rows: readonly (readonly CsvCell[])[]): string {
 
 /**
  * Parse RFC-4180 CSV into a grid of rows of cells. Handles quoted fields containing commas,
- * newlines and doubled-quote (`""`) escapes — Google's export quotes any multi-line cell, so the
- * newlines inside a session's detail survive as part of one field rather than splitting the row.
+ * newlines and doubled-quote (`""`) escapes — Google's export quotes any multi-line cell, so its
+ * newlines survive as part of one field rather than splitting the row.
  * A `\r\n` or `\r` row break **outside** a quoted field is treated as one break (bytes inside a
  * quoted field are kept verbatim). A trailing newline does not add an empty row.
  */
