@@ -74,10 +74,13 @@ pnpm --filter @sugt/db db:seed:people  # the founding Staff, once, per environme
 Turbo runs with `envMode: strict`, so a variable missing from a task's `env` is
 invisible to it even when the shell has it.
 
-Sign-in adds four more, declared on the same three tasks: `BETTER_AUTH_SECRET`,
-`BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Provisioning the
-Google OAuth client and supplying the values is separate work; nothing in this repo
-holds them.
+Sign-in adds eight more, declared on the same three tasks: `BETTER_AUTH_SECRET`,
+`BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and for the ITB
+account (Microsoft) button `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`,
+`MICROSOFT_TENANT_ID` and `MICROSOFT_OAUTH_REDIRECT_URL` — the last exactly
+`${BETTER_AUTH_URL}/api/auth/callback/microsoft`, or the app refuses to boot.
+Provisioning the OAuth clients and supplying the values is separate work; nothing in
+this repo holds them.
 
 The aggregates endpoints add `INTERNAL_APP_URL`, `PUBLIC_APP_URL`,
 `AGGREGATES_SECRET` and `REVALIDATE_SECRET`, all subject to the same rule — and the

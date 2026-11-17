@@ -33,3 +33,11 @@ Finance reconciles and reports outside the app, so programme-wide money views du
 
 "Transactions are still recorded" no longer holds: Finance now records them outside the app too ([ADR-0060](./0060-trip-spending-is-recorded-outside-the-app.md),
 [#541](https://github.com/sugt-itb/sugt-itb-26/issues/541)). Each Perjadin's Report and CSV export stay, for the lines already recorded.
+
+## Amendment (2026-11-17): `/keuangan` returns as a view of Finance's spreadsheet
+
+"No programme-wide money view" no longer holds for one view: `/keuangan` returns, read-only, showing
+the Block B tab of Finance's spreadsheet ([ADR-0064](./0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md), [#549](https://github.com/sugt-itb/sugt-itb-26/issues/549)). The reason above is why: Finance reconciles
+outside the app, so the app shows Finance's sheet rather than a figure of its own. The **Keuangan**
+Grant comes back to gate it; the holders this ADR's migration deleted are not restored. Nothing else
+here changes, and transactions are still not recorded.

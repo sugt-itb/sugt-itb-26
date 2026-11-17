@@ -400,6 +400,27 @@
       "when": 1793640658334,
       "tag": "0056_retire_keuangan_grant",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1794827387357,
+      "tag": "0057_footage_upload_folders",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1794829898245,
+      "tag": "0058_footage_copy",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1794894732146,
+      "tag": "0059_keuangan_grant_and_source",
+      "breakpoints": true
     }
   ]
 }

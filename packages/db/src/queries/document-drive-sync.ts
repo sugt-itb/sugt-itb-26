@@ -12,7 +12,8 @@ import { requireStaff } from "./staff-only";
 /**
  * **What the document reconcile reads and writes** (ADR-0042, #397) — one Perjadin Document's place
  * in the company Drive, the same way `./drive-sync.ts` is one transaction's. Staff-only throughout:
- * the reconcile runs after a Staff member uploads, or when an Administrator — Staff too — sweeps.
+ * the reconcile runs when an Administrator — Staff — sweeps or reconnects. Nothing uploads a
+ * document any more (ADR-0061); it finishes the ones recorded before that.
  *
  * **No row lock is held across a call to Google.** Every folder id is claimed by compare-and-set:
  * the write lands only where the id is still what the caller last read, and a caller that lost

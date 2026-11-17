@@ -5,6 +5,7 @@ import type { Role } from "@sugt/domain";
 
 import { addPerson } from "./fixtures";
 import { stubGoogle, type GoogleProfile } from "./google";
+import { stubMicrosoft, type MicrosoftProfile } from "./microsoft";
 
 const ORIGIN = "http://localhost:3001";
 
@@ -25,12 +26,12 @@ export type SignInResult = {
   location: URL;
   /** The session cookie, ready to hand to seam 2. `null` when none was issued. */
   sessionCookie: string | null;
-  /** How many times Google's token endpoint was reached. */
+  /** How many times the provider's token endpoint was reached. */
   tokenExchanges: number;
 };
 
 /**
- * Drive a whole Google sign-in through the same handler `route.ts` mounts.
+ * Drive a whole Google sign-in through the same handler `route.ts` mounts (`signInWith`, below).
  *
  * Two requests, because that is what a browser makes: `POST /sign-in/social` to get
  * the authorization URL and the state cookie, then `GET /callback/google` carrying
@@ -43,13 +44,41 @@ export async function signInWithGoogle(
   { callbackURL = "/" }: { callbackURL?: string } = {},
 ): Promise<SignInResult> {
   const google = stubGoogle(profile);
+  return { ...(await signInWith("google", callbackURL)), tokenExchanges: google.tokenExchanges };
+}
 
+/**
+ * **The same, through ITB's Microsoft tenant** (#565): the "Masuk dengan akun ITB" button. Also
+ * answers how many requests reached Microsoft Graph, which must be none.
+ */
+export async function signInWithMicrosoft(
+  profile: MicrosoftProfile,
+  { callbackURL = "/" }: { callbackURL?: string } = {},
+): Promise<SignInResult & { graphRequests: number }> {
+  const microsoft = stubMicrosoft(profile);
+  const result = await signInWith("microsoft", callbackURL);
+  return {
+    ...result,
+    tokenExchanges: microsoft.tokenExchanges,
+    graphRequests: microsoft.graphRequests,
+  };
+}
+
+/**
+ * Both requests of one sign-in, against whichever provider's stub is in place: `POST
+ * /sign-in/social` for the authorization URL and the state cookie, then `GET /callback/{provider}`
+ * with the code the provider would have sent back.
+ */
+async function signInWith(
+  provider: "google" | "microsoft",
+  callbackURL: string,
+): Promise<Omit<SignInResult, "tokenExchanges">> {
   const start = await auth.handler(
     new Request(`${ORIGIN}/api/auth/sign-in/social`, {
       method: "POST",
       headers: { "content-type": "application/json", origin: ORIGIN },
       body: JSON.stringify({
-        provider: "google",
+        provider,
         callbackURL,
         errorCallbackURL: SIGN_IN_PATH,
       }),
@@ -66,7 +95,7 @@ export async function signInWithGoogle(
 
   const response = await auth.handler(
     new Request(
-      `${ORIGIN}/api/auth/callback/google?state=${encodeURIComponent(state)}&code=stub-authorization-code`,
+      `${ORIGIN}/api/auth/callback/${provider}?state=${encodeURIComponent(state)}&code=stub-authorization-code`,
       { headers: { cookie: cookieHeader(start), origin: ORIGIN } },
     ),
   );
@@ -76,7 +105,6 @@ export async function signInWithGoogle(
     authorizationURL,
     location: new URL(response.headers.get("location") ?? "", ORIGIN),
     sessionCookie: sessionCookie(response),
-    tokenExchanges: google.tokenExchanges,
   };
 }
 

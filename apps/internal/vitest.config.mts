@@ -44,6 +44,15 @@ export default defineConfig({
       GOOGLE_CLIENT_ID: "test-google-client-id",
       GOOGLE_CLIENT_SECRET: "test-google-client-secret",
       /**
+       * ITB's Microsoft sign-in (#565). Values, not secrets: the tests stub the tenant's token
+       * endpoint the same way. The redirect URL must be exactly `BETTER_AUTH_URL` plus
+       * `/api/auth/callback/microsoft`, or `auth.ts` refuses to boot.
+       */
+      MICROSOFT_CLIENT_ID: "test-microsoft-client-id",
+      MICROSOFT_CLIENT_SECRET: "test-microsoft-client-secret",
+      MICROSOFT_TENANT_ID: "00000000-0000-0000-0000-0000000017b0",
+      MICROSOFT_OAUTH_REDIRECT_URL: "http://localhost:3001/api/auth/callback/microsoft",
+      /**
        * The aggregates routes build public photo URLs from `SUPABASE_URL` and check the bearer
        * against `AGGREGATES_SECRET`; the revalidation call posts to `PUBLIC_APP_URL` with
        * `REVALIDATE_SECRET`. Values, not secrets — the fetch to `PUBLIC_APP_URL` is stubbed at the

@@ -53,6 +53,20 @@ export const driveConnection = pgTable(
     // ensured the same way, where footage needs them.
     footageFolderId: text("footage_folder_id"),
     footagePelaksanaanOfflineFolderId: text("footage_pelaksanaan_offline_folder_id"),
+    // `Foto & Video — Unggahan/` and its `Pelaksanaan Offline/` (#561, ADR-0063): the upload tree,
+    // where Staff put footage straight from Drive. Beside the archive above, never inside it, and
+    // ensured where the archive is.
+    footageUploadFolderId: text("footage_upload_folder_id"),
+    footageUploadPelaksanaanOfflineFolderId: text("footage_upload_pelaksanaan_offline_folder_id"),
+    // The scopes the stored token carries, space-separated, as Google last reported them — on the
+    // connect and on every refresh (#562). Without the full `drive` scope the daily Foto & Video copy
+    // cannot run, and the card says to reconnect. Null for a connection no refresh has reported yet.
+    scope: text("scope"),
+    // While the daily Foto & Video copy runs (#562): claimed by compare-and-set when null or past, and
+    // cleared at the end, so the cron and a Periksa koneksi press never copy at once. A crashed pass
+    // frees it by letting it expire. A lease rather than an advisory lock: the runtime pool is
+    // Supavisor's transaction mode.
+    footageCopyLeaseUntil: timestamp("footage_copy_lease_until", { withTimezone: true }),
     folderProblem: text("folder_problem").$type<DriveFolderProblem>(),
     status: text("status").$type<DriveConnectionStatus>().notNull(),
     brokenAt: timestamp("broken_at", { withTimezone: true }),

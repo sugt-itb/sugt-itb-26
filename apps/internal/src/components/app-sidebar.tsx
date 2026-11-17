@@ -29,12 +29,14 @@ function AppSidebarNav({
   role,
   canEditDaring,
   canViewDashboard,
+  canViewKeuangan,
   canAdminister,
   driveNeedsAttention,
 }: {
   role: Role;
   canEditDaring: boolean;
   canViewDashboard: boolean;
+  canViewKeuangan: boolean;
   canAdminister: boolean;
   driveNeedsAttention: boolean;
 }) {
@@ -43,6 +45,7 @@ function AppSidebarNav({
     role,
     canEditDaring,
     canViewDashboard,
+    canViewKeuangan,
     canAdminister,
     driveNeedsAttention,
   });

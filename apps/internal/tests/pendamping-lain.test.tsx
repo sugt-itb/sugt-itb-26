@@ -11,12 +11,10 @@ import {
   pendampingOptions,
   pendampingPerjadin,
   perjadinDetail,
-  recordPerjadinDocument,
   togglePreparationItem,
   type Person,
 } from "@sugt/db/queries";
 import type { Grant } from "@sugt/domain";
-import { eq } from "drizzle-orm";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -330,7 +328,7 @@ describe("the page", () => {
 
 describe("a write on Pendamping Lain is the viewer's", () => {
   it.each(["sari", "budi"] as const)(
-    "ticks Persiapan, marks a Session delivered and uploads a Dokumen, logged under %s, who is not in the Group",
+    "ticks Persiapan and marks a Session delivered as %s, who is not in the Group",
     async (name) => {
       const who = await people();
       const viewer = who[name];
@@ -348,22 +346,6 @@ describe("a write on Pendamping Lain is the viewer's", () => {
       await expect(markSessionDelivered(viewer, a.sessionId)).resolves.toEqual({
         outcome: "delivered",
       });
-
-      await expect(
-        recordPerjadinDocument(viewer, {
-          perjadinId: a.id,
-          documentId: randomUUID(),
-          driveFileId: randomUUID(),
-          byteSize: 2048,
-          kind: "Daftar Hadir Pendamping",
-          documentDate: daysFromToday(7),
-        }),
-      ).resolves.toEqual({ outcome: "recorded" });
-      const entries = await db
-        .select()
-        .from(schema.activityLog)
-        .where(eq(schema.activityLog.action, "document_uploaded"));
-      expect(entries.map((entry) => entry.actorPersonId)).toEqual([viewer.id]);
     },
   );
 });

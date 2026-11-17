@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { FakeDrive } from "-/lib/drive/fake-drive";
 import { db, schema } from "@sugt/db";
 import {
   activityLogAksi,
@@ -18,6 +19,7 @@ import { asc, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { logActivity } from "../../../packages/db/src/queries/activity-log";
+import { addRecordedDocument, connectDrive } from "./support/drive";
 import {
   addActivityLogEntry,
   addCluster,
@@ -140,7 +142,7 @@ describe("each money write logs one entry with the change", () => {
     await expect(entries()).resolves.toEqual([]);
   });
 
-  it("cannot be handed advance_set, advance_changed, report_filed or transaction_recorded — they are history only (ADR-0051, ADR-0055, ADR-0060)", () => {
+  it("cannot be handed advance_set, advance_changed, report_filed, transaction_recorded or a document_* — they are history only (ADR-0051, ADR-0055, ADR-0060, ADR-0061)", () => {
     // Never called: the assertion is the typecheck gate, which fails on an unused `@ts-expect-error`
     // the day `logActivity` accepts the action again.
     const set = { action: "advance_set", details: { amountIdr: 1 } } as const;
@@ -160,6 +162,9 @@ describe("each money write logs one entry with the change", () => {
         receiptCount: 1,
       },
     } as const;
+    const document = { documentId: randomUUID(), kind: "SPPD", documentDate: null } as const;
+    const uploaded = { action: "document_uploaded", details: document } as const;
+    const deleted = { action: "document_deleted", details: document } as const;
     const neverRun = (tx: Parameters<typeof logActivity>[0], actor: Person) => [
       // @ts-expect-error -- advance_set is no longer written
       logActivity(tx, actor, randomUUID(), set),
@@ -169,6 +174,10 @@ describe("each money write logs one entry with the change", () => {
       logActivity(tx, actor, randomUUID(), filed),
       // @ts-expect-error -- transaction_recorded is no longer written (#541)
       logActivity(tx, actor, randomUUID(), recorded),
+      // @ts-expect-error -- document_uploaded is no longer written (#559)
+      logActivity(tx, actor, randomUUID(), uploaded),
+      // @ts-expect-error -- document_deleted is no longer written (#559)
+      logActivity(tx, actor, randomUUID(), deleted),
     ];
     expect(neverRun).toBeTypeOf("function");
   });
@@ -525,5 +534,73 @@ describe("transaction_deleted, which Hapus transaksi will write (#463)", () => {
     expect(activityLogRincian(entry)).toBe(
       "Konsumsi · Rp150.000 · Siswa · tgl 2026-10-13 · Makan siang · 2 bukti",
     );
+  });
+});
+
+describe("past Dokumen entries, now that nothing uploads or deletes a document (#559)", () => {
+  beforeEach(resetDatabase);
+
+  it("stay on /log with their labels, found by the Dokumen filter and by search, the file linked while it stands", async () => {
+    const admin = await administrator();
+    const rina = await staff();
+    const trip = await addPerjadin({
+      picPersonId: rina.id,
+      startsOn: "2026-10-12",
+      endsOn: "2026-10-15",
+    });
+    const drive = new FakeDrive();
+    const folders = await connectDrive(drive, rina.id);
+    const kept = await addRecordedDocument(drive, folders, rina, {
+      perjadinId: trip.id,
+      kind: "Daftar Hadir Pendamping",
+      documentDate: "2026-10-13",
+    });
+    // One deleted before #559: its row is gone, so its entries link nothing.
+    const goneId = randomUUID();
+    for (const action of ["document_uploaded", "document_deleted"] as const) {
+      const entry: ActivityLogEntry = {
+        action,
+        details: {
+          documentId: goneId,
+          kind: "Daftar Hadir Narasumber",
+          documentDate: "2026-10-12",
+        },
+      };
+      await addActivityLogEntry({
+        perjadinId: trip.id,
+        actorPersonId: rina.id,
+        actorEmail: rina.email,
+        action,
+        details: entry.details,
+        searchText: searchTextOf(entry),
+      });
+    }
+
+    const read = async (filters: Partial<ActivityLogFilters>) =>
+      (
+        await activityLogPage(admin, {
+          q: "",
+          aksi: null,
+          dari: null,
+          sampai: null,
+          page: 1,
+          ...filters,
+        })
+      ).rows.map((row) => [
+        activityLogAksi(row.action, row.backfilled),
+        "documentId" in row.details ? row.details.documentId : null,
+        row.documentFileId,
+      ]);
+
+    const expected = expect.arrayContaining([
+      ["Dokumen diunggah", kept.documentId, kept.fileId],
+      ["Dokumen diunggah", goneId, null],
+      ["Dokumen dihapus", goneId, null],
+    ]);
+    expect(await read({ aksi: "dokumen" })).toEqual(expected);
+    expect(await read({ aksi: "dokumen" })).toHaveLength(3);
+    expect(await read({ q: "daftar hadir pendamping" })).toEqual([
+      ["Dokumen diunggah", kept.documentId, kept.fileId],
+    ]);
   });
 });

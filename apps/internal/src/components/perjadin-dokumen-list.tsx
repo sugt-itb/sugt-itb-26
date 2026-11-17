@@ -1,48 +1,51 @@
-"use client";
-
-import { deleteDocumentAction } from "-/app/(app)/perjadin/[id]/dokumen/actions";
-import {
-  DOCUMENT_UNSYNCED_TOOLTIP,
-  deleteRefusalText,
-  documentRowText,
-  sppdSummary,
-} from "-/components/perjadin-dokumen-form";
 import { UnsyncedMarker } from "-/components/unsynced-marker";
 import { driveFileUrl } from "-/lib/drive/receipt-files";
-import type { UploadGate } from "-/lib/drive/upload-gate";
-import type { DocumentSchool, PerjadinDocumentRow } from "@sugt/db/queries";
-import { PERJADIN_DOCUMENT_KINDS } from "@sugt/domain";
-import { Button } from "@sugt/ui/components/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@sugt/ui/components/dialog";
-import { useState, useTransition } from "react";
+import type { PerjadinDocumentRow } from "@sugt/db/queries";
+import { formatTimeRange, PERJADIN_DOCUMENT_KINDS } from "@sugt/domain";
+
+/** What the "belum tersinkron" marker on a document says, in full. */
+export const DOCUMENT_UNSYNCED_TOOLTIP =
+  "Dokumen belum tersinkron ke Google Drive — Administrator dapat menyelesaikannya lewat Periksa koneksi.";
 
 /**
- * **A trip's Perjadin Documents, grouped by kind** (ADR-0042): four headings, each document with a
- * **Buka** link to its PDF in Drive and "belum tersinkron" while it is not yet in place. One list
- * for both places that show it — the Dokumen dialog on a `/pendamping` card, and the read-only
- * section on `/perjadin/[id]` (#398). The SPPD heading carries **SPPD: x/y sekolah** (#441), so a
- * School still missing its SPPD shows.
- *
- * With `hapus`, each row also carries **Hapus** — the dialog passes it, the trip page does not.
+ * One document as its row reads: the date, for a Peserta sheet its School, cohort and span, and for
+ * an SPPD its School alone (#441).
+ */
+export function documentRowText(row: PerjadinDocumentRow): string {
+  if (row.kind === "SPPD") return row.schoolName ?? "";
+  if (row.schoolName && row.participantType && row.startsAt && row.endsAt && row.timeZone) {
+    return [
+      row.documentDate,
+      row.schoolName,
+      row.participantType,
+      formatTimeRange(row.startsAt, row.endsAt, row.timeZone),
+    ].join(" · ");
+  }
+  return row.documentDate ?? "";
+}
+
+/**
+ * **`SPPD: x/y sekolah`** (#441): how many of the trip's Schools have their SPPD, so a missing one
+ * shows. An SPPD for a School that has since left the trip still stands, but is not counted.
+ */
+export function sppdSummary(schools: { hasSppd: boolean }[]): string {
+  return `SPPD: ${schools.filter((school) => school.hasSppd).length}/${schools.length} sekolah`;
+}
+
+/**
+ * **A trip's Perjadin Documents, grouped by kind, read-only** (ADR-0042, ADR-0061): four headings,
+ * each document with a **Buka** link to its PDF in Drive and "belum tersinkron" while it is not yet
+ * in place. The SPPD heading carries **SPPD: x/y sekolah** (#441), so a School still missing its SPPD
+ * shows. Nothing here uploads or deletes: documents are no longer filed in the tool (#559), and the
+ * ones already recorded are only listed, on `/perjadin/[id]`.
  */
 function PerjadinDokumenList({
   documents,
   schools,
-  hapus,
 }: {
   documents: PerjadinDocumentRow[];
   /** The trip's Schools, which the SPPD summary counts against. */
-  schools: DocumentSchool[];
-  /** Hapus on every row: closed with the gate's reason while Drive cannot take it. */
-  hapus?: { gate: UploadGate; onDeleted: () => void };
+  schools: { hasSppd: boolean }[];
 }) {
   return (
     <div className="grid gap-4">
@@ -77,13 +80,6 @@ function PerjadinDokumenList({
                       Buka
                     </a>
                     {row.unsynced && <UnsyncedMarker explanation={DOCUMENT_UNSYNCED_TOOLTIP} />}
-                    {hapus && (
-                      <Hapus
-                        row={row}
-                        gate={hapus.gate}
-                        onDeleted={hapus.onDeleted}
-                      />
-                    )}
                   </li>
                 ))}
               </ul>
@@ -92,90 +88,6 @@ function PerjadinDokumenList({
         );
       })}
     </div>
-  );
-}
-
-/**
- * **Hapus** behind a confirmation (#398). The file goes to the Drive trash first, then the row; a
- * refusal — Drive disconnected, or unreachable — leaves the document listed and says why.
- */
-function Hapus({
-  row,
-  gate,
-  onDeleted,
-}: {
-  row: PerjadinDocumentRow;
-  gate: UploadGate;
-  onDeleted: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [refusal, setRefusal] = useState<string | null>(null);
-  const [deleting, startDeleting] = useTransition();
-
-  function submit() {
-    startDeleting(async () => {
-      setRefusal(null);
-      const result = await deleteDocumentAction(row.id);
-      if (result.outcome === "deleted" || result.outcome === "no-such-document") {
-        setOpen(false);
-        onDeleted();
-        return;
-      }
-      setRefusal(deleteRefusalText(result));
-    });
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) setRefusal(null);
-      }}
-    >
-      <DialogTrigger
-        disabled={!gate.open}
-        title={gate.open ? undefined : gate.reason}
-        render={
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={`Hapus ${row.kind} ${documentRowText(row)}`}
-          >
-            Hapus
-          </Button>
-        }
-      />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Hapus dokumen</DialogTitle>
-          <DialogDescription>
-            Hapus dokumen ini? File akan dipindahkan ke Sampah Google Drive.
-          </DialogDescription>
-        </DialogHeader>
-        <p className="text-sm">
-          {row.kind} · {documentRowText(row)}
-        </p>
-        {refusal !== null && <p className="text-sm text-destructive">{refusal}</p>}
-        <DialogFooter>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setOpen(false);
-            }}
-          >
-            Batal
-          </Button>
-          <Button
-            variant="destructive"
-            disabled={deleting}
-            onClick={submit}
-          >
-            {deleting ? "Menghapus…" : "Hapus"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

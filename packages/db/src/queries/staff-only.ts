@@ -143,8 +143,8 @@ export class NotGrantedError extends Error {
     super(
       `A ${grant}-granted surface was handed ${person.role} caller ${person.id}, who holds ` +
         `[${person.grants.join(", ") || "no grants"}]. A Grant is Staff-only ` +
-        `(ADR-0028, ADR-0047); the write that reaches one is refused server-side, so this is a bug in ` +
-        `whoever offered the write, not a state a user can reach.`,
+        `(ADR-0028, ADR-0047); a write or a gated read that reaches one is refused server-side, so ` +
+        `this is a bug in whoever offered it, not a state a user can reach.`,
     );
   }
 }
@@ -227,6 +227,30 @@ export function canViewDashboard(person: Person): boolean {
   return hasGrant(person, "Dashboard Viewer");
 }
 
+/**
+ * **May this Person read `/keuangan`?** (ADR-0064, #549) The one predicate behind the page guard,
+ * the sidebar link and `keuanganSourceForRead`, so the link is shown exactly when the page is
+ * reachable. The same shape as `canViewDashboard`:
+ * - **A `Pimpinan` reads it by Role.** Grants are Staff-only (ADR-0028), so a Pimpinan holds none.
+ * - **A `Staff` reads it by holding `Keuangan`**, which only Administrator implies.
+ *
+ * Another documented exception to "reading is open to any signed-in Person" (ADR-0026): the view
+ * shows Finance's spreadsheet, with names and receipt links, not the app's own records.
+ */
+export function canViewKeuangan(person: Person): boolean {
+  if (person.role === "Pimpinan") return true;
+  return hasGrant(person, "Keuangan");
+}
+
+/**
+ * The `/keuangan` read's choke point: `canViewKeuangan`, refusing with the same `NotGrantedError` a
+ * Grant check throws, which `staffSurface()` turns into a 403. A Pimpinan passes by Role, so this is
+ * not `requireGrant(person, "Keuangan")`.
+ */
+export function requireKeuanganReader(person: Person): void {
+  if (!canViewKeuangan(person)) throw new NotGrantedError(person, "Keuangan");
+}
+
 const NOT_ON_PERJADIN_ERROR_CODE = "sugt/not-on-perjadin";
 
 /**
@@ -270,7 +294,8 @@ export function isNotOnPerjadinError(error: unknown): error is NotOnPerjadinErro
  * writes every Perjadin, then anyone else only a trip whose Group — a `group_member` row, the PIC included —
  * they are in. A Pimpinan recorded on a trip is not in its Group (ADR-0020). The one statement of
  * the rule: `requirePerjadinWriter`, `canWritePerjadin` and the `/perjadin` directory's per-row
- * answer all read it. Not exported from the package.
+ * answer all read it. Not exported from the package. **`perjadinWriterEmails`** (`./perjadin-writers.ts`)
+ * states the same rule the other way round, as the list of who may write; change the two together.
  */
 export function perjadinWriterSql(person: Person): SQL<boolean> {
   if (person.role !== "Staff") return sql<boolean>`false`;

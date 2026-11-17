@@ -229,7 +229,8 @@ describe("the summary figures", () => {
         detailUrl: `${ORIGIN}/`,
         // 5 delivered Sessions + 1 Pretest unit, of 3 Schools × 10.
         kegiatanTerlaksana: { percent: 20, completed: 6, total: 30 },
-        pretest: 50,
+        // Pretest counts Schools with all four boxes: SMAN 1 alone, of 3 → 33%.
+        pretest: 33,
         daring: 17,
         luring: 33,
         posttest: 0,
@@ -237,8 +238,9 @@ describe("the summary figures", () => {
       sessions: {
         offline: { delivered: 2, total: 6, detailUrl: `${ORIGIN}/perjadin` },
         online: { delivered: 3, total: 18, detailUrl: `${ORIGIN}/sesi-daring` },
-        pretest: { completed: 6, total: 12, detailUrl: `${ORIGIN}/` },
-        posttest: { completed: 0, total: 12, detailUrl: `${ORIGIN}/` },
+        // One complete School of 3 — SMAN 2's two of four boxes add nothing.
+        pretest: { completed: 1, total: 3, detailUrl: `${ORIGIN}/` },
+        posttest: { completed: 0, total: 3, detailUrl: `${ORIGIN}/` },
       },
       // No feedback filed yet: every average is `null`, never 0 (#504).
       participantFeedback: {
@@ -277,7 +279,10 @@ describe("the summary figures", () => {
         ...payload.progress.kegiatanTerlaksana,
         percent: dashboard.activitiesPercent,
       },
-      ...dashboard.summary,
+      pretest: dashboard.summary.pretest.percent,
+      daring: dashboard.summary.daring.percent,
+      luring: dashboard.summary.luring.percent,
+      posttest: dashboard.summary.posttest.percent,
     });
   });
 

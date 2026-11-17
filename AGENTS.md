@@ -63,8 +63,10 @@ script.
 
 `envMode` defaults to `strict`: a task only sees environment variables declared in
 its `env` (or `globalEnv`). `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
-`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are declared on `build`, `typecheck` and
-`dev` for exactly that reason — without it a value is invisible even when set in the
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`,
+`MICROSOFT_TENANT_ID`, `MICROSOFT_OAUTH_REDIRECT_URL` and `CRON_SECRET` (the bearer token Vercel
+Cron sends to the daily Foto & Video copy, #562) are declared on `build`, `typecheck` and `dev`
+for exactly that reason — without it a value is invisible even when set in the
 shell. Anything reading one goes through `requireEnv` in `@sugt/internal`, which fails
 with a sentence naming the strict-mode cause rather than with `undefined`. A new
 variable belongs in `turbo.json` in the same commit that first reads it.

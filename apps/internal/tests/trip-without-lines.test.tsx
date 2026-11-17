@@ -75,7 +75,6 @@ async function screens(viewer: Person, perjadinId: string) {
         title="Perjalanan Dinas Anda"
         description=""
         trips={trips.current}
-        uploadGate={{ open: true }}
         canWrite
       />,
     ),
@@ -157,18 +156,20 @@ describe("nothing records a new line", () => {
     }
   });
 
-  it("keeps three buttons on the card, the last taking the whole row on a phone", async () => {
+  it("keeps two buttons on the card, an odd last one taking the whole row on a phone", async () => {
     const { rina, trip } = await aTrip();
 
     const { card } = await screens(rina, trip.id);
 
-    for (const label of [">Dokumen<", ">Evaluasi Perjadin<", ">Edit<"]) {
+    for (const label of [">Evaluasi Perjadin<", ">Edit<"]) {
       expect(card, label).toContain(label);
     }
+    // Dokumen went with #559.
+    expect(card).not.toContain(">Dokumen<");
     expect(card).toContain("[&amp;&gt;:last-child:nth-child(odd)]:col-span-2");
   });
 
-  it("speaks of dokumen, not transaksi, over a finished trip on /pendamping", async () => {
+  it("speaks of neither dokumen nor transaksi over a finished trip on /pendamping", async () => {
     const rina = await addPerson({ fullName: "Rina", email: "rina@itb.ac.id", role: "Staff" });
     await addPerjadin({
       picPersonId: rina.id,
@@ -181,7 +182,9 @@ describe("nothing records a new line", () => {
       await PendampingPage({ searchParams: Promise.resolve({}) } as never),
     );
 
-    expect(html).toContain("Dokumennya masih bisa dikerjakan.");
+    // Nothing uploads a document any more either (#559).
+    expect(html).toContain("Perjalanan yang sudah selesai, yang terbaru di atas.</p>");
+    expect(html).not.toContain("Dokumennya");
     expect(html).not.toContain("Transaksi dan dokumennya");
   });
 });

@@ -293,7 +293,7 @@ export const PERJADIN_ROLE_LABELS: Record<Role, string> = {
  * `(id, role)` foreign keys, and being Staff-only they can never punch through "a Pimpinan writes
  * nothing" (ADR-0025). See `docs/adr/0028-grants-are-a-second-additive-access-axis.md`.
  *
- * Five named Grants (ADR-0052, #469; ADR-0059, #533):
+ * Six named Grants (ADR-0052, #469; ADR-0059, #533; ADR-0064, #549):
  * - **Administrator** — administers Grants (assign/revoke any Grant on any Staff Person, including
  *   making another Administrator) and **implies every other Grant**, so an Administrator satisfies
  *   any grant check without holding that grant's own row.
@@ -305,8 +305,11 @@ export const PERJADIN_ROLE_LABELS: Record<Role, string> = {
  *   Dashboard Viewer** (`GRANT_IMPLIED_BY`, beside `hasGrant`).
  * - **Dashboard Viewer** — may read the Dashboard, and nothing more. A Pimpinan never holds it —
  *   Grants are Staff-only (ADR-0028); a Pimpinan's Dashboard access comes from their role.
+ * - **Keuangan** — reads `/keuangan`, the Block B budget view of Finance's spreadsheet (ADR-0064).
+ *   A Pimpinan reads it by Role, as the Dashboard (`canViewKeuangan`).
  *
- * **No other Grant implies another**: Perjadin Editor and Daring Editor do not read the Dashboard.
+ * **No other Grant implies another**: Perjadin Editor and Daring Editor do not read the Dashboard,
+ * and Keuangan implies nothing.
  *
  * Unlike `TRANSACTION_CATEGORIES`, these **are** terms the Programme's language defines — `CONTEXT.md`
  * glosses them under **Access** — so they belong here beside `ROLES`. The list is mirrored by
@@ -319,6 +322,7 @@ export const GRANTS = [
   "Daring Editor",
   "Dashboard Editor",
   "Dashboard Viewer",
+  "Keuangan",
 ] as const;
 export type Grant = (typeof GRANTS)[number];
 
@@ -334,6 +338,7 @@ export const GRANT_LABELS: Record<Grant, string> = {
   "Daring Editor": "Daring Editor",
   "Dashboard Editor": "Dashboard Editor",
   "Dashboard Viewer": "Dashboard Viewer",
+  Keuangan: "Keuangan",
 };
 
 /**
@@ -346,6 +351,7 @@ export const GRANT_DESCRIPTIONS: Record<Grant, string> = {
   "Daring Editor": "Sesi daring dan Pretest",
   "Dashboard Editor": "termasuk Dashboard Viewer",
   "Dashboard Viewer": "membaca Dashboard",
+  Keuangan: "membaca anggaran Blok B di Keuangan",
 };
 
 /**
@@ -644,21 +650,12 @@ export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 /**
  * **Session Footage** — the photos and videos documenting one offline Session, shown as "Foto &
- * Video" (#424, ADR-0046). Two kinds, each with its own cap, in the same MiB arithmetic as
- * `MAX_UPLOAD_BYTES`. A photo is held to the receipts' 50 MB; a video may be twenty times that.
- * Footage is uploaded untouched, so these caps are on the file as it was taken.
+ * Video" (#424, ADR-0046). Two kinds. Since #561 (ADR-0063) the app no longer uploads footage, so it
+ * checks no type or size: Staff put files into the Session's upload folder in Drive. The kinds and
+ * types below describe the rows uploads made before then, which the app still reads.
  */
 export const SESSION_FOOTAGE_KINDS = ["foto", "video"] as const;
 export type SessionFootageKind = (typeof SESSION_FOOTAGE_KINDS)[number];
-
-export const MAX_FOOTAGE_PHOTO_BYTES = 50 * 1024 * 1024;
-export const MAX_FOOTAGE_VIDEO_BYTES = 1000 * 1024 * 1024;
-
-/** The cap on one file of each kind. */
-export const MAX_FOOTAGE_BYTES: Record<SessionFootageKind, number> = {
-  foto: MAX_FOOTAGE_PHOTO_BYTES,
-  video: MAX_FOOTAGE_VIDEO_BYTES,
-};
 
 /**
  * The types Session Footage is stored as — the six the server recognises from a file's first bytes
@@ -692,7 +689,8 @@ export type SessionFootageContentType = keyof typeof SESSION_FOOTAGE_CONTENT_TYP
  * longer tracked, so nothing writes them, but the entries already in the Log stay readable and
  * searchable. `report_filed` is history only the same way (ADR-0055, #489): the Laporan is no
  * longer filed. So is `transaction_recorded` (ADR-0060, #541): nothing records a new line, but past entries
- * keep their label and the `/log` filter still finds them.
+ * keep their label and the `/log` filter still finds them. And so are `document_uploaded` and
+ * `document_deleted` (ADR-0061, #559): nothing uploads or deletes a Perjadin Document any more.
  */
 export const ACTIVITY_LOG_ACTIONS = [
   "advance_set",

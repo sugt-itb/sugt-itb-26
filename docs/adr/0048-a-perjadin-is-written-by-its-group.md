@@ -42,7 +42,12 @@ ADR-0047's.
 - Catat transaksi, Unggah bukti (and its early receipt count), Laporkan — _amended 2026-10-13:
   Laporkan is gone, the Report being neither filed nor due
   ([ADR-0055](./0055-the-perjadin-report-is-neither-filed-nor-due.md))_
-- Dokumen and Foto & Video: the upload openers, the record, and Hapus
+- Dokumen and Foto & Video: the upload openers, the record, and Hapus — _amended 2026-11-16: Foto &
+  Video has no upload, record or Hapus any more. Who may add footage is enforced by Drive's edit access
+  on the trip's upload folder, re-applied from this rule when a writer clicks Foto & Video, straight
+  after a Group change or a revocation (#563), and by Periksa koneksi — so leaving a Group takes effect
+  at once, and only a Grant change waits for Periksa koneksi or the next click
+  ([ADR-0063](./0063-session-footage-is-uploaded-to-a-drive-folder-and-copied-into-the-company-archive.md))_
 
 The guard runs on the write's own transaction where it has one, so the membership it reads is the state
 the write commits against: a member who removes themselves from the Group is refused on their next write.
@@ -124,3 +129,11 @@ the amendment to [ADR-0052](./0052-editor-splits-into-perjadin-daring-and-dashbo
 Its transactions no longer include recording a new one ([ADR-0060](./0060-trip-spending-is-recorded-outside-the-app.md), [#541](https://github.com/sugt-itb/sugt-itb-26/issues/541)). Unggah bukti, Hapus bukti and
 Hapus transaksi on the lines already recorded are still the trip's writers', under
 `requirePerjadinWriter`. "Records transactions" under the rejected alternatives is history.
+
+## Amendment (2026-11-16): Dokumen writes are gone
+
+Dokumen's upload opener, its record and its Hapus are no longer writes of the trip's
+([ADR-0061](./0061-trip-paperwork-is-not-filed-in-the-app.md),
+[#559](https://github.com/sugt-itb/sugt-itb-26/issues/559)): nothing uploads or deletes a document. Foto
+& Video's stay the trip's writers', under `requirePerjadinWriter`. "Uploads … Dokumen" under the
+rejected alternatives is history.

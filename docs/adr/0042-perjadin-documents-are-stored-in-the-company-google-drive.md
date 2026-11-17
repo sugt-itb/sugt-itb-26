@@ -239,3 +239,11 @@ My Drive/
                     ├── 2026-10-12 · SMAN 1 Bontang · Foto · M-7c8d9e0f.jpg                        shared by link (this file)
                     └── 2026-10-12 · SMAN 1 Bontang · Video · M-1b2c3d4e.mp4                       shared by link
 ```
+
+## Amendment (2026-11-16): documents are no longer filed here
+
+Nothing uploads or deletes a Perjadin Document any more
+([ADR-0061](./0061-trip-paperwork-is-not-filed-in-the-app.md),
+[#559](https://github.com/sugt-itb/sugt-itb-26/issues/559)). The write order and "Deleting a document"
+above are history. The documents already uploaded stay readable on `/perjadin/[id]`, and the tree, the
+per-file sharing, the reconcile and the folder rename stay, so one left unsynced still finishes.

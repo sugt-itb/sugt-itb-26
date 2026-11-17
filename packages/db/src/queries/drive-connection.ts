@@ -7,8 +7,8 @@ import {
   type DriveFolderProblem,
 } from "../schema/drive";
 import { person } from "../schema/people";
-import type { Person } from "./caller";
-import { requireGrant, requireStaff } from "./staff-only";
+import type { DriveCaller, Person } from "./caller";
+import { requireGrant } from "./staff-only";
 
 /**
  * **The company Google Drive connection** (ADR-0040, #372) — the one `drive_connection` row.
@@ -16,9 +16,11 @@ import { requireGrant, requireStaff } from "./staff-only";
  * Two audiences, two guards, and the split is ADR-0040's "Who":
  * - **Only an Administrator connects, reconnects or inspects it.** The card's read and the two
  *   connect writes open with `requireGrant(caller, "Administrator")`.
- * - **Any Staff member uploads through it**, so the credential read and the two bookkeeping writes
- *   a token refresh makes (`last_used_at`, broken) open with `requireStaff` alone. A Pimpinan writes
- *   nothing, so reaches none of them.
+ * - **Anyone signed in may have the app use it.** The credential read and the two bookkeeping writes
+ *   a token refresh makes (`last_used_at`, broken) carry no guard of their own: a Staff upload reaches
+ *   them after its own write guard, and since #561 (ADR-0063) Lihat arsip refreshes the token on a
+ *   Pimpinan's click too, to make and share a Session's archive folder as the company account's
+ *   housekeeping. The ciphertext never leaves the server, and only `@sugt/internal` can decrypt it.
  *
  * This module stores and reads ciphertext only. Encrypting, decrypting and talking to Google are
  * `@sugt/internal`'s, which holds `DRIVE_TOKEN_KEY`; nothing here could decrypt a token if it tried.
@@ -61,6 +63,8 @@ export type DriveConnectionCard = DriveFolderIds & {
   lastUsedAt: Date | null;
   connectedAt: Date;
   connectedByName: string;
+  /** The scopes the token carries, as last reported (#562); `null` until a connect or refresh says. */
+  scope: string | null;
 };
 
 /** The Pengaturan card. Administrator only. */
@@ -76,6 +80,7 @@ export async function driveConnectionCard(caller: Person): Promise<DriveConnecti
       lastUsedAt: driveConnection.lastUsedAt,
       connectedAt: driveConnection.connectedAt,
       connectedByName: person.fullName,
+      scope: driveConnection.scope,
       rootFolderId: driveConnection.rootFolderId,
       stagingFolderId: driveConnection.stagingFolderId,
       buktiTransaksiFolderId: driveConnection.buktiTransaksiFolderId,
@@ -122,10 +127,11 @@ export type DriveCredentials = DriveFolderIds & {
   refreshToken: EncryptedRefreshToken;
 };
 
-/** The stored credential, for any Staff upload. `null` when Drive was never connected. */
-export async function driveCredentials(caller: Person): Promise<DriveCredentials | null> {
-  requireStaff(caller);
-
+/**
+ * The stored credential, for the app's own use of the company Drive: a Staff upload, or the Foto &
+ * Video and Lihat arsip buttons, Lihat arsip on anyone's click (#561). `null` when Drive was never connected.
+ */
+export async function driveCredentials(_caller: DriveCaller): Promise<DriveCredentials | null> {
   const [row] = await db.select().from(driveConnection);
   if (!row) return null;
   return {
@@ -149,12 +155,13 @@ export async function driveCredentials(caller: Person): Promise<DriveCredentials
  */
 export async function saveDriveConnection(
   caller: Person,
-  input: { accountEmail: string; refreshToken: EncryptedRefreshToken },
+  input: { accountEmail: string; refreshToken: EncryptedRefreshToken; scope: string },
 ): Promise<void> {
   requireGrant(caller, "Administrator");
 
   const values = {
     accountEmail: input.accountEmail,
+    scope: input.scope,
     refreshTokenCiphertext: input.refreshToken.ciphertext,
     refreshTokenIv: input.refreshToken.iv,
     refreshTokenTag: input.refreshToken.tag,
@@ -185,21 +192,20 @@ export async function recordDriveFolders(
  * The stored token stopped working — Google answered `invalid_grant`, or it will not decrypt under
  * the current key. Only a `connected` row moves, so the first failure's time is the one kept.
  */
-export async function markDriveConnectionBroken(caller: Person): Promise<void> {
-  requireStaff(caller);
-
+export async function markDriveConnectionBroken(_caller: DriveCaller): Promise<void> {
   await db
     .update(driveConnection)
     .set({ status: "broken", brokenAt: sql`now()` })
     .where(eq(driveConnection.status, "connected"));
 }
 
-/** A refresh succeeded. Bumps `last_used_at` on a still-connected row. */
-export async function touchDriveConnection(caller: Person): Promise<void> {
-  requireStaff(caller);
-
+/**
+ * A refresh succeeded. Bumps `last_used_at` on a still-connected row, and records the scopes the
+ * token carries (#562), so the card can say when the connection needs the full `drive` scope.
+ */
+export async function touchDriveConnection(_caller: DriveCaller, scope: string): Promise<void> {
   await db
     .update(driveConnection)
-    .set({ lastUsedAt: sql`now()` })
+    .set({ lastUsedAt: sql`now()`, scope })
     .where(eq(driveConnection.status, "connected"));
 }

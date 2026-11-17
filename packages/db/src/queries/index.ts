@@ -21,8 +21,9 @@
  *    either: **writing** money is Staff-only (ADR-0026 reversed ADR-0004's read half), and
  *    **arranging delivery** is Staff-only by the surface list. One guard, two reasons — see
  *    `./staff-only.ts`. Some reads are gated after all, each by a Grant, and none for its money: the
- *    Dashboard (ADR-0037, by its page through `canViewDashboard`; ADR-0059), and the Administrator's
- *    roster and Activity Log (by their queries through `requireGrant`).
+ *    Dashboard (ADR-0037, by its page through `canViewDashboard`; ADR-0059), `/keuangan`'s source
+ *    (ADR-0064, through `canViewKeuangan`), and the Administrator's roster and Activity Log (by their
+ *    queries through `requireGrant`).
  * 5. **A write function owns its own transaction.** Several writes are
  *    multi-statement: Rencanakan Perjadin writes `perjadin`, `group_member` and N
  *    `session` rows; a Group is replaced wholesale. The boundary belongs in the function
@@ -44,6 +45,8 @@
  */
 export type {
   Caller,
+  CronCaller,
+  DriveCaller,
   ParticipantToken,
   PerjadinToken,
   Person,
@@ -255,18 +258,14 @@ export {
   type RemovePreparationItemResult,
   type RewordPreparationItemResult,
 } from "./preparation-items";
+export { perjadinWriterEmails, perjadinsWithUploadFolderOfMember } from "./perjadin-writers";
 export {
-  deleteSessionFootage,
-  footageSession,
-  recordSessionFootage,
-  sessionFootageList,
-  type DeleteSessionFootageResult,
-  type FootageSession,
-  type FootageSessionRefusal,
-  type NewSessionFootage,
-  type RecordSessionFootageResult,
-  type SessionFootageRow,
-} from "./session-footage";
+  claimFootageCopyLease,
+  footageCopySessions,
+  markFootageUploadChecked,
+  releaseFootageCopyLease,
+  type FootageCopySession,
+} from "./footage-copy";
 export {
   claimFootageFolder,
   claimPerjadinFootageFolder,
@@ -276,12 +275,17 @@ export {
   markFootageSynced,
   markFootageSyncFailed,
   sessionFootageFolders,
+  sessionFootageFolderTarget,
+  sessionFootageUploadFolders,
   unsyncedFootage,
   type FootageFolderIds,
   type FootageReconcileTarget,
+  type FootageTree,
   type PlacedFootage,
   type SessionFolderNaming,
   type SessionFootageFolder,
+  type SessionFootageFolderTarget,
+  type SessionFootageUploadFolder,
   type UnsyncedFootage,
 } from "./session-footage-drive-sync";
 export {
@@ -440,22 +444,21 @@ export {
   type UnsyncedDocument,
 } from "./document-drive-sync";
 export {
-  checkDocumentFields,
-  deletePerjadinDocument,
   perjadinDokumen,
-  recordPerjadinDocument,
-  type DeletePerjadinDocumentResult,
-  type DocumentFields,
-  type DocumentFieldsRefusal,
   type DocumentSchool,
-  type NewPerjadinDocument,
   type PerjadinDocumentRow,
   type PerjadinDokumen,
-  type PesertaFields,
-  type RecordPerjadinDocumentResult,
 } from "./perjadin-documents";
 export {
+  keuanganSourceCard,
+  keuanganSourceForRead,
+  setKeuanganSource,
+  type KeuanganSourceCard,
+  type KeuanganSourceForRead,
+} from "./keuangan-source";
+export {
   canViewDashboard,
+  canViewKeuangan,
   canWritePerjadin,
   hasGrant,
   isNotGrantedError,
@@ -465,6 +468,7 @@ export {
   NotOnPerjadinError,
   NotStaffError,
   requireGrant,
+  requireKeuanganReader,
   requirePerjadinWriter,
   requireSessionWriter,
   requireStaff,

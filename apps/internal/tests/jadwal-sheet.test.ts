@@ -1,4 +1,5 @@
-import { fetchJadwal, parseCsv, parseJadwal } from "-/lib/jadwal-sheet";
+import { parseCsv } from "-/lib/csv";
+import { fetchJadwal, parseJadwal } from "-/lib/jadwal-sheet";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**

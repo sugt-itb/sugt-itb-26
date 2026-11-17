@@ -50,23 +50,24 @@ last), then `session` and what hangs off it.
 `CONTEXT.md` defines around thirty terms. Far fewer are tables, and that is deliberate — the
 list below exists so nobody later "completes" the schema by adding the rest.
 
-| Term                                                         | Where it lives                                                                                                                                             |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Programme, Track, Kementerian Pendidikan Tinggi, DITSAMA ITB | Nowhere. There is one of each; naming them in a table says nothing.                                                                                        |
-| Stream, Class kind, Session mode, Role                       | `@sugt/domain`, as `as const` arrays. Fixed sets, not rows.                                                                                                |
-| Class                                                        | Not a table. A Class is `(school_id, class_kind)` — three per School, by construction.                                                                     |
-| GTK Class, MS Class, Student Class                           | The three values of `class_kind`.                                                                                                                          |
-| Perjadin Report                                              | Not a table. It is the acquittal state on `perjadin` — see [Money](#money).                                                                                |
-| Participant                                                  | Not a table. Nobody enrols Participants; one exists in the records only as a name they typed on their own feedback.                                        |
-| Project Team, Final Project                                  | Not stored at all. [ADR-0009](./adr/0009-the-tool-tracks-delivery-not-outcomes.md) is explicit; they reach the public as curated pieces, never as records. |
-| Advance                                                      | Not stored (ADR-0051). Its column was dropped in migration 0050 (#465).                                                                                    |
-| Uang Perjalanan Terpakai                                     | Not a column. The sum of a Perjadin's transactions, all categories, derived on every read.                                                                 |
-| A trip's Pimpinan                                            | Not a table. Everyone in `session_pimpinan` on one of the trip's non-cancelled Sessions, derived on every read (ADR-0056).                                 |
-| Report deadline                                              | None. The Report is neither filed nor due (ADR-0055, #489), so no deadline is stored or derived.                                                           |
-| Aspect                                                       | Not a table and not a value. Every Aspect on all four evaluations is a **column**; `@sugt/domain` names each rubric.                                       |
-| Rating                                                       | Not a table. A Rating is one Aspect column on one row of an evaluation.                                                                                    |
-| Transaction category                                         | Not a table. A `text` column on `transaction`, CHECKed against a closed set — see [Money](#money).                                                         |
-| Story kind                                                   | Not a table. A `text` column on `story`; field narrative or a Final Project piece, and nothing else differs between them.                                  |
+| Term                                                         | Where it lives                                                                                                                                                                        |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Programme, Track, Kementerian Pendidikan Tinggi, DITSAMA ITB | Nowhere. There is one of each; naming them in a table says nothing.                                                                                                                   |
+| Stream, Class kind, Session mode, Role                       | `@sugt/domain`, as `as const` arrays. Fixed sets, not rows.                                                                                                                           |
+| Class                                                        | Not a table. A Class is `(school_id, class_kind)` — three per School, by construction.                                                                                                |
+| GTK Class, MS Class, Student Class                           | The three values of `class_kind`.                                                                                                                                                     |
+| Perjadin Report                                              | Not a table. It is the acquittal state on `perjadin` — see [Money](#money).                                                                                                           |
+| Participant                                                  | Not a table. Nobody enrols Participants; one exists in the records only as a name they typed on their own feedback.                                                                   |
+| Project Team, Final Project                                  | Not stored at all. [ADR-0009](./adr/0009-the-tool-tracks-delivery-not-outcomes.md) is explicit; they reach the public as curated pieces, never as records.                            |
+| Advance                                                      | Not stored (ADR-0051). Its column was dropped in migration 0050 (#465).                                                                                                               |
+| Uang Perjalanan Terpakai                                     | Not a column. The sum of a Perjadin's transactions, all categories, derived on every read.                                                                                            |
+| A trip's Pimpinan                                            | Not a table. Everyone in `session_pimpinan` on one of the trip's non-cancelled Sessions, derived on every read (ADR-0056).                                                            |
+| Budget Line, the Block B budget                              | Not stored. Finance's spreadsheet is its source; `/keuangan` reads a prepared copy's Block B tab on every request. Only the pointer to it is stored, in `keuangan_source` (ADR-0064). |
+| Report deadline                                              | None. The Report is neither filed nor due (ADR-0055, #489), so no deadline is stored or derived.                                                                                      |
+| Aspect                                                       | Not a table and not a value. Every Aspect on all four evaluations is a **column**; `@sugt/domain` names each rubric.                                                                  |
+| Rating                                                       | Not a table. A Rating is one Aspect column on one row of an evaluation.                                                                                                               |
+| Transaction category                                         | Not a table. A `text` column on `transaction`, CHECKed against a closed set — see [Money](#money).                                                                                    |
+| Story kind                                                   | Not a table. A `text` column on `story`; field narrative or a Final Project piece, and nothing else differs between them.                                                             |
 
 Every CHECK constraint value list in this document is **character-for-character** an
 `as const` array in `packages/domain/src/index.ts` — `STREAMS`, `CLASS_KINDS`,
@@ -211,7 +212,7 @@ historical reference to that person.
 
 **Grants live in `person_grant`, a second access axis** ([ADR-0028](./adr/0028-grants-are-a-second-additive-access-axis.md)):
 a row is a capability a Staff Person holds, its `grant` column CHECKed against the closed set
-`in ('Administrator', 'Perjadin Editor', 'Daring Editor', 'Dashboard Editor', 'Dashboard Viewer')`,
+`in ('Administrator', 'Perjadin Editor', 'Daring Editor', 'Dashboard Editor', 'Dashboard Viewer', 'Keuangan')`,
 character-for-character `GRANTS` in `@sugt/domain`. Migration `0051`
 ([#469](https://github.com/sugt-itb/sugt-itb-26/issues/469),
 [ADR-0052](./adr/0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md)) split `'Editor'`
@@ -219,7 +220,9 @@ into the three Editors, giving every Editor all three, and added `'Keuangan'`, b
 CHECK pattern `0018`/`0025`/`0031` use with the rows moved between the drop and the add. Migration `0056`
 ([#533](https://github.com/sugt-itb/sugt-itb-26/issues/533),
 [ADR-0059](./adr/0059-programme-wide-money-is-not-in-the-app.md)) retired `'Keuangan'` the same way,
-deleting its rows and with them the record of who held it. No Grant
+deleting its rows and with them the record of who held it. Migration `0059`
+([#549](https://github.com/sugt-itb/sugt-itb-26/issues/549), [ADR-0064](./adr/0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md)) brought `'Keuangan'` back for `/keuangan`'s read of Finance's
+spreadsheet: a plain widening, with no rows to move, so the holders `0056` deleted are not restored. No Grant
 implies another except `Administrator` (all of them) and `Dashboard Editor` (`Dashboard Viewer`), a
 rule `hasGrant` holds, not the database. The
 `Dashboard Viewer` grant is what [#322](https://github.com/sugt-itb/sugt-itb-26/issues/322)/[ADR-0037](./adr/0037-dashboard-read-is-gated-by-a-grant.md)
@@ -250,8 +253,17 @@ The single edge that crosses the library boundary sits on the library's side of 
 the Perjadin foreign key graph.
 
 A `databaseHooks.user.create.before` hook looks up `person` by lowercased email. No match
-means it throws, so **an uninvited Google account cannot create a user row at all** — the
+means it throws, so **an uninvited Google or ITB account cannot create a user row at all** — the
 invite list gates signup, not merely authorisation.
+
+**Two providers, one identity per Person** ([ADR-0062](./adr/0062-itb-microsoft-sign-in-beside-google.md),
+[#565](https://github.com/sugt-itb/sugt-itb-26/issues/565)). Google and ITB's Microsoft tenant each
+write an `account` row; Better Auth links a second provider to the existing `user` **by email**, so a
+Person who has used both has one `user` and two `account` rows, and a session per sign-in. Linking
+needs the provider to report the email verified; Google does, and the Microsoft provider reports it
+only after its guard: the address, from the ID token's `email` or else its `preferred_username`,
+lowercased, must be at `itb.ac.id` or a subdomain of it. Anything else — a tenant guest's Gmail —
+is refused before any account is linked or any row written. Nothing here is a new column.
 
 **`person_id` records which Person the identity was created for; it is not what a request
 resolves through.** The column is written once, when the `user` row is created. After a
@@ -1621,26 +1633,24 @@ content type is pinned to PDF.
 
 **At most one SPPD per (Perjadin, School)** is the partial unique index
 `perjadin_document_sppd_unique`. It is per Perjadin, never per School alone: the same School on
-another trip gets its own. `checkDocumentFields` checks it first — the upload opener asks it, so a
-second SPPD is refused before a byte moves (`sppd-exists`) — and `recordPerjadinDocument` asks again
-in its transaction; the index is what holds two uploads racing, the loser's violation coming back
-as the same `sppd-exists`.
+another trip gets its own.
 
-**The application holds the rest**, in `recordPerjadinDocument`: `document_date` lies inside the
-trip, and a Peserta sheet's School is one of **the trip's Schools** — it has a non-cancelled
-Session on this Perjadin (`isTripSchool`, the same rule `tripSchoolNames` reads names through) —
-refused as `school-not-on-perjadin` ([#410](https://github.com/sugt-itb/sugt-itb-26/issues/410)).
-An SPPD's School is held to the same rule.
-It used to be the trip's Sub-Cluster, but a Sub-Cluster may be covered by several trips (ADR-0043),
-so that offered Schools this trip never visits. The Dokumen dialog's picker offers exactly that set.
-The rule is checked on a new upload only: a sheet recorded for a School whose Sessions on the trip
-were all cancelled later stays listed and deletable. It cannot be a constraint: it reads the
-Sessions, which change after the sheet is written. The three attendance kinds have **no duplicate
-rule**: two sheets of one kind and date are two rows, told apart in Drive by `D-{doc8}`.
+**Nothing writes a row any more** (#559,
+[ADR-0061](./adr/0061-trip-paperwork-is-not-filed-in-the-app.md)): the paperwork is no longer filed
+in the tool, so there is no upload and no Hapus. The rows already here stay, read-only —
+`perjadinDokumen` is `/perjadin/[id]`'s read of them — and so do their files and folders in Drive.
+While a document was still recorded, the application held what the CHECKs cannot: `document_date`
+inside the trip, and a Peserta sheet's or an SPPD's School one of **the trip's Schools** — a
+non-cancelled Session on this Perjadin (`isTripSchool`,
+[#410](https://github.com/sugt-itb/sugt-itb-26/issues/410)). That rule read the Sessions, which
+change after a sheet is written, so a sheet for a School whose Sessions on the trip were all
+cancelled later stays listed. The three attendance kinds have **no duplicate rule**: two sheets of
+one kind and date are two rows, told apart in Drive by `D-{doc8}`.
 
-**The row and its Activity Log entry are written in one transaction**, and the row lands with
-`drive_synced_at` null; the reconcile sets it once the file is named, filed and shared. `id` is
-generated before the insert, because the file's name carries it.
+**A row and its `document_uploaded` Log entry were written in one transaction**, the row landing
+with `drive_synced_at` null; the reconcile sets it once the file is named, filed and shared, and
+Periksa koneksi's sweep still finishes a row left unsynced. `id` was generated before the insert,
+because the file's name carries it.
 
 **Folders.** `perjadin.drive_dokumen_folder_id` is the trip's folder under `Dokumen/Pelaksanaan
 Offline`, and `perjadin_document_folder` holds its four kind folders, each made on first use. Both
@@ -1648,13 +1658,10 @@ are claimed by compare-and-set: the first by `where drive_dokumen_folder_id is n
 the primary key, `on conflict do nothing`. A caller that lost trashes its own folder and uses the
 winner's.
 
-**Hapus trashes the file first, then deletes the row** (#398). Its file is public by link, so a row
-must never vanish while the file stays live: the file goes to the Drive trash, and only then are the
-row deleted and a `document_deleted` Log entry written, in one transaction. The entry is a snapshot
-of the row's fields, since the row is gone after it. A file already in the trash, or gone, counts as
-trashed, so if the delete fails after the trash, the row stays, pointing at a trashed file, and
-Hapus again finishes it. Hapus is refused while the connection is not usable. An emptied kind folder
-is left in place, and nothing is ever edited: a wrong upload is a Hapus and a new upload.
+**Hapus trashed the file first, then deleted the row** (#398), until ADR-0061 removed it: a row
+never vanished while its public file stayed live, and the row went with a `document_deleted` Log
+entry, a snapshot of its fields, in one transaction. Those entries, and `document_uploaded`'s, stay
+in the Log as history.
 
 ### Session Footage
 
@@ -1680,31 +1687,49 @@ create table session_footage (
 
 alter table perjadin add column drive_footage_folder_id text;
 alter table session  add column drive_footage_folder_id text;
+alter table perjadin add column drive_footage_upload_folder_id text;  -- #561
+alter table session  add column drive_footage_upload_folder_id text;  -- #561
+alter table session  add column drive_footage_upload_checked_at timestamptz;  -- #562
 ```
 
-**One offline Session's photos and videos, one file each** (#424,
+**One offline Session's photos and videos, one file each, as the old upload recorded them** (#424,
 [ADR-0046](./adr/0046-session-footage-is-stored-in-the-company-google-drive.md)), shown as "Foto &
-Video". **The database holds** each file's kind against its type and its kind's cap
-(`MAX_FOOTAGE_PHOTO_BYTES`, `MAX_FOOTAGE_VIDEO_BYTES` as literals), so no write can store a 2 GB
-"photo", and that the uploader is Staff, by the composite key a PIC's is held by. `content_type` is
-the type the server **sniffed**; a HEIF file is stored as `image/heic`.
+Video". **Nothing writes to this table any more** (#561,
+[ADR-0063](./adr/0063-session-footage-is-uploaded-to-a-drive-folder-and-copied-into-the-company-archive.md)): Staff now put
+footage into the Session's upload folder in the company Drive, which the app cannot see, and a daily
+job copies it into the archive, so there is no row, no type or size check and no Activity Log entry
+for it. The table, its rows and its CHECKs are
+kept, with no migration, because three things still read them: Periksa koneksi's sweep, which finishes a
+row an upload left unsynced; the renames, which name the files the old upload made; and the old
+`footage_uploaded` / `footage_deleted` entries on `/log`.
 
-**The application holds the rest**: in `recordSessionFootage`, the Session is offline and not
-cancelled when the footage is added — checked again under a row lock inside the commit — and, in
-the upload's verify step before it, the file was opened for this Session and its declared kind
-matches the sniffed one. Footage of a Session cancelled later stays. The key to
+**The database holds** each row's kind against its type and its kind's cap (50 MiB for a photo,
+1000 MiB for a video, as literals), and that the uploader is Staff, by the composite key a PIC's is held
+by. `content_type` is the type the upload **sniffed**; a HEIF file is stored as `image/heic`. The key to
 `session` has **no cascade**: offline Sessions are only ever cancelled, so a delete that would orphan
-Drive files is refused rather than followed.
+Drive files is refused rather than followed. `drive_synced_at` is null until the reconcile names, files
+and shares a row's file.
 
-**The row and its Activity Log entry are written in one transaction** (`footage_uploaded`), with
-`drive_synced_at` null until the reconcile names, files and shares the file. `id` is generated before
-the insert, because the file's name carries it (`M-{footage8}`). **Hapus** is the Dokumen order: the
-file to the Drive trash first, then the row and a `footage_deleted` entry in one transaction.
+**Folders, in two trees.** The **archive**: `perjadin.drive_footage_folder_id` is the trip's folder
+under `Foto & Video/Pelaksanaan Offline`, named as its other two; `session.drive_footage_folder_id` is
+the Session's folder inside it, `{held_on} · {HH.MM} · {School} · S-{session8}`. The **upload tree**
+(#561): `perjadin.drive_footage_upload_folder_id` and `session.drive_footage_upload_folder_id` are the
+same two folders, with the same names, under `Foto & Video — Unggahan/Pelaksanaan Offline`. **They are
+made on the first click** — the archive's by Lihat arsip, by anyone signed in; both trees' by Foto &
+Video, by the trip's writers — and each is claimed by compare-and-set (`where … is null`). The sharing
+is Drive's side, and the database holds none of it. The upload folder's writers are re-applied on
+each Foto & Video click, right after the trip's Group or PIC changes or one of its members is
+deactivated, and by Periksa koneksi (#563): a Session's archive
+folder can be viewed by anyone with its link, and the trip's upload folder can be edited by the trip's
+writers. Every one of these folders, and the files the old upload placed in the archive, are renamed
+when the trip's name or the Session's date, time or School changes; a Staff file in the upload tree
+never is.
 
-**Folders.** `perjadin.drive_footage_folder_id` is the trip's folder under `Foto & Video/Pelaksanaan
-Offline`, named as its other two; `session.drive_footage_folder_id` is the Session's folder inside it,
-`{held_on} · {HH.MM} · {School} · S-{session8}`. Both are claimed by compare-and-set
-(`where … is null`). A Session's folder and files are renamed when its date or time moves.
+**The daily copy** (#562, ADR-0063) keeps **no row per file**: each copy in the archive carries its
+original's id in Drive (`appProperties.sugtSourceFileId`), and that is how the next pass knows what
+is done. `session.drive_footage_upload_checked_at` is when the copy last went through a Session's
+whole upload folder — failures included, so a file Google keeps refusing cannot hold the queue —
+null until then, and the pass takes Sessions in that order, never-checked first, so one cut short by its time budget does not starve the same Sessions.
 
 ## Money
 
@@ -1907,13 +1932,14 @@ create index activity_log_occurred_at_id_idx on activity_log (occurred_at desc, 
 **One row per act on a Perjadin's money, receipts, documents or report** (#395), read only by an
 Administrator on `/log`. The `action` values are character for character `ACTIVITY_LOG_ACTIONS` in
 `packages/domain/src/index.ts`. The two `document_*` values went into the CHECK with the rest, so the
-Dokumen uploads and Hapus needed no CHECK migration. The `footage_*` pair widened it in migration
+Dokumen uploads and Hapus needed no CHECK migration; both are history only since ADR-0061 (#559). The `footage_*` pair widened it in migration
 0044, and the two money deletes, `evidence_deleted` and `transaction_deleted` (ADR-0050), in
 migration 0049 — one migration for both.
 
 **Each entry is written in the same database transaction as the change it records**, so a refused
 or failed write logs nothing. The money writes log as below, each through `logActivity` in
-`queries/activity-log.ts`; the Dokumen and Foto & Video writes are described with their tables:
+`queries/activity-log.ts`; the Foto & Video writes are described with their table, and nothing
+writes `document_uploaded` or `document_deleted` since ADR-0061:
 
 | Write                       | `action`               | `details`                                                                                             |
 | --------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -1951,6 +1977,36 @@ match with no index: `ilike` on the email, the trip's Sub-Cluster name, its Scho
 one string) and the PIC's name, `like` on the
 already lower-cased `search_text`. If search over a much larger table ever becomes slow, a `pg_trgm` trigram index on the
 searched text is the known fix.
+
+### The Block B source for `/keuangan`
+
+`/keuangan` shows the Block B tab of a link-shared copy of Finance's spreadsheet, read as CSV on every
+request ([ADR-0064](./adr/0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md)). The budget is never stored; only the pointer to the tab is, because each fresh copy
+has a new URL and an Administrator sets it on `/pengaturan` ([#549](https://github.com/sugt-itb/sugt-itb-26/issues/549),
+[#571](https://github.com/sugt-itb/sugt-itb-26/issues/571)).
+
+```sql
+create table keuangan_source (
+  singleton         boolean primary key default true check (singleton),
+  url               text not null,
+  sheet_id          text not null,
+  gid               text not null,
+  updated_at        timestamptz not null default now(),
+  set_by_person_id  uuid not null references person (id)
+);
+```
+
+**The database holds that there is one source or none**, as `drive_connection` does: `singleton` is
+the primary key and CHECKed true. No row means "not set yet". Saving again **replaces** the row, an
+upsert, and nothing deletes it.
+
+**The application holds the rest.** `url` is the text the Administrator pasted; `sheet_id` and `gid`
+are what `keuanganSourceFromUrl` read from it, and the export URL is built from those two alone, so
+the pasted text is never fetched. A source is saved only after the sheet reads and parses, which the
+action checks, not the database. **Who reaches it:** `keuanganSourceCard` and `setKeuanganSource` need
+the Administrator Grant, and the write refuses anyone else itself. `keuanganSourceForRead`, for the
+page, admits whoever `canViewKeuangan` admits (Keuangan, an Administrator, or a Pimpinan by Role) and
+returns only `sheet_id`, `gid` and `updated_at`, never the URL or the setter.
 
 ---
 
@@ -2187,6 +2243,10 @@ create table drive_connection (
   dokumen_pelaksanaan_offline_folder_id text,
   footage_folder_id              text,
   footage_pelaksanaan_offline_folder_id text,
+  footage_upload_folder_id       text,
+  footage_upload_pelaksanaan_offline_folder_id text,
+  scope                          text,
+  footage_copy_lease_until       timestamptz,
   folder_problem                 text check (folder_problem in
                                    ('root-trashed', 'root-missing',
                                     'staging-trashed', 'staging-missing',
@@ -2229,11 +2289,24 @@ koneksi and the document reconcile each make whichever is unset, missing or tras
 compare-and-set, so no Administrator has to reconnect for them. **`footage_folder_id` and
 `footage_pelaksanaan_offline_folder_id`** are `Foto & Video/` and its `Pelaksanaan Offline/`
 (ADR-0046), kept and ensured the same way — on connect, by Periksa koneksi and by the footage
-reconcile.
+reconcile. **`footage_upload_folder_id` and `footage_upload_pelaksanaan_offline_folder_id`** are
+`Foto & Video — Unggahan/` and its `Pelaksanaan Offline/` (#561, ADR-0063), the upload tree beside
+it, ensured where the archive's are and by the Foto & Video button.
+
+**`scope`** is the space-separated scopes the stored token carries, as Google reported them on the
+connect and on each refresh (#562). Without the full `drive` scope the daily Foto & Video copy does
+not run and the card asks for a reconnect; null, for a connection no refresh has reported on since,
+reads the same way. **`footage_copy_lease_until`** is the copy's lease: set by compare-and-set only
+when null or past, cleared when the pass ends, so the daily cron and a Periksa koneksi press never
+copy at once. A lease rather than an advisory lock, because the runtime pool is Supavisor's
+transaction mode; a crashed pass frees it by letting it expire.
 
 **Who reaches it.** The card's read and the connect writes need the Administrator Grant. The
-credential read, and the two writes a token refresh makes (`last_used_at`, broken), need Staff,
-because any Staff member uploads through the connection.
+credential read, and the two writes a token refresh makes (`last_used_at`, broken), carry no guard of
+their own: an upload reaches them after its own write guard, and Lihat arsip reaches them on anyone's
+click, a Pimpinan's included, to make and share a Session's archive folder as the company account's
+housekeeping (ADR-0063). The daily copy reaches them with no Person at all, as Vercel Cron holding
+`CRON_SECRET` (a `CronCaller`, #562), and the copy's own lease and checked times with them. The ciphertext never leaves the server.
 
 ---
 
@@ -2469,7 +2542,8 @@ number nobody is disputing is the kind of invented friction
 and delivery-arranging Staff-only to **write** — is application code, not RLS.
 [ADR-0004](./adr/0004-delivery-data-is-open-internally-money-is-not.md) drew the line at
 delivery-vs-money; [ADR-0026](./adr/0026-money-is-open-to-read-and-staff-only-to-write.md) (#180)
-redrew it as read-vs-write, so money reads are open now (a Pimpinan reads all money) and it is money
+redrew it as read-vs-write, so money reads are open now (a Pimpinan reads all money; the one gated
+read, `/keuangan`, shows Finance's spreadsheet, not these tables, ADR-0064) and it is money
 _writes_ that the guard closes. Better Auth means there is no `auth.uid()` in Postgres, so policies
 would need `SET LOCAL` on every transaction plus a non-superuser role with `FORCE ROW LEVEL
 SECURITY`: a great deal of machinery for one role rule. Every money-_writing_ query therefore takes
@@ -2501,6 +2575,7 @@ type rather than one type with optional fields:
 | `UnifiedDashboardCaller` | the company's Unified Dashboard, with a verified JWT    | the Programme summary; no money | nothing                                |
 | `ParticipantToken`       | a live Session feedback token                           | nothing                         | `participant_feedback` only            |
 | `PerjadinToken`          | a live Perjadin feedback token                          | nothing                         | `perjadin_evaluation` only             |
+| `CronCaller`             | Vercel Cron, holding `CRON_SECRET` (#562)               | the company Drive's bookkeeping | the same; nothing a person entered     |
 
 Every query takes one, and the money queries accept only `Person`. A single type carrying
 optional fields would turn "is this a Staff caller" into a runtime shape check — which is
@@ -2514,6 +2589,12 @@ for both would open to the public site whatever is opened to leadership. It read
 `programmeDelivery` and `assessmentCompletions`, the same rows `/` reads, and
 `participantFeedbackFigures` and `perjadinFeedbackFigures`, the read behind `/feedback`'s average
 cards (#504). Nothing it reads returns money, a comment, a name or a row.
+
+**The cron is its own arm too** (#562, ADR-0063). The daily Foto & Video copy runs with nobody
+signed in, so it is a `CronCaller`. It reaches only the queries the company Drive's own housekeeping
+uses — the stored credential and token refresh, the footage folder ids and their claims, a trip's
+folder ids and what they are named from (`perjadinDriveFolder`), and the copy's lease and checked
+times — each of which takes `DriveCaller` (`Person | CronCaller`).
 
 **A person on two overlapping Perjadins.** Genuinely preventable with `btree_gist` and an
 exclusion constraint, and genuinely useful — but it would mean denormalising the date range
