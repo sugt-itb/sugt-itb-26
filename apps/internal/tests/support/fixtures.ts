@@ -807,6 +807,7 @@ export async function resetDatabase() {
       public."preparation_card",
       public."preparation_checklist_item",
       public."drive_connection",
+      public."keuangan_source",
       public."activity_log",
       public."perjadin_document",
       public."perjadin_document_folder",

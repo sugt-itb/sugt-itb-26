@@ -88,3 +88,9 @@ Administrator-only, but `pendampingOptions` sends every other Staff Person's ema
 picker can search by it, and a Perjadin Editor now receives those. Only names are displayed. The list
 has no `active` filter, so deactivated Staff are in it too; who appears was left as it was. `/orang`
 itself stays Administrator-only, and so does Pengaturan Perjadin.
+
+## Amendment (2026-11-17): Keuangan returns
+
+The Keuangan row above applies again, with a new meaning: it reads `/keuangan`, now a read-only view
+of Finance's spreadsheet ([ADR-0064](./0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md), [#549](https://github.com/sugt-itb/sugt-itb-26/issues/549)). Six Grants exist. Keuangan still implies nothing and does not
+read the Dashboard, and only Administrator implies it.

@@ -21,8 +21,9 @@
  *    either: **writing** money is Staff-only (ADR-0026 reversed ADR-0004's read half), and
  *    **arranging delivery** is Staff-only by the surface list. One guard, two reasons — see
  *    `./staff-only.ts`. Some reads are gated after all, each by a Grant, and none for its money: the
- *    Dashboard (ADR-0037, by its page through `canViewDashboard`; ADR-0059), and the Administrator's
- *    roster and Activity Log (by their queries through `requireGrant`).
+ *    Dashboard (ADR-0037, by its page through `canViewDashboard`; ADR-0059), `/keuangan`'s source
+ *    (ADR-0064, through `canViewKeuangan`), and the Administrator's roster and Activity Log (by their
+ *    queries through `requireGrant`).
  * 5. **A write function owns its own transaction.** Several writes are
  *    multi-statement: Rencanakan Perjadin writes `perjadin`, `group_member` and N
  *    `session` rows; a Group is replaced wholesale. The boundary belongs in the function
@@ -449,7 +450,15 @@ export {
   type PerjadinDokumen,
 } from "./perjadin-documents";
 export {
+  keuanganSourceCard,
+  keuanganSourceForRead,
+  setKeuanganSource,
+  type KeuanganSourceCard,
+  type KeuanganSourceForRead,
+} from "./keuangan-source";
+export {
   canViewDashboard,
+  canViewKeuangan,
   canWritePerjadin,
   hasGrant,
   isNotGrantedError,

@@ -50,23 +50,24 @@ last), then `session` and what hangs off it.
 `CONTEXT.md` defines around thirty terms. Far fewer are tables, and that is deliberate — the
 list below exists so nobody later "completes" the schema by adding the rest.
 
-| Term                                                         | Where it lives                                                                                                                                             |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Programme, Track, Kementerian Pendidikan Tinggi, DITSAMA ITB | Nowhere. There is one of each; naming them in a table says nothing.                                                                                        |
-| Stream, Class kind, Session mode, Role                       | `@sugt/domain`, as `as const` arrays. Fixed sets, not rows.                                                                                                |
-| Class                                                        | Not a table. A Class is `(school_id, class_kind)` — three per School, by construction.                                                                     |
-| GTK Class, MS Class, Student Class                           | The three values of `class_kind`.                                                                                                                          |
-| Perjadin Report                                              | Not a table. It is the acquittal state on `perjadin` — see [Money](#money).                                                                                |
-| Participant                                                  | Not a table. Nobody enrols Participants; one exists in the records only as a name they typed on their own feedback.                                        |
-| Project Team, Final Project                                  | Not stored at all. [ADR-0009](./adr/0009-the-tool-tracks-delivery-not-outcomes.md) is explicit; they reach the public as curated pieces, never as records. |
-| Advance                                                      | Not stored (ADR-0051). Its column was dropped in migration 0050 (#465).                                                                                    |
-| Uang Perjalanan Terpakai                                     | Not a column. The sum of a Perjadin's transactions, all categories, derived on every read.                                                                 |
-| A trip's Pimpinan                                            | Not a table. Everyone in `session_pimpinan` on one of the trip's non-cancelled Sessions, derived on every read (ADR-0056).                                 |
-| Report deadline                                              | None. The Report is neither filed nor due (ADR-0055, #489), so no deadline is stored or derived.                                                           |
-| Aspect                                                       | Not a table and not a value. Every Aspect on all four evaluations is a **column**; `@sugt/domain` names each rubric.                                       |
-| Rating                                                       | Not a table. A Rating is one Aspect column on one row of an evaluation.                                                                                    |
-| Transaction category                                         | Not a table. A `text` column on `transaction`, CHECKed against a closed set — see [Money](#money).                                                         |
-| Story kind                                                   | Not a table. A `text` column on `story`; field narrative or a Final Project piece, and nothing else differs between them.                                  |
+| Term                                                         | Where it lives                                                                                                                                                                        |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Programme, Track, Kementerian Pendidikan Tinggi, DITSAMA ITB | Nowhere. There is one of each; naming them in a table says nothing.                                                                                                                   |
+| Stream, Class kind, Session mode, Role                       | `@sugt/domain`, as `as const` arrays. Fixed sets, not rows.                                                                                                                           |
+| Class                                                        | Not a table. A Class is `(school_id, class_kind)` — three per School, by construction.                                                                                                |
+| GTK Class, MS Class, Student Class                           | The three values of `class_kind`.                                                                                                                                                     |
+| Perjadin Report                                              | Not a table. It is the acquittal state on `perjadin` — see [Money](#money).                                                                                                           |
+| Participant                                                  | Not a table. Nobody enrols Participants; one exists in the records only as a name they typed on their own feedback.                                                                   |
+| Project Team, Final Project                                  | Not stored at all. [ADR-0009](./adr/0009-the-tool-tracks-delivery-not-outcomes.md) is explicit; they reach the public as curated pieces, never as records.                            |
+| Advance                                                      | Not stored (ADR-0051). Its column was dropped in migration 0050 (#465).                                                                                                               |
+| Uang Perjalanan Terpakai                                     | Not a column. The sum of a Perjadin's transactions, all categories, derived on every read.                                                                                            |
+| A trip's Pimpinan                                            | Not a table. Everyone in `session_pimpinan` on one of the trip's non-cancelled Sessions, derived on every read (ADR-0056).                                                            |
+| Budget Line, the Block B budget                              | Not stored. Finance's spreadsheet is its source; `/keuangan` reads a prepared copy's Block B tab on every request. Only the pointer to it is stored, in `keuangan_source` (ADR-0064). |
+| Report deadline                                              | None. The Report is neither filed nor due (ADR-0055, #489), so no deadline is stored or derived.                                                                                      |
+| Aspect                                                       | Not a table and not a value. Every Aspect on all four evaluations is a **column**; `@sugt/domain` names each rubric.                                                                  |
+| Rating                                                       | Not a table. A Rating is one Aspect column on one row of an evaluation.                                                                                                               |
+| Transaction category                                         | Not a table. A `text` column on `transaction`, CHECKed against a closed set — see [Money](#money).                                                                                    |
+| Story kind                                                   | Not a table. A `text` column on `story`; field narrative or a Final Project piece, and nothing else differs between them.                                                             |
 
 Every CHECK constraint value list in this document is **character-for-character** an
 `as const` array in `packages/domain/src/index.ts` — `STREAMS`, `CLASS_KINDS`,
@@ -211,7 +212,7 @@ historical reference to that person.
 
 **Grants live in `person_grant`, a second access axis** ([ADR-0028](./adr/0028-grants-are-a-second-additive-access-axis.md)):
 a row is a capability a Staff Person holds, its `grant` column CHECKed against the closed set
-`in ('Administrator', 'Perjadin Editor', 'Daring Editor', 'Dashboard Editor', 'Dashboard Viewer')`,
+`in ('Administrator', 'Perjadin Editor', 'Daring Editor', 'Dashboard Editor', 'Dashboard Viewer', 'Keuangan')`,
 character-for-character `GRANTS` in `@sugt/domain`. Migration `0051`
 ([#469](https://github.com/sugt-itb/sugt-itb-26/issues/469),
 [ADR-0052](./adr/0052-editor-splits-into-perjadin-daring-and-dashboard-editor.md)) split `'Editor'`
@@ -219,7 +220,9 @@ into the three Editors, giving every Editor all three, and added `'Keuangan'`, b
 CHECK pattern `0018`/`0025`/`0031` use with the rows moved between the drop and the add. Migration `0056`
 ([#533](https://github.com/sugt-itb/sugt-itb-26/issues/533),
 [ADR-0059](./adr/0059-programme-wide-money-is-not-in-the-app.md)) retired `'Keuangan'` the same way,
-deleting its rows and with them the record of who held it. No Grant
+deleting its rows and with them the record of who held it. Migration `0059`
+([#549](https://github.com/sugt-itb/sugt-itb-26/issues/549), [ADR-0064](./adr/0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md)) brought `'Keuangan'` back for `/keuangan`'s read of Finance's
+spreadsheet: a plain widening, with no rows to move, so the holders `0056` deleted are not restored. No Grant
 implies another except `Administrator` (all of them) and `Dashboard Editor` (`Dashboard Viewer`), a
 rule `hasGrant` holds, not the database. The
 `Dashboard Viewer` grant is what [#322](https://github.com/sugt-itb/sugt-itb-26/issues/322)/[ADR-0037](./adr/0037-dashboard-read-is-gated-by-a-grant.md)
@@ -2274,6 +2277,36 @@ their own: an upload reaches them after its own write guard, and Lihat arsip rea
 click, a Pimpinan's included, to make and share a Session's archive folder as the company account's
 housekeeping (ADR-0063). The daily copy reaches them with no Person at all, as Vercel Cron holding
 `CRON_SECRET` (a `CronCaller`, #562), and the copy's own lease and checked times with them. The ciphertext never leaves the server.
+
+### The Block B source for `/keuangan`
+
+`/keuangan` shows the Block B tab of a link-shared copy of Finance's spreadsheet, read as CSV on every
+request ([ADR-0064](./adr/0064-keuangan-displays-the-block-b-tab-of-finances-spreadsheet.md)). The budget is never stored; only the pointer to the tab is, because each fresh copy
+has a new URL and an Administrator sets it on `/pengaturan` ([#549](https://github.com/sugt-itb/sugt-itb-26/issues/549),
+[#571](https://github.com/sugt-itb/sugt-itb-26/issues/571)).
+
+```sql
+create table keuangan_source (
+  singleton         boolean primary key default true check (singleton),
+  url               text not null,
+  sheet_id          text not null,
+  gid               text not null,
+  updated_at        timestamptz not null default now(),
+  set_by_person_id  uuid not null references person (id)
+);
+```
+
+**The database holds that there is one source or none**, as `drive_connection` does: `singleton` is
+the primary key and CHECKed true. No row means "not set yet". Saving again **replaces** the row, an
+upsert, and nothing deletes it.
+
+**The application holds the rest.** `url` is the text the Administrator pasted; `sheet_id` and `gid`
+are what `keuanganSourceFromUrl` read from it, and the export URL is built from those two alone, so
+the pasted text is never fetched. A source is saved only after the sheet reads and parses, which the
+action checks, not the database. **Who reaches it:** `keuanganSourceCard` and `setKeuanganSource` need
+the Administrator Grant, and the write refuses anyone else itself. `keuanganSourceForRead`, for the
+page, admits whoever `canViewKeuangan` admits (Keuangan, an Administrator, or a Pimpinan by Role) and
+returns only `sheet_id`, `gid` and `updated_at`, never the URL or the setter.
 
 ---
 

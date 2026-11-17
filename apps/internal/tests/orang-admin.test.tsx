@@ -145,7 +145,7 @@ describe("the roster's writes", () => {
 });
 
 describe("the Grant picker's options and lock", () => {
-  it("offers the five Grants in order, each with the line saying what it gates", () => {
+  it("offers the six Grants in order, each with the line saying what it gates", () => {
     expect(GRANT_OPTIONS.map((option) => [option.value, option.description])).toEqual([
       ["Administrator", "semua akses"],
       [
@@ -155,21 +155,25 @@ describe("the Grant picker's options and lock", () => {
       ["Daring Editor", "Sesi daring dan Pretest"],
       ["Dashboard Editor", "termasuk Dashboard Viewer"],
       ["Dashboard Viewer", "membaca Dashboard"],
+      ["Keuangan", "membaca anggaran Blok B di Keuangan"],
     ]);
   });
 
-  /** Code deploys before migration 0056 (#533), so `/orang` can briefly read a retired Grant's row. */
+  /**
+   * A stored value the picker does not offer — as when code deployed before migration 0056 (#533) met
+   * a retired Grant's row — renders without a chip rather than failing.
+   */
   it("renders a stored Grant it no longer offers without a chip, and without failing", () => {
     const html = renderToStaticMarkup(
       <MultiSelectCombobox
         options={GRANT_OPTIONS}
-        value={["Keuangan", "Daring Editor"]}
+        value={["Bendahara", "Daring Editor"]}
         onValueChange={() => undefined}
       />,
     );
 
     expect(html).toContain("Daring Editor");
-    expect(html).not.toContain("Keuangan");
+    expect(html).not.toContain("Bendahara");
   });
 
   it("puts back a locked value a change dropped, and leaves every other change alone", () => {

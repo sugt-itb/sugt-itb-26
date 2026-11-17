@@ -227,6 +227,21 @@ export function canViewDashboard(person: Person): boolean {
   return hasGrant(person, "Dashboard Viewer");
 }
 
+/**
+ * **May this Person read `/keuangan`?** (ADR-0064, #549) The one predicate behind the page guard,
+ * the sidebar link and `keuanganSourceForRead`, so the link is shown exactly when the page is
+ * reachable. The same shape as `canViewDashboard`:
+ * - **A `Pimpinan` reads it by Role.** Grants are Staff-only (ADR-0028), so a Pimpinan holds none.
+ * - **A `Staff` reads it by holding `Keuangan`**, which only Administrator implies.
+ *
+ * Another documented exception to "reading is open to any signed-in Person" (ADR-0026): the view
+ * shows Finance's spreadsheet, with names and receipt links, not the app's own records.
+ */
+export function canViewKeuangan(person: Person): boolean {
+  if (person.role === "Pimpinan") return true;
+  return hasGrant(person, "Keuangan");
+}
+
 const NOT_ON_PERJADIN_ERROR_CODE = "sugt/not-on-perjadin";
 
 /**
