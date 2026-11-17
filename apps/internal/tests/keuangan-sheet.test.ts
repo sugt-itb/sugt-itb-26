@@ -45,6 +45,7 @@ describe("keuanganSourceFromUrl", () => {
     ["text that is not a URL", "Blok B"],
     ["an empty paste", "   "],
     ["a port", `https://docs.google.com:8443/spreadsheets/d/${ID}/edit#gid=1`],
+    ["a username", `https://user@docs.google.com/spreadsheets/d/${ID}/edit#gid=1`],
     ["credentials", `https://user:pass@docs.google.com/spreadsheets/d/${ID}/edit#gid=1`],
     [
       "a published-to-web link",
