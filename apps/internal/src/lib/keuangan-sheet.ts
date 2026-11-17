@@ -29,6 +29,9 @@ const SHEET_PATH = /^\/spreadsheets\/d\/([A-Za-z0-9_-]+)(?:\/.*)?$/;
 /** A tab's gid: digits only, so the export URL built from it can carry nothing else. */
 const GID = /^\d+$/;
 
+/** Longer than any tab address Google writes; the pasted text is stored as-is, so it is bounded. */
+const MAX_SOURCE_LENGTH = 2048;
+
 /**
  * Turn the text an Administrator pastes into a {@link KeuanganSource}. Only
  * `https://docs.google.com/spreadsheets/d/{id}/…` with a `gid` is accepted: without a gid the export
@@ -38,6 +41,10 @@ const GID = /^\d+$/;
  */
 export function keuanganSourceFromUrl(text: string): KeuanganSourceResult {
   const refuse = (detail: string): KeuanganSourceResult => ({ ok: false, detail });
+
+  if (text.trim().length > MAX_SOURCE_LENGTH) {
+    return refuse(`Alamat terlalu panjang: lebih dari ${MAX_SOURCE_LENGTH} karakter.`);
+  }
 
   let url: URL;
   try {
