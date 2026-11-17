@@ -1242,7 +1242,9 @@ sheet's own total row. The address and who set it are shown there only. Preparin
 ### Pengaturan — the company Google Drive
 
 **Only an Administrator sees Pengaturan**, in the sidebar and at `/pengaturan`. Anyone else,
-Pimpinan included, gets the 403. It holds one card for now: the company Google Drive that
+Pimpinan included, gets the 403. It holds two cards. Below the Drive card is **Sumber data
+Keuangan**, the Block B tab `/keuangan` reads (#571; see [Keuangan](#keuangan--the-block-b-budget-from-finances-spreadsheet)).
+The first is the company Google Drive that
 holds transaction evidence, Dokumen and Foto & Video, and serves Unggah bukti and the Foto & Video
 folders — Dokumen no longer uploads (ADR-0061), but the documents already recorded stay there and
 still finish syncing

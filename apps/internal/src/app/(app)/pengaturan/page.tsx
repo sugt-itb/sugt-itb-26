@@ -6,7 +6,13 @@ import { driveFolderUrl } from "-/lib/drive/receipt-files";
 import { requireEnv } from "-/lib/env";
 import { formatWib } from "-/lib/format-wib";
 import { requirePerson } from "-/lib/person";
-import { driveConnectionCard, hasGrant, type DriveConnectionCard } from "@sugt/db/queries";
+import {
+  driveConnectionCard,
+  hasGrant,
+  keuanganSourceCard,
+  type DriveConnectionCard,
+  type KeuanganSourceCard,
+} from "@sugt/db/queries";
 import { Alert, AlertDescription } from "@sugt/ui/components/alert";
 import { Button } from "@sugt/ui/components/button";
 import {
@@ -21,6 +27,7 @@ import type { Metadata } from "next";
 import { forbidden } from "next/navigation";
 
 import { connectDriveAction } from "./actions";
+import { KeuanganSourceForm } from "./keuangan-source-form";
 import { PeriksaKoneksi } from "./periksa-koneksi";
 
 export const metadata: Metadata = { title: "Pengaturan" };
@@ -32,11 +39,12 @@ export const metadata: Metadata = { title: "Pengaturan" };
 export const maxDuration = 60;
 
 /**
- * **Pengaturan** (#372) — Administrator only. Today it holds one card: the company Google Drive that
- * transaction evidence is stored in (ADR-0040).
+ * **Pengaturan** (#372) — Administrator only. It holds two cards: the company Google Drive that
+ * transaction evidence is stored in (ADR-0040), and below it the spreadsheet tab `/keuangan` reads
+ * (#571, ADR-0064).
  *
  * Anyone else, a Pimpinan included, gets `forbidden()` and the 403. That is the page's gate; the
- * connect action and the callback each re-check Administrator themselves, because a layout or page
+ * connect action, the callback and the Block B source's save action each re-check Administrator themselves, because a layout or page
  * does not run before a Server Action or a Route Handler. The sidebar hides the link from the same
  * people, so the 403 is only ever reached by a direct URL.
  */
@@ -45,6 +53,7 @@ export default async function Page({ searchParams }: PageProps<"/pengaturan">) {
   if (!hasGrant(person, "Administrator")) forbidden();
 
   const connection = await driveConnectionCard(person);
+  const keuanganSource = await keuanganSourceCard(person);
   const accountEmail = requireEnv("GOOGLE_DRIVE_ACCOUNT_EMAIL");
   const outcome = parseDriveConnectOutcome((await searchParams).drive);
 
@@ -67,6 +76,7 @@ export default async function Page({ searchParams }: PageProps<"/pengaturan">) {
           connection={connection}
           accountEmail={accountEmail}
         />
+        <KeuanganSourceCardView source={keuanganSource} />
       </div>
     </div>
   );
@@ -185,6 +195,51 @@ function DriveCard({
       </CardContent>
       <CardFooter>
         <PeriksaKoneksi>{connectButton("Hubungkan ulang")}</PeriksaKoneksi>
+      </CardFooter>
+    </Card>
+  );
+}
+
+/**
+ * **The Block B source for `/keuangan`** (#571): which tab of a prepared copy of Finance's
+ * spreadsheet the page reads. It shows the current source — its address, a link opening in a new
+ * tab, and when and by whom it was set — or **Belum diatur**. This card is the only place the address
+ * appears; `/keuangan` never shows it. A new address replaces the old one, and there is no remove.
+ */
+function KeuanganSourceCardView({ source }: { source: KeuanganSourceCard | null }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Sumber data Keuangan</CardTitle>
+        <CardDescription>{source ? "Diatur" : "Belum diatur"}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4 text-sm">
+        <p className="text-muted-foreground">
+          Tab Blok B dari salinan spreadsheet Keuangan yang dibaca halaman Keuangan. Tempel alamat
+          tab itu dari browser; alamat disimpan hanya bila seluruh tab terbaca.
+        </p>
+        {source && (
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
+            <dt className="text-muted-foreground">Spreadsheet</dt>
+            <dd className="break-all">
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-4"
+              >
+                {source.url}
+              </a>
+            </dd>
+            <dt className="text-muted-foreground">Diatur oleh</dt>
+            <dd>
+              {source.setByName}, {formatWib(source.updatedAt)}
+            </dd>
+          </dl>
+        )}
+      </CardContent>
+      <CardFooter>
+        <KeuanganSourceForm />
       </CardFooter>
     </Card>
   );
