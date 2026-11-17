@@ -1,3 +1,4 @@
+import { parseCsv } from "-/lib/csv";
 import { requireEnv } from "-/lib/env";
 
 /**
@@ -50,70 +51,6 @@ const MONTH_ABBREV: Record<string, string> = {
   nov: "11",
   dec: "12",
 };
-
-/**
- * Parse RFC-4180 CSV into a grid of rows of cells. Handles quoted fields containing commas,
- * newlines and doubled-quote (`""`) escapes — Google's export quotes any multi-line cell, so the
- * newlines inside a session's detail survive as part of one field rather than splitting the row.
- * A `\r\n` or `\r` row break **outside** a quoted field is treated as one break (bytes inside a
- * quoted field are kept verbatim). A trailing newline does not add an empty row.
- */
-export function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  // Whether the current cell has been opened (a quote or a character seen). It lets the
-  // end-of-input flush tell a quoted empty final field (`""` → `[[""]]`) apart from no field at all.
-  let cellOpened = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-
-    if (inQuotes) {
-      if (char === '"') {
-        if (text[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        field += char;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inQuotes = true;
-      cellOpened = true;
-    } else if (char === ",") {
-      row.push(field);
-      field = "";
-      cellOpened = false;
-    } else if (char === "\n" || char === "\r") {
-      // Collapse a `\r\n` pair into one row break.
-      if (char === "\r" && text[i + 1] === "\n") i++;
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-      cellOpened = false;
-    } else {
-      field += char;
-      cellOpened = true;
-    }
-  }
-
-  // Flush a final field/row — including a row whose only cell is a quoted empty string — but not a
-  // phantom row when the text ended exactly on a row break.
-  if (field !== "" || cellOpened || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-
-  return rows;
-}
 
 /** `18-Sep-2026` → `2026-09-18`; `null` for anything that is not a `d-MMM-yyyy` date. */
 function toIsoDate(cell: string): string | null {
