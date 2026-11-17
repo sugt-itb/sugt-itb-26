@@ -73,7 +73,7 @@ function blockB(drop?: string) {
 }
 
 async function staff(role: Role, email: string, grants: Grant[] = []): Promise<Person> {
-  let person: Person = await addPerson({ fullName: email.split("@")[0]!, email, role });
+  let person = await addPerson({ fullName: email.split("@")[0]!, email, role });
   for (const grant of grants) person = await withGrant(person, grant);
   return person;
 }
